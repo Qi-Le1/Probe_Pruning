@@ -1,0 +1,31 @@
+---
+# control
+
+control:
+  data_name: CIFAR10
+  model_name: cnn
+  active_rate: '0.1'
+  num_clients: '100'
+  data_split_mode: 'non-iid-d-0.3'
+  algo_mode: 'fedavg'
+  local_epoch: '5'
+  relu_threshold: '0'
+  test_server_batch_size: '100'
+  prune_norm: '2'
+  delete_method: 'our'
+  delete_criteria: 'sparsity'
+  delete_threshold: '0.1'
+  batch_deletion: 'PQ'
+
+  
+  
+# experiment
+pin_memory: True
+num_workers: 0
+init_seed: 0
+num_experiments: 1
+log_interval: 0.25
+device: cpu
+world_size: 1
+resume_mode: 0
+verbose: False
