@@ -42,12 +42,12 @@ class Block(nn.Module):
 
     def forward(self, x):
         # out = F.relu(self.n1(x))
-        out, _ = self.relu1(self.n1(x))
-        shortcut = self.shortcut(out) if hasattr(self, 'shortcut') else x
-        out = self.conv1(out)
+        out, selected_channels = self.relu1(self.n1(x))
+        shortcut = self.shortcut(out, selected_channels) if hasattr(self, 'shortcut') else x
+        out = self.conv1(out, selected_channels)
         # out = self.conv2(F.relu(self.n2(out)))
-        out, _ = self.relu2(self.n2(out))
-        out = self.conv2(out)
+        out, selected_channels = self.relu2(self.n2(out))
+        out = self.conv2(out, selected_channels)
         out += shortcut
         return out
 
@@ -89,10 +89,10 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         # x = F.relu(self.n4(x))
-        x, _ = self.relu3(self.n4(x))
+        x, selected_channels = self.relu3(self.n4(x))
         x = F.adaptive_avg_pool2d(x, 1)
         x = x.view(x.size(0), -1)
-        x = self.linear(x)
+        x = self.linear(x, selected_channels)
 
         return x
 

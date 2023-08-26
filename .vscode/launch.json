@@ -67,9 +67,9 @@
         // delete_method: 'our'
         // delete_criteria: 'sparsity'
         // delete_threshold: '0.1'
-
+        
         {
-            "name": "test_cnn_relu_our_PQ",
+            "name": "test_cnn_relu_PQ_PQ",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
@@ -81,7 +81,45 @@
                 "--init_seed",
                 "0",
                 "--control_name",
-                "CIFAR10_cnn_0.1_100_iid_fedavg_5_0_1_2_our_PQ_0",
+                "CIFAR10_cnn_0.1_100_iid_fedavg_5_0_1_2_PQ_0_PQ",
+               
+            // python train_classifier_fl.py --control_name 
+            ]
+        },
+        
+        {
+            "name": "test_cnn_relu_None_PQ",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_classifier_fl.py",
+            "justMyCode": true,
+            "args": [
+                "--device",
+                "cpu",
+                "--init_seed",
+                "0",
+                "--control_name",
+                "CIFAR10_cnn_0.1_100_iid_fedavg_5_0_1_2_None_0_PQ",
+               
+            // python train_classifier_fl.py --control_name 
+            ]
+        },
+
+        {
+            "name": "test_resnet18_relu_PQ_PQ",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_classifier_fl.py",
+            "justMyCode": true,
+            "args": [
+                "--device",
+                "cpu",
+                "--init_seed",
+                "0",
+                "--control_name",
+                "CIFAR10_resnet18_0.1_100_iid_fedavg_5_0_1_2_PQ_0_PQ",
                
             // python train_classifier_fl.py --control_name 
             ]

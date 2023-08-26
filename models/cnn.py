@@ -89,11 +89,34 @@ class SimpleCNN(nn.Module):
         #     self.fc2 = InferenceLinear(self.fc2)
         #     self.fc3 = InferenceLinear(self.fc3)
 
+    def map_indices(self, selected_channels, H, W):
+        flattened_indices = []
+        for c in selected_channels:
+            start_idx = c * H * W
+            end_idx = (c + 1) * H * W
+            flattened_indices.extend(range(start_idx, end_idx))
+        return flattened_indices
+
     def f(self, x, start_layer_idx):
 
         if start_layer_idx == -1:
             return self.fc3(x)
-        a = 'current_mode' in cfg
+        # a = 'current_mode' in cfg
+        # x = self.n1(self.conv1(x))
+        # # x = self.pool(F.relu(x))
+        # x = self.pool(self.relu1(x))
+        # # print('normalize', flush=True)
+        # x = self.n2(self.conv2(x))
+        # # x = self.pool(F.relu(x))
+        # x = self.pool(self.relu2(x))
+        # x = x.view(-1, 16 * 5 * 5)
+
+        # # x = F.relu(self.fc1(x))
+        # # x = F.relu(self.fc2(x))
+        # x = self.relu3(self.fc1(x))
+        # x = self.relu4(self.fc2(x))
+        # x = self.fc3(x)
+        
         if 'current_mode' not in cfg or cfg['current_mode'] == 'train':
             x = self.n1(self.conv1(x))
             # x = self.pool(F.relu(x))
@@ -112,23 +135,25 @@ class SimpleCNN(nn.Module):
         elif 'current_mode' in cfg and cfg['current_mode'] == 'test':
             x = self.n1(self.conv1(x))
             # x = self.pool(F.relu(x))
-            x, selected_channel = self.relu1(x)
+            x, selected_channels = self.relu1(x)
             x = self.pool(x)
             # print('normalize', flush=True)
-            x = self.n2(self.conv2(x, selected_channel))
+            x = self.n2(self.conv2(x, selected_channels))
             # x = self.pool(F.relu(x))
-            x, selected_channel = self.relu2(x)
+            x, selected_channels = self.relu2(x)
             x = self.pool(x)
-            x = x.view(-1, 16 * 5 * 5)
-
+            x = x.view(-1, x.size(1) * 5 * 5)
+            if selected_channels:
+                selected_channels = self.map_indices(selected_channels, 5, 5)
             # x = F.relu(self.fc1(x))
             # x = F.relu(self.fc2(x))
-            x, selected_channel = self.relu3(self.fc1(x))
-            x, selected_channel = self.relu4(self.fc2(x, selected_channel))
-            x = self.fc3(x, selected_channel)
+            x, selected_channels = self.relu3(self.fc1(x, selected_channels))
+            x, selected_channels = self.relu4(self.fc2(x, selected_channels))
+            x = self.fc3(x, selected_channels)
         return x
         
     def forward(self, input, start_layer_idx=None):
+        # print('here')
         if start_layer_idx == -1:
             output = {}
             output['target'] = self.f(input['data'], start_layer_idx)

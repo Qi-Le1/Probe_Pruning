@@ -214,10 +214,15 @@ class ChannelDeletor():
             for i in range(norm.size(0)):  # iterate over the first dimension (n)
                 indices_to_prune = indices[i, :int(number_of_pruned_channel.item())]  # get the indices to prune
 
+                # if tensor.dim() > 2:
+                #     tensor[i, indices_to_prune, :, :] = 0
+                # else:
+                #     tensor[i, indices_to_prune] = 0
+                select_channels = indices[i, int(number_of_pruned_channel.item()):].tolist()
                 if tensor.dim() > 2:
-                    tensor[i, indices_to_prune, :, :] = 0
+                    tensor = tensor[:, list(select_channels), :, :]
                 else:
-                    tensor[i, indices_to_prune] = 0
+                    tensor = tensor[:, list(select_channels)]
 
         # shrink the whole column
         if cfg['server']['batch_size']['test'] != 1:
@@ -238,10 +243,11 @@ class ChannelDeletor():
 
                 sorted_norms, indices = torch.sort(norm, dim=0)
 
+                select_channels = indices[int(number_of_pruned_channel.item()):].tolist()
                 if tensor.dim() > 2:
-                    tensor[:, indices[:int(number_of_pruned_channel.item())], :, :] = 0
+                    tensor = tensor[:, list(select_channels), :, :]
                 else:
-                    tensor[:, indices[:int(number_of_pruned_channel.item())]] = 0
+                    tensor = tensor[:, list(select_channels)]
 
             elif cfg['batch_deletion'] == 'inter':
                 
@@ -266,13 +272,16 @@ class ChannelDeletor():
                 print('intersection_set_tensor', len(intersection_tensor), tensor.shape[1])
                 self.delete_channel_ratio = len(intersection_tensor) / tensor.shape[1]
 
-                if tensor.dim() > 2:
-                    tensor[:, list(intersection_tensor), :, :] = 0
-                else:
-                    tensor[:, list(intersection_tensor)] = 0
+                select_channels = list(set(range(tensor.shape[1])) - set(intersection_tensor.tolist()))
 
-        select_channel = None
-        return tensor, select_channel
+                if tensor.dim() > 2:
+                    tensor = tensor[:, list(select_channels), :, :]
+                else:
+                    tensor = tensor[:, list(select_channels)]
+                
+        select_channels.sort()
+        # select_channels = None
+        return tensor, select_channels
         
     def delete_channel(self, tensor):
         # if cfg['delete_criteria'] == 'NA':
@@ -294,144 +303,173 @@ class CustomReLU(nn.Module):
 
     def forward(self, x):
         out = torch.where(x >= self.relu_threshold, x, torch.tensor(0, dtype=x.dtype, device=x.device))
-        selected_channel = None
-        if cfg['delete_method'] == 'our':
-            out, selected_channel = self.channel_deletor.delete_channel(out)
-        return out, selected_channel
+        selected_channels = None
+        if 'current_mode' in cfg and cfg['current_mode'] == 'test' and cfg['delete_criteria'] != 'None':
+            out, selected_channels = self.channel_deletor.delete_channel(out)
+        # return out
+        return out, selected_channels
 
-class ParameterDeletor():
+# class ParameterDeletor():
 
-    def __init__(self, layer_type):
-        # super().__init__()
-        if isinstance(layer_type, nn.Conv2d):
-            self.layer_type = 'conv'
-        elif isinstance(layer_type, nn.Linear):
-            self.layer_type = 'linear'
-        else:
-            print('layer_type not correct', layer_type)
+#     def __init__(self, layer_type):
+#         # super().__init__()
+#         if isinstance(layer_type, nn.Conv2d):
+#             self.layer_type = 'conv'
+#         elif isinstance(layer_type, nn.Linear):
+#             self.layer_type = 'linear'
+#         else:
+#             print('layer_type not correct', layer_type)
 
-        self.pruned_dimension = None
+#         self.pruned_dimension = None
 
-        return
+#         return
 
-    def prune_weights_by_magnitude(self, module, norm, number_of_pruned_eles):
-        # Flatten the weights and get their absolute values
-        flat_weights = module.weight.data.view(-1)
+#     def prune_weights_by_magnitude(self, module, norm, number_of_pruned_eles):
+#         # Flatten the weights and get their absolute values
+#         flat_weights = module.weight.data.view(-1)
 
-        norm = norm.view(-1)
-        # Get the indices of the smallest weights by magnitude
-        _, indices_to_prune = torch.topk(norm, get_scalar_value(number_of_pruned_eles), largest=False)
+#         norm = norm.view(-1)
+#         # Get the indices of the smallest weights by magnitude
+#         _, indices_to_prune = torch.topk(norm, get_scalar_value(number_of_pruned_eles), largest=False)
 
-        # Set the weights corresponding to these indices to zero
-        flat_weights[indices_to_prune] = 0
+#         # Set the weights corresponding to these indices to zero
+#         flat_weights[indices_to_prune] = 0
 
-        module.weight.data = flat_weights.view(module.weight.data.shape)
+#         module.weight.data = flat_weights.view(module.weight.data.shape)
 
-    def unstructured(self, module):
-        if self.layer_type in 'conv':
+#     def unstructured(self, module):
+#         if self.layer_type in 'conv':
             
-            if cfg['delete_criteria'] == 'PQ':
-                copy_weight = module.weight.data.view(-1).clone()
-                norm = torch.pow(copy_weight, cfg['prune_norm'])
-                total_elements = torch.prod(torch.tensor(module.weight.data.shape)).item()
-                PQ_index_list, number_of_pruned_eles = cal_pq_index(copy_weight, norm, 0, total_elements)
-                if number_of_pruned_eles == None:
-                    return
-                # prune.l1_unstructured(module, name='weight', amount=cfg['delete_threshold'])
-                # prune.remove(module, 'weight')
-                self.prune_weights_by_magnitude(module, norm, number_of_pruned_eles)
+#             if cfg['delete_criteria'] == 'PQ':
+#                 copy_weight = module.weight.data.view(-1).clone()
+#                 norm = torch.pow(copy_weight, cfg['prune_norm'])
+#                 total_elements = torch.prod(torch.tensor(module.weight.data.shape)).item()
+#                 PQ_index_list, number_of_pruned_eles = cal_pq_index(copy_weight, norm, 0, total_elements)
+#                 if number_of_pruned_eles == None:
+#                     return
+#                 # prune.l1_unstructured(module, name='weight', amount=cfg['delete_threshold'])
+#                 # prune.remove(module, 'weight')
+#                 self.prune_weights_by_magnitude(module, norm, number_of_pruned_eles)
                 
-                self.delete_channel_ratio = number_of_pruned_eles.sum().item() / total_elements
-        elif self.layer_type == 'linear':
-            pass
-        return
+#                 self.delete_channel_ratio = number_of_pruned_eles.sum().item() / total_elements
+#         elif self.layer_type == 'linear':
+#             pass
+#         return
     
-    def get_indices_to_prune(self, sorted_indices, number_of_pruned_channel):
-        indices_to_prune = sorted_indices[:int(number_of_pruned_channel[0].item())]  # get the indices to prune
-        return indices_to_prune
+#     def get_indices_to_prune(self, sorted_indices, number_of_pruned_channel):
+#         indices_to_prune = sorted_indices[:int(number_of_pruned_channel[0].item())]  # get the indices to prune
+#         return indices_to_prune
 
 
-    def set_weight_to_zero(self, tensor, indices_to_prune):
-        # indices_to_prune = indices[:int(number_of_pruned_channel[0].item())]  # get the indices to prune
+#     def set_weight_to_zero(self, tensor, indices_to_prune):
+#         # indices_to_prune = indices[:int(number_of_pruned_channel[0].item())]  # get the indices to prune
 
-        if self.pruned_dimension == 0:
-            if tensor.dim() == 4:
-                tensor[indices_to_prune, :, :, :] = 0
-            else:
-                tensor[indices_to_prune, :] = 0
-        elif self.pruned_dimension == 1:
-            if tensor.dim() == 4:
-                tensor[:, indices_to_prune, :, :] = 0
-                print('channel-wise prune index', len(indices_to_prune), indices_to_prune)
-            else:
-                tensor[:, indices_to_prune] = 0
+#         if self.pruned_dimension == 0:
+#             if tensor.dim() == 4:
+#                 tensor[indices_to_prune, :, :, :] = 0
+#             else:
+#                 tensor[indices_to_prune, :] = 0
+#         elif self.pruned_dimension == 1:
+#             if tensor.dim() == 4:
+#                 tensor[:, indices_to_prune, :, :] = 0
+#                 print('channel-wise prune index', len(indices_to_prune), indices_to_prune)
+#             else:
+#                 tensor[:, indices_to_prune] = 0
 
-        return
+#         return
     
-    def channel_wise(self, module):
-        if self.layer_type == 'conv':
-            # Compute L1 norm for each channel
-            # out_channels, in_channels, kernel_height, kernel_width
-            norm = torch.norm(module.weight.data, p=cfg['prune_norm'], dim=(0, 2, 3))
+#     def channel_wise(self, module):
+#         if self.layer_type == 'conv':
+#             # Compute L1 norm for each channel
+#             # out_channels, in_channels, kernel_height, kernel_width
+#             norm = torch.norm(module.weight.data, p=cfg['prune_norm'], dim=(0, 2, 3))
         
-            if cfg['delete_criteria'] == 'PQ':
-                sorted_norms, sorted_indices = torch.sort(norm, dim=-1)
-                PQ_index_list, number_of_pruned_channel = cal_pq_index(module.weight.data, norm, 0, module.weight.data.shape[1])
-                if number_of_pruned_channel == None:
-                    return
-                indices_to_prune = self.get_indices_to_prune(sorted_indices, number_of_pruned_channel)
-                self.set_weight_to_zero(module.weight.data, indices_to_prune)
-                self.delete_channel_ratio = number_of_pruned_channel.sum().item() / module.weight.data.shape[1]
+#             if cfg['delete_criteria'] == 'PQ':
+#                 sorted_norms, sorted_indices = torch.sort(norm, dim=-1)
+#                 PQ_index_list, number_of_pruned_channel = cal_pq_index(module.weight.data, norm, 0, module.weight.data.shape[1])
+#                 if number_of_pruned_channel == None:
+#                     return
+#                 indices_to_prune = self.get_indices_to_prune(sorted_indices, number_of_pruned_channel)
+#                 self.set_weight_to_zero(module.weight.data, indices_to_prune)
+#                 self.delete_channel_ratio = number_of_pruned_channel.sum().item() / module.weight.data.shape[1]
 
-                print('channel-wise prune ratio', self.delete_channel_ratio)
-        elif self.layer_type == 'linear':
-            # Similar approach for Linear layers
-            pass
-        return indices_to_prune
+#                 print('channel-wise prune ratio', self.delete_channel_ratio)
+#         elif self.layer_type == 'linear':
+#             # Similar approach for Linear layers
+#             pass
+#         return indices_to_prune
     
-    def filter_wise(self, module):
-        if self.layer_type == 'conv':
-            norm = torch.norm(module.weight.data, p=cfg['prune_norm'], dim=(1, 2, 3))
+#     def filter_wise(self, module):
+#         if self.layer_type == 'conv':
+#             norm = torch.norm(module.weight.data, p=cfg['prune_norm'], dim=(1, 2, 3))
         
-            if cfg['delete_criteria'] == 'PQ':
-                sorted_norms, sorted_indices = torch.sort(norm, dim=-1)
-                PQ_index_list, number_of_pruned_filter = cal_pq_index(module.weight.data, norm, 0, module.weight.data.shape[0])
-                if number_of_pruned_filter == None:
-                    return
-                indices_to_prune = self.get_indices_to_prune(sorted_indices, number_of_pruned_filter)
-                self.set_weight_to_zero(module.weight.data, indices_to_prune)
-                self.delete_channel_ratio = number_of_pruned_filter.sum().item() / module.weight.data.shape[0]
-        elif self.layer_type == 'linear':
-            # Similar approach for Linear layers
-            pass
-        return indices_to_prune
+#             if cfg['delete_criteria'] == 'PQ':
+#                 sorted_norms, sorted_indices = torch.sort(norm, dim=-1)
+#                 PQ_index_list, number_of_pruned_filter = cal_pq_index(module.weight.data, norm, 0, module.weight.data.shape[0])
+#                 if number_of_pruned_filter == None:
+#                     return
+#                 indices_to_prune = self.get_indices_to_prune(sorted_indices, number_of_pruned_filter)
+#                 self.set_weight_to_zero(module.weight.data, indices_to_prune)
+#                 self.delete_channel_ratio = number_of_pruned_filter.sum().item() / module.weight.data.shape[0]
+#         elif self.layer_type == 'linear':
+#             # Similar approach for Linear layers
+#             pass
+#         return indices_to_prune
     
 
-    def process(self, module):
-        if cfg['delete_method'] == 'unstructured':
-            self.unstructured(module)
-        elif cfg['delete_method'] == 'channel-wise':
-            indices_to_prune = self.channel_wise(module)
-            self.pruned_dimension = 1
-        elif cfg['delete_method'] == 'filter-wise':
-            indices_to_prune = self.filter_wise(module)
-            self.pruned_dimension = 0
-        else:
-            print('no parameter deletion\n')
+#     def process(self, module):
+#         if cfg['delete_method'] == 'unstructured':
+#             self.unstructured(module)
+#         elif cfg['delete_method'] == 'channel-wise':
+#             indices_to_prune = self.channel_wise(module)
+#             self.pruned_dimension = 1
+#         elif cfg['delete_method'] == 'filter-wise':
+#             indices_to_prune = self.filter_wise(module)
+#             self.pruned_dimension = 0
+#         else:
+#             print('no parameter deletion\n')
 
-        return indices_to_prune
+#         return indices_to_prune
 
+
+def add_weight_orig(module):
+    # Fit torchinfo workflow
+
+    # Check if the module has a parameter named 'weight'
+    if hasattr(module, 'weight'):
+        # Create a new parameter 'weight_orig' with the same data as 'weight'
+        setattr(module, 'weight_orig', module.weight.data.clone())
+        
+        # Delete the original 'weight' parameter
+        # del module._parameters['weight']
 
 class InferenceConv2d(nn.Module):
 
     def __init__(self, conv_layer):
         super().__init__()
+        self.layer_type = 'conv'
+        # self.conv = conv_layer
+        # self.conv_orig = conv_layer
+        # self.conv_mask = copy.deepcopy(conv_layer)
         
         self.conv = conv_layer
-        self.parameter_deletor = ParameterDeletor(conv_layer)
-        self.indices_to_prune = self.parameter_deletor.process(self.conv)
+        # for name, module in self.conv.named_modules():
+        #     print('InferenceConv2d Name', name)
+        add_weight_orig(self.conv)
+
+        #     setattr(self.conv, 'conv_orig', self.conv.conv)  # Add a new attribute 'conv_orig' and assign the module to it
+        #     delattr(self.conv, 'conv')  # Delete the old 'conv' attribute
+
+            # name = name + '_orig'
+        # self.weight_clone = conv_layer.weight.clone()
+        # self.weight_clone1 = conv_layer.weight.clone()
+        # self.weight_clone2 = conv_layer.weight.clone()
+        # self.weight_clone3 = conv_layer.weight.clone()
+        # self.weight_clone4 = conv_layer.weight.clone()
+        # self.current_weight = None
+        # self.indices_to_prune = self.parameter_deletor.process(self.conv)
         # first dimension becomes the batch size
-        self.indices_to_prune += 1
+        # self.indices_to_prune += 1
         return
         # self.weight = conv_layer.weight
         # self.bias = conv_layer.bias
@@ -440,41 +478,81 @@ class InferenceConv2d(nn.Module):
         # self.dilation = conv_layer.dilation
         # self.groups = conv_layer.groups
 
-    def prune_input_based
-    def forward(self, x, selected_channel=None):
+    
+
+    def forward(self, x, selected_channels=None):
         
+        # if selected_channels is not None:
+        #     # selected_weights = self.conv_orig.weight[:, selected_channels, :, :]
+                   
+        #     # # Use functional convolution to utilize the sliced weights and biases
+        #     # out = torch.nn.functional.conv2d(x, selected_weights, bias=self.conv_orig.bias, 
+        #     #                                 stride=self.conv_orig.stride, padding=self.conv_orig.padding, 
+        #     #                                 dilation=self.conv_orig.dilation, groups=self.conv_orig.groups)
+            
+        #     out = self.conv_mask(x)
+        # else:
+        #     out = self.conv_orig(x)
+
+        # weight = self.conv.weight_orig * self.conv.weight_mask
+        # out = torch.nn.functional.conv2d(x, weight, bias=self.conv.bias, 
+        #                                 stride=self.conv.stride, padding=self.conv.padding, 
+        #                                 dilation=self.conv.dilation, groups=self.conv.groups)
         
-        # if selected_channel is not None:
-        #     weight = self.weight[:, selected_channel, :, :]
+        # if selected_channels:
+        #     selected_weights = self.conv.weight[:, selected_channels, :, :]
+                   
+        #     # Use functional convolution to utilize the sliced weights and biases
+        #     out = torch.nn.functional.conv2d(x, selected_weights, bias=self.conv.bias, 
+        #                                     stride=self.conv.stride, padding=self.conv.padding, 
+        #                                     dilation=self.conv.dilation, groups=self.conv.groups)
+        # else:
+        #     out = self.conv(x)
+        out = self.conv(x)
+        return out
+    
+        # if selected_channels is not None:
+        #     weight = self.weight[:, selected_channels, :, :]
         # else:
         #     weight = self.weight
         # weight = self.weight
         # out = F.conv2d(x, weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
 
-        out = self.conv(x)
-        return out
-
-
 class InferenceLinear(nn.Module):
 
     def __init__(self, linear_layer):
         super().__init__()
+        self.layer_type = 'linear'
         # self.weight = linear_layer.weight
         # self.bias = linear_layer.bias
+        # self.linear_orig = linear_layer
+        # self.linear_mask = copy.deepcopy(linear_layer)
         self.linear = linear_layer
-        self.parameter_deletor = ParameterDeletor(linear_layer)
-        indices_to_prune = self.parameter_deletor.process(self.linear)
+        add_weight_orig(self.linear)
+        # self.weight_clone = linear_layer.weight.clone()
         return
     
-    def forward(self, x, selected_channel=None):
+    def forward(self, x, selected_channels=None):
 
-        # if selected_channel is not None:
-        #     weight = self.weight[:, selected_channel]
+        # if selected_channels is not None:
+        #     weight = self.weight[:, selected_channels]
         # else:
         #     weight = self.weight
         # weight = self.weight
         # out = F.linear(x, weight, self.bias)
 
+        # if selected_channels is not None:
+        #     # selected_weights = self.linear.weight[:, selected_channels]
+            
+        #     # # Use functional linear operation to utilize the sliced weights and biases
+        #     # out = F.linear(x, selected_weights, bias=self.linear.bias)
+
+        #     out = self.linear_mask(x)
+        # else:
+        #     out = self.linear(x)
+        
+        # weight = self.linear.weight_orig * self.linear.weight_mask
+        # out = F.linear(x, self.linear.weight, bias=self.linear.bias)
         out = self.linear(x)
         return out
     

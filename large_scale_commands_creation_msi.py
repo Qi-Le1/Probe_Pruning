@@ -665,11 +665,15 @@ def main():
                 # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
                 # controls.extend(CIFAR10_controls_9)
 
+                # control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
+                #                 ['fedavg'], ['5'], ['0'], ['1', '10', '100', '1000'], ['1', '2'], ['PQ'],  ['0', '0.001', '0.01', '0.03', '0.06', '0.1', '0.5', '1.0', '999'], ['PQ', 'inter']]]
+                # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+                # controls.extend(CIFAR10_controls_9)
+
                 control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
-                                ['fedavg'], ['5'], ['0'], ['1'], ['2'], ['channel-wise', 'filter-wise'], ['PQ'],  [ '0.01']]]
+                                ['fedavg'], ['5'], ['0'], ['1', '10', '100', '1000'], ['1', '2'], ['PQ'],  ['0', '0.001', '0.01', '0.03'], ['PQ', 'inter']]]
                 CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
                 controls.extend(CIFAR10_controls_9)
-
                 # control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
                 #                 ['fedavg'], ['5'], ['0'], ['10', '100', '1000'], ['1', '2'], ['our'], ['PQ'],  ['0', '0.001', '0.01', '0.03', '0.06', '0.1', '0.5', '1.0', '999'], ['inter']]]
                 # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)

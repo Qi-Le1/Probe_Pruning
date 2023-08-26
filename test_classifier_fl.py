@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import models
-from thop import profile
+# from thop import profile
 from config import cfg, process_args
 from data import (
     fetch_dataset, 
@@ -22,6 +22,8 @@ from models.api import (
     InferenceConv2d,
     InferenceLinear
 )
+
+from torchinfo import summary
 
 # from utils import save, to_device, process_control, process_dataset, resume, collate
 from utils.api import (
@@ -74,7 +76,7 @@ def _get_submodules(model, key):
     return parent, target, target_name
 
 def _replace_module(parent_module, child_name, new_module, old_module):
-        new_module.to(old_module.weight.device)
+        new_module.to(old_module.weight_orig.device)
         setattr(parent_module, child_name, new_module)
         return
         # new_module.weight = old_module.weight
@@ -91,6 +93,74 @@ def _replace_module(parent_module, child_name, new_module, old_module):
         #     if "lora_" in name:
         #         module.to(old_module.weight.device)
 
+
+def pre_hook_prune_weight(module, input):
+    
+    """Create a LayerInfo object to aggregate layer information."""
+    # del inputs
+    # info = LayerInfo(var_name, module, curr_depth, parent_info)
+    # info.calculate_num_params()
+    # info.check_recursive(layer_ids)
+    # summary_list.append(info)
+    # layer_ids.add(info.layer_id)
+    # global_layer_info[info.layer_id] = info
+
+    input_data = input[0]
+    selected_channels = None
+    if len(input) == 2:
+        selected_channels = input[1]
+
+    if selected_channels is not None:
+        if module.layer_type == 'conv':
+            module.conv.weight = nn.Parameter(module.conv.weight_orig[:, selected_channels, :, :])
+
+            # Create a tensor of zeros with the same shape as the original weights
+            # binary_mask = torch.zeros_like(module.conv.weight_orig)
+
+            # # Set positions corresponding to selected_channels to one
+            # binary_mask[:, selected_channels, :, :] = 1
+
+            # # Convert the binary mask tensor to a Parameter
+            # module.conv.weight_mask = binary_mask
+
+        elif module.layer_type == 'linear':
+            module.linear.weight = nn.Parameter(module.linear.weight_orig[:, selected_channels])
+
+            # Create a tensor of zeros with the same shape as the original weights
+            # binary_mask = torch.zeros_like(module.linear.weight_orig)
+
+            # # Set positions corresponding to selected_channels to one
+            # binary_mask[:, selected_channels] = 1
+
+            # # Convert the binary mask tensor to a Parameter
+            # module.linear.weight_mask = binary_mask
+    # else:
+    #     if module.layer_type == 'conv':
+    #         # module.conv_mask.weight = nn.Parameter(module.conv_orig.weight[:, selected_channels, :, :])
+
+    #         # Create a tensor of zeros with the same shape as the original weights
+    #         binary_mask = torch.ones_like(module.conv.weight_orig)
+
+    #         # Convert the binary mask tensor to a Parameter
+    #         module.conv.weight_mask = binary_mask
+
+    #     elif module.layer_type == 'linear':
+    #         # module.linear_mask.weight = nn.Parameter(module.linear_orig.weight[:, selected_channels])
+
+    #         # Create a tensor of zeros with the same shape as the original weights
+    #         binary_mask = torch.ones_like(module.linear.weight_orig)
+
+    #         # Set positions corresponding to selected_channels to one
+    #         # binary_mask[:, selected_channels] = 1
+
+    #         # Convert the binary mask tensor to a Parameter
+    #         module.linear.weight_mask = binary_mask
+    # if selected_channels:
+    #     print('my pre_hook_prune_weight: ', len(selected_channels))
+    # else:
+    #     print('my pre_hook_prune_weight: ')
+    return
+
 def replace_module(model, logger):
 
     key_list = [key for key, _ in model.named_modules()]
@@ -99,7 +169,7 @@ def replace_module(model, logger):
         # if isinstance(peft_config.target_modules, str):
         # target_module_found = re.fullmatch(cfg['replace_model_config'][cfg['model_name']], key)
         # else:
-        print(f'key: {key}')
+        # print(f'key: {key}')
         # target_module_found = any(key.endswith(target_key) or key.startswith(target_key) for target_key in cfg['replace_model_config'][cfg['model_name']])
         target_module_found = any(target_key in key for target_key in cfg['replace_model_config'][cfg['model_name']])
         if target_module_found:
@@ -109,30 +179,33 @@ def replace_module(model, logger):
             elif isinstance(target, nn.Linear):
                 new_module = InferenceLinear(target)
 
-            print('target_found_name: {}'.format(target_name))
-            if cfg['delete_method'] == 'unstructured' or cfg['delete_method'] == 'channel-wise' or cfg['delete_method'] == 'filter-wise':
-                evaluation = {}
-                for attr, value in vars(new_module.parameter_deletor).items():
-                    key = f'{key}_{attr}'
-                    # evaluation[key] = value
-                    if attr == 'delete_channel_ratio':
-                        print(f'replace_module/{key}: {value}')
-                    if type(value) != str:
-                        evaluation[key] = value
-                logger.append(evaluation, 'test', 1)
-                logger.safe(False)
+            new_module.register_forward_pre_hook(pre_hook_prune_weight)
+            # print('target_found_name: {}'.format(target_name))
+            # for name, module in new_module.named_modules():
+                # print('new_module Name', name)
+            # if cfg['delete_method'] == 'unstructured' or cfg['delete_method'] == 'channel-wise' or cfg['delete_method'] == 'filter-wise':
+            #     evaluation = {}
+            #     for attr, value in vars(new_module.parameter_deletor).items():
+            #         key = f'{key}_{attr}'
+            #         # evaluation[key] = value
+            #         if attr == 'delete_channel_ratio':
+            #             print(f'replace_module/{key}: {value}')
+            #         if type(value) != str:
+            #             evaluation[key] = value
+            #     logger.append(evaluation, 'test', 1)
+            #     logger.safe(False)
             _replace_module(parent, target_name, new_module, target)
     return
 
 
-def save_intermediate_info(model, logger, evaluation):
+def save_intermediate_info(model, logger, evaluation, MACs_ratio):
     for name, module in model.named_modules():
         if 'relu' in name:
             for attr, value in vars(module.channel_deletor).items():
                 key = f'{name}_{attr}'
                 evaluation[key] = value
-                if attr == 'PQ_index':
-                    print(f'{key}: {value}')
+                # if attr == 'PQ_index':
+                #     print(f'{key}: {value}')
             # key = f'name'
             # for key, val in module.layer_sparsity[module.batch_size][module.relu_threshold].items():
             #     if check_type(val):
@@ -155,6 +228,7 @@ def save_intermediate_info(model, logger, evaluation):
             #         'test', 
             #         n = len(module.layer_sparsity[module.batch_size][module.relu_threshold]['PQ_index_list_distribution_mean'])
             #     )          
+    evaluation['MACs_ratio'] = MACs_ratio
     # logger.safe(False)
     # logger.reset()
     return
@@ -214,7 +288,11 @@ def check_type(var):
 
 
 def test(data_loader, model, metric, logger, epoch): 
-   
+    
+    # for name, module in model.named_modules():
+    #     print(f'name: {name}')
+
+    original_model_MACs = None
     with torch.no_grad():
         model.train(False)
         for i, input in enumerate(data_loader):
@@ -222,15 +300,30 @@ def test(data_loader, model, metric, logger, epoch):
             input = collate(input)
             input_size = input['data'].size(0)
             input = to_device(input, cfg['device'])
+            temp_input = copy.deepcopy(input)
+            if original_model_MACs is None:
+                delete_criteria_temp = cfg['delete_criteria']
+                cfg['delete_criteria'] = 'None'
+                model_stats = summary(model, input_data=[temp_input], col_names=["output_size", "num_params", "mult_adds"])
+                original_model_MACs = model_stats.total_mult_adds
+                cfg['delete_criteria'] = delete_criteria_temp
+
             output = model(input)
-            flops, params = profile(model, inputs=(input, ))
-            print(f"FLOPs: {flops}, Params: {params}")
+            # del temp_input['id']
+            print('-----------\n')
+            model_stats = summary(model, input_data=[temp_input], col_names=["output_size", "num_params", "mult_adds"])
+            ERI_MACs = model_stats.total_mult_adds
+
+            MACs_ratio = ERI_MACs / original_model_MACs
+            print('MACs_ratio', ERI_MACs, original_model_MACs, MACs_ratio)
+            # res = summary(model, input_size=(1, 3, 32, 32))
+            # print('torchinfo res: ', res)
             # print('------\n')
             # key_name = f'ReLU_{relu_threshold}'
             evaluation = metric.evaluate(metric.metric_name['test'], input, output)
             # accuracy = evaluation['Accuracy']
             # evaluation = {key_name: accuracy}
-            save_intermediate_info(model, logger, evaluation)
+            save_intermediate_info(model, logger, evaluation, MACs_ratio)
             logger.append(evaluation, 'test', input_size)
             logger.safe(False)
         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
