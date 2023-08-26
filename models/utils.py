@@ -219,6 +219,7 @@ class ChannelDeletor():
                 # else:
                 #     tensor[i, indices_to_prune] = 0
                 select_channels = indices[i, int(number_of_pruned_channel.item()):].tolist()
+                select_channels.sort()
                 if tensor.dim() > 2:
                     tensor = tensor[:, list(select_channels), :, :]
                 else:
@@ -244,6 +245,7 @@ class ChannelDeletor():
                 sorted_norms, indices = torch.sort(norm, dim=0)
 
                 select_channels = indices[int(number_of_pruned_channel.item()):].tolist()
+                select_channels.sort()
                 if tensor.dim() > 2:
                     tensor = tensor[:, list(select_channels), :, :]
                 else:
@@ -273,13 +275,13 @@ class ChannelDeletor():
                 self.delete_channel_ratio = len(intersection_tensor) / tensor.shape[1]
 
                 select_channels = list(set(range(tensor.shape[1])) - set(intersection_tensor.tolist()))
-
+                select_channels.sort()
                 if tensor.dim() > 2:
                     tensor = tensor[:, list(select_channels), :, :]
                 else:
                     tensor = tensor[:, list(select_channels)]
                 
-        select_channels.sort()
+        # select_channels.sort()
         # select_channels = None
         return tensor, select_channels
         

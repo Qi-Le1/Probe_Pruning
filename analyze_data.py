@@ -72,10 +72,14 @@ def make_control_list(file):
     elif file == 'baseline_batch_multiple':
 
         control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
-                        ['fedavg'], ['5'], ['0'], ['10', '100', '1000'], ['1', '2'], ['our'], ['PQ'],  ['0', '0.001', '0.01', '0.03', '0.06', '0.1', '0.5', '1.0', '999'], ['PQ', 'inter']]]
+                                ['fedavg'], ['5'], ['0'], ['1', '10', '100', '1000'], ['1', '2'], ['PQ'],  ['0', '0.001', '0.01', '0.03', '0.06', '0.1', '0.5', '1.0', '999'], ['PQ', 'inter']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
+        # control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
+        #                         ['fedavg'], ['5'], ['0'], ['1'], ['1'], ['PQ'],  ['0', '0.001'], ['PQ', 'inter']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
     elif file == 'resnet18':
         control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
                                 ['fedavg'], ['5'], ['0'], ['1'], ['PQ'], ['0', '0.001', '0.01', '0.03', '0.06', '0.1', '0.5', '1.0', '999']]]
@@ -456,14 +460,14 @@ def make_df_history(extracted_processed_result_history):
         
         elif len(control) == 13:
             data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, \
-            epoch, relu_threshold, test_server_batch_size, prune_norm, delete_method, delete_criteria, delete_threshold = control
+            epoch, relu_threshold, test_server_batch_size, prune_norm, delete_criteria, delete_threshold, batch_deletion = control
             df_name = '_'.join(
                 [data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, \
-                    epoch, relu_threshold, test_server_batch_size, prune_norm, delete_method, delete_criteria, delete_threshold])
+                    epoch, relu_threshold, test_server_batch_size, prune_norm, delete_criteria, delete_threshold, batch_deletion])
             
             max_mean_plus_se = []
             for k in extracted_processed_result_history[exp_name]:
-                index_name = ['_'.join([delete_method, delete_criteria, delete_threshold, k])]
+                index_name = ['_'.join([delete_criteria, delete_threshold, k])]
                 # print(f'k is: {k}')
                 # print('\n')
                 # if 'Accuracy_mean' in k:
@@ -833,7 +837,7 @@ def make_vis(df_exp, df_history):
             #         epoch, relu_threshold, test_server_batch_size, delete_criteria, delete_threshold = df_name_list
             
             data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, \
-            epoch, relu_threshold, test_server_batch_size, prune_norm, delete_method, delete_criteria, delete_threshold = df_name_list
+            epoch, relu_threshold, test_server_batch_size, prune_norm, delete_criteria, delete_threshold, batch_deletion = df_name_list
             
             def draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy'):
                 # temp = range(len(x))
@@ -850,9 +854,10 @@ def make_vis(df_exp, df_history):
                 plt.legend(loc=loc_dict['Accuracy'], fontsize=fontsize['legend'])
                 return
 
-            fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, test_server_batch_size, prune_norm, delete_method, delete_criteria, 'Accuracy'])
+            fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, test_server_batch_size, prune_norm, delete_criteria, batch_deletion, 'Accuracy'])
             fig[fig_name] = plt.figure(fig_name)
             temp = df_history[df_name].iterrows()
+            cur_accuracy = None
             for ((index, row), (index_se, row_se)) in zip(temp, temp):
                 # print('index: ', index)
                 if 'test/Accuracy' not in index:
@@ -869,10 +874,11 @@ def make_vis(df_exp, df_history):
                 if float(delete_threshold) == 999:
                     x = -1
                 plt.yticks([10, 20, 30, 40, 50, 60, 70, 80, 90])
+                cur_accuracy = row.iloc[0]
                 draw_str_x_figure(plt, x, row.iloc[0], row_se.iloc[0], key_for_dict, 'eta_value')
             
             if delete_criteria == 'PQ':
-                fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, relu_threshold, test_server_batch_size, prune_norm, delete_method, delete_criteria, 'PQ_mean'])
+                fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, relu_threshold, test_server_batch_size, prune_norm, delete_criteria, batch_deletion, 'PQ_mean'])
                 fig[fig_name] = plt.figure(fig_name)
                 temp = df_history[df_name].iterrows()
                 temp_list = []
@@ -897,24 +903,25 @@ def make_vis(df_exp, df_history):
 
 
             if float(delete_threshold) != 999:
-                fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, relu_threshold, test_server_batch_size, prune_norm, delete_method, delete_criteria, 'delete_channel_ratio'])
+                fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, relu_threshold, test_server_batch_size, prune_norm, delete_criteria,batch_deletion, 'MACs_ratio_mean'])
                 fig[fig_name] = plt.figure(fig_name)
                 temp = df_history[df_name].iterrows()
                 temp_list = []
                 temp_se_list = []
                 for ((index, row), (index_se, row_se)) in zip(temp, temp):
                     # print('index: ', index)
-                    if 'test' not in index or 'delete_channel_ratio_mean' not in index:
+                    if 'test' not in index or 'MACs_ratio_mean' not in index:
                         continue
 
                     if 'of_max' in index:
                         continue
                     
-                    temp_list.append(np.mean(np.array(row[0])))
-                    temp_se_list.append(np.mean(np.array(row_se[0])))
+                    # temp_list.append(np.mean(np.array(row[0])))
+                    # temp_se_list.append(np.mean(np.array(row_se[0])))
+                    MACs_ratio_mean = row[0]
 
                 key_for_dict = f'{delete_criteria}_{delete_threshold}'
-                draw_str_x_figure(plt, np.arange(len(temp_list)), temp_list, temp_se_list, key_for_dict, 'layers', 'delete_channel_ratio')
+                draw_str_x_figure(plt, MACs_ratio_mean, cur_accuracy, 0, key_for_dict, 'layers', 'MACs_ratio_mean')
 
                 # self.total_empty_channel_count_in_all_samples_ratio
                 # self.empty_channel_count_in_all_samples_ratio
