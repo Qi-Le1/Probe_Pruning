@@ -124,6 +124,25 @@
             // python train_classifier_fl.py --control_name 
             ]
         },
+        
+        {
+            "name": "zhege-test_cnn_relu_our_PQ_10batch_PQ",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_classifier_fl.py",
+            "justMyCode": true,
+            "args": [
+                "--device",
+                "cpu",
+                "--init_seed",
+                "0",
+                "--control_name",
+                "CIFAR10_cnn_0.1_100_iid_fedavg_5_0_10_2_PQ_0_PQ",
+               
+            // python train_classifier_fl.py --control_name 
+            ]
+        },
 
         {
             "name": "test_cnn_relu_our_PQ_10batch",

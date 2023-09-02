@@ -60,6 +60,8 @@ class ChannelDeletor():
 
         # self.PQ_index_num = 0
         # self.PQ_index_list_distribution_mean = None
+        self.pq_indices = None
+        self.PQ_trans_delete_ratio_list = None
         return  
     
     def add_info_to_logger(self, logger):
@@ -207,10 +209,12 @@ class ChannelDeletor():
         #     self.PQ_index_list_distribution_mean = ((self.PQ_index_num - len(cur_PQ_index_list)) * self.PQ_index_list_distribution_mean + len(cur_PQ_index_list) * cur_PQ_index_list) / self.PQ_index_num
         
         # Sort norm_f along dim=1 (channels dimension) and get indices
-        sorted_norms, indices = torch.sort(norm, dim=1)
+        each_vector_sorted_norms, indices = torch.sort(norm, dim=1)
+
 
         # Select number_of_pruned_channel smallest values
         if cfg['server']['batch_size']['test'] == 1:
+
             for i in range(norm.size(0)):  # iterate over the first dimension (n)
                 indices_to_prune = indices[i, :int(number_of_pruned_channel.item())]  # get the indices to prune
 
@@ -226,7 +230,7 @@ class ChannelDeletor():
                     tensor = tensor[:, list(select_channels)]
 
         # shrink the whole column
-        if cfg['server']['batch_size']['test'] != 1:
+        elif cfg['server']['batch_size']['test'] != 1:                    
             if cfg['batch_deletion'] == 'PQ':
                 if tensor.ndimension() == 4:
                     norm = torch.norm(tensor, p=cfg['prune_norm'], dim=(0, 2, 3))
@@ -280,7 +284,31 @@ class ChannelDeletor():
                     tensor = tensor[:, list(select_channels), :, :]
                 else:
                     tensor = tensor[:, list(select_channels)]
-                
+
+        def compute_pq_indices_for_all_lengths(sorted_norms):
+            PQ_trans_delete_ratio_list = []
+            pq_indices = []
+
+            # for i in range(sorted_norms.size(0)):
+            for i in range(sorted_norms.size(1)):  # Assuming the channel dimension is 1
+                # Slice the tensor and norms
+                cur_sorted_norms = sorted_norms[:, i:]
+                # print('cur_sorted_norms', cur_sorted_norms)
+                # Calculate the PQ index and the number of pruned channels
+                dimension = sorted_norms.size(1) - i
+                pq_index, _ = cal_pq_index(cur_sorted_norms, cur_sorted_norms, 1, dimension)
+
+                # Store the results
+                # pq_indices.append(np.array(pq_index.item()))
+                # print('pq_index', pq_index)
+                pq_indices.append(pq_index.cpu().numpy())
+                PQ_trans_delete_ratio_list.append(i / sorted_norms.size(1))
+            pq_indices = np.array(pq_indices).mean(axis=1)
+            print('pq_indices', pq_indices)
+            return pq_indices, PQ_trans_delete_ratio_list
+
+        # Using the function
+        self.pq_indices, self.PQ_trans_delete_ratio_list = compute_pq_indices_for_all_lengths(each_vector_sorted_norms)        
         # select_channels.sort()
         # select_channels = None
         return tensor, select_channels

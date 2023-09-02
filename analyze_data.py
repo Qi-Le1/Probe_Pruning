@@ -71,11 +71,17 @@ def make_control_list(file):
         #                         ['fedavg'], ['5'], ['0'], ['100'], ['sparsity', 'PQ'], ['0.1']]]
     elif file == 'baseline_batch_multiple':
 
-        control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
-                                ['fedavg'], ['5'], ['0'], ['1', '10', '100', '1000'], ['1', '2'], ['PQ'],  ['0', '0.001', '0.01', '0.03', '0.06', '0.1', '0.5', '1.0', '999'], ['PQ', 'inter']]]
+        # control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
+        #                         ['fedavg'], ['5'], ['0'], ['1', '10', '100', '1000'], ['1', '2'], ['PQ'],  ['0', '0.001', '0.01', '0.03', '0.06', '0.1', '0.5', '1.0', '999'], ['PQ', 'inter']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
+        #                         ['fedavg'], ['5'], ['0'], ['1', '10', '100', '1000'], ['1', '2'], ['PQ'],  ['0.001'], ['PQ', 'inter']]]
+        control_name = [[['CIFAR10'], ['cnn'], ['0.1'], ['100'], ['iid'], 
+                                ['fedavg'], ['5'], ['0'], ['10'], ['2'], ['PQ'],  ['0.001'], ['PQ', 'inter']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
-
         # control_name = [[['CIFAR10'], ['resnet18'], ['0.1'], ['100'], ['iid'], 
         #                         ['fedavg'], ['5'], ['0'], ['1'], ['1'], ['PQ'],  ['0', '0.001'], ['PQ', 'inter']]]
         # CIFAR10_controls_9 = make_controls(control_name)
@@ -181,8 +187,12 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
                 if metric_name not in processed_result_exp:
                     # processed_result_exp[metric_name] = {'exp': [None for _ in range(num_experiments)]}
                     processed_result_history[metric_name] = {'history': [None for _ in range(num_experiments)]}
+
                 # processed_result_exp[metric_name]['exp'][exp_idx] = base_result['logger']['test'].mean[k]
                 processed_result_history[metric_name]['history'][exp_idx] = base_result['logger']['test'].history[k]
+                if 'pq_indices' in metric_name:
+                    a = base_result['logger']['test'].history[k]
+                    b = 5
         else:
             print('Missing {}'.format(base_result_path_i))
     else:
@@ -232,12 +242,13 @@ def summarize_result(processed_result):
         temp_length = []
         for item in filter_length:
             temp_length.append(len(item))
+
         processed_result[pivot] = filter_length
         a = copy.deepcopy(processed_result[pivot])
         processed_result[pivot] = np.stack(processed_result[pivot], axis=0)
-        processed_result['mean'] = np.mean(processed_result[pivot], axis=1)
+        processed_result['mean'] = np.mean(processed_result[pivot], axis=0)
         # TODO: for inference
-        processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=1), len(processed_result[pivot]))
+        processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot]))
         processed_result['max'] = np.max(processed_result[pivot], axis=1)
         processed_result['min'] = np.min(processed_result[pivot], axis=1)
         b = np.max(processed_result[pivot], axis=1)
@@ -261,6 +272,7 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
         metric_name = control[-1]
         if exp_name not in extracted_processed_result:
             extracted_processed_result[exp_name] = defaultdict()
+        
         extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = processed_result['mean']
         extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = processed_result['se']
 
@@ -607,33 +619,6 @@ def make_vis(df_exp, df_history):
              'dynamicfl_0.6-0.4': 'green',
              'dynamicfl_0.9-0.1': 'dodgerblue',
 
-             'freq_6-0': 'red',
-             'freq_6-5': 'green',
-             'freq_6-4': 'dodgerblue',
-             'freq_6-3': 'brown',
-             'freq_6-2.5': 'orange',
-             'freq_6-2': 'black',
-             'freq_6-1': 'purple',
-             
-             'freq_5-0': 'red',
-             'freq_5-4': 'green',
-             'freq_5-3': 'dodgerblue',
-             'freq_5-2.5': 'brown',
-             'freq_5-2': 'orange',
-             'freq_5-1': 'black',
-
-             'freq_4-0': 'red',
-             'freq_4-3': 'green',
-             'freq_4-2.5': 'dodgerblue',
-             'freq_4-2': 'brown',
-             'freq_4-1': 'orange',
-
-             'freq_3-0': 'red',
-             'freq_3-2.5': 'green',
-             'freq_3-2': 'dodgerblue',
-             'freq_3-1': 'brown',
-
-
              'ReLU_0': 'red',
              'ReLU_0.01': 'green',
              'ReLU_0.02': 'dodgerblue',
@@ -696,7 +681,10 @@ def make_vis(df_exp, df_history):
              'PQ_0.8': 'sienna',
              'PQ_0.9': 'green',
              'PQ_1.0': 'red',
-             'PQ_999': 'darkseagreen'
+             'PQ_999': 'darkseagreen',
+
+             'PQ': 'orange',
+             'inter': 'purple'   
              }
     linestyle = {'5_0.5': '-', '1_0.5': '--', '5_0': ':', '5_0.5_nomixup': '-.', '5_0_nomixup': '-.',
                  '5_0.9': (0, (1, 5)), 'iid': '-', 'non-iid-l-2': '--', 'non-iid-d-0.1': '-.', 'non-iid-d-0.3': ':',
@@ -780,7 +768,7 @@ def make_vis(df_exp, df_history):
                 'ReLU_0.02': (0, (1, 1)),
                 'ReLU_0.03': '--',
                 'ReLU_0.04': (0, (3, 1, 1, 1, 1, 1)),
-                 'ReLU_0.05': (0, (3, 1, 1, 1, 1, 1)),
+                'ReLU_0.05': (0, (3, 1, 1, 1, 1, 1)),
                 'ReLU_0.06': (5, (10, 3)),
                 'ReLU_0.07': (0, (3, 1, 1, 1)),
                 'ReLU_0.09': (0, (1, 1, 1)),
@@ -791,6 +779,9 @@ def make_vis(df_exp, df_history):
                 'ReLU_0.5': (0, (3, 1, 1, 1, 1, 1)),
                 'ReLU_0.7': (5, (10, 3)),
                 'ReLU_0.8': (0, (3, 1, 1, 1)),
+
+                'PQ': (5, (10, 3)),
+                'inter': (0, (3, 1, 1, 1)),
                 }
         
     resource_ratios = ['0.3-0.7', '0.6-0.4', '0.9-0.1']
@@ -839,6 +830,13 @@ def make_vis(df_exp, df_history):
             data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, \
             epoch, relu_threshold, test_server_batch_size, prune_norm, delete_criteria, delete_threshold, batch_deletion = df_name_list
             
+            def label_exists(plt, label):
+                legend = plt.gca().legend_
+                if legend:
+                    existing_labels = [t.get_text() for t in legend.get_texts()]
+                    return label in existing_labels
+                return False
+
             def draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy'):
                 # temp = range(len(x))
                 plt.scatter(x, y, color=color[key_for_dict], linestyle=linestyle[key_for_dict], label=key_for_dict)
@@ -853,6 +851,50 @@ def make_vis(df_exp, df_history):
                 plt.yticks(fontsize=fontsize['ticks'])
                 plt.legend(loc=loc_dict['Accuracy'], fontsize=fontsize['legend'])
                 return
+            
+            
+            temp = df_history[df_name].iterrows()
+            layer_dict = {
+                'pq_indices': collections.defaultdict(list),
+                'PQ_trans_delete_ratio_list': collections.defaultdict(list),
+            }
+            # for ((index, row), (index_se, row_se)) in zip(temp, temp):
+            #     print('index: ', index)
+            #     if 'pq_indices_mean' in index:
+            #         a = 5
+            #         b = row
+            #         c = len(row)
+            #         d = 'zz'
+            for ((index, row), (index_se, row_se)) in zip(temp, temp):
+                # print('index: ', index)
+
+                # if 'mean' in index:
+                #     continue
+
+                if 'of_max' in index:
+                    continue
+                
+                if 'pq_indices_mean' in index:
+                    a = row
+                    if index not in layer_dict['pq_indices']:
+                        layer_dict['pq_indices'][index] = [None, None]
+                    temp_index = index
+                    layer_dict['pq_indices'][index][0] = row.tolist()
+                    
+
+                if 'PQ_trans_delete_ratio_list_mean' in index:
+                    layer_dict['pq_indices'][temp_index][1] = row.tolist()
+
+            for key in layer_dict['pq_indices']:
+                temp_key = key.split('/')[1]
+                fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, test_server_batch_size, prune_norm, delete_criteria, delete_threshold, batch_deletion, temp_key, 'PQ_trans'])
+                fig[fig_name] = plt.figure(fig_name)
+                x = layer_dict['pq_indices'][key][1]
+                y = layer_dict['pq_indices'][key][0]
+                key_for_dict = batch_deletion
+                draw_str_x_figure(plt, x, y, None, key_for_dict, 'delete_channel_ratio', 'PQ_index')
+
+            
 
             fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, test_server_batch_size, prune_norm, delete_criteria, batch_deletion, 'Accuracy'])
             fig[fig_name] = plt.figure(fig_name)
@@ -902,26 +944,49 @@ def make_vis(df_exp, df_history):
                 draw_str_x_figure(plt, np.arange(len(temp_list)), temp_list, temp_se_list, key_for_dict, 'layers', 'PQ_mean')
 
 
-            if float(delete_threshold) != 999:
-                fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, relu_threshold, test_server_batch_size, prune_norm, delete_criteria,batch_deletion, 'MACs_ratio_mean'])
-                fig[fig_name] = plt.figure(fig_name)
-                temp = df_history[df_name].iterrows()
-                temp_list = []
-                temp_se_list = []
-                for ((index, row), (index_se, row_se)) in zip(temp, temp):
-                    # print('index: ', index)
-                    if 'test' not in index or 'MACs_ratio_mean' not in index:
-                        continue
+            def draw_macs_acc_figure(plt, x, y, yerr, key_for_dict, annotation='default', x_label='Activation Layers in Order', y_label='Accuracy'):
+                # temp = range(len(x))
+                if label_exists(plt, key_for_dict):
+                    plt.scatter(x, y, color=color[key_for_dict], linestyle=linestyle[key_for_dict])
+                else:
+                    plt.scatter(x, y, color=color[key_for_dict], linestyle=linestyle[key_for_dict], label=key_for_dict)
+                # plt.plot(x, y, color=color[key_for_dict], linestyle=linestyle[key_for_dict])
 
-                    if 'of_max' in index:
-                        continue
-                    
-                    # temp_list.append(np.mean(np.array(row[0])))
-                    # temp_se_list.append(np.mean(np.array(row_se[0])))
-                    MACs_ratio_mean = row[0]
+                plt.annotate(annotation, (x, y))
+                # plt.fill_between(x, (y - yerr), (y + yerr), color=color[algo_mode], alpha=.1)
 
-                key_for_dict = f'{delete_criteria}_{delete_threshold}'
-                draw_str_x_figure(plt, MACs_ratio_mean, cur_accuracy, 0, key_for_dict, 'layers', 'MACs_ratio_mean')
+                plt.errorbar(x, y, yerr=yerr, color=color[key_for_dict], linestyle=linestyle[key_for_dict])
+                
+                plt.xlabel(x_label, fontsize=fontsize['label'])
+                plt.ylabel(y_label, fontsize=fontsize['label'])
+                plt.xticks(fontsize=fontsize['ticks'])
+                plt.yticks(fontsize=fontsize['ticks'])
+                plt.legend(loc=loc_dict['Accuracy'], fontsize=fontsize['legend'])
+                return
+            
+            # if float(delete_threshold) != 999:
+            fig_name = '_'.join([data_name, model_name, active_rate, num_clients, data_split_mode, algo_mode, epoch, relu_threshold, test_server_batch_size, prune_norm, delete_criteria, 'MACs_ratio_mean'])
+            fig[fig_name] = plt.figure(fig_name)
+            temp = df_history[df_name].iterrows()
+            temp_list = []
+            temp_se_list = []
+
+            for ((index, row), (index_se, row_se)) in zip(temp, temp):
+                # print('index: ', index)
+                if 'test' not in index or 'MACs_ratio_mean' not in index:
+                    continue
+
+                if 'of_max' in index:
+                    continue
+                
+                # temp_list.append(np.mean(np.array(row[0])))
+                # temp_se_list.append(np.mean(np.array(row_se[0])))
+                MACs_ratio_mean = row[0]
+
+            key_for_dict = batch_deletion
+            # eta
+            annotation = delete_threshold
+            draw_macs_acc_figure(plt, MACs_ratio_mean, cur_accuracy, 0, key_for_dict, annotation, 'MACs_ratio_mean', 'Accuracy')
 
                 # self.total_empty_channel_count_in_all_samples_ratio
                 # self.empty_channel_count_in_all_samples_ratio

@@ -203,7 +203,7 @@ def save_intermediate_info(model, logger, evaluation, MACs_ratio):
         if 'relu' in name:
             for attr, value in vars(module.channel_deletor).items():
                 key = f'{name}_{attr}'
-                evaluation[key] = value
+                evaluation[key] = copy.deepcopy(value)
                 # if attr == 'PQ_index':
                 #     print(f'{key}: {value}')
             # key = f'name'
@@ -325,13 +325,14 @@ def test(data_loader, model, metric, logger, epoch):
             # evaluation = {key_name: accuracy}
             save_intermediate_info(model, logger, evaluation, MACs_ratio)
             logger.append(evaluation, 'test', input_size)
-            logger.safe(False)
+            
+            # TODO: logger.safe(False) here可以把每个都存下来，不然在最后就是存一个平均
         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
         logger.append(info, 'test', mean=False)
        
         print(logger.write('test', metric.metric_name['test']))
-    
-    logger.reset()
+    logger.safe(False)
+    # logger.reset()
     return
 
 
