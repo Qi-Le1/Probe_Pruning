@@ -1,0 +1,56 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "verify.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/verify.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "fpb-sa_test_s2s_8_pq-h-1-0.2-1#2-max_inter_somemethods-3",
+            ],
+        },
+
+        
+        {
+            "name": "train_cola.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/train_cola_dreambooth.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "dreambooth-dog_sdiffusion_t2i_cola-lowrank-1_1",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "test_cola.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/generate_cola_dreambooth.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "dreambooth-dog_sdiffusion_t2i_cola-lowrank-1_1",
+                "--device",
+                "cpu"
+            ],
+        },
+    ]
+}
+
+
+
+
+

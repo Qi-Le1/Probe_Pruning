@@ -54,6 +54,19 @@
                 "baseline_batch_multiple"
             ],
         },
+
+        {
+            "name": "Draw_baseline_observe_pq",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/analyze_data.py",
+            "justMyCode": true,
+            "args": [
+                "--type",
+                "observe_pq"
+            ],
+        },
         // data_name: CIFAR10
         // model_name: cnn
         // active_rate: '0.1'
@@ -145,6 +158,44 @@
         },
 
         {
+            "name": "zhege-test_cnn_relu_our_PQ_10batch_999",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_classifier_fl.py",
+            "justMyCode": true,
+            "args": [
+                "--device",
+                "cpu",
+                "--init_seed",
+                "0",
+                "--control_name",
+                "CIFAR10_cnn_0.1_100_iid_fedavg_5_0_10_2_PQ_999_PQ",
+               
+            // python train_classifier_fl.py --control_name 
+            ]
+        },
+
+        {
+            "name": "cur_union_-test_cnn_relu_our_PQ_10batch_999",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_classifier_fl.py",
+            "justMyCode": true,
+            "args": [
+                "--device",
+                "cpu",
+                "--init_seed",
+                "0",
+                "--control_name",
+                "CIFAR10_cnn_0.1_100_iid_fedavg_5_0_10_2_PQ_0.1_inter",
+               
+            // python train_classifier_fl.py --control_name 
+            ]
+        },
+
+        {
             "name": "test_cnn_relu_our_PQ_10batch",
             "type": "python",
             "request": "launch",
@@ -177,6 +228,25 @@
                 "0",
                 "--control_name",
                 "CIFAR10_cnn_0.1_100_iid_fedavg_5_0_10_2_our_PQ_0_inter",
+               
+            // python train_classifier_fl.py --control_name 
+            ]
+        },
+
+        {
+            "name": "cur_test_cnn_relu_our_PQ_union_10batch",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_classifier_fl.py",
+            "justMyCode": true,
+            "args": [
+                "--device",
+                "cpu",
+                "--init_seed",
+                "0",
+                "--control_name",
+                "CIFAR10_cnn_0.1_100_iid_fedavg_5_0_10_2_sparsity_0_union",
                
             // python train_classifier_fl.py --control_name 
             ]
@@ -239,6 +309,7 @@
             ]
         },
         
+
         {
             "name": "test_cnn_relu_sp",
             "type": "python",
