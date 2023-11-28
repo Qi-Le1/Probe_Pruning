@@ -18,6 +18,10 @@ def make_model(model_name, sub_model_name=None):
         tokenizer = None
     return model, tokenizer
 
+def make_prune_model(model):
+    from .eri import EriModel
+    model = EriModel(model)
+    return model
 
 def make_loss(output, input):
     if 'target' in input:

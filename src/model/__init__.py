@@ -5,3 +5,4 @@ from .mlp import *
 from .cnn import *
 from .resnet import *
 from .wresnet import *
+from .eri import *

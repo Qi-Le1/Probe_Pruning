@@ -19,3 +19,5 @@ msiout*/
 
 # Ignore folders starting with msiexp
 cifar*/
+
+**/__pycache__/

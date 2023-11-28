@@ -12,6 +12,7 @@ from sklearn.exceptions import NotFittedError, ConvergenceWarning
 from sklearn.neural_network import MLPRegressor
 from transformers.pytorch_utils import Conv1D
 from config import cfg
+from math import prod
 from .model import init_param, mse_loss
 from typing import List, Optional, Tuple, Union
 from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING
@@ -50,6 +51,7 @@ class EriModel(torch.nn.Module):
         loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
         loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
         kwargs = {
+            "prune_tgt": cfg['prune_tgt'],
             "pruning_module": self.pruning_module,
             "fan_in_fan_out": False,
         }
@@ -87,7 +89,7 @@ class EriModel(torch.nn.Module):
         is_target_modules_in_base_model = False
         key_list = [key for key, _ in self.model.named_modules()]
         print('key_list: ', key_list)
-        target_modules = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
+        target_modules = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_type']]
         print('target_modules: ', target_modules)
         for key in key_list:
             if not self._check_target_module_exists(target_modules, key):
@@ -101,7 +103,7 @@ class EriModel(torch.nn.Module):
 
         if not is_target_modules_in_base_model:
             raise ValueError(
-                f"Target modules {TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]} not found in the base model. "
+                f"Target modules {TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_type']]} not found in the base model. "
                 f"Please check the target modules and try again."
             )
 
@@ -147,38 +149,13 @@ class EriLayer:
     def __init__(self, in_features: int, out_features: int, **kwargs):
         pass
     
-    def extract_weight(self, input_dim, pruned_h, pruned_dims, prune_channels_multi_dims):
-        # unstruct pruning
-        if pruned_dims is None:
-            return self.weight
-        
-        # [batch_size, in_features]
-        if input_dim == 2:
-            check_dim = 1
-        # [batch_size, seq_lens, token_lens]
-        elif input_dim == 3:
-            check_dim = 2
-        else:
-            raise ValueError('Not valid input dimension')
-        
-        if pruned_dims[check_dim] is None or prune_channels_multi_dims[check_dim] is None:
-            return self.weight
-        else:
-            # weight dim 1 should have same size as original h dim 2
-            mask = torch.ones(self.weight.size(1), dtype=torch.bool)
-            # Mark the indices to be pruned as False
-            mask[prune_channels_multi_dims[check_dim]] = False
-            # Use the mask to index the tensor
-            weight = torch.index_select(self.weight, dim=1, index=mask.nonzero().squeeze())
-            return weight
-
-    
 class Linear(nn.Linear, EriLayer):
     def __init__(
         self,
         pruner_name,
         in_features,
         out_features,
+        prune_tgt,
         pruning_module,
         fan_in_fan_out: bool = False,  # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
         is_target_conv_1d_layer: bool = False,
@@ -189,21 +166,82 @@ class Linear(nn.Linear, EriLayer):
         # Freezing the pre-trained weight matrix
         self.weight.requires_grad = False
 
+        self.prune_tgt = prune_tgt
         self.pruning_module = pruning_module
         self.fan_in_fan_out = fan_in_fan_out
         if fan_in_fan_out:
             self.weight.data = self.weight.data.T
 
         self.is_target_conv_1d_layer = is_target_conv_1d_layer
+        if self.prune_tgt == 'weight':
+            self.update_weight(self.weight)
 
+    def update_weight(self, weight):
+        linear_layer_info = {
+            'weight': self.weight,
+            'bias': self.bias,
+        }
+        pruned_w, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(weight, 'linear', linear_layer_info)
+        print('pruned_w.shape: ', pruned_w.shape)
+        self.weight = nn.Parameter(pruned_w)
+
+        self.input_prune_channels = None
+        if pruned_dims[0] != None:
+            self.input_prune_channels = prune_channels_multi_dims[0]
+        return 
+
+    def extract_input(self, x):
+        # [batch_size, in_features] / [batch_size, seq_lens, token_lens]
+        if x.dim() != 2 and x.dim() != 3:
+            raise ValueError('Not valid input dimension')
+        
+        # Create a boolean mask for all indices
+        mask = torch.ones(x.size(-1), dtype=torch.bool)
+        if self.input_prune_channels is None:
+            return x
+        # Mark the indices to be pruned as False
+        mask[self.input_prune_channels] = False
+        # Use the mask to index the tensor
+
+        pruned_x = x.index_select(dim=-1, index=mask.nonzero().squeeze())
+        return pruned_x
+    
+    def extract_weight(self, input_dim, pruned_h, pruned_dims, prune_channels_multi_dims):
+        # unstruct pruning
+        if pruned_dims is None:
+            return self.weight
+        
+        # [batch_size, in_features] / [batch_size, seq_lens, token_lens]
+        if input_dim != 2 and input_dim != 3:
+            raise ValueError('Not valid input dimension')
+        
+        if pruned_dims[-1] is None or prune_channels_multi_dims[-1] is None:
+            return self.weight
+        else:
+            # weight dim 1 should have same size as original h dim 2
+            mask = torch.ones(self.weight.size(1), dtype=torch.bool)
+            # Mark the indices to be pruned as False
+            mask[prune_channels_multi_dims[-1]] = False
+            # Use the mask to index the tensor
+            weight = torch.index_select(self.weight, dim=1, index=mask.nonzero().squeeze())
+            return weight
+    
     def forward(self, x: torch.Tensor):
         previous_dtype = x.dtype
-        print('x.shape: ', x.shape)
-        input_dim = x.dim()
-        pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, 'linear')
-        weight = self.extract_weight(input_dim, pruned_h, pruned_dims, prune_channels_multi_dims)
-        print(pruned_h.shape, weight.shape, self.weight.shape)
-        result = F.linear(pruned_h, transpose(weight, self.fan_in_fan_out), bias=self.bias)
+        if self.prune_tgt == 'hidden_repr':
+            print('x.shape: ', x.shape)
+            input_dim = x.dim()
+            linear_layer_info = {
+                'weight': self.weight,
+                'bias': self.bias,
+            }
+            pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, 'linear', linear_layer_info)
+            weight = self.extract_weight(input_dim, pruned_h, pruned_dims, prune_channels_multi_dims)
+            print(pruned_h.shape, weight.shape, self.weight.shape)
+            result = F.linear(pruned_h, transpose(weight, self.fan_in_fan_out), bias=self.bias)
+        elif self.prune_tgt == 'weight':
+            x = self.extract_input(x)
+            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
         result = result.to(previous_dtype)
         return result
     
@@ -259,29 +297,31 @@ class BasePruning:
         self.batch_integ = cfg['batch_integ']
 
 
-
 class HiddenRepresentationPruning(BasePruning):
 
     def __init__(self, cfg):
         BasePruning.__init__(self, cfg)
         pass
 
-    def batch_pruning(self, h, layer_type):
+    def batch_pruning(self, h, layer_type, layer_info):
         # Exclude the first dimension (batch size) and the prune_dim
         # calculate the pq-index per sample
-        if self.batch_integ in ['inter', 'union']:
-            exclude_dim = 0
-
-        prune_channels_multi_dims = [None for _ in range(h.dim())]
-        prune_eles_multi_dims = [0 for _ in range(h.dim())]
+        exclude_dim = 0 if self.batch_integ in ['inter', 'union'] else None
+        prune_channels_multi_dims = [None] * h.dim()
+        saving_flops_multi_dims = [0] * h.dim()
         h_shape = h.shape
-        # prune_channels_multi_dims = []
-        # prune_eles_multi_dims = []
+        h_type = h.dtype
+        
         if self.prune_name == 'base-unstruct':
-            pruned_h = self.apply_pruning(h)
+            if self.batch_integ not in ['inter', 'union']:
+                raise ValueError('Not valid batch integration method')
+            prune_indices = self.apply_pruning(h)
+            prune_indices = self.apply_batch_integ(prod(h_shape[1:]), prune_indices)
+            # Create a mask with the same shape as h, initially set to True
+            mask = torch.ones_like(h, dtype=torch.bool)
+            mask[:, prune_indices] = False
+            pruned_h = h * mask
             return pruned_h, None, None
-        
-        
         elif self.prune_name in ['pq', 'base-struct']:
             if self.prune_dim_select_mode == 'max':
                 for prune_dim in self.prune_dim:
@@ -289,19 +329,26 @@ class HiddenRepresentationPruning(BasePruning):
                     prune_channels = self.apply_batch_integ(h_shape[prune_dim], prune_channels)
                     prune_channels_multi_dims[prune_dim] = prune_channels
 
-                    # prune_eles = self.cal_prune_eles(h, prune_dim, prune_channels)
-                    prune_eles = len(prune_channels)
-                    prune_eles_multi_dims[prune_dim] = prune_eles
+                    saving_flops = self.cal_saving_flops(h, prune_dim, prune_channels, layer_type, layer_info)
+                    saving_flops_multi_dims[prune_dim] = saving_flops
 
-                final_prune_dim = np.argmax(prune_eles_multi_dims)
+                final_prune_dim = np.argmax(saving_flops_multi_dims)
                 pruned_h = self.prune_h(h, final_prune_dim, prune_channels_multi_dims[final_prune_dim])
 
-                pruned_dims = [final_prune_dim if dim == final_prune_dim else None for dim in range(h.dim())]
+                print('final_prune_dim', final_prune_dim)
+                print('saving_flops_multi_dims', saving_flops_multi_dims)
+                print('prune_channels_multi_dims', prune_channels_multi_dims)
+
+                pruned_dims = [dim if dim == final_prune_dim else None for dim in range(h.dim())]
                 for dim in range(len(prune_channels_multi_dims)):
                     if dim != final_prune_dim:
                         prune_channels_multi_dims[dim] = None
-                        prune_eles_multi_dims[dim] = 0
-                        
+                        saving_flops_multi_dims[dim] = 0
+                
+                print('after\n')
+                print('final_prune_dim', final_prune_dim)
+                print('saving_flops_multi_dims', saving_flops_multi_dims)
+                print('prune_channels_multi_dims', prune_channels_multi_dims)
                 return pruned_h, pruned_dims, prune_channels_multi_dims
             elif self.prune_dim_select_mode == 'casc':
                 for prune_dim in self.prune_dim:
@@ -309,15 +356,15 @@ class HiddenRepresentationPruning(BasePruning):
                     prune_channels = self.apply_batch_integ(h_shape[prune_dim], prune_channels)
                     prune_channels_multi_dims[prune_dim] = prune_channels
                     
-                    prune_eles = self.cal_prune_eles(h, prune_dim, prune_channels)
-                    prune_eles_multi_dims[prune_dim] = prune_eles
+                    saving_flops = self.cal_saving_flops(h, prune_dim, prune_channels, layer_type, layer_info)
+                    saving_flops_multi_dims[prune_dim] = saving_flops
 
                     pruned_h = self.prune_h(h, prune_dim, prune_channels_multi_dims[prune_dim])
                     h = pruned_h
                 pruned_dims = [dim if dim in self.prune_dim else None for dim in range(h.dim())]
                 return pruned_h, pruned_dims, prune_channels_multi_dims
     
-    def prune_h(self, h, prune_dim, prune_channels):
+    def prune_h(self, h, prune_dim, prune_channels, mask=None):
         # Create a boolean mask for all indices
         mask = torch.ones(h.size(prune_dim), dtype=torch.bool)
         # Mark the indices to be pruned as False
@@ -326,29 +373,49 @@ class HiddenRepresentationPruning(BasePruning):
         pruned_h = h.index_select(dim=prune_dim, index=mask.nonzero().squeeze())
         return pruned_h
 
-    def cal_prune_eles(self, h, prune_dim, prune_channels):
+    def linear_flops_compute(self, input, weight, bias=None):
+        out_features = weight.shape[0]
+        macs = input.numel() * out_features
+        return 2 * macs, macs
+
+    def cal_saving_flops(self, h, prune_dim, prune_channels, layer_type, layer_info):
         if prune_channels is None:
             return 0
-        rest_dims = tuple(i for i in range(h.dim()) if i != prune_dim)
-        prune_eles = len(prune_channels) * reduce(lambda x, y: x * y, h.shape[rest_dims])
-        return prune_eles
-    
+        if layer_type == 'linear':
+            weight = layer_info['weight']
 
+            rest_dim_sizes = [h.shape[i] for i in range(h.dim()) if i != prune_dim]
+            product_of_rest_dims = prod(rest_dim_sizes)
+
+            out_features = weight.shape[0]
+            saving_flops = 2 * len(prune_channels) * product_of_rest_dims * out_features
+        elif layer_type == 'conv2d':
+            pass
+
+        else:
+            raise ValueError('Not valid layer type')
+        # rest_dims = tuple(i for i in range(h.dim()) if i != prune_dim)
+        # prune_eles = len(prune_channels) * reduce(lambda x, y: x * y, h.shape[rest_dims])
+        return saving_flops
+    
     def apply_batch_integ(self, cur_total_channels, prune_channels):
+        if not prune_channels[0].numel():  # Check if the tensor is empty
+            return None
+
         if self.batch_integ == 'inter':
             sets = [set(tensor.tolist()) for tensor in prune_channels]
             if len(sets) == 0:
                 sets = [set()]
             intersected_set = set.intersection(*sets)
-            prune_channels = torch.tensor(list(intersected_set))
+            prune_channels = torch.tensor(list(intersected_set), dtype=torch.long)
         elif self.batch_integ == 'union':
             sets = [set(tensor.tolist()) for tensor in prune_channels]
             if len(sets) == 0:
                 sets = [set()]
             intersected_set = set.union(*sets)
-            prune_channels = torch.tensor(list(intersected_set))
+            prune_channels = torch.tensor(list(intersected_set), dtype=torch.long)
         elif self.batch_integ == 'full':
-            prune_channels = torch.tensor(prune_channels)
+            prune_channels = torch.tensor(prune_channels[0], dtype=torch.long)
         else:
             raise ValueError('Not valid batch integration method')
         if prune_channels.numel() == 0:
@@ -357,7 +424,7 @@ class HiddenRepresentationPruning(BasePruning):
             prune_channels_list = prune_channels.tolist()
             prune_channels_list.remove(random.choice(prune_channels_list))
             # Convert back to tensor
-            prune_channels = torch.tensor(prune_channels_list, dtype=prune_channels.dtype)
+            prune_channels = torch.tensor(prune_channels_list, dtype=torch.long)
             warnings.warn("Attempting to prune all channels. Keeping one channel for calculation.")
         return prune_channels
     
@@ -412,21 +479,70 @@ class HiddenRepresentationPruning(BasePruning):
         prune_channels = [sorted_channels[i, :int(count.item())] for i, count in enumerate(prune_channels_count)]
         return prune_channels
 
-
     def base_unstruct(self, h):
         flattened_h = h.view(h.size(0), -1)
         norm_along_dim_1 = torch.linalg.vector_norm(flattened_h, ord=self.prune_norm, dim=1)
         _, sorted_indices = torch.sort(norm_along_dim_1, dim=1)
         num_indices_to_prune = int(self.prune_hyper * sorted_indices.size(1))
-
         # Select the indices to prune (lowest norms)
         pruned_indices = sorted_indices[:, :num_indices_to_prune]
         return pruned_indices
     
-    def base_struct(self, h, prune_dim):
+    def base_struct(self, h, prune_dim, exclude_dim):
+        calc_dim = 1 if exclude_dim == 0 else 0
+        dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != exclude_dim)
+        norm_across_other_dims = torch.linalg.vector_norm(h, ord=self.prune_norm, dim=dims_to_aggregate)        
+        prune_channels_count = int(self.prune_hyper * h.shape(prune_dim))
+        _, sorted_channels = torch.sort(norm_across_other_dims, dim=calc_dim)
+        prune_channels = [sorted_channels[i, :int(count.item())] for i, count in enumerate(prune_channels_count)]
+        return prune_channels
 
+        
+    # placeholder
+    def _conv_flops_compute(input_shape, weight_shape, bias=None, stride=1, padding=0, dilation=1, groups=1):
+        assert weight.shape[1] * groups == input.shape[1]
 
-        return
+        batch_size = input.shape[0]
+        in_channels = input.shape[1]
+        out_channels = weight.shape[0]
+        kernel_dims = list(weight.shape[2:])
+        input_dims = list(input.shape[2:])
+
+        length = len(input_dims)
+
+        strides = stride if type(stride) is tuple else (stride, ) * length
+        dilations = dilation if type(dilation) is tuple else (dilation, ) * length
+        if isinstance(padding, str):
+            if padding == 'valid':
+                paddings = (0, ) * length
+            elif padding == 'same':
+                paddings = ()
+                for d, k in zip(dilations, kernel_dims):
+                    total_padding = d * (k - 1)
+                    paddings += (total_padding // 2, )
+        elif isinstance(padding, tuple):
+            paddings = padding
+        else:
+            paddings = (padding, ) * length
+
+        output_dims = []
+        for idx, input_dim in enumerate(input_dims):
+            output_dim = (input_dim + 2 * paddings[idx] - (dilations[idx] *
+                                                        (kernel_dims[idx] - 1) + 1)) // strides[idx] + 1
+            output_dims.append(output_dim)
+
+        filters_per_channel = out_channels // groups
+        conv_per_position_macs = int(_prod(kernel_dims)) * in_channels * filters_per_channel
+        active_elements_count = batch_size * int(_prod(output_dims))
+        overall_conv_macs = conv_per_position_macs * active_elements_count
+        overall_conv_flops = 2 * overall_conv_macs
+
+        bias_flops = 0
+        if bias is not None:
+            bias_flops = out_channels * active_elements_count
+
+        return int(overall_conv_flops + bias_flops), int(overall_conv_macs)
+
 
 
 
@@ -434,20 +550,156 @@ class HiddenRepresentationPruning(BasePruning):
 
 class WeightPruning(BasePruning):
 
-    def __init__(self):
-        BasePruning.__init__(self)
+    def __init__(self, cfg):
+        BasePruning.__init__(self, cfg)
         pass
 
-    def prune_weights(self, weights):
-        # Implement weight pruning logic
-        # ...
-        return pruned_weights
+    def batch_pruning(self, w, layer_type, layer_info):
+        if self.batch_integ != 'full':
+            raise ValueError('Not valid batch integration method')
+        if layer_type == 'linear' and self.prune_dim != [1]:
+            raise ValueError('Not valid pruning dimension')
 
-    def apply_pruning_to_layer(self, layer):
-        layer_type = self.get_layer_type(layer)
-        if hasattr(layer, 'weight'):
-            pruned_weights = self.prune_weights(layer.weight.data)
-            layer.weight.data = pruned_weights
-        return layer
+        prune_channels_multi_dims = [None] * w.dim()
+        saving_flops_multi_dims = [0] * w.dim()
+        w_shape = w.shape
+        w_type = w.dtype
+        prune_dim = 1
+        final_prune_dim = 1
+
+        if self.prune_name == 'base-unstruct':
+            prune_indices = self.apply_pruning(w)
+            prune_indices = self.apply_batch_integ(prod(w_shape), prune_indices)
+            # Create a mask with the same shape as h, initially set to True
+            mask = torch.ones_like(w, dtype=torch.bool)
+            mask[:, prune_indices] = False
+            pruned_w = w * mask
+            return pruned_w, None, None
+        elif self.prune_name in ['pq', 'base-struct']:
+            prune_channels = self.apply_pruning(w, prune_dim)
+            prune_channels = self.apply_batch_integ(w_shape[prune_dim], prune_channels)
+            prune_channels_multi_dims[prune_dim] = prune_channels
+
+            pruned_w = self.prune_w(w, prune_dim, prune_channels_multi_dims[prune_dim])
+
+            pruned_dims = [dim if dim == final_prune_dim else None for dim in range(w.dim())]
+            for dim in range(len(prune_channels_multi_dims)):
+                if dim != final_prune_dim:
+                    prune_channels_multi_dims[dim] = None
+                    # saving_flops_multi_dims[dim] = 0
+            
+            return pruned_w, pruned_dims, prune_channels_multi_dims
+    
+    def prune_w(self, w, prune_dim, prune_channels, mask=None):
+        # Create a boolean mask for all indices
+        mask = torch.ones(w.size(prune_dim), dtype=torch.bool)
+        # Mark the indices to be pruned as False
+        mask[prune_channels] = False
+        # Use the mask to index the tensor
+        pruned_w = w.index_select(dim=prune_dim, index=mask.nonzero().squeeze())
+        return pruned_w
+
+    def cal_saving_flops(self, h, prune_dim, prune_channels, layer_type, layer_info):
+        if prune_channels is None:
+            return 0
+        if layer_type == 'linear':
+            weight = layer_info['weight']
+
+            rest_dim_sizes = [h.shape[i] for i in range(h.dim()) if i != prune_dim]
+            product_of_rest_dims = prod(rest_dim_sizes)
+
+            out_features = weight.shape[0]
+            saving_flops = 2 * len(prune_channels) * product_of_rest_dims * out_features
+        elif layer_type == 'conv2d':
+            pass
+
+        else:
+            raise ValueError('Not valid layer type')
+        # rest_dims = tuple(i for i in range(h.dim()) if i != prune_dim)
+        # prune_eles = len(prune_channels) * reduce(lambda x, y: x * y, h.shape[rest_dims])
+        return saving_flops
+    
+    def apply_batch_integ(self, cur_total_channels, prune_channels):
+        if not prune_channels[0].numel():  # Check if the tensor is empty
+            return None
+        
+        if self.batch_integ == 'full':
+            prune_channels = torch.tensor(prune_channels[0], dtype=torch.long)
+        else:
+            raise ValueError('Not valid batch integration method')
+        if prune_channels.numel() == 0:
+            return None
+        if prune_channels.numel() >= cur_total_channels:
+            prune_channels_list = prune_channels.tolist()
+            prune_channels_list.remove(random.choice(prune_channels_list))
+            # Convert back to tensor
+            prune_channels = torch.tensor(prune_channels_list, dtype=torch.long)
+            warnings.warn("Attempting to prune all channels. Keeping one channel for calculation.")
+        return prune_channels
+    
+    def apply_pruning(self, h, prune_dim=None):
+        if prune_dim >= h.dim():
+            raise ValueError('Not valid pruning dimension')
+        
+        if self.prune_name == 'pq':
+            prune_channels = self.pq(h, prune_dim)
+            return prune_channels
+        elif self.prune_name == 'base-struct':
+            prune_channels = self.base_struct(h, prune_dim)
+            return prune_channels
+        elif self.prune_name == 'base-unstruct':
+            pruned_indices = self.base_unstruct(h)
+            return pruned_indices
+        else:
+            raise ValueError('Not valid pruning method')
+        
+
+    def pq(self, w, prune_dim):
+        # set pq-index hyper
+        p = 1
+        q = 2
+        gamma = 1
+        beta = 0.9
+        eta = self.prune_hyper
+
+        dims_to_aggregate = tuple(i for i in range(w.dim()) if i != prune_dim)
+        norm_across_other_dims = torch.linalg.vector_norm(w, ord=self.prune_norm, dim=dims_to_aggregate)        
+        norm_p = torch.linalg.vector_norm(norm_across_other_dims, ord=p, dim=0)
+        norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=q, dim=0) + 1e-10
+        
+        dimension = w.shape[prune_dim]
+        pq_indices = (1 - dimension ** (1/q - 1/p) * norm_p / norm_q)
+
+        # add additional dimension if dimension is 0
+        if pq_indices.dim() == 0:
+            pq_indices = pq_indices.unsqueeze(0)
+
+        if torch.isnan(pq_indices).any():
+            raise ValueError('pq_indices contains nan values')
+
+        lower_bound = dimension * (1 + eta) ** (-q / (q - p)) * (1 - pq_indices) ** (q * p / (q - p))
+        beta_tensor = torch.full_like(lower_bound, beta)
+        prune_channels_count = torch.floor(dimension * torch.min(gamma * (1 - lower_bound / dimension), beta_tensor))
+
+        _, sorted_channels = torch.sort(norm_across_other_dims, dim=0)
+        prune_channels = [sorted_channels[:int(prune_channels_count.item())]]
+        return prune_channels
+
+    def base_unstruct(self, w):
+        flattened_w = w.view(-1)
+        norm = torch.linalg.vector_norm(flattened_w, ord=self.prune_norm, dim=0)
+        _, sorted_indices = torch.sort(norm, dim=0)
+        num_indices_to_prune = int(self.prune_hyper * sorted_indices.size(0))
+        # Select the indices to prune (lowest norms)
+        pruned_indices = sorted_indices[:, :num_indices_to_prune]
+        return pruned_indices
+    
+    def base_struct(self, w, prune_dim):
+        dims_to_aggregate = tuple(i for i in range(w.dim()) if i != prune_dim)
+        norm_across_other_dims = torch.linalg.vector_norm(w, ord=self.prune_norm, dim=dims_to_aggregate)        
+        prune_channels_count = int(self.prune_hyper * w.shape(prune_dim))
+        _, sorted_channels = torch.sort(norm_across_other_dims, dim=0)
+        prune_channels = [sorted_channels[:int(prune_channels_count.item())]]
+        return prune_channels
 
 

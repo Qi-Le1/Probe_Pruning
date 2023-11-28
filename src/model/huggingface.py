@@ -108,6 +108,13 @@ def make_hf_model(model_name, sub_model_name=None):
     if any(k in model_name for k in ("gpt", "llama")):
         model.config.pad_token_id = tokenizer.pad_token_id
     cfg['pad_token_id'] = tokenizer.pad_token_id
+
+    # base_model_name_or_path = model.__dict__.get("name_or_path", None)
+    model_config = getattr(model, "config", {"model_type": "custom"})
+    if hasattr(model_config, "to_dict"):
+        model_config = model_config.to_dict()
+    model_type = model_config["model_type"]
+    cfg['model_type'] = model_type
     return model, tokenizer
 
 

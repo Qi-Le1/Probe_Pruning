@@ -1,12 +1,14 @@
 import argparse
 import os
+import time
 import torch
+import datetime
 import torch.backends.cudnn as cudnn
 from config import cfg, process_args
 from dataset import make_dataset, make_data_loader, process_dataset, collate, make_batchnorm_stats
 from metric import make_metric, make_logger
 from model import make_model
-from module import save, to_device, process_control, resume
+from module import save, to_device, process_control, resume, makedir_exist_ok
 
 cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='cfg')
@@ -27,37 +29,37 @@ def main():
         runExperiment()
     return
 
+# model = make_prune_model(model)
+# model = model.to(cfg['device'])
 
 def runExperiment():
     cfg['seed'] = int(cfg['model_tag'].split('_')[0])
     torch.manual_seed(cfg['seed'])
     torch.cuda.manual_seed(cfg['seed'])
-    model_path = os.path.join('output', 'model')
     result_path = os.path.join('output', 'result')
-    model_tag_path = os.path.join(model_path, cfg['model_tag'])
-    checkpoint_path = os.path.join(model_tag_path, 'checkpoint')
-    best_path = os.path.join(model_tag_path, 'best')
+    makedir_exist_ok(result_path)
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
     dataset = process_dataset(dataset, tokenizer)
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
-    result = resume(os.path.join(best_path, 'model'))
-    model.load_state_dict(result['model_state_dict'])
     model = model.to(cfg['device'])
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
-    cfg['epoch'] = result['epoch']
+    # cfg['epoch'] = result['epoch']
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     test(data_loader['test'], model, metric, test_logger)
-    result = resume(os.path.join(checkpoint_path, 'model'))
-    result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger_state_dict': {'train': result['logger_state_dict'],
-                                                                       'test': test_logger.state_dict()}}
+    result = {'cfg': cfg, 'logger_state_dict': {'test': test_logger.state_dict()}}
     save(result, os.path.join(result_path, cfg['model_tag']))
     return
 
+def get_model_profile(model):
+    pass
+
+
 
 def test(data_loader, model, metric, logger):
+    start_time = time.time()
     with torch.no_grad():
         model.train(False)
         for i, input in enumerate(data_loader):
@@ -89,9 +91,17 @@ def test(data_loader, model, metric, logger):
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
             logger.append(evaluation, 'test', input_size)
+            if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
+                batch_time = (time.time() - start_time) / (i + 1)
+                epoch_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
+                exp_finished_time = epoch_finished_time + datetime.timedelta(
+                    seconds=round((1) * batch_time * len(data_loader)))
+                info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch Finished Time: {}'.format(epoch_finished_time),
+                                'Experiment Finished Time: {}'.format(exp_finished_time)]}
+                print('running_info', info)
         evaluation = metric.evaluate('test', 'full')
         logger.append(evaluation, 'test')
-        info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(cfg['epoch'], 100.)]}
+        info = {'info': ['Model: {}'.format(cfg['model_tag'])]}
         logger.append(info, 'test')
         print(logger.write('test', metric.metric_name['test']))
     return

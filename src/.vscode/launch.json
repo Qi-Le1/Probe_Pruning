@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "verify.py",
+            "name": "verify_r.py",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
@@ -17,17 +17,44 @@
             ],
         },
 
-        
         {
-            "name": "train_cola.py",
+            "name": "verify_w.py",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
-            "program": "${workspaceFolder}/train_cola_dreambooth.py",
+            "program": "${workspaceFolder}/verify.py",
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "dreambooth-dog_sdiffusion_t2i_cola-lowrank-1_1",
+                "fpb-sa_test_s2s_8_pq-w-1-0.2-1-max_full_somemethods-3",
+            ],
+        },
+        
+        {
+            "name": "verify_r_dart_bart-base.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "dart_bart-base_s2s_1_pq-h-1-0.2-2-max_inter_somemethods-3",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_r_fpb_bart-base.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "fpb-sa_bart-base_s2s_1_pq-h-1-0.2-2-max_inter_somemethods-3",
                 "--device",
                 "cpu"
             ],
