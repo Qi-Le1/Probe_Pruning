@@ -13,14 +13,21 @@ from .huggingface import make_hf_model
 def make_model(model_name, sub_model_name=None):
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i']:
         model, tokenizer = make_hf_model(model_name, sub_model_name)
+        # base_model_name_or_path = model.__dict__.get("name_or_path", None)
+        model_config = getattr(model, "config", {"model_type": "custom"})
+        if hasattr(model_config, "to_dict"):
+            model_config = model_config.to_dict()
+        model_type = model_config["model_type"]
+        cfg['model_type'] = model_type
     else:
         model = eval('model.{}()'.format(model_name))
         tokenizer = None
+        cfg['model_type'] = model_name
     return model, tokenizer
 
-def make_prune_model(model):
+def make_prune_model(model, test_logger):
     from .eri import EriModel
-    model = EriModel(model)
+    model = EriModel(model, test_logger)
     return model
 
 def make_loss(output, input):

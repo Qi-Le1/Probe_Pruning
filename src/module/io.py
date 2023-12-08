@@ -1,5 +1,6 @@
 import errno
 import numpy as np
+import io
 import os
 import pickle
 import torch
@@ -21,6 +22,29 @@ def makedir_exist_ok(path):
             raise
     return
 
+# def save(input, path, mode='torch'):
+#     dirname = os.path.dirname(path)
+#     makedir_exist_ok(dirname)
+#     if mode == 'torch':
+#         torch.save(input, path, pickle_protocol=4)
+#     elif mode == 'np':
+#         np.save(path, input, allow_pickle=True)
+#     elif mode == 'pickle':
+#         pickle.dump(input, open(path, 'wb'))
+#     else:
+#         raise ValueError('Not valid save mode')
+#     return
+
+# def load(path, mode='torch'):
+#     if mode == 'torch':
+#         return torch.load(path, map_location=lambda storage, loc: storage)
+#     elif mode == 'np':
+#         return np.load(path, allow_pickle=True)
+#     elif mode == 'pickle':
+#         return pickle.load(open(path, 'rb'))
+#     else:
+#         raise ValueError('Not valid save mode')
+#     return
 
 def save(input, path, mode='pickle'):
     dirname = os.path.dirname(path)
@@ -35,8 +59,15 @@ def save(input, path, mode='pickle'):
         raise ValueError('Not valid save mode')
     return
 
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+        else: return super().find_class(module, name)
 
 def load(path, mode='pickle'):
+    if not torch.cuda.is_available() and mode == 'pickle':
+        return CPU_Unpickler(open(path, 'rb')).load()
     if mode == 'torch':
         return torch.load(path, map_location=lambda storage, loc: storage)
     elif mode == 'np':

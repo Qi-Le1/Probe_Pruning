@@ -1,3 +1,4 @@
+import copy
 from collections import defaultdict
 from collections.abc import Iterable
 from torch.utils.tensorboard import SummaryWriter
@@ -17,7 +18,8 @@ class Logger:
 
     def save(self, flush):
         for name in self.mean:
-            self.history[name].append(self.mean[name])
+            if len(self.history[name]) < 1000000:
+                self.history[name].append(self.mean[name])
         if flush:
             self.flush()
         return
@@ -32,6 +34,7 @@ class Logger:
         for k in result:
             name = '{}/{}'.format(tag, k)
             self.tracker[name] = result[k]
+            prev_n = copy.deepcopy(n)
             if isinstance(result[k], Number):
                 self.counter[name] += n
                 self.mean[name] = ((self.counter[name] - n) * self.mean[name] + n * result[k]) / self.counter[name]
@@ -46,6 +49,9 @@ class Logger:
                         self.counter[name][i] += n[i]
                         self.mean[name][i] = ((self.counter[name][i] - n[i]) * self.mean[name][i] + n[i] *
                                               result[k][i]) / self.counter[name][i]
+            else:
+                raise ValueError('Not valid data type for logger')
+            n = prev_n
         return
 
     def write(self, tag, metric_names):

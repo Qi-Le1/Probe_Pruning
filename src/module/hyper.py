@@ -23,6 +23,10 @@ def process_control():
     multibatch_integ_list = cfg['control']['multibatch_integ'].split('-')
     cfg['multibatch_integ'] = multibatch_integ_list[0]
     cfg['multibatch_factor'] = float(multibatch_integ_list[1])
+
+    cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('-')
+    if cfg['cust_tgt_modules'] == ['None']:
+        cfg['cust_tgt_modules'] = None
     cfg['split_metric'] = False
     make_data_name()
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i']:
@@ -52,36 +56,15 @@ def process_control():
         cfg[model_name] = {}
     cfg[model_name]['shuffle'] = {'train': True, 'test': False}
     if cfg['task_name'] in ['s2s', 'sc', 'clm']:
-        cfg[model_name]['num_epochs'] = 40
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
     elif cfg['task_name'] in ['ic']:
-        cfg[model_name]['num_epochs'] = 400
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
     elif cfg['task_name'] in ['t2i']:
         cfg['collate_mode'] = 'dreambooth'
-        cfg[model_name]['num_epochs'] = 40
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
     else:
         raise ValueError('Not valid task name')
 
-
-    cfg['test_computation'] = False
-    if cfg['test_computation']:
-        cfg['num_test_iter'] = 10
-        # cfg['device_cola'] = 'cpu'
-        cfg['device_cola'] = cfg['device']
-        cfg['offload_device'] = 'cpu'
-        # cfg['offload_device'] = cfg['device']
-        # cfg['offload_device'] = 'cuda:1'
-        cfg['time_used'] = []
-        cfg['time_used_cola'] = []
-        cfg['mem_used'] = []
-        cfg['mem_used_cola'] = []
-    else:
-        # cfg['device_cola'] = 'cpu'
-        cfg['device_cola'] = cfg['device']
-        # cfg['offload_device'] = 'cpu'
-        cfg['offload_device'] = cfg['device']
     return
 
 
@@ -274,6 +257,10 @@ TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
     "RefinedWeb": ["query_key_value"],
     "falcon": ["query_key_value"],
     "btlm": ["c_proj", "c_attn"],
+
+    'resnet9': ['.shortcut', '.conv1', '.conv2'],
+    # 'resnet9': ['.conv2'],
+    'resnet18': ['.shortcut', '.conv1', '.conv2'],
 
     'test': ['fc']
 }

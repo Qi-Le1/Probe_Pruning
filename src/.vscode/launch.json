@@ -4,6 +4,21 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
+        {
+            "name": "process.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--type",
+                "observe_pq",
+            ],
+        },
+
+
         {
             "name": "verify_r.py",
             "type": "python",
@@ -54,7 +69,52 @@
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "fpb-sa_bart-base_s2s_1_pq-h-1-0.2-2-max_inter_somemethods-3",
+                "fpb-sa_bart-base_s2s_10_pq-h-2-0.2-2-max_inter_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_r_fpb_llama-2.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "fpb-sa_llama-2_clm_10_pq-h-2-0-2-max_inter_somemethods-3",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_r_glue_roberta.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "glue-cola_roberta-base_sc_1_pqstruct-h-2-0-2-max_inter_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_r_resnet.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_local_tuned_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "CIFAR10_resnet9_ic_1_pqstruct-h-2-0-1-max_inter_somemethods-3_None",
                 "--device",
                 "cpu"
             ],

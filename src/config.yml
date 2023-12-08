@@ -8,6 +8,7 @@ control:
   prune_name: pq-w-l1-0.2-2#3#4-max/casc
   batch_integ: inter / union / full
   multibatch_integ: somemethods-intmutiples
+  cust_tgt_modules: None
 # experiment
 pin_memory: True
 num_workers: 0

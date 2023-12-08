@@ -58,7 +58,8 @@ def make_hf_model(model_name, sub_model_name=None):
         if 'llama' in model_name:
             # "Training Llama in float16 is not recommended and known to produce nan, as such the model should be trained in bfloat16.""
             model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.bfloat16,
-                                                     device_map=cfg['device'], cache_dir=cfg['cache_model_path'])
+                                                     device_map=cfg['device'])
+            # cache_dir=cfg['cache_model_path']
         else:
             model = AutoModelForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'])
     elif cfg['task_name'] == 's2s':
@@ -107,14 +108,7 @@ def make_hf_model(model_name, sub_model_name=None):
         tokenizer.pad_token_id = tokenizer.eos_token_id
     if any(k in model_name for k in ("gpt", "llama")):
         model.config.pad_token_id = tokenizer.pad_token_id
-    cfg['pad_token_id'] = tokenizer.pad_token_id
-
-    # base_model_name_or_path = model.__dict__.get("name_or_path", None)
-    model_config = getattr(model, "config", {"model_type": "custom"})
-    if hasattr(model_config, "to_dict"):
-        model_config = model_config.to_dict()
-    model_type = model_config["model_type"]
-    cfg['model_type'] = model_type
+    cfg['pad_token_id'] = tokenizer.pad_token_id    
     return model, tokenizer
 
 
