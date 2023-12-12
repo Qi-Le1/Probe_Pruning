@@ -43,6 +43,21 @@ def make_control_list(file):
                     ['inter'], ['somemethods-3'], ['output.dense']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
+    elif file == 'observe_ic':
+        control_name = [[['CIFAR10', 'CIFAR100'], ['resnet9', 'resnet18'], ['ic'], ['10'], [f'pqstruct-h-2-{x}-1-max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+                             ['inter'], ['somemethods-3'], ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet9', 'resnet18'], ['ic'], ['10'], [f'pqstruct-h-2-{x}-1-max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #                      ['inter'], ['somemethods-3'], ['None']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet9', 'resnet18'], ['ic'], ['1', '100', '1000'], [f'pqstruct-h-2-{x}-1-max' for x in [0]],
+        #                     ['inter'], ['somemethods-3'], ['None']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
     return controls
 
 
@@ -54,7 +69,7 @@ def main():
     vis_path = './output/vis/{}'.format(args['type'])
     files = [args['type']]
 
-    if args['type'] == 'observe_pq':
+    if 'observe' in args['type']:
         num_experiments = 1
     else:
         raise ValueError('Not valid type')
@@ -117,8 +132,8 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
                 #     processed_result_history[metric_name]['history'][exp_idx] = base_result['logger']['train'].history[k]
                 
             for k in base_result['logger']['test'].history:
-                if 'norm_across_other_dims' in k:
-                    continue
+                # if 'norm_across_other_dims' in k:
+                #     continue
                 metric_name = k
                 if metric_name not in processed_result_exp:
                     # processed_result_exp[metric_name] = {'exp': [None for _ in range(num_experiments)]}
@@ -196,9 +211,9 @@ def summarize_result(processed_result):
         for k, v in processed_result.items():
             # print(f'key {k}')
             # print(f'value length {len(v)}')
-            if 'norm_across_other_dims' in k:
-                print('kkkk', k)
-                continue
+            # if 'norm_across_other_dims' in k:
+            #     print('kkkk', k)
+            #     continue
             summarize_result(v)
         return
     return
@@ -303,7 +318,7 @@ def make_vis(df_exp, df_history):
         0.3: 'orange', 0.4: 'black', 0.5: 'purple', 0.6: 'black', 0.7: 'purple', 
         0.8: 'sienna', 0.9: 'green', 1.0: 'red', 9999: 'darkseagreen'
     }
-    prune_names = ['pqstruct', 'pqunstruct', 'basestruct', 'baseunstruct']
+    prune_names = ['pqstruct', 'pqunstruct', 'magstruct', 'magunstruct']
     for name in prune_names:
         for hyper in prune_hypers:
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
@@ -350,14 +365,30 @@ def make_vis(df_exp, df_history):
                 plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'])
                 return
             
-            def draw_histogram(plt, data, bins=100, x_label='Value', y_label='Frequency', title='Data Distribution'):
-                plt.hist(data, bins=bins, color='blue', edgecolor='black', alpha=0.7)
+            def draw_histogram(plt, data, bins=100, density=False, x_label='Value', y_label='Frequency', title='Data Distribution'):
+                plt.hist(data, bins=bins, density=density, color='blue', edgecolor='black')
                 plt.xlabel(x_label, fontsize=12)
                 plt.ylabel(y_label, fontsize=12)
                 plt.title(title, fontsize=14)
                 plt.xticks(fontsize=10)
                 plt.yticks(fontsize=10)
                 return
+
+            def draw_bar(plt, bin_edges, data, x_label='Value', y_label='Prob', title='Data Distribution'):
+                a = sum(data)
+                b = np.diff(bin_edges)
+                
+                total = sum(data)
+                density = [d / total for d in data] if total != 0 else data
+                plt.bar(bin_edges[:-1], density, width=np.diff(bin_edges), align='edge')
+                plt.xlabel(x_label, fontsize=12)
+                plt.ylabel(y_label, fontsize=12)
+                plt.title(title, fontsize=14)
+                plt.xticks(fontsize=10)
+                plt.yticks(fontsize=10)
+                return
+
+
 
             def draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, annotation='default', x_label='Activation Layers in Order', y_label='Accuracy'):
                 # temp = range(len(x))
@@ -379,6 +410,22 @@ def make_vis(df_exp, df_history):
                 plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'])
                 return
             
+            def process_distri(data, left_range=-1, right_range=1):
+                bin_edges = [
+                    -1000, -900, -800, -700, -600, -500, -400, -300, -200, -100, # -1000 to -100
+                    -90, -80, -70, -60, -50, -40, -30, -20, -10,  
+                    10, 20, 30, 40, 50, 60, 70, 80, 90, 100,  # -100 to 100 
+                    200, 300, 400, 500, 600, 700, 800, 900, 1000  # 100 to 1000
+                ]
+                fine_bins = np.arange(-10, 10, 0.1).tolist()
+                # for drawing 0
+                bin_edges = bin_edges + fine_bins + [0.01]
+                bin_edges = sorted(set(bin_edges))
+
+                # Find the index for left_range and right_range
+                left_index = next(i for i, x in enumerate(bin_edges) if x >= left_range)
+                right_index = next(i for i, x in enumerate(bin_edges) if x >= right_range)
+                return data[left_index:right_index+1], bin_edges[left_index:right_index+2]
             # if isinstance(df_history[df_name], list):
             #     # Handle the case where it's a list
             #     temp = df_history[df_name]
@@ -395,6 +442,8 @@ def make_vis(df_exp, df_history):
             temp = copy.deepcopy(df_history[df_name]) 
             '''
                 1. norm_across_other_dims distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
+                2. vanilla_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
+                3. pruned_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
                 2. pq_indices for each prune layer (y is pq_indices, x is all the layers, 1 for each prune_hyper)
                 3. pruned_ratio for each prune layer (y is pruned_ratio, x is all the layers, 1 for each prune_hyper)
                 4. pruned_FLOPs_ratio for each prune layer (y is pruned_FLOPs_ratio, x is all the layers, 1 for each prune_hyper)
@@ -417,13 +466,36 @@ def make_vis(df_exp, df_history):
                         continue
 
                     index_list = index.split('/')
-                    if 'norm_across_other_dims' in index:
-                        temp_key = index_list[-1]
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, temp_key, 'distribution'])
-                        fig[fig_name] = plt.figure(fig_name)
-                        data = row.tolist()
-                        # key_for_dict = f"{prune_name}_{prune_hyper}"
-                        draw_histogram(plt, data)
+
+                    # if 'vanilla_hist_mean' in index:
+                    #     temp_key = index_list[-1]
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, temp_key, 'distribution'])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     data = row.tolist()
+                    #     # draw_bar(plt, bin_edges[:-1], data)
+                    #     data, bin_edges = process_distri(data, -0.3, 1)
+                    #     # draw_histogram(plt, data, bins=bin_edges, density=True)
+                    #     draw_bar(plt, bin_edges, data)
+
+                    # if 'pruned_hist_mean' in index:
+                    #     temp_key = index_list[-1]
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, temp_key, 'distribution'])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     data = row.tolist()
+                    #     # draw_bar(plt, bin_edges[:-1], data)
+                    #     data, bin_edges = process_distri(data, -0.3, 1)
+                    #     # draw_histogram(plt, data, bins=bin_edges, density=True)
+                    #     draw_bar(plt, bin_edges, data)
+
+                    # if 'norm_across_other_dims_mean' in index:
+                    #     temp_key = index_list[-1]
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, temp_key, 'distribution'])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     data = row.tolist()
+                    #     # key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     draw_histogram(plt, data)
+
+                    
 
                     # only for y: pq, x: eta
                     if 'pq_indices_mean' in index:
@@ -470,6 +542,8 @@ def make_vis(df_exp, df_history):
                             key_for_dict = f"{prune_name}_{prune_hyper}"
                             draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'FLOPs_ratio', cur_metric_name)
                             performance_vs_total_FLOPs_ratio = [None, None]
+                    
+                    
 
     def write_xlsx(path, df, startrow=0):
         writer = pd.ExcelWriter(path, engine='xlsxwriter')

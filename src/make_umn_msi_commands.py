@@ -160,10 +160,10 @@ def main():
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['CIFAR10', 'CIFAR100'], ['resnet9', 'resnet18'], ['ic'], ['1', '10', '100', '1000'], [f'pqstruct-h-2-{x}-1-max' for x in [0]],
-                             ['inter'], ['somemethods-3'], ['None']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet9', 'resnet18'], ['ic'], ['1', '100', '1000'], [f'pqstruct-h-2-{x}-1-max' for x in [0]],
+            #                  ['inter'], ['somemethods-3'], ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
     else:
         raise ValueError('Not valid file')
 
@@ -231,7 +231,7 @@ def main():
         if is_femnist:
             temp_mem = int(3 * temp_mem)
         s = '#!/bin/bash -l\n'
-        s += '#SBATCH --time=00:50:00\n'
+        s += '#SBATCH --time=01:50:00\n'
         s += f'#SBATCH --nodes={task_parallel_num}\n'
         s += f'#SBATCH --ntasks={task_parallel_num}\n'
         # s += '#SBATCH --cpus-per-task=2'

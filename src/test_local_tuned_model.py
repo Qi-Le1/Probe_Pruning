@@ -57,33 +57,41 @@ def runExperiment():
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
     # result = resume(os.path.join(best_path, 'model'))
     result = resume(os.path.join(checkpoint_path, 'model'))
-    cfg['epoch'] = result['epoch']
+
+    if 'epoch' in result:
+        cfg['epoch'] = result['epoch']
+    else:
+        cfg['epoch'] = 0
 
 
 
     model, tokenizer = make_model(cfg['model_name'])
-    model.load_state_dict(copy.deepcopy(result['model_state_dict']))
-    model_prof = FlopsProfiler(model)
-    model = model.to(cfg['device'])
-    if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
-        model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
-    test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    test(copy.deepcopy(data_loader['test']), model, model_prof, copy.deepcopy(metric), test_logger)
-    vanilla_info_list = get_model_profile('vanilla', model_prof)
 
+    # test FL one
+    # if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
+    #     result['model_state_dict'] = result['server'].server_model_state_dict
+    # model.load_state_dict(result['model_state_dict'])
+    # model = model.to(cfg['device'])
+    # if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
+    #     model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
+    # model_prof = FlopsProfiler(model)
+    # test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
+    # test(data_loader['test'], model, model_prof, copy.deepcopy(metric), test_logger)
+    # vanilla_info_list = get_model_profile('vanilla', model_prof)
 
     model, tokenizer = make_model(cfg['model_name'])
-    model.load_state_dict(copy.deepcopy(result['model_state_dict']))
-    model = make_prune_model(model, test_logger)
-    model_prof = FlopsProfiler(model)
+    model.load_state_dict(result['model_state_dict'])
     model = model.to(cfg['device'])
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
+    model = model.to("cpu")
+    model = make_prune_model(model)
+    model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    test(copy.deepcopy(data_loader['test']), model, model_prof, copy.deepcopy(metric), test_logger)
+    test(data_loader['test'], model, model_prof, copy.deepcopy(metric), test_logger)
     pruned_info_list = get_model_profile('pruned', model_prof)
     
-    
+    # print('vanilla_info_list', vanilla_info_list[0], vanilla_info_list[1])
     batch_num = len(data_loader['test'])
     summarize_info_list(vanilla_info_list, pruned_info_list, batch_num, test_logger)
     result = resume(os.path.join(checkpoint_path, 'model'))
@@ -99,11 +107,19 @@ def get_model_profile(tag, model_prof):
     info_list = []
     for name, module in model_prof.model.named_modules():
         temp = [name, module.__flops__, module.__duration__, module.__params__, module.__macs__, type(module)]
-        if hasattr(module, 'is_pruned'):
+        # print('temp', temp)
+        if hasattr(module, 'pruning_module'):
             temp.append(module.key)
-            temp.append(module.is_pruned)
+            temp.append(True)
         info_list.append(temp)
-    return info_list
+    return copy.deepcopy(info_list)
+
+def record_pruing_info(model, logger):
+    for name, module in model.named_modules():
+        if hasattr(module, 'pruning_module'):
+            logger.append(module.pruning_module.pruning_info, 'test')
+            module.pruning_module.reset_pruning_info()
+    return
 
 def summarize_info_list(vanilla_info_list, pruned_info_list, batch_num, logger):
 
@@ -112,7 +128,7 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, batch_num, logger):
     pruned_total_flops = sum([pruned_info_list[i][1] for i in range(len(pruned_info_list))])
     print(f"Vanilla FLOPs ({FLOPS_UNIT[1]}): ", vanilla_total_flops/FLOPS_UNIT[0], flush=True)
     print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
-    print('Pruning FLOPs reduction percentage (%): ', ((vanilla_total_flops - pruned_total_flops) / vanilla_total_flops) * 100, flush=True)
+    print('Pruning FLOPs reduction percentage (%): ', ((vanilla_total_flops - pruned_total_flops) / (vanilla_total_flops + 1e-6)) * 100, flush=True)
 
     vanilla_total_inference_time = sum([vanilla_info_list[i][2] for i in range(len(vanilla_info_list))])
     pruned_total_inference_time = sum([pruned_info_list[i][2] for i in range(len(pruned_info_list))])
@@ -126,17 +142,17 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, batch_num, logger):
         'Pruned_total_FLOPs': pruned_total_flops,
         'vanilla_total_inference_time': vanilla_total_inference_time,
         'pruned_total_inference_time': pruned_total_inference_time,
-        'total_FLOPs_ratio': pruned_total_flops/vanilla_total_flops,
+        'total_FLOPs_ratio': pruned_total_flops/(vanilla_total_flops+1e-6),
     }
 
-    # for i in range(len(vanilla_info_list)):
-    #     sub_vanilla_info = vanilla_info_list[i]
-    #     sub_pruned_info = pruned_info_list[i+1]
-    #     if sub_pruned_info[-1] == True:
-    #         info[f"{sub_pruned_info[-2]}_pruned_FLOPs_ratio"] = sub_pruned_info[1]/sub_vanilla_info[1]
-    #     print('----\n')
-    #     print(f"VANILLA: {sub_vanilla_info[0]} - {sub_vanilla_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_vanilla_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_vanilla_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_vanilla_info[4]}", flush=True)
-    #     print(f"PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_pruned_info[4]}", flush=True)
+    for i in range(len(vanilla_info_list)):
+        sub_vanilla_info = vanilla_info_list[i]
+        sub_pruned_info = pruned_info_list[i+1]
+        if sub_pruned_info[-1] == True:
+            info[f"{sub_pruned_info[-2]}_pruned_FLOPs_ratio"] = sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6)
+        print('----\n')
+        print(f"VANILLA: {sub_vanilla_info[0]} - {sub_vanilla_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_vanilla_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_vanilla_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_vanilla_info[4]}", flush=True)
+        print(f"PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_pruned_info[4]}", flush=True)
     print('Summary Finished ---------\n')
     logger.append(info, 'test')
     logger.save(False)
@@ -146,7 +162,7 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, batch_num, logger):
 def test(data_loader, model, model_prof, metric, logger):
     start_time = time.time()
     with torch.no_grad():
-        # model_prof.start_profile()
+        model_prof.start_profile()
         model = model.to(cfg['device'])
         model.train(False)
         for i, input in enumerate(data_loader):
@@ -178,10 +194,10 @@ def test(data_loader, model, model_prof, metric, logger):
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
             logger.append(evaluation, 'test', input_size)
-            logger.save(False)
-
-            print('output', output_)
-            break
+            # logger.save(False)
+            record_pruing_info(model, logger)
+            # print('output', output_)
+            # break
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
@@ -192,7 +208,7 @@ def test(data_loader, model, model_prof, metric, logger):
         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(cfg['epoch'], 100.)]}
         logger.append(info, 'test')
         print(logger.write('test', metric.metric_name['test']))
-        # model_prof.stop_profile()
+        model_prof.stop_profile()
     return
 
 def match_prefix(model_path):

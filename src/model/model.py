@@ -25,9 +25,9 @@ def make_model(model_name, sub_model_name=None):
         cfg['model_type'] = model_name
     return model, tokenizer
 
-def make_prune_model(model, test_logger):
+def make_prune_model(model):
     from .eri import EriModel
-    model = EriModel(model, test_logger)
+    model = EriModel(model)
     return model
 
 def make_loss(output, input):

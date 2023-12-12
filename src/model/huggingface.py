@@ -44,6 +44,11 @@ def make_hf_model(model_name, sub_model_name=None):
         elif '7b' in model_name:
             cfg['model_name_or_path'] = 'openlm-research/open_llama_7b_v2'
             cfg['tokenizer_name_or_path'] = 'openlm-research/open_llama_7b_v2'
+    elif 'opt' in model_name:
+        # https://huggingface.co/facebook/opt-1.3b
+        if '1.3b' in model_name:
+            cfg['model_name_or_path'] = 'facebook/opt-1.3b'
+            cfg['tokenizer_name_or_path'] = 'facebook/opt-1.3b'
     elif 'llama-2' in model_name:
         # https://huggingface.co/docs/transformers/main/model_doc/llama2
         # FOLLOW the instruction to run the script: python convert_llama_weights_to_hf.py --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir output/llama-2-7b
@@ -108,6 +113,9 @@ def make_hf_model(model_name, sub_model_name=None):
         tokenizer.pad_token_id = tokenizer.eos_token_id
     if any(k in model_name for k in ("gpt", "llama")):
         model.config.pad_token_id = tokenizer.pad_token_id
+    if 'opt' in model_name:
+        model.config.end_token_id = tokenizer.eos_token_id
+        model.config.pad_token_id = model.config.eos_token_id
     cfg['pad_token_id'] = tokenizer.pad_token_id    
     return model, tokenizer
 

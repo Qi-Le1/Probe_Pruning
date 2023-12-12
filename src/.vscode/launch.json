@@ -6,7 +6,7 @@
     "configurations": [
 
         {
-            "name": "process.py",
+            "name": "process_language_model",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
@@ -18,6 +18,18 @@
             ],
         },
 
+        {
+            "name": "process_ic",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--type",
+                "observe_ic",
+            ],
+        },
 
         {
             "name": "verify_r.py",
@@ -114,9 +126,95 @@
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "CIFAR10_resnet9_ic_1_pqstruct-h-2-0-1-max_inter_somemethods-3_None",
+                "CIFAR10_resnet18_ic_1_pqstruct-h-2-0-1-max_inter_somemethods-3_None",
                 "--device",
                 "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_w_resnet_pqstructlocal.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_local_tuned_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "CIFAR10_resnet9_ic_1_pqstructlocal-w-2-0-1-max_full_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+        
+        {
+            "name": "verify_w_resnet_magstructlocal.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_local_tuned_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "CIFAR10_resnet9_ic_1_magstructlocal-w-2-0-1-max_full_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_w_resnet_basestructglobal.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_local_tuned_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "CIFAR10_resnet9_ic_1_basestructglobal-w-2-0-1-max_full_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+        
+        {
+            "name": "verify_w_resnet_baseunstructlocal.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_local_tuned_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "CIFAR10_resnet9_ic_1_baseunstructlocal-w-2-0-1-max_full_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_r_wikitext.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "wikitext-2rawv1_opt-1.3b_clm_1_pqstruct-h-2-0-2-max_inter_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_simple_test.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/simple_test.py",
+            "justMyCode": true,
+            "args": [
             ],
         },
 

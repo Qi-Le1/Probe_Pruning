@@ -28,6 +28,12 @@ def process_control():
     if cfg['cust_tgt_modules'] == ['None']:
         cfg['cust_tgt_modules'] = None
     cfg['split_metric'] = False
+
+    cfg['pq_p'] = 1
+    cfg['pq_q'] = 2
+    cfg['gamma'] = 1
+    cfg['beta'] = 0.9
+    
     make_data_name()
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i']:
         cfg['collate_mode'] = 'transformer'
@@ -36,6 +42,9 @@ def process_control():
         cfg['gpt2'] = {'max_length': 128}
         if 'llama' in cfg['model_name']:
             cfg[cfg['model_name']] = {'max_length': 128}
+        if 'opt' in cfg['model_name']:
+            cfg[cfg['model_name']] = {'max_length': 128}
+        # cfg['opt'] = {'max_length': 128}
     elif cfg['task_name'] in ['ic']:
         cfg['collate_mode'] = 'dict'
         data_shape = {'MNIST': [1, 28, 28], 'FashionMNIST': [1, 28, 28], 'SVHN': [3, 32, 32], 'CIFAR10': [3, 32, 32],
@@ -152,8 +161,14 @@ def make_data_name():
                                                    'text_column': ['instruction', 'context'],
                                                    'label_column': 'response'}
                                            }
-
                       },
+            # https://huggingface.co/datasets/wikitext
+            'wikitext': {'data_name': 'wikitext',
+                          'subset_name_dict': {'2v1': {'subset_name': 'wikitext-2-v1',
+                                                   'text_column': ['text'],
+                                                   'label_column': None}
+                                           }                       
+                         },
             # Dataset: https://github.com/google/dreambooth
             # DreamBooth paper: https://arxiv.org/pdf/2208.12242.pdf
             'dreambooth': {'data_name': 'DreamBooth',

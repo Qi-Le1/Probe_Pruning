@@ -13,7 +13,7 @@ def make_metric(metric_name, tokenizer):
             pivot_direction = 'up'
             pivot_name = 'ROUGE'
             metric_name['train'].extend(['Perplexity'])
-            metric_name['test'].extend(['ROUGE'])
+            metric_name['test'].extend(['ROUGE', 'Perplexity'])
         else:
             raise ValueError('Not valid data name')
     elif cfg['task_name'] == 's2s':

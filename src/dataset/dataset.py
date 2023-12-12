@@ -111,6 +111,9 @@ def make_dataset(data_name, subset_name=None, verbose=True):
     elif data_name in ['dolly']:
         dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
         dataset_ = dataset_['train'].train_test_split(test_size=0.1, seed=cfg['seed'])
+    elif data_name in ['wikitext']:
+        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
+        dataset_['test'] = dataset_['validation']
     elif data_name in ['dreambooth']:
         model, tokenizer = make_model(cfg['model_name'])
 
@@ -349,6 +352,49 @@ def process_dataset(dataset, tokenizer):
                 desc="Running tokenizer on dataset",
             )
             cfg['max_new_tokens'] = 40
+        elif cfg['data_name'] == 'wikitext':
+            max_length = cfg[cfg['model_name']]['max_length']
+
+            def preprocess_function_test(examples):
+                batch_size = len(examples[text_column[0]])
+                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}") for i in range(batch_size)]
+                targets = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}") for i in range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding='max_length', truncation=True)
+                # labels = [input_ids[1:] + [tokenizer.pad_token_id] for input_ids in model_inputs["input_ids"]]
+                labels = tokenizer(targets, max_length=max_length, padding='max_length', truncation=True)
+                
+                model_inputs["split"] = []
+                for i in range(batch_size):
+                    sample_input_ids = model_inputs["input_ids"][i]
+                    sample_attention_mask = model_inputs["attention_mask"][i]
+                    # label_input_ids = labels[i]
+                    model_inputs["input_ids"][i] = sample_input_ids
+                    model_inputs["attention_mask"][i] = sample_attention_mask
+                    # labels["input_ids"][i] = label_input_ids
+                    # model_inputs["split"].append(cfg['task_label'][examples['category'][i]])
+                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
+                model_inputs["labels"] = labels["input_ids"]
+                return model_inputs
+
+            def remove_empty_examples(example):
+                return example["text"].strip() != ""
+
+            processed_dataset = {}
+            
+            filtered_dataset = dataset['test'].filter(remove_empty_examples)
+            processed_dataset['test'] = filtered_dataset.map(
+                preprocess_function_test,
+                batched=True,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset",
+            )
+
+
+
         elif cfg['data_name'] == 'wikisql':
             '''
             This example was too long and was cropped:
