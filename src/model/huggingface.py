@@ -96,6 +96,8 @@ def make_hf_model(model_name, sub_model_name=None):
     else:
         raise ValueError('Not valid task name')
     if any(k in cfg['model_name_or_path'] for k in ("gpt", "opt", "bloom", "llama")):
+        cfg[cfg['model_name']]['max_length'] = model.config.max_position_embeddings
+        # cfg[cfg['model_name']]['max_length'] = 512
         padding_side = "left"
     else:
         padding_side = "right"

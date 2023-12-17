@@ -2,6 +2,9 @@ import copy
 import dataset
 import numpy as np
 import os
+import time
+import random
+from collections.abc import Mapping
 import copy
 import torch
 from functools import partial
@@ -11,6 +14,7 @@ from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import default_collate
 from transformers import default_data_collator
+from torch.nn.utils.rnn import pad_sequence
 from config import cfg
 from model import make_model
 from module import to_device
@@ -112,8 +116,9 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
         dataset_ = dataset_['train'].train_test_split(test_size=0.1, seed=cfg['seed'])
     elif data_name in ['wikitext']:
-        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
-        dataset_['test'] = dataset_['validation']
+        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test')
+        # del dataset_['train']
+        # del dataset_['validation']
     elif data_name in ['dreambooth']:
         model, tokenizer = make_model(cfg['model_name'])
 
@@ -171,6 +176,38 @@ def dreambooth_input_collate(batch):
     }
     return batch
 
+def torch_default_data_collator(features):
+    if not isinstance(features[0], Mapping):
+        features = [vars(f) for f in features]
+    first = features[0]
+    batch = {}
+
+    # Special handling for labels.
+    # Ensure that tensor is created with the correct type
+    # (it should be automatically the case, but let's make sure of it.)
+    if "label" in first and first["label"] is not None:
+        label = first["label"].item() if isinstance(first["label"], torch.Tensor) else first["label"]
+        dtype = torch.long if isinstance(label, int) else torch.float
+        batch["labels"] = torch.tensor([f["label"] for f in features], dtype=dtype)
+    elif "label_ids" in first and first["label_ids"] is not None:
+        if isinstance(first["label_ids"], torch.Tensor):
+            batch["labels"] = torch.stack([f["label_ids"] for f in features])
+        else:
+            dtype = torch.long if isinstance(first["label_ids"][0], int) else torch.float
+            batch["labels"] = torch.tensor([f["label_ids"] for f in features], dtype=dtype)
+
+    # Handling of all other possible keys.
+    # Again, we will use the first element to figure out which key/values are not None for this model.
+    for k, v in first.items():
+        if k not in ("label", "label_ids") and v is not None and not isinstance(v, str):
+            if isinstance(v, torch.Tensor):
+                batch[k] = torch.stack([f[k] for f in features])
+            elif isinstance(v, np.ndarray):
+                batch[k] = torch.tensor(np.stack([f[k] for f in features]))
+            else:
+                batch[k] = torch.tensor([f[k] for f in features])
+
+    return batch
 
 def make_data_collate(collate_mode, tokenizer=None):
     if collate_mode == 'dict':
@@ -179,6 +216,7 @@ def make_data_collate(collate_mode, tokenizer=None):
         return default_collate
     elif collate_mode == 'transformer':
         return default_data_collator
+        # return torch_default_data_collator
     elif collate_mode == 'dreambooth':
         return dreambooth_input_collate
     elif collate_mode == 'pad':
@@ -354,47 +392,48 @@ def process_dataset(dataset, tokenizer):
             cfg['max_new_tokens'] = 40
         elif cfg['data_name'] == 'wikitext':
             max_length = cfg[cfg['model_name']]['max_length']
-
+            print('max_length', max_length)
             def preprocess_function_test(examples):
-                batch_size = len(examples[text_column[0]])
-                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}") for i in range(batch_size)]
-                targets = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}") for i in range(batch_size)]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding='max_length', truncation=True)
-                # labels = [input_ids[1:] + [tokenizer.pad_token_id] for input_ids in model_inputs["input_ids"]]
-                labels = tokenizer(targets, max_length=max_length, padding='max_length', truncation=True)
+                print('debug here 1.5')
+                # sleep_time = random.randint(3, 30)
+
+                # # Sleep for that number of seconds
+                # time.sleep(sleep_time)
+                all_text = "\n\n".join(examples[text_column[0]])
+                print('debug here 2')
+                model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
+
+                print("Size of input_ids:", model_inputs['input_ids'].size())
+                print("Size of attention_mask:", model_inputs['attention_mask'].size())
+
+                input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
+                attention_mask = model_inputs['attention_mask'][0]
+
+                input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+                mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+
+                final_inputs = defaultdict(list)
+                for i in range(len(input_chunks)):
+                    if len(input_chunks[i]) == max_length:
+                        final_inputs['input_ids'].append(input_chunks[i])
+                        final_inputs['attention_mask'].append(mask_chunks[i])
+                        final_inputs['labels'].append(input_chunks[i])
                 
-                model_inputs["split"] = []
-                for i in range(batch_size):
-                    sample_input_ids = model_inputs["input_ids"][i]
-                    sample_attention_mask = model_inputs["attention_mask"][i]
-                    # label_input_ids = labels[i]
-                    model_inputs["input_ids"][i] = sample_input_ids
-                    model_inputs["attention_mask"][i] = sample_attention_mask
-                    # labels["input_ids"][i] = label_input_ids
-                    # model_inputs["split"].append(cfg['task_label'][examples['category'][i]])
-                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
-                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
-                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
-                model_inputs["labels"] = labels["input_ids"]
-                return model_inputs
+                print('length', len(final_inputs['input_ids']))
+                return final_inputs
 
-            def remove_empty_examples(example):
-                return example["text"].strip() != ""
-
+            print('debug here 1')
             processed_dataset = {}
-            
-            filtered_dataset = dataset['test'].filter(remove_empty_examples)
-            processed_dataset['test'] = filtered_dataset.map(
+            processed_dataset['test'] = dataset['test'].map(
                 preprocess_function_test,
                 batched=True,
+                # batch_size=50,
                 num_proc=1,
                 remove_columns=dataset["test"].column_names,
                 load_from_cache_file=False,
                 desc="Running tokenizer on dataset",
             )
-
-
-
+            print('debug here 3')
         elif cfg['data_name'] == 'wikisql':
             '''
             This example was too long and was cropped:

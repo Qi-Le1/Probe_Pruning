@@ -318,7 +318,7 @@ def make_vis(df_exp, df_history):
         0.3: 'orange', 0.4: 'black', 0.5: 'purple', 0.6: 'black', 0.7: 'purple', 
         0.8: 'sienna', 0.9: 'green', 1.0: 'red', 9999: 'darkseagreen'
     }
-    prune_names = ['pqstruct', 'pqunstruct', 'magstruct', 'magunstruct']
+    prune_names = ['magstructglobal', 'magunstructglobal', 'pqstructlocal', 'magstructlocal']
     for name in prune_names:
         for hyper in prune_hypers:
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
@@ -454,6 +454,7 @@ def make_vis(df_exp, df_history):
             pruned_ratio_order = 0
             pruned_FLOPs_ratio_order = 0
             performance_vs_total_FLOPs_ratio = [None, None]
+            performance_vs_sparsity = [None, None]
             for i in range(len(temp)):
                 cur_item = temp[i]
                 for index, row in cur_item.iterrows():
@@ -543,7 +544,40 @@ def make_vis(df_exp, df_history):
                             draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'FLOPs_ratio', cur_metric_name)
                             performance_vs_total_FLOPs_ratio = [None, None]
                     
-                    
+                    # data_name, model_name, task_name, batch_size, prune_name, batch_integ, multibatch_integ, cust_tgt_modules = df_name_list
+                    # prune_name_list = prune_name.split('-')
+                    # prune_name = prune_name_list[0]
+                    # prune_tgt = prune_name_list[1]
+                    # if prune_tgt == 'w':
+                    #     prune_tgt = 'weight'
+                    # elif prune_tgt == 'h':
+                    #     prune_tgt = 'hidden_repr'
+                    # else:
+                    #     raise ValueError('Not valid prune target')
+                    # prune_norm = prune_name_list[2]
+                    # prune_hyper = prune_name_list[3]
+                    # prune_dim = prune_name_list[4]
+                    # prune_dim_select_mode = prune_name_list[5] if len(prune_name_list) > 5 else 'max'
+
+                    # for unstructure pruning, performance v.s. sparsity
+                    if any(metric_name in index for metric_name in metric_name_list) and 'unstruct' in prune_name:
+                        cur_metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                        if any(metric_name in index for metric_name in metric_name_list):
+                            if performance_vs_sparsity[0] is None:
+                                performance_vs_sparsity[0] = row.tolist()[0]
+                        elif 'sparsity' in index:
+                            if performance_vs_sparsity[1] is None:
+                                performance_vs_sparsity[1] = row.tolist()[0]
+
+                        if any(metric_name in index for metric_name in metric_name_list):
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'performance_vs_sparsity'])
+                            fig[fig_name] = plt.figure(fig_name)
+                            x = performance_vs_sparsity[1]
+                            y = performance_vs_sparsity[0]
+                            key_for_dict = f"{prune_name}_{prune_hyper}"
+                            draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'sparsity', cur_metric_name)
+                            performance_vs_total_FLOPs_ratio = [None, None]
+
 
     def write_xlsx(path, df, startrow=0):
         writer = pd.ExcelWriter(path, engine='xlsxwriter')
@@ -555,9 +589,17 @@ def make_vis(df_exp, df_history):
         writer.save()
         return
 
+#     save_format = 'png'
+# result_path = './output/result'
+# vis_path = './output/vis/{}'.format(save_format)
+
     for fig_name in fig:
         fig[fig_name] = plt.figure(fig_name)
         plt.grid()
+        fig_name_list = fig_name.split('_')
+        data_name = fig_name_list[0]
+        model_name = fig_name_list[1]
+        vis_path = os.path.join('output', 'vis', '{}'.format(save_format), data_name, model_name)
         fig_path = '{}/{}.{}'.format(vis_path, fig_name, save_format)
         makedir_exist_ok(vis_path)
         plt.savefig(fig_path, dpi=500, bbox_inches='tight', pad_inches=0)

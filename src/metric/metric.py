@@ -13,7 +13,13 @@ def make_metric(metric_name, tokenizer):
             pivot_direction = 'up'
             pivot_name = 'ROUGE'
             metric_name['train'].extend(['Perplexity'])
-            metric_name['test'].extend(['ROUGE', 'Perplexity'])
+            metric_name['test'].extend(['ROUGE'])
+        elif cfg['data_name'] in ['wikitext']:
+            pivot = float('inf')
+            pivot_direction = 'down'
+            pivot_name = 'Perplexity'
+            metric_name['train'].extend(['Perplexity'])
+            metric_name['test'].extend(['Perplexity'])
         else:
             raise ValueError('Not valid data name')
     elif cfg['task_name'] == 's2s':
@@ -59,7 +65,7 @@ def Loss(output):
 
 
 def Perplexity(output):
-    ppl = output.exp().item()
+    ppl = torch.exp(output).item()
     return ppl
 
 

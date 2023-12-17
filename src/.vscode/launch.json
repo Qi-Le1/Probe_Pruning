@@ -32,15 +32,15 @@
         },
 
         {
-            "name": "verify_r.py",
+            "name": "verify_wikitext_gpt.py",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
-            "program": "${workspaceFolder}/verify.py",
+            "program": "${workspaceFolder}/test_model.py",
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "fpb-sa_test_s2s_8_pq-h-1-0.2-1#2-max_inter_somemethods-3",
+                "wikitext-2v1_gpt2_clm_1_pq-h-1-0.2-1-max_inter_somemethods-3_None",
             ],
         },
 
@@ -156,14 +156,14 @@
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "CIFAR10_resnet9_ic_1_magstructlocal-w-2-0-1-max_full_somemethods-3_None",
+                "CIFAR10_resnet9_ic_1_magstructlocal-w-2-0.1-1-max_full_somemethods-3_None",
                 "--device",
                 "cpu"
             ],
         },
 
         {
-            "name": "verify_w_resnet_basestructglobal.py",
+            "name": "verify_w_resnet_magstructglobal.py",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
@@ -171,14 +171,15 @@
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "CIFAR10_resnet9_ic_1_basestructglobal-w-2-0-1-max_full_somemethods-3_None",
+                "CIFAR10_resnet9_ic_1_magstructglobal-w-2-0.1-1-max_full_somemethods-3_None",
                 "--device",
                 "cpu"
             ],
         },
         
+
         {
-            "name": "verify_w_resnet_baseunstructlocal.py",
+            "name": "verify_w_resnet_wandaunstructlocal.py",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
@@ -186,7 +187,22 @@
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "CIFAR10_resnet9_ic_1_baseunstructlocal-w-2-0-1-max_full_somemethods-3_None",
+                "CIFAR10_resnet9_ic_1_wandaunstructlocal-h-2-0.1-1-max_full_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_w_resnet_magunstructlocal.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_local_tuned_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "CIFAR10_resnet9_ic_1_magunstructlocal-w-2-0.1-1-max_full_somemethods-3_None",
                 "--device",
                 "cpu"
             ],
@@ -202,6 +218,36 @@
             "args": [
                 "--control_name",
                 "wikitext-2rawv1_opt-1.3b_clm_1_pqstruct-h-2-0-2-max_inter_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_w_wikitet_wandaunstructlocal.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "wikitext-2v1_llama-2_clm_1_wandaunstructlocal-h-2-0.1-1-max_full_somemethods-3_None",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "verify_h_bus_bug",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "wikitext-2v1_gpt2_clm_1_pqstructlocal:h:2:0:-1:max_inter_somemethods-3_None",
                 "--device",
                 "cpu"
             ],

@@ -5,7 +5,7 @@ def process_control():
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
-    prune_name_list = cfg['control']['prune_name'].split('-')
+    prune_name_list = cfg['control']['prune_name'].split(':')
     cfg['prune_name'] = prune_name_list[0]
     cfg['prune_tgt'] = prune_name_list[1]
     if cfg['prune_tgt'] == 'w':
@@ -33,17 +33,17 @@ def process_control():
     cfg['pq_q'] = 2
     cfg['gamma'] = 1
     cfg['beta'] = 0.9
-    
+
     make_data_name()
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i']:
         cfg['collate_mode'] = 'transformer'
         cfg['bart-base'] = {'max_length': 128}
         cfg['roberta-base'] = {'max_length': 128}
-        cfg['gpt2'] = {'max_length': 128}
+        cfg['gpt2'] = {'max_length': 512}
         if 'llama' in cfg['model_name']:
-            cfg[cfg['model_name']] = {'max_length': 128}
+            cfg[cfg['model_name']] = {'max_length': 512}
         if 'opt' in cfg['model_name']:
-            cfg[cfg['model_name']] = {'max_length': 128}
+            cfg[cfg['model_name']] = {'max_length': 512}
         # cfg['opt'] = {'max_length': 128}
     elif cfg['task_name'] in ['ic']:
         cfg['collate_mode'] = 'dict'
@@ -74,6 +74,7 @@ def process_control():
     else:
         raise ValueError('Not valid task name')
 
+    print('cfg: ', cfg)
     return
 
 
@@ -164,7 +165,7 @@ def make_data_name():
                       },
             # https://huggingface.co/datasets/wikitext
             'wikitext': {'data_name': 'wikitext',
-                          'subset_name_dict': {'2v1': {'subset_name': 'wikitext-2-v1',
+                          'subset_name_dict': {'2v1': {'subset_name': 'wikitext-2-raw-v1',
                                                    'text_column': ['text'],
                                                    'label_column': None}
                                            }                       
@@ -252,7 +253,7 @@ TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
     "gpt2": ["c_attn"],
     "bloom": ["query_key_value"],
     "blip-2": ["q", "v", "q_proj", "v_proj"],
-    "opt": ["q_proj", "v_proj"],
+    "opt": ["q_proj", "v_proj", "k_proj", "out_proj", "fc1", "fc2"],
     "gptj": ["q_proj", "v_proj"],
     "gpt_neox": ["query_key_value"],
     "gpt_neo": ["q_proj", "v_proj"],
@@ -263,7 +264,7 @@ TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
     "deberta-v2": ["query_proj", "value_proj"],
     "deberta": ["in_proj"],
     "layoutlm": ["query", "value"],
-    "llama": ["q_proj", "v_proj"],
+    "llama": ["q_proj", "v_proj", "o_proj", "k_proj", "gate_proj", "up_proj", "down_proj"],
     # "llama": ["proj"],
     "chatglm": ["query_key_value"],
     "gpt_bigcode": ["c_attn"],

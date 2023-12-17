@@ -150,10 +150,93 @@ def main():
             controls.extend(CIFAR10_controls_9)
 
         elif 'clm' in data:
-            control_name = [[['dolly-15k'], ['gpt2', 'llama-2'], ['clm'], ['1'], [f'pqstruct-h-2-{x}-2-max' for x in [0]], 
+            # control_name = [[['wikitext-2v1'], ['gpt2', 'llama-2', 'opt-1.3b'], ['clm'], ['1'], [f'pqstruct-h-2-{x}-2-max' for x in [9999]], 
+            #         ['inter'], ['somemethods-3'], ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2'], ['clm'], ['5'], [f'wandaunstructlocal:h:2:{x}:1:max' for x in [0, 0.01,  9999]],
+            #         ['full'], ['somemethods-3'], ['down_proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2'], ['clm'], ['5'], [f'magunstructglobal:w:2:{x}:1:max' for x in [0, 0.01,  9999]],
+            #         ['full'], ['somemethods-3'], ['down_proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            
+            # control_name = [[['wikitext-2v1'], ['llama-2'], ['clm'], ['5'], [f'magstructglobal:w:2:{x}:1:max' for x in [0, 0.01,  9999]],
+            #         ['full'], ['somemethods-3'], ['down_proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2'], ['clm'], ['5'], [f'magstructlocal:h:2:{x}:-1:max' for x in [0, 0.01,  9999]],
+            #         ['inter'], ['somemethods-3'], ['down_proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2'], ['clm'], ['5'], [f'pqstructlocal:h:2:{x}:-1:max' for x in [0, 0.01,  9999]],
+            #         ['inter'], ['somemethods-3'], ['down_proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['5'], [f'wandaunstructlocal:h:2:{x}:1:max' for x in [0, 0.01,  9999]],
+            #         ['full'], ['somemethods-3'], ['fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['5'], [f'magunstructglobal:w:2:{x}:1:max' for x in [0, 0.01,  9999]],
+            #         ['full'], ['somemethods-3'], ['fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['5'], [f'magstructglobal:w:2:{x}:1:max' for x in [0, 0.01,  9999]],
+            #         ['full'], ['somemethods-3'], ['fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+            #         ['inter'], ['somemethods-3'], ['fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+            #         ['inter'], ['somemethods-3'], ['fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['5'], [f'wandaunstructlocal:h:2:{x}:1:max' for x in [0, 0.01,  9999]],
+            #         ['full'], ['somemethods-3'], ['fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['5'], [f'magunstructglobal:w:2:{x}:1:max' for x in [0, 0.01,  9999]],
+            #         ['full'], ['somemethods-3'], ['fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['5'], [f'magstructglobal:w:2:{x}:1:max' for x in [0, 0.01,  9999]],
+            #         ['full'], ['somemethods-3'], ['fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['gpt2'], ['clm'], ['1'], [f'magstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+            #         ['inter'], ['somemethods-3'], ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['dolly-15k'], ['gpt2'], ['clm'], ['1'], [f'pqstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
                     ['inter'], ['somemethods-3'], ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+
+            # down_proj
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['5'], [f'wandaunstructlocal-h-2-{x}-1-max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]], 
+            #         ['full'], ['somemethods-3'], ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
         elif 'ic' in data:
             control_name = [[['CIFAR10', 'CIFAR100'], ['resnet9', 'resnet18'], ['ic'], ['10'], [f'pqstruct-h-2-{x}-1-max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
                              ['inter'], ['somemethods-3'], ['None']]]
@@ -213,25 +296,31 @@ def main():
         sub_controls = []
         j = 0
         is_llama = False
-        is_femnist = False
+        is_opt = False
+        is_gpt = False
         while j < task_parallel_num and i < len(controls):
             controls[i] = list(controls[i])
             sub_controls.append(controls[i])
             print('controls[i]', controls[i])
             if 'llama' in controls[i][4]:
                 is_llama = True
-            if 'FEMNIST' in controls[i][4]:
-                is_femnist = True
+            if 'opt' in controls[i][4]:
+                is_opt = True
+            if 'gpt' in controls[i][4]:
+                is_gpt = True
             j += 1
             i += 1
-            
+        
+        # print('isgpt', is_gpt)
         temp_mem = mem
         if is_llama:
             temp_mem = int(2.3 * mem)
-        if is_femnist:
-            temp_mem = int(3 * temp_mem)
+        if is_opt:
+            temp_mem = int(5.5 * temp_mem)
+        if is_gpt:
+            temp_mem = int(5.5 * temp_mem)
         s = '#!/bin/bash -l\n'
-        s += '#SBATCH --time=01:50:00\n'
+        s += '#SBATCH --time=05:40:00\n'
         s += f'#SBATCH --nodes={task_parallel_num}\n'
         s += f'#SBATCH --ntasks={task_parallel_num}\n'
         # s += '#SBATCH --cpus-per-task=2'
@@ -255,10 +344,10 @@ def main():
         #     k_for_max = k_for_max + 1
         #     continue
         # while i < len(controls):
-        
+        # srun --nodes=1 --ntasks=1 
         for item in sub_controls:
             s += '\n'
-            s = s + 'srun --nodes=1 --ntasks=1 python {} --device {} --resume_mode {} --init_seed {} --control_name {}&\n'.format(*item)
+            s = s + 'srun --nodes=1 --ntasks=1 python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
         
         s += 'wait\n'
         # controls[i][0] = 'test_classifier_fl.py'
