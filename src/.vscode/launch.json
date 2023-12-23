@@ -40,7 +40,7 @@
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "wikitext-2v1_gpt2_clm_1_pq-h-1-0.2-1-max_inter_somemethods-3_None",
+                "wikitext-2v1_gpt2_clm_1_pqstruct-h-1-0.2-1-max_inter_somemethods-3_None",
             ],
         },
 

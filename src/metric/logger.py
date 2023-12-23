@@ -20,6 +20,9 @@ class Logger:
         for name in self.mean:
             if len(self.history[name]) < 1000000:
                 self.history[name].append(self.mean[name])
+            # record counter for pruned channels
+            # if 'pruned_channels' in name:
+            #     self.history[f'{name}_counter'] = self.counter[name]
         if flush:
             self.flush()
         return
@@ -50,6 +53,7 @@ class Logger:
                         self.mean[name][i] = ((self.counter[name][i] - n[i]) * self.mean[name][i] + n[i] *
                                               result[k][i]) / self.counter[name][i]
             else:
+                print(result[k], type(result[k]), k)
                 raise ValueError('Not valid data type for logger')
             n = prev_n
         return

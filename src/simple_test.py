@@ -184,13 +184,33 @@ from transformers import AutoTokenizer
 
 # for x in range(2, 30, 10):
 #     print(x)
-eta = 0
-pq_p = 1
-pq_q = 2
-prune_norm = 2
-beta = 0.9
-gamma = 1
+# eta = 0
+# pq_p = 1
+# pq_q = 2
+# prune_norm = 2
+# beta = 0.9
+# gamma = 1
+import time
+class YourClass:
+    # Other methods...
+    def __init__(self):
+        self.logger_info_time_used = 0
 
+    def monitor_time(func):
+        def wrapper(*args, **kwargs):
+            print('wrapper', args, kwargs)
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            args[0].logger_info_time_used += time.time() - start_time
+            return result
+        return wrapper
+    
+    @monitor_time
+    def update_pruning_info(self, info):
+        a = 5
+
+a = YourClass()
+a.update_pruning_info(1)
 # def calculate_entropy(probabilities):
 #     """
 #     Calculate the entropy of a probability distribution.
@@ -387,85 +407,197 @@ def load_and_tokenize_dataset(model_checkpoint, dataset_name='wikitext', dataset
     # # testenc = tokenizer("\n\n".join(dataset['text']), return_tensors='pt')
     # # Tokenize the dataset
 
-    def preprocess_function_test(examples):
-        pass
-        return
+#     def preprocess_function_test(examples):
+#         pass
+#         return
     
-    # tokenized_dataset = dataset.map(preprocess_function_test, remove_columns=dataset.column_names, batched=False)
-    a= dataset['text']
+#     # tokenized_dataset = dataset.map(preprocess_function_test, remove_columns=dataset.column_names, batched=False)
+#     a= dataset['text']
     
-    all_text = "\n\n".join(dataset['text'])
-    model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
+#     all_text = "\n\n".join(dataset['text'])
+#     model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
 
-    max_length = 1024  # Set your desired max length
-    input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
-    attention_mask = model_inputs['attention_mask'][0]
+#     max_length = 1024  # Set your desired max length
+#     input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
+#     attention_mask = model_inputs['attention_mask'][0]
 
-    input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
-    mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+#     input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+#     mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
 
-    final_inputs = collections.defaultdict(list)
-    for i in range(len(input_chunks)):
-        if len(input_chunks[i]) == max_length:
-            final_inputs['input_ids'].append(input_chunks[i])
-            final_inputs['attention_mask'].append(mask_chunks[i])
-            final_inputs['labels'].append(input_chunks[i])
+#     final_inputs = collections.defaultdict(list)
+#     for i in range(len(input_chunks)):
+#         if len(input_chunks[i]) == max_length:
+#             final_inputs['input_ids'].append(input_chunks[i])
+#             final_inputs['attention_mask'].append(mask_chunks[i])
+#             final_inputs['labels'].append(input_chunks[i])
     
-    dataset.remove_columns(dataset.column_names)
-    dataset['input_ids'] = final_inputs['input_ids']
-    dataset['attention_mask'] = final_inputs['attention_mask']
-    dataset['labels'] = final_inputs['labels']
+#     dataset.remove_columns(dataset.column_names)
+#     dataset['input_ids'] = final_inputs['input_ids']
+#     dataset['attention_mask'] = final_inputs['attention_mask']
+#     dataset['labels'] = final_inputs['labels']
 
-    processed_dataset = {}
-    processed_dataset['test'] = dataset.map(
-        preprocess_function_test,
-        batched=False,
-        batch_size=60,
-        num_proc=1,
-        remove_columns=dataset.column_names,
-        load_from_cache_file=False,
-        desc="Running tokenizer on dataset",
-    )
-# print('count', count)
-    # print('tokenized_dataset', len(tokenized_dataset))
-    # Prepare the dataset for training (for a language modeling task)
-    # tokenized_dataset = tokenized_dataset.map(lambda examples: {'labels': examples['input_ids']}, batched=True)
-    # tokenized_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
+#     processed_dataset = {}
+#     processed_dataset['test'] = dataset.map(
+#         preprocess_function_test,
+#         batched=False,
+#         batch_size=60,
+#         num_proc=1,
+#         remove_columns=dataset.column_names,
+#         load_from_cache_file=False,
+#         desc="Running tokenizer on dataset",
+#     )
+# # print('count', count)
+#     # print('tokenized_dataset', len(tokenized_dataset))
+#     # Prepare the dataset for training (for a language modeling task)
+#     # tokenized_dataset = tokenized_dataset.map(lambda examples: {'labels': examples['input_ids']}, batched=True)
+#     # tokenized_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
 
-    return processed_dataset['test']
+#     return processed_dataset['test']
 
+# # # Example usage
+# model_checkpoint = "gpt2"  # Replace with your model of choice
+# processed_dataset = load_and_tokenize_dataset(model_checkpoint)
+
+
+# import torch
+# import torch.nn as nn
+# import torch.optim as optim
+# from torchvision import datasets, transforms
+# from torch.utils.data import DataLoader
+
+# # Define a simple neural network
+# class SimpleNet(nn.Module):
+#     def __init__(self):
+#         super(SimpleNet, self).__init__()
+#         self.fc1 = nn.Linear(784, 128)
+#         self.relu = nn.ReLU()
+#         self.fc2 = nn.Linear(128, 64)
+#         self.fc3 = nn.Linear(64, 10)
+
+#     def forward(self, x):
+#         x = x.view(-1, 784)
+#         x = self.relu(self.fc1(x))
+#         x = self.relu(self.fc2(x))
+#         x = self.fc3(x)
+#         return x
+
+# # Instantiate the model
+# model = SimpleNet()
+
+
+import torch
+
+# norm_across_other_dims = torch.tensor([[1, 2, 3], []])
+# print(norm_across_other_dims, norm_across_other_dims.shape)
+# norm_across_other_dims = norm_across_other_dims.float()
+# # Calculate the mean across the zeroth dimension
+# mean_tensor = norm_across_other_dims.mean(dim=0)
+
+# # Squeeze the zeroth dimension if it's of size 1
+# squeezed_tensor = mean_tensor.squeeze(0)
+
+# # Convert the tensor to a list
+# result_list = squeezed_tensor.tolist()
+
+# print('11', result_list)
+
+
+
+import numpy as np
+
+# def compare_1d_vector_norms(v, p, q, gamma, beta):
+#     pq_p = p
+#     pq_q = q
+#     p_norm = np.linalg.norm(v, p)
+#     q_norm = np.linalg.norm(v, q)
+
+#     print(f"  {p} Norm: {p_norm}")
+#     print(f"  {q} Norm: {q_norm}")
+
+#     # Calculate and compare ratios of norms
+#     dimension = len(v)
+#     ratio = p_norm / q_norm
+
+#     print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
+    
+#     pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
+#     print(f"  pq_indices_{p}_{q}: {pq_indices}")
+
+#     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
+#     beta_array = np.full_like(lower_bound, beta)
+#     prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
+#     print(f"ratio", {gamma * (1 - lower_bound / dimension)})
+#     print(f"  Lower Bound: {lower_bound}")
+#     print(f"  Prune Channels Count: {prune_channels_count}\n")
+
+# # pq_p = 1
+# # pq_q = 2
+# gamma = 1
+# beta = 0.9
 # # Example usage
-model_checkpoint = "gpt2"  # Replace with your model of choice
-processed_dataset = load_and_tokenize_dataset(model_checkpoint)
+# vectors = [
+#     np.array([1, 1, 1,1, 0]),
+#     np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
+#     np.array([0.1,0.1,0.1,0.1,0.1,]),
+#     np.array([100,100,100,100,100,]),
+#     np.array([100,100,100,100,0]),
+#     # np.array([-7, 8, -9])
+# ]
+# #  (1,3), (2,3)
+# for vector in vectors:
+#     for comb in [(1,2)]:
+#         p = comb[0]
+#         q = comb[1]
+#         compare_1d_vector_norms(vector, p, q, gamma, beta)
 
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+# def compare_1d_vector_norms(v, p, q, gamma, beta, pq_indices):
+#     pq_p = p
+#     pq_q = q
+#     # print(f"  p Norm: {p_norm}, q Norm: {q_norm}")
+#     # p_norm = np.linalg.norm(v, p)
+#     # q_norm = np.linalg.norm(v, q)
 
-# Define a simple neural network
-class SimpleNet(nn.Module):
-    def __init__(self):
-        super(SimpleNet, self).__init__()
-        self.fc1 = nn.Linear(784, 128)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 10)
+#     # print(f"  {p} Norm: {p_norm}")
+#     # print(f"  {q} Norm: {q_norm}")
 
-    def forward(self, x):
-        x = x.view(-1, 784)
-        x = self.relu(self.fc1(x))
-        x = self.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+#     # # Calculate and compare ratios of norms
+#     # dimension = len(v)
+#     # ratio = p_norm / q_norm
 
-# Instantiate the model
-model = SimpleNet()
+#     # print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
+#     dimension = 100
+#     # pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
+#     print(f"  pq_indices: {pq_indices}")
+    
+#     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
+#     beta_array = np.full_like(lower_bound, beta)
+#     prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
+#     print(f"ratio", {gamma * (1 - lower_bound / dimension)})
+#     print(f"  Lower Bound: {lower_bound}")
+#     print(f"  Prune Channels Count: {prune_channels_count}\n")
 
-
-import torch
+# # pq_p = 1
+# # pq_q = 2
+# gamma = 1
+# beta = 0.9
+# # Example usage
+# # vectors = [
+# #     np.array([1, 1, 1,1, 0]),
+# #     np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
+# #     np.array([0.1,0.1,0.1,0.1,0.1,]),
+# #     np.array([100,100,100,100,100,]),
+# #     np.array([100,100,100,100,0]),
+# #     # np.array([-7, 8, -9])
+# # ]
+# #  (1,3), (2,3)
+# for i in np.arange(0, 1, 0.01):
+#     # for j in np.arange(0.1, 1, 0.1):
+#     # for comb in [(1,2)]:
+#     p = 1
+#     q = 2
+#     vector = None
+#     compare_1d_vector_norms(vector, p, q, gamma, beta, i)
 
 # # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # model.to("cpu")

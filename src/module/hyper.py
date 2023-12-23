@@ -32,7 +32,7 @@ def process_control():
     cfg['pq_p'] = 1
     cfg['pq_q'] = 2
     cfg['gamma'] = 1
-    cfg['beta'] = 0.9
+    cfg['beta'] = 0.5
 
     make_data_name()
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i']:
@@ -74,6 +74,7 @@ def process_control():
     else:
         raise ValueError('Not valid task name')
 
+    cfg['logger_detailed_info'] = False
     print('cfg: ', cfg)
     return
 
@@ -170,6 +171,20 @@ def make_data_name():
                                                    'label_column': None}
                                            }                       
                          },
+
+            '''
+            piqa: piqa
+            storycloze: storycloze , 
+            arc-e: arc-easy 
+            arc-c: arc-challenge (Clark et al., 2018), 
+            hellaswag: hellaswag (Zellers et al., 2019) 
+            obqa: OpenBookQA (Mihaylov et al., 2018)
+
+            '''
+            
+           
+
+            
             # Dataset: https://github.com/google/dreambooth
             # DreamBooth paper: https://arxiv.org/pdf/2208.12242.pdf
             'dreambooth': {'data_name': 'DreamBooth',
@@ -280,3 +295,57 @@ TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
 
     'test': ['fc']
 }
+
+
+
+
+# gpt2 layer
+'''
+key:  transformer.h.3 <class 'transformers.models.gpt2.modeling_gpt2.GPT2Block'>
+key:  transformer.h.3.ln_1 <class 'torch.nn.modules.normalization.LayerNorm'>
+key:  transformer.h.3.attn <class 'transformers.models.gpt2.modeling_gpt2.GPT2Attention'>
+key:  transformer.h.3.attn.c_attn <class 'transformers.pytorch_utils.Conv1D'>
+key:  transformer.h.3.attn.c_proj <class 'transformers.pytorch_utils.Conv1D'>
+key:  transformer.h.3.attn.attn_dropout <class 'torch.nn.modules.dropout.Dropout'>
+key:  transformer.h.3.attn.resid_dropout <class 'torch.nn.modules.dropout.Dropout'>
+key:  transformer.h.3.ln_2 <class 'torch.nn.modules.normalization.LayerNorm'>
+key:  transformer.h.3.mlp <class 'transformers.models.gpt2.modeling_gpt2.GPT2MLP'>
+key:  transformer.h.3.mlp.c_fc <class 'transformers.pytorch_utils.Conv1D'>
+key:  transformer.h.3.mlp.c_proj <class 'transformers.pytorch_utils.Conv1D'>
+key:  transformer.h.3.mlp.act <class 'transformers.activations.NewGELUActivation'>
+key:  transformer.h.3.mlp.dropout <class 'torch.nn.modules.dropout.Dropout'>
+'''
+
+
+# opt 1.3b layer
+'''
+key:  model.decoder.layers.0 <class 'transformers.models.opt.modeling_opt.OPTDecoderLayer'>
+key:  model.decoder.layers.0.self_attn <class 'transformers.models.opt.modeling_opt.OPTAttention'>
+key:  model.decoder.layers.0.self_attn.k_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.decoder.layers.0.self_attn.v_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.decoder.layers.0.self_attn.q_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.decoder.layers.0.self_attn.out_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.decoder.layers.0.activation_fn <class 'torch.nn.modules.activation.ReLU'>
+key:  model.decoder.layers.0.self_attn_layer_norm <class 'torch.nn.modules.normalization.LayerNorm'>
+key:  model.decoder.layers.0.fc1 <class 'torch.nn.modules.linear.Linear'>
+key:  model.decoder.layers.0.fc2 <class 'torch.nn.modules.linear.Linear'>
+key:  model.decoder.layers.0.final_layer_norm <class 'torch.nn.modules.normalization.LayerNorm'>
+'''
+
+# llama-2-7b layer
+'''
+key:  model.layers.0 <class 'transformers.models.llama.modeling_llama.LlamaDecoderLayer'>
+key:  model.layers.0.self_attn <class 'transformers.models.llama.modeling_llama.LlamaAttention'>
+key:  model.layers.0.self_attn.q_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.layers.0.self_attn.k_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.layers.0.self_attn.v_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.layers.0.self_attn.o_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.layers.0.self_attn.rotary_emb <class 'transformers.models.llama.modeling_llama.LlamaRotaryEmbedding'>
+key:  model.layers.0.mlp <class 'transformers.models.llama.modeling_llama.LlamaMLP'>
+key:  model.layers.0.mlp.gate_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.layers.0.mlp.up_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.layers.0.mlp.down_proj <class 'torch.nn.modules.linear.Linear'>
+key:  model.layers.0.mlp.act_fn <class 'transformers.activations.SiLUActivation'>
+key:  model.layers.0.input_layernorm <class 'transformers.models.llama.modeling_llama.LlamaRMSNorm'>
+key:  model.layers.0.post_attention_layernorm <class 'transformers.models.llama.modeling_llama.LlamaRMSNorm'>
+'''

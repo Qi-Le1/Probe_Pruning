@@ -53,6 +53,7 @@ class EriModel(torch.nn.Module):
         kwargs = {
             "prune_tgt": cfg['prune_tgt'],
             "prune_name": cfg['prune_name'],
+            "prune_norm": cfg['prune_norm'],
             "pruning_module": pruning_module,
             "key": key,
             "fan_in_fan_out": False
@@ -115,7 +116,7 @@ class EriModel(torch.nn.Module):
 
     def _replace_module(self, parent_module, child_name, new_module, old_module):
         setattr(parent_module, child_name, new_module)
-        new_module.weight = old_module.weight
+        new_module.weight = transpose(old_module.weight, new_module.fan_in_fan_out)
         if hasattr(old_module, "bias"):
             # if old_module.bias is not None:
             new_module.bias = old_module.bias
@@ -140,7 +141,8 @@ class EriModel(torch.nn.Module):
             return getattr(self.model, name)
 
 def transpose(weight, fan_in_fan_out):
-    return weight.T if fan_in_fan_out else weight
+    transposed_weight = weight.T if fan_in_fan_out else weight
+    return nn.Parameter(transposed_weight)
 
 def mark_no_trainable(model: nn.Module) -> None:
     for n, p in model.named_parameters():
@@ -183,10 +185,18 @@ def _check_target_module_exists(target_modules, key):
 
 class EriLayer:
     def __init__(self, in_features: int, out_features: int, **kwargs):
+        self.prune_name = kwargs['prune_name']
+        self.prune_tgt = kwargs['prune_tgt']
+        self.prune_norm = kwargs['prune_norm']
+        self.pruning_module = kwargs['pruning_module']
+        self.key = kwargs['key']
+
         self.pruning_channel_ratio = []
         self.input_prune_channels = None
+        self.weight_norm_across_channel_dims = None
         pass
     
+
     # TODO, weight.data
     def prune_weight(self, weight, layer_type):
         layer_info = {
@@ -267,7 +277,7 @@ class EriLayer:
                 # print('zzzzz')
                 return self.weight
             else:
-                extract_weight_dim = 0 if self.fan_in_fan_out else 1
+                extract_weight_dim = 1
                 # weight dim 1 should have same size as original h dim 2
                 mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
                 # Mark the indices to be pruned as False
@@ -305,23 +315,21 @@ class Linear(nn.Linear, EriLayer):
         **kwargs,
     ):
         nn.Linear.__init__(self, in_features, out_features)
-        EriLayer.__init__(self, in_features=in_features, out_features=out_features)
+        EriLayer.__init__(self, in_features=in_features, out_features=out_features, **kwargs)
         # Freezing the pre-trained weight matrix
         self.weight.requires_grad = False
 
         self.fan_in_fan_out = fan_in_fan_out
         # print('fan_in_fan_out: ', fan_in_fan_out, self.weight.data.shape, self.weight.shape)
         # GPT2 has CON1D, which is a self-defined layer, not the traditional Conv1D
+        print('self.weight')
         if fan_in_fan_out:
             self.weight.data = self.weight.data.T
         # print('after fan_in_fan_out: ', fan_in_fan_out, self.weight.data.shape)
         self.is_target_conv_1d_layer = is_target_conv_1d_layer
         
         self.layer_type = 'linear'
-        self.prune_name = kwargs['prune_name']
-        self.prune_tgt = kwargs['prune_tgt']
-        self.pruning_module = kwargs['pruning_module']
-        self.key = kwargs['key']
+        
         # if 'local' in self.prune_name and self.prune_tgt == 'weight':
         #     self.prune_weight(self.weight, self.layer_type)
     
@@ -336,16 +344,17 @@ class Linear(nn.Linear, EriLayer):
             input_shape = x.shape
             linear_layer_info = {
                 'weight': self.weight.data,
+                # 'weight_norm_across_channel_dims': self.weight_norm_across_channel_dims,
             }
             pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key)
             weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
             
-            result = F.linear(pruned_h, transpose(weight, self.fan_in_fan_out), bias=self.bias)
+            result = F.linear(pruned_h, weight, bias=self.bias)
         elif self.prune_tgt == 'weight':
             pruned_h = self.extract_input(x, self.layer_type)
-            result = F.linear(pruned_h, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+            result = F.linear(pruned_h, self.weight, bias=self.bias)
         
-        self.pruning_module.cal_repr_distribution(pruned_h, 'pruned_hist')
+        self.pruning_module.cal_repr_distribution(pruned_h, f'{self.key}_pruned_hist')
         result = result.to(previous_dtype)
         return result
     
@@ -378,10 +387,6 @@ class Conv2d(nn.Conv2d, EriLayer):
         self.weight.requires_grad = False   
 
         self.layer_type = 'conv2d'
-        self.prune_name = kwargs['prune_name']
-        self.prune_tgt = kwargs['prune_tgt']
-        self.pruning_module = kwargs['pruning_module']
-        self.key = kwargs['key']
         # if 'local' in self.prune_name and self.prune_tgt == 'weight':
         #     self.prune_weight(self.weight, self.layer_type)
             
@@ -435,6 +440,7 @@ class BasePruning:
         self.prune_dim = cfg['prune_dim'] 
         self.prune_dim_select_mode = cfg['prune_dim_select_mode'] 
         self.batch_integ = cfg['batch_integ']   
+        self.logger_detailed_info = cfg['logger_detailed_info']
 
         self.pq_p = cfg['pq_p']
         self.pq_q = cfg['pq_q']
@@ -453,19 +459,43 @@ class BasePruning:
         self.bin_edges = sorted(set(self.bin_edges))
         self.reset_pruning_info()
 
+        self.logger_info_time_used = 0
+        self.weight_norm_across_channel_dims = None
+
+    def monitor_time(func):
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            args[0].logger_info_time_used += time.time() - start_time
+            return result
+        return wrapper
+    
     def reset_pruning_info(self):
         self.pruning_info = {}
         pass
     
+    @monitor_time
     def update_pruning_info(self, info):
         self.pruning_info.update(info)
         pass
     
+    @monitor_time
     def cal_repr_distribution(self, h, info_key):
+        if not self.logger_detailed_info:
+            return
         temp_h = h.detach().to(torch.float32).cpu().numpy()
         hist, _ = np.histogram(temp_h, bins=self.bin_edges)
         self.update_pruning_info({info_key: (hist/temp_h.shape[0]).tolist()})
 
+    def cal_weight_norm_across_channel_dims(self, weight):
+        if weight.dim() == 2:
+            self.weight_norm_across_channel_dims = torch.linalg.vector_norm(weight, ord=1, dim=0)
+        elif weight.dim() == 4:
+            self.weight_norm_across_channel_dims = torch.linalg.vector_norm(weight, ord=1, dim=(0, 2, 3))
+        else:
+            raise ValueError('Not valid weight dimension')
+        return
+    
 class HiddenRepresentationPruning(BasePruning):
 
     def __init__(self, cfg, key):
@@ -523,7 +553,11 @@ class HiddenRepresentationPruning(BasePruning):
             if self.prune_dim_select_mode == 'max':
                 for prune_dim in self.prune_dim:
                     prune_dim = (h.dim() + prune_dim) % h.dim()
-                    prune_channels = self.apply_pruning(h, key, prune_dim, exclude_dim)
+                    if layer_type == 'linear' and prune_dim != h.dim() - 1:
+                        raise ValueError('Not valid prune dim')
+                    elif layer_type == 'conv2d' and prune_dim != 1:
+                        raise ValueError('Not valid prune dim')
+                    prune_channels = self.apply_pruning(h, key, layer_info, prune_dim, exclude_dim)
                     prune_channels = self.apply_batch_integ(h_shape[prune_dim], prune_channels)
                     prune_channels_multi_dims[prune_dim] = prune_channels
 
@@ -556,12 +590,14 @@ class HiddenRepresentationPruning(BasePruning):
                 else:
                     num_pruned_channels = prune_channels_multi_dims[pruned_dims[final_prune_dim]].size(-1)
 
+                start_time = time.time()
                 cur_batch_info = {
                     f"{key}_pruned_dims": pruned_dims[final_prune_dim],
-                    f"{key}_pruned_channels": num_pruned_channels,
+                    # f"{key}_pruned_channels": list(prune_channels_multi_dims[pruned_dims[final_prune_dim]]),
                     f"{key}_total_channels": h_shape[pruned_dims[final_prune_dim]],
                     f"{key}_pruned_ratio": num_pruned_channels / (h_shape[pruned_dims[final_prune_dim]] + 1e-10),
                 }
+                self.logger_info_time_used += time.time() - start_time
                 self.update_pruning_info(cur_batch_info)
                 # print('after\n')
                 # print('final_prune_dim', final_prune_dim)
@@ -584,6 +620,8 @@ class HiddenRepresentationPruning(BasePruning):
         else:
             raise ValueError('Not valid pruning method')
         
+        torch.cuda.empty_cache()
+
     def prune_h(self, h, prune_dim, prune_channels):
         # Create a boolean mask for all indices
         mask = torch.ones(h.size(prune_dim), dtype=torch.bool)
@@ -650,7 +688,7 @@ class HiddenRepresentationPruning(BasePruning):
             warnings.warn("Attempting to prune all channels. Keeping one channel for calculation.")
         return prune_channels
     
-    def apply_pruning(self, h, key, prune_dim=None, exclude_dim=None):
+    def apply_pruning(self, h, key, layer_info, prune_dim=None, exclude_dim=None):
         # print('apply_pruning', prune_dim, h.dim(), h.shape)
         if prune_dim >= h.dim():
             raise ValueError('Not valid pruning dimension')
@@ -662,7 +700,7 @@ class HiddenRepresentationPruning(BasePruning):
             return [torch.empty(0)]
 
         if 'pqstruct' in self.prune_name:
-            prune_channels = self.pq_struct(h, key, prune_dim, exclude_dim)
+            prune_channels = self.pq_struct(h, key, layer_info, prune_dim, exclude_dim)
             return prune_channels
         elif 'magstruct' in self.prune_name:
             prune_channels = self.mag_struct(h, key, prune_dim, exclude_dim)
@@ -674,7 +712,8 @@ class HiddenRepresentationPruning(BasePruning):
             raise ValueError('Not valid pruning method')
         
 
-    def pq_struct(self, h, key, prune_dim, exclude_dim):
+    def pq_struct(self, h, key, layer_info, prune_dim, exclude_dim):
+        info = {}
         calc_dim = 0
         if exclude_dim != None and exclude_dim == 0:
             calc_dim = 1
@@ -682,7 +721,20 @@ class HiddenRepresentationPruning(BasePruning):
         dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != exclude_dim)
         norm_across_other_dims = torch.linalg.vector_norm(h, ord=self.prune_norm, dim=dims_to_aggregate)     
 
+        if 'w*pqstruct' in self.prune_name:
+            if self.weight_norm_across_channel_dims is None:
+                self.cal_weight_norm_across_channel_dims(layer_info['weight'])
+                start_time = time.time()
+                info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
+                self.logger_info_time_used += time.time() - start_time
+            norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
+            # info[f"{key}_weight_norm_across_channel_dims"] = list(layer_info['weight_norm_across_channel_dims'])
+            # print('norm_across_other_dims', norm_across_other_dims.shape, norm_across_other_dims.dim())
         # print('norm_across_other_dims', norm_across_other_dims.shape, norm_across_other_dims.dim())
+        # non_zero_mask = norm_across_other_dims != 0
+        norm_across_other_dims = norm_across_other_dims + (norm_across_other_dims == 0) * 1e-9
+        # Calculate norms only for non-zero channels
+        # non_zero_norms = norm_across_other_dims[non_zero_mask]
         norm_p = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=calc_dim)
         norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=calc_dim) + 1e-10
         
@@ -701,16 +753,46 @@ class HiddenRepresentationPruning(BasePruning):
         prune_channels_count = torch.floor(dimension * torch.min(self.gamma * (1 - lower_bound / dimension), beta_tensor))
 
         _, sorted_channels = torch.sort(norm_across_other_dims, dim=calc_dim)
+
+        if self.prune_hyper == 9999:
+            start_time = time.time()
+            pq_indices_varying_lengths = [1]
+            # Iterate over the lengths
+            for length in range(1, norm_across_other_dims.size(calc_dim) + 1):
+                # Slicing the tensor up to the current length
+                current_norms = norm_across_other_dims.narrow(calc_dim, 0, length)
+
+                # Calculate norms
+                norm_p_current = torch.linalg.vector_norm(current_norms, ord=self.pq_p, dim=calc_dim)
+                norm_q_current = torch.linalg.vector_norm(current_norms, ord=self.pq_p, dim=calc_dim) + 1e-10
+
+                # Calculate pq_indices for the current length
+                pq_indices_current = (1 - length ** (1/self.pq_q - 1/self.pq_p) * norm_p_current / norm_q_current)
+
+                # Add additional dimension if needed
+                # if pq_indices_current.dim() == 0:
+                #     pq_indices_current = pq_indices_current.unsqueeze(0)
+
+                # Check for NaN values
+                if torch.isnan(pq_indices_current).any():
+                    raise ValueError('pq_indices contains nan values')
+
+                # Store the pq_indices for the current length
+                pq_indices_varying_lengths.append(pq_indices_current.item())
+            info[f"{key}_pq_indices_varying_lengths"] = pq_indices_varying_lengths
+            self.logger_info_time_used += time.time() - start_time
         # print('sorted_channels', sorted_channels.shape, sorted_channels, prune_channels_count)
         if sorted_channels.dim() > 1:
             prune_channels = [sorted_channels[i, :int(count.item())] for i, count in enumerate(prune_channels_count)]
+            logger_norm_across_other_dims = norm_across_other_dims.mean(dim=0).squeeze(0).tolist()
         else:
             prune_channels = [sorted_channels[:int(prune_channels_count[0].item())]]
+            logger_norm_across_other_dims = norm_across_other_dims.tolist()
 
-        info = {
-            f"{key}_norm_across_other_dims": norm_across_other_dims.mean(dim=0).squeeze(0).tolist(),
-            f"{key}_pq_indices": pq_indices.mean(dim=0).squeeze(0).tolist(),
-        }
+        start_time = time.time()
+        info[f"{key}_norm_across_other_dims"] = logger_norm_across_other_dims
+        info[f"{key}_pq_indices"] = pq_indices.mean(dim=0).squeeze(0).tolist()
+        self.logger_info_time_used += time.time() - start_time
         self.update_pruning_info(info)
         return prune_channels
 
@@ -748,21 +830,93 @@ class WeightPruning(BasePruning):
         pass
     
     def global_pruning(self, model):
-        if self.prune_hyper == 9999:
+        if self.prune_hyper == 9999 or self.prune_hyper == 0:
             return
+        if len(self.prune_dim) > 1 and self.prune_dim[0] != 1:
+            raise ValueError('Not valid prune dim')
         
-        if 'struct' in self.prune_name:
+        if 'unstruct' in self.prune_name:
             all_weights = []
-            # TODO, prune_dim can only has 1 dim now
-            channel_norms = []
             for name, module in model.named_modules():
                 if _check_target_module_exists(self.target_modules, name):
                     if hasattr(module, 'weight') and module.weight is not None:
+                        all_weights.append(module.weight.data.reshape(-1))
+
+            all_weights_vector = torch.cat(all_weights)
+            sorted_weights = torch.sort(torch.abs(all_weights_vector)).values
+            if 'magunstruct' in self.prune_name:
+                # Concatenate all weights and convert to a single vector
+                
+                # Rank weights by absolute value and find the threshold for pruning
+                num_weights_to_prune = int(all_weights_vector.numel() * self.prune_hyper) 
+                print('magunstruct', num_weights_to_prune, all_weights_vector.numel())
+                # threshold = torch.kthvalue(torch.abs(all_weights_vector), num_weights_to_prune).values
+                threshold = sorted_weights[num_weights_to_prune - 1] 
+                print('threshold', threshold)
+            elif 'pqunstruct' in self.prune_name:
+                # raise ValueError('Not valid pruning method')
+                norm_p = torch.linalg.vector_norm(all_weights_vector, ord=self.pq_p, dim=0)
+                norm_q = torch.linalg.vector_norm(all_weights_vector, ord=self.pq_p, dim=0) + 1e-10
+                
+                dimension = len(all_weights_vector)
+                pq_indices = (1 - dimension ** (1/self.pq_q - 1/self.pq_p) * norm_p / norm_q)
+
+                # add additional dimension if dimension is 0
+                if pq_indices.dim() == 0:
+                    pq_indices = pq_indices.unsqueeze(0)
+
+                if torch.isnan(pq_indices).any():
+                    raise ValueError('pq_indices contains nan values')
+
+                lower_bound = dimension * (1 + self.eta) ** (-self.pq_q / (self.pq_q - self.pq_p)) * (1 - pq_indices) ** (self.pq_q * self.pq_p / (self.pq_q - self.pq_p))
+                beta_tensor = torch.full_like(lower_bound, self.beta)
+                prune_channels_count = torch.floor(dimension * torch.min(self.gamma * (1 - lower_bound / dimension), beta_tensor))
+                # threshold = torch.kthvalue(torch.abs(all_weights_vector), prune_channels_count).values
+                threshold = sorted_weights[num_weights_to_prune - 1] 
+
+
+            # Apply pruning directly without a separate mask
+            index = 0
+            for name, module in model.named_modules():
+                if index >= all_weights_vector.numel():
+                    break   
+                if _check_target_module_exists(self.target_modules, name):
+                    if hasattr(module, 'weight') and module.weight is not None:
+                        # numel = module.weight.data.numel()
+                        absolute_weights = module.weight.data.abs()
+
+                        # Determine the mask for weights to prune (weights below the threshold)
+                        prune_mask = absolute_weights < threshold
+
+                        # Apply pruning to the original weights
+                        # This sets weights below the threshold to zero
+                        module.weight.data[prune_mask] = 0
+                        # module.weight.data.reshape(-1).abs().clamp_(min=threshold)
+                        index += torch.sum(prune_mask)
+    
+                        info = {f"{name}_pruned_ratio": torch.sum(prune_mask).item() / (module.weight.data.numel() + 1e-10)}
+                        module.pruning_module.update_pruning_info(info)
+
+            del all_weights_vector
+            del all_weights
+
+        elif 'struct' in self.prune_name:
+            all_weights = []
+            # TODO, prune_dim can only has 1 dim now
+            channel_norms = []
+            info = {}
+            for name, module in model.named_modules():
+                is_exist = _check_target_module_exists(self.target_modules, name)
+                if _check_target_module_exists(self.target_modules, name):
+                    # print('is_exist', is_exist, name, hasattr(module, 'weight'), module.weight is not None, module.weight.data.dim())
+                    if hasattr(module, 'weight') and module.weight is not None:
                         dims_to_aggregate = tuple(i for i in range(module.weight.data.dim()) if i != self.prune_dim[0])
+                        # print('dims_to_aggregate', dims_to_aggregate)
                         norm_across_other_dims = torch.linalg.vector_norm(module.weight.data, ord=self.prune_norm, dim=dims_to_aggregate) 
                         for i, norm in enumerate(norm_across_other_dims):
                             channel_norms.append((norm.item(), name, i, module.weight.shape))  # Store norm, layer name, channel index, and shape
-
+                        info[f"{name}_weight_norm_across_channel_dims"] = norm_across_other_dims.tolist()
+            # print('channel_norms', channel_norms)
             if 'magstruct' in self.prune_name:
                 channel_norms.sort(key=lambda x: x[0])
                 num_channels_to_prune = int(len(channel_norms) * self.prune_hyper) 
@@ -788,63 +942,37 @@ class WeightPruning(BasePruning):
 
             pruning_info = collections.defaultdict(list)
             for norm_value, layer_name, channel_index, shape in channel_norms:
+                # print('norm_value', norm_value, 'pruning_threshold', pruning_threshold, 'layer_name', layer_name, 'channel_index', channel_index, 'shape', shape)
                 if norm_value > pruning_threshold:
                     break  # Only consider channels below the threshold
                 pruning_info[layer_name].append(channel_index)
 
+            # print('pruning_info', pruning_info)
             # Step 2: Apply Pruning
-            for layer_name, channel_index_list in pruning_info.items():
-                layer = dict(model.named_modules())[layer_name]
-                with torch.no_grad():
-                    # Prune the specific channel
-                    layer.weight.data = self.prune_w(layer.weight.data, self.prune_dim[0], channel_index_list)
-                    # Store the pruned channel index if needed
-                    layer.input_prune_channels = channel_index_list
-
-        elif 'unstruct' in self.prune_name:
-            all_weights = []
             for name, module in model.named_modules():
                 if _check_target_module_exists(self.target_modules, name):
+                    # print('is_exist', is_exist, name, hasattr(module, 'weight'), module.weight is not None, module.weight.data.dim())
                     if hasattr(module, 'weight') and module.weight is not None:
-                        all_weights.append(module.weight.data.view(-1))
+                        if name not in pruning_info:
+                            module.pruning_module.pruning_info[f"{layer_name}_pruned_ratio"] = 0
+                            continue
 
-            if 'magunstruct' in self.prune_name:
-                # Concatenate all weights and convert to a single vector
-                all_weights_vector = torch.cat(all_weights)
-                # Rank weights by absolute value and find the threshold for pruning
-                num_weights_to_prune = int(all_weights_vector.numel() * self.prune_hyper) 
-                threshold = torch.kthvalue(torch.abs(all_weights_vector), num_weights_to_prune).values
-            elif 'pqunstruct' in self.prune_name:
-                norm_p = torch.linalg.vector_norm(all_weights_vector, ord=self.pq_p, dim=0)
-                norm_q = torch.linalg.vector_norm(all_weights_vector, ord=self.pq_p, dim=0) + 1e-10
-                
-                dimension = len(all_weights_vector)
-                pq_indices = (1 - dimension ** (1/self.pq_q - 1/self.pq_p) * norm_p / norm_q)
-
-                # add additional dimension if dimension is 0
-                if pq_indices.dim() == 0:
-                    pq_indices = pq_indices.unsqueeze(0)
-
-                if torch.isnan(pq_indices).any():
-                    raise ValueError('pq_indices contains nan values')
-
-                lower_bound = dimension * (1 + self.eta) ** (-self.pq_q / (self.pq_q - self.pq_p)) * (1 - pq_indices) ** (self.pq_q * self.pq_p / (self.pq_q - self.pq_p))
-                beta_tensor = torch.full_like(lower_bound, self.beta)
-                prune_channels_count = torch.floor(dimension * torch.min(self.gamma * (1 - lower_bound / dimension), beta_tensor))
-                threshold = torch.kthvalue(torch.abs(all_weights_vector), prune_channels_count).values
-
-
-            # Apply pruning directly without a separate mask
-            index = 0
-            for name, module in model.named_modules():
-                if _check_target_module_exists(self.target_modules, name):
-                    if hasattr(module, 'weight') and module.weight is not None:
-                        numel = module.weight.data.numel()
-                        module.weight.data.view(-1).abs_().clamp_(min=threshold)
-                        index += numel
+                        with torch.no_grad():
+                            # Prune the specific channel
+                            prune_dim = self.prune_dim[0]
+                            channel_index_list = pruning_info[name]
+                            # info = {f"{name}_pruned_channels": channel_index_list}
+                            # module.pruning_module.pruning_info[f"{name}_pruned_ratio"] = len(channel_index_list) / (module.weight.data.shape[prune_dim] + 1e-10)
+                            module.pruning_module.update_pruning_info(info)
+                            module.weight.data = self.prune_w(module.weight.data, prune_dim, channel_index_list)
+                            # Store the pruned channel index if needed
+                            module.input_prune_channels = channel_index_list
+                            
+            
+        torch.cuda.empty_cache()
 
     def local_pruning(self, w, layer_type, layer_info, key, h = None):
-        if self.prune_hyper == 9999:
+        if self.prune_hyper == 9999 or self.prune_hyper == 0:
             return w, None, None
         # if h and 'wanda' not in self.prune_name:
         #     return h, None, None
@@ -929,10 +1057,22 @@ class WeightPruning(BasePruning):
                 else:
                     num_pruned_channels = prune_channels_multi_dims[pruned_dims[final_prune_dim]].size(-1)
 
+                start_time = time.time()
+                cur_weight_info = {
+                    f"{key}_pruned_dims": pruned_dims[final_prune_dim],
+                    # f"{key}_pruned_channels": list(prune_channels_multi_dims[pruned_dims[final_prune_dim]]),
+                    f"{key}_total_channels": w_shape[pruned_dims[final_prune_dim]],
+                    f"{key}_pruned_ratio": num_pruned_channels / (w_shape[pruned_dims[final_prune_dim]] + 1e-10),
+                }
+                self.logger_info_time_used += time.time() - start_time
+                self.update_pruning_info(cur_weight_info)
+
                 return pruned_w, pruned_dims, prune_channels_multi_dims
         else:
             raise ValueError('Not valid pruning method')
-    
+
+        torch.cuda.empty_cache()
+
     def prune_w(self, w, prune_dim, prune_channels, mask=None):
         # Create a boolean mask for all indices
         mask = torch.ones(w.size(prune_dim), dtype=torch.bool)
@@ -967,7 +1107,7 @@ class WeightPruning(BasePruning):
         
         dims_to_aggregate = tuple(i for i in range(w.dim()) if i != prune_dim)
         norm_across_other_dims = torch.linalg.vector_norm(w, ord=self.prune_norm, dim=dims_to_aggregate)     
-
+        norm_across_other_dims = norm_across_other_dims + (norm_across_other_dims == 0) * 1e-9
         norm_p = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=calc_dim)
         norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=calc_dim) + 1e-10
         

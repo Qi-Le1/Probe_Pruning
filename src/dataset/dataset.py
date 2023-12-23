@@ -2,6 +2,7 @@ import copy
 import dataset
 import numpy as np
 import os
+import re
 import time
 import random
 from collections.abc import Mapping
@@ -393,18 +394,10 @@ def process_dataset(dataset, tokenizer):
         elif cfg['data_name'] == 'wikitext':
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
-            def preprocess_function_test(examples):
-                print('debug here 1.5')
-                # sleep_time = random.randint(3, 30)
-
-                # # Sleep for that number of seconds
-                # time.sleep(sleep_time)
+            def preprocess_function_test(examples):   
                 all_text = "\n\n".join(examples[text_column[0]])
-                print('debug here 2')
+        
                 model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
-
-                print("Size of input_ids:", model_inputs['input_ids'].size())
-                print("Size of attention_mask:", model_inputs['attention_mask'].size())
 
                 input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
                 attention_mask = model_inputs['attention_mask'][0]
@@ -422,7 +415,6 @@ def process_dataset(dataset, tokenizer):
                 print('length', len(final_inputs['input_ids']))
                 return final_inputs
 
-            print('debug here 1')
             processed_dataset = {}
             processed_dataset['test'] = dataset['test'].map(
                 preprocess_function_test,
@@ -432,8 +424,65 @@ def process_dataset(dataset, tokenizer):
                 remove_columns=dataset["test"].column_names,
                 load_from_cache_file=False,
                 desc="Running tokenizer on dataset",
+                keep_in_memory=True,
             )
-            print('debug here 3')
+
+        elif cfg['data_name'] == 'piqa':
+            pass
+        elif cfg['data_name'] == 'storycloze':
+            pass
+        elif cfg['data_name'] == 'arc-e':
+            pass
+        elif cfg['data_name'] == 'arc-c':
+            pass
+        
+        elif cfg['data_name'] == 'hellaswag':
+            def preprocess(text):
+                text = text.strip()
+                # NOTE: Brackets are artifacts of the WikiHow dataset portion of HellaSwag.
+                text = text.replace(" [title]", ". ")
+                text = re.sub("\\[.*?\\]", "", text)
+                text = text.replace("  ", " ")
+                return text
+            
+            def preprocess_function_test(examples):   
+                ctx = examples["ctx_a"] + " " + examples["ctx_b"].capitalize()
+                out_doc = {
+                    "query": preprocess(examples["activity_label"] + ": " + ctx),
+                    "choices": [preprocess(ending) for ending in examples["endings"]],
+                    "gold": int(examples["label"]),
+                }
+                return out_doc
+                all_text = "\n\n".join(examples[text_column[0]])
+        
+                model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
+
+                input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
+                attention_mask = model_inputs['attention_mask'][0]
+
+                input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+                mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+
+                final_inputs = defaultdict(list)
+                for i in range(len(input_chunks)):
+                    if len(input_chunks[i]) == max_length:
+                        final_inputs['input_ids'].append(input_chunks[i])
+                        final_inputs['attention_mask'].append(mask_chunks[i])
+                        final_inputs['labels'].append(input_chunks[i])
+
+            processed_dataset = {}
+            processed_dataset['test'] = dataset['test'].map(
+                preprocess_function_test,
+                batched=True,
+                # batch_size=50,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset",
+                keep_in_memory=True,
+            )
+        elif cfg['data_name'] == 'obqa':
+            pass
         elif cfg['data_name'] == 'wikisql':
             '''
             This example was too long and was cropped:
