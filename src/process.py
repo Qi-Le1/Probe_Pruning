@@ -1,4 +1,5 @@
 import os
+import math
 import itertools
 import json
 import copy
@@ -38,121 +39,125 @@ def make_controls(control_name):
 
 def make_control_list(file):
     controls = []
-    if file == 'observe_pq':
-        # control_name = [[['glue-cola', 'glue-mnli', 'glue-mrpc', 'glue-qnli', 'glue-qqp', 'glue-rte', 'glue-sst2', 'glue-stsb'], ['roberta-base'], ['sc'], ['1'], [f'pqstruct-h-2-{x}-2-max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 9999]], 
-        #             ['inter'], ['somemethods-3'], ['output.dense']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magunstructglobal:w:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #             ['full'], ['somemethods-3'], ['fc2']]]
+    if file == 'observe_llm':
+        # ------- llama-2-7b
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3'], [f'magunstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #         ['full'], ['somemethods-3'], ['down-proj']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
         
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magstructglobal:w:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3'], [f'magstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #         ['full'], ['somemethods-3'], ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #         ['full'], ['somemethods-3'], ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #         ['inter'], ['somemethods-3'], ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #         ['inter'], ['somemethods-3'], ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #         ['inter'], ['somemethods-3'], ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
+                ['inter'], ['somemethods-3'], ['default', 'gate-proj+up-proj+down-proj', 'down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
+                ['inter'], ['somemethods-3'], ['default', 'gate-proj+up-proj+down-proj', 'down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # ----- opt 1.3b
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magunstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #         ['full'], ['somemethods-3'], ['fc2']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+        
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
         #         ['full'], ['somemethods-3'], ['fc2']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['inter'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w+pqstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['inter'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['inter'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal:h:2:{x}:-1:max' for x in [0]],
-        #         ['inter'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, ]],
-        #         ['inter'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w+pqstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05,  9999]],
-        #         ['inter'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magunstructglobal:w:2:{x}:1:max' for x in [0.01]],
-        #             ['full'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magunstructglobal:w:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #             ['full'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        
-
-
-
-
-
-        control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magstructglobal:w:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-                ['full'], ['somemethods-3'], ['fc2']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magstructlocal:w:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
         #         ['full'], ['somemethods-3'], ['fc2']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-                ['inter'], ['somemethods-3'], ['fc2']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal:h:2:{x}:-1:max' for x in [0.01]],
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
         #         ['inter'], ['somemethods-3'], ['fc2']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w*pqstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-                    ['inter'], ['somemethods-3'], ['fc2']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
         #         ['inter'], ['somemethods-3'], ['fc2']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w+pqstructlocal:h:2:{x}:-1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
         #         ['inter'], ['somemethods-3'], ['fc2']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-    elif file == 'observe_ic':
-        control_name = [[['CIFAR10', 'CIFAR100'], ['resnet9', 'resnet18'], ['ic'], ['10'], [f'pqstruct-h-2-{x}-1-max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-                             ['inter'], ['somemethods-3'], ['None']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet9', 'resnet18'], ['ic'], ['10'], [f'pqstruct-h-2-{x}-1-max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #                      ['inter'], ['somemethods-3'], ['None']]]
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
+        #         ['inter'], ['somemethods-3'], ['default', 'fc2']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet9', 'resnet18'], ['ic'], ['1', '100', '1000'], [f'pqstruct-h-2-{x}-1-max' for x in [0]],
-        #                     ['inter'], ['somemethods-3'], ['None']]]
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
+        #         ['inter'], ['somemethods-3'], ['default', 'fc2']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
+
+    elif file == 'observe_cv':
+        # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #                      ['inter'], ['somemethods-3'], ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'w*pqstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #                     ['inter'], ['somemethods-3'], ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'magstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #                     ['inter'], ['somemethods-3'], ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'magstructlocal:w:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #                     ['inter'], ['somemethods-3'], ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'magstructglobal:w:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        #                     ['inter'], ['somemethods-3'], ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [9999]],
+        #                      ['inter'], ['somemethods-3'], ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'w*pqstructlocal:h:2:{x}:1:max' for x in [9999]],
+        #                     ['inter'], ['somemethods-3'], ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+        pass
     return controls
 
 
@@ -417,7 +422,13 @@ def make_vis(df_exp, df_history):
         0.3: 'orange', 0.4: 'black', 0.5: 'purple', 0.6: 'black', 0.7: 'purple', 
         0.8: 'sienna', 0.9: 'green', 1.0: 'red', 9999: 'darkseagreen'
     }
-    prune_names = ['magstructglobal', 'magunstructglobal', 'pqstructlocal', 'magstructlocal', 'w+pqstructlocal']
+    prune_names = ['magstructglobal', 'magunstructglobal', 'pqstructlocal', 'magstructlocal', 'w*pqstructlocal']
+    total_layers = {
+        'gpt2': 12,
+        'opt-1.3b': 23,
+        'llama-2-7b': 31,
+        'llama-2': 31
+    }
     for name in prune_names:
         for hyper in prune_hypers:
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
@@ -428,6 +439,7 @@ def make_vis(df_exp, df_history):
     metric_name_list = ['test/Rouge', 'test/ROUGE', 'test/GLUE', 'test/Accuracy', 'test/Perplexity']
     
     performance_metric_max = 500
+    y_max_in_graph = 60
     fig = {}
     reorder_fig = []
 
@@ -436,7 +448,7 @@ def make_vis(df_exp, df_history):
         if len(df_name_list) == 8:
             data_name, model_name, task_name, batch_size, prune_name, batch_integ, multibatch_integ, cust_tgt_modules = df_name_list
             
-            prune_name_list = prune_name.split(':')
+            prune_name_list = prune_name.split('+')
             prune_name = prune_name_list[0]
             prune_tgt = prune_name_list[1]
             if prune_tgt == 'w':
@@ -450,6 +462,18 @@ def make_vis(df_exp, df_history):
             prune_dim = prune_name_list[4]
             prune_dim_select_mode = prune_name_list[5] if len(prune_name_list) > 5 else 'max'
             
+            def is_valid_layer_for_detailed_info(index, model_name):
+                if model_name in total_layers:
+                    layer_number = int(index.split(".layers.")[1].split(".")[0])
+                    if layer_number <= math.ceil(total_layers[model_name] * 0.05) or math.ceil(layer_number >= total_layers[model_name] * 0.95):
+                        # print(f'layer_number: {layer_number}')
+                        return True
+                # print(f'False layer_number: {layer_number}')
+                    return False
+                else:
+                    return True
+
+
             def draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy'):
                 if label_exists(plt, key_for_dict):
                     plt.scatter(x, y, color=color[key_for_dict], linestyle=linestyle[key_for_dict])
@@ -559,7 +583,7 @@ def make_vis(df_exp, df_history):
                 cur_item = temp[i]
                 for index, row in cur_item.iterrows():
             # for ((index, row), (index_se, row_se)) in zip(temp, temp):
-                    print(f'index: {index}')
+                    # print(f'index: {index}')
                     if 'of_max' in index:
                         continue
                     
@@ -569,6 +593,8 @@ def make_vis(df_exp, df_history):
                     index_list = index.split('/')
                     temp_key = index_list[-1]
                     if 'vanilla_hist_mean' in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
                         # temp_key = index_list[-1]
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
                         fig[fig_name] = plt.figure(fig_name)
@@ -583,6 +609,8 @@ def make_vis(df_exp, df_history):
                         plt.text(0, y, f'{y} for x=0', ha='center', va='bottom')
 
                     if 'pruned_hist_mean' in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
                         # temp_key = index_list[-1]
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
                         fig[fig_name] = plt.figure(fig_name)
@@ -596,6 +624,8 @@ def make_vis(df_exp, df_history):
                         plt.text(0, y, f'{y} for x=0', ha='center', va='bottom')
 
                     if 'norm_across_other_dims_mean' in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
                         # temp_key = index_list[-1]
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
                         fig[fig_name] = plt.figure(fig_name)
@@ -606,6 +636,8 @@ def make_vis(df_exp, df_history):
                         plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
                     
                     if 'weight_norm_across_channel_dims' in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
                         # temp_key = index_list[-1]
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
                         fig[fig_name] = plt.figure(fig_name)
@@ -638,7 +670,7 @@ def make_vis(df_exp, df_history):
 
                     # only for y: pq, x: eta
                     if 'pq_indices_mean' in index:
-                        # one prune_hyper for all layers
+                        # one prune_hyper for all layers (1 figure the whole model for each prune_hyper)
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', 'all_layer_pq_indices_mean'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = pq_indices_order
@@ -647,13 +679,90 @@ def make_vis(df_exp, df_history):
                         key_for_dict = f"{prune_name}_{prune_hyper}"
                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'PQ_index')
 
-                        # one layer for all prune_hyper
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
                         fig[fig_name] = plt.figure(fig_name)
                         x = prune_hyper
                         y = row.tolist()[0]
                         key_for_dict = f"{prune_name}_{prune_hyper}"
                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Eta', 'PQ_index')
+
+                    if '_pq_lower_bound_mean' in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                        cur_temp_key = temp_key.replace('_pq_lower_bound_mean', '_pq_indices_varying_lengths_mean')
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', cur_temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = int(row.tolist()[0])
+                        print('lower_bound', x)
+                        plt.text(x, 0.03, f'B', ha='center', va='bottom')
+
+                    if "_pq_indices_varying_lengths_mean" in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
+
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG: log', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        y = row.tolist()
+                        y = np.log(y)
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index (log scale)')
+
+                    if "reversed_pq_indices_varying_lengths" in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length(in reversed sorted)', 'PQ_index')
+                    
+                    if "_pq_indices_ratio" in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'small part(left) length', 'coefficient')
+
+                    if f"_p_norm_ratio" in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'small part(left) length', 'coefficient')
+
+                    if f"_q_norm_ratio" in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'small part(left) length', 'coefficient')
 
                     if 'pruned_ratio_mean' in index:
                         # one prune_hyper for all layers
@@ -665,6 +774,8 @@ def make_vis(df_exp, df_history):
                         key_for_dict = f"{prune_name}_{prune_hyper}"
                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'pruned_ratio')
 
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
                         # one layer for all prune_hyper
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
                         fig[fig_name] = plt.figure(fig_name)
@@ -684,6 +795,8 @@ def make_vis(df_exp, df_history):
                         key_for_dict = f"{prune_name}_{prune_hyper}"
                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'pruned_FLOPs_ratio')
 
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
                         # one layer for all prune_hyper
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
                         fig[fig_name] = plt.figure(fig_name)
@@ -694,7 +807,6 @@ def make_vis(df_exp, df_history):
                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_hypers', 'pruned_FLOPs_ratio')
                     
                     
-
 
 
                     if any(metric_name in index for metric_name in metric_name_list) or 'total_FLOPs_ratio' in index:

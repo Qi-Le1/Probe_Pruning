@@ -30,8 +30,17 @@ import torch.nn as nn
 
 # print(isinstance(linear_layer, nn.Embedding))     # False
 # print(isinstance(linear_layer, nn.Linear))        # True
+# self.exclude_dim_to_aggregate = None
+# self.sort_norm_dim = 0
+# a = torch.tensor([5])
 
+# # Add an extra dimension
+# # To add it at the 0th dimension (making it 1x1)
+# a = a.unsqueeze(0)
 
+# # Now a is a 2D tensor with shape (1, 1)
+# print(a)  # Outputs tensor([[5]])
+# print(a.shape)  # Outputs torch.Size([1, 1])
 # a = 'lora'
 
 # b = a.split('-')
@@ -191,26 +200,26 @@ from transformers import AutoTokenizer
 # beta = 0.9
 # gamma = 1
 import time
-class YourClass:
-    # Other methods...
-    def __init__(self):
-        self.logger_info_time_used = 0
+# class YourClass:
+#     # Other methods...
+#     def __init__(self):
+#         self.logger_info_time_used = 0
 
-    def monitor_time(func):
-        def wrapper(*args, **kwargs):
-            print('wrapper', args, kwargs)
-            start_time = time.time()
-            result = func(*args, **kwargs)
-            args[0].logger_info_time_used += time.time() - start_time
-            return result
-        return wrapper
+#     def monitor_time(func):
+#         def wrapper(*args, **kwargs):
+#             print('wrapper', args, kwargs)
+#             start_time = time.time()
+#             result = func(*args, **kwargs)
+#             args[0].logger_info_time_used += time.time() - start_time
+#             return result
+#         return wrapper
     
-    @monitor_time
-    def update_pruning_info(self, info):
-        a = 5
+#     @monitor_time
+#     def update_pruning_info(self, info):
+#         a = 5
 
-a = YourClass()
-a.update_pruning_info(1)
+# a = YourClass()
+# a.update_pruning_info(1)
 # def calculate_entropy(probabilities):
 #     """
 #     Calculate the entropy of a probability distribution.
@@ -305,40 +314,40 @@ print(vis_path, fig_path)
 
 a = 5
 # a = 5
-def preprocess_function_test(dataset):
-    all_text = "\n\n".join(dataset['text'])
-    model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
+# def preprocess_function_test(dataset):
+#     all_text = "\n\n".join(dataset['text'])
+#     model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
 
-    max_length = 512  # Set your desired max length
-    input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
-    attention_mask = model_inputs['attention_mask'][0]
+#     max_length = 512  # Set your desired max length
+#     input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
+#     attention_mask = model_inputs['attention_mask'][0]
 
-    input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
-    mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+#     input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+#     mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
 
-    final_inputs = []
-    for chunk in input_chunks:
-        final_inputs.append({
-            'input_ids': torch.tensor(chunk, dtype=torch.long),
-            'attention_mask': torch.tensor(mask_chunks[final_inputs.index(chunk)], dtype=torch.long)
-        })
+#     final_inputs = []
+#     for chunk in input_chunks:
+#         final_inputs.append({
+#             'input_ids': torch.tensor(chunk, dtype=torch.long),
+#             'attention_mask': torch.tensor(mask_chunks[final_inputs.index(chunk)], dtype=torch.long)
+#         })
 
-    # Add labels if required
-    for item in final_inputs:
-        item['labels'] = item['input_ids'].clone()
+#     # Add labels if required
+#     for item in final_inputs:
+#         item['labels'] = item['input_ids'].clone()
 
-    return final_inputs
+#     return final_inputs
 
-def load_and_tokenize_dataset(model_checkpoint, dataset_name='wikitext', dataset_version='wikitext-2-v1', max_length=512):
-    # count = 0
-    # Load the dataset
-    dataset = load_dataset(dataset_name, dataset_version, split='test')
+# def load_and_tokenize_dataset(model_checkpoint, dataset_name='wikitext', dataset_version='wikitext-2-v1', max_length=512):
+#     # count = 0
+#     # Load the dataset
+#     dataset = load_dataset(dataset_name, dataset_version, split='test')
 
-    a = dataset['text']
-    # Load the tokenizer    
-    tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
+#     a = dataset['text']
+#     # Load the tokenizer    
+#     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+#     if tokenizer.pad_token_id is None:
+#         tokenizer.pad_token_id = tokenizer.eos_token_id
     # Tokenization function
     # def preprocess_function_test(examples):
     #     max_length = 120
@@ -505,52 +514,141 @@ import torch
 
 import numpy as np
 
-# def compare_1d_vector_norms(v, p, q, gamma, beta):
-#     pq_p = p
-#     pq_q = q
-#     p_norm = np.linalg.norm(v, p)
-#     q_norm = np.linalg.norm(v, q)
+def compare_1d_vector_norms(v, p, q, gamma, beta):
+    pq_p = p
+    pq_q = q
+    p_norm = np.linalg.norm(v, p)
+    q_norm = np.linalg.norm(v, q)
 
-#     print(f"  {p} Norm: {p_norm}")
-#     print(f"  {q} Norm: {q_norm}")
+    print(f"  {p} Norm: {p_norm}")
+    print(f"  {q} Norm: {q_norm}")
 
-#     # Calculate and compare ratios of norms
-#     dimension = len(v)
-#     ratio = p_norm / q_norm
+    # Calculate and compare ratios of norms
+    dimension = len(v)
+    ratio = p_norm / q_norm
 
-#     print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
+    print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
     
-#     pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
-#     print(f"  pq_indices_{p}_{q}: {pq_indices}")
+    pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
+    pq_indices = 0.08
+    dimension = 8000
+    print(f"  pq_indices_{p}_{q}: {pq_indices}")
+    eta = 0
+    lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
+    beta_array = np.full_like(lower_bound, beta)
+    prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
+    print(f"ratio", {gamma * (1 - lower_bound / dimension)})
+    print(f"  Lower Bound: {lower_bound}")
+    print(f"  Prune Channels Count: {prune_channels_count}\n")
 
-#     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
-#     beta_array = np.full_like(lower_bound, beta)
-#     prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
-#     print(f"ratio", {gamma * (1 - lower_bound / dimension)})
-#     print(f"  Lower Bound: {lower_bound}")
-#     print(f"  Prune Channels Count: {prune_channels_count}\n")
+# pq_p = 1
+# pq_q = 2
+gamma = 1
+beta = 0.9
+# Example usage
+vectors = [
+    # np.array([1, 1, 1,1, 0]),
+    # np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
+    np.array([0.1,0.1,0.1,0.1,0.1,0.2,0.2,0.2,0.2,0.2]),
+    # np.array([100,100,100,100,100,]),
+    # np.array([100,100,100,100,0]),
+    # np.array([-7, 8, -9])
+]
+#  (1,3), (2,3)
+for vector in vectors:
+    for comb in [(1,2)]:
+        p = comb[0]
+        q = comb[1]
+        compare_1d_vector_norms(vector, p, q, gamma, beta)
 
-# # pq_p = 1
-# # pq_q = 2
-# gamma = 1
-# beta = 0.9
-# # Example usage
-# vectors = [
-#     np.array([1, 1, 1,1, 0]),
-#     np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
-#     np.array([0.1,0.1,0.1,0.1,0.1,]),
-#     np.array([100,100,100,100,100,]),
-#     np.array([100,100,100,100,0]),
-#     # np.array([-7, 8, -9])
-# ]
-# #  (1,3), (2,3)
-# for vector in vectors:
-#     for comb in [(1,2)]:
-#         p = comb[0]
-#         q = comb[1]
-#         compare_1d_vector_norms(vector, p, q, gamma, beta)
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define the PQ Index calculation
+def pq_index(w, p, q):
+    norm_p = np.linalg.norm(w, p)
+    norm_q = np.linalg.norm(w, q)
+    d = len(w)
+    return 1 - d ** (1/q - 1/p) * (norm_p / norm_q)
+
+# Create a Gaussian distribution
+length = 1000
+data = np.random.normal(size=length)
+data = np.abs(data)
+# Sort the data
+sorted_data = np.sort(data)
+print(sorted_data)
+# Calculate PQ Index for increasing length
+p = 1  # Example value for p
+q = 2    # Example value for q
+pq_indices = [pq_index(sorted_data[:i], p, q) for i in range(1, length + 1)]
+# print(pq_indices)
+# # Plot the trend of PQ Index
+# plt.plot(pq_indices)
+# plt.xlabel('Length of the vector')
+# plt.ylabel('PQ Index')
+# plt.title('PQ Index Trend for Sorted Gaussian Distribution')
+# plt.show()
 
 
+
+
+def parallel_cal_varying_length_norm(sorted_norm, norm):
+    if norm == 1:
+        # Take the absolute value of each element
+        processed_channels = sorted_norm.abs()
+        varying_vector_norm = processed_channels.cumsum(dim=1)
+    elif norm == 2:
+        # Take the square of each element
+        processed_channels = sorted_norm.pow(2)
+        # print('processed_channels', processed_channels.shape, processed_channels[0])
+        varying_vector_norm = processed_channels.cumsum(dim=1).sqrt()
+        # print('varying_vector_norm', varying_vector_norm.shape, varying_vector_norm[0])
+    else:
+        # Handle other cases or throw an error
+        raise ValueError('Not valid norm')
+    return varying_vector_norm
+
+def parallel_cal_varying_length_info(sorted_norm, reversed=False):
+    if reversed:
+        sorted_norm = torch.flip(sorted_norm, [1])
+    nominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, p)
+    denominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, q)
+
+    # nominator_varying_vector_norm = nominator_varying_vector_norm.to(cfg['device'])
+    # denominator_varying_vector_norm = denominator_varying_vector_norm.to(cfg['device'])
+    # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm[0])
+    # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm[0])
+
+    num_rows, num_cols = nominator_varying_vector_norm.shape
+
+    # if reversed:
+    #     # Create a tensor where each row starts from 1 and decreases to the length of the row
+    #     dimension = torch.arange(num_cols, 0, -1).unsqueeze(0)
+    # else:
+        # Create a tensor where each row starts from 1 and increases to the length of the row
+    dimension = torch.arange(1, num_cols + 1).unsqueeze(0)
+    # dimension = dimension.expand(num_rows, -1).to(cfg['device'])
+    return nominator_varying_vector_norm, denominator_varying_vector_norm, dimension
+
+sorted_data = torch.from_numpy(sorted_data)
+sorted_data.unsqueeze_(0)
+
+nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_data)
+# print('dimension', dimension.shape, dimension)
+pq_indices_varying_length = (1 - dimension ** (1/q - 1/p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
+
+pq_indices_varying_length = pq_indices_varying_length[0].tolist()
+
+plt.plot(pq_indices_varying_length)
+plt.xlabel('Length of the vector')
+plt.ylabel('PQ Index')
+plt.title('PQ Index Trend for Sorted Gaussian Distribution')
+plt.show()
+
+
+# print(pq_indices[:10])
+# print(pq_indices_varying_length[0][:10])
 # def compare_1d_vector_norms(v, p, q, gamma, beta, pq_indices):
 #     pq_p = p
 #     pq_q = q

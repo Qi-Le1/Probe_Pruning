@@ -5,7 +5,7 @@ def process_control():
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
-    prune_name_list = cfg['control']['prune_name'].split(':')
+    prune_name_list = cfg['control']['prune_name'].split('+')
     cfg['prune_name'] = prune_name_list[0]
     cfg['prune_tgt'] = prune_name_list[1]
     if cfg['prune_tgt'] == 'w':
@@ -16,7 +16,7 @@ def process_control():
         raise ValueError('Not valid prune target')
     cfg['prune_norm'] = int(prune_name_list[2])
     cfg['prune_hyper'] = float(prune_name_list[3])
-    cfg['prune_dim'] = [int(dim) for dim in prune_name_list[4].split('#')]
+    cfg['prune_dim'] = [int(dim) for dim in prune_name_list[4].split('+')]
     cfg['prune_dim_select_mode'] = prune_name_list[5] if len(prune_name_list) > 5 else 'max'
 
     cfg['batch_integ'] = cfg['control']['batch_integ']
@@ -24,9 +24,11 @@ def process_control():
     cfg['multibatch_integ'] = multibatch_integ_list[0]
     cfg['multibatch_factor'] = float(multibatch_integ_list[1])
 
-    cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('-')
-    if cfg['cust_tgt_modules'] == ['None']:
-        cfg['cust_tgt_modules'] = None
+    cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
+    # if cfg['cust_tgt_modules'] == ['None']:
+    #     cfg['cust_tgt_modules'] = None
+    if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != 'default':
+        cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
     cfg['split_metric'] = False
 
     cfg['pq_p'] = 1
@@ -75,6 +77,7 @@ def process_control():
         raise ValueError('Not valid task name')
 
     cfg['logger_detailed_info'] = False
+    print(cfg['prune_hyper'] == 9999)
     print('cfg: ', cfg)
     return
 
@@ -171,7 +174,6 @@ def make_data_name():
                                                    'label_column': None}
                                            }                       
                          },
-
             '''
             piqa: piqa
             storycloze: storycloze , 
@@ -179,12 +181,35 @@ def make_data_name():
             arc-c: arc-challenge (Clark et al., 2018), 
             hellaswag: hellaswag (Zellers et al., 2019) 
             obqa: OpenBookQA (Mihaylov et al., 2018)
-
             '''
-            
-           
+            # https://huggingface.co/datasets/piqa
+            'piqa': {'data_name': 'piqa',
+                    'subset_name_dict': {
+                        'none': {'subset_name': None,
+                              'text_column': ['story_id', 'sol1', 'sol2'],
+                              'label_column': 'label'}
+                        },
+            },       
+            # https://huggingface.co/datasets/story_cloze
+            'storycloze': {'data_name': 'story_cloze',
+                    'subset_name_dict': {
+                        '2016': {'subset_name': None,
+                              'text_column': ['goal', 'sol1', 'sol2'],
+                              'label_column': 'label'}
+                        },
+            },        
+            # https://huggingface.co/datasets/ai2_arc          
+           'arc': {'data_name': 'ai2_arc',
+                    'subset_name_dict': {
+                        'e': {'subset_name': 'ARC-Easy',
+                              'text_column': ['id', 'question', 'choices'],
+                             'label_column': 'answerKey'},   
+                        'c': {'subset_name': 'ARC-Challenge',
+                              'text_column': ['id', 'question', 'choices'],
+                              'label_column': 'answerKey'}
+                        },                        
+            },
 
-            
             # Dataset: https://github.com/google/dreambooth
             # DreamBooth paper: https://arxiv.org/pdf/2208.12242.pdf
             'dreambooth': {'data_name': 'DreamBooth',

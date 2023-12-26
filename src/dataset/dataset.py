@@ -118,8 +118,8 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         dataset_ = dataset_['train'].train_test_split(test_size=0.1, seed=cfg['seed'])
     elif data_name in ['wikitext']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test')
-        # del dataset_['train']
-        # del dataset_['validation']
+    elif data_name in ['arc']:
+        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test')
     elif data_name in ['dreambooth']:
         model, tokenizer = make_model(cfg['model_name'])
 
@@ -426,16 +426,73 @@ def process_dataset(dataset, tokenizer):
                 desc="Running tokenizer on dataset",
                 keep_in_memory=True,
             )
-
+        # piqa: piqa
+        # storycloze: storycloze , 
+        # arc-e: arc-easy 
+        # arc-c: arc-challenge (Clark et al., 2018), 
+        # hellaswag: hellaswag (Zellers et al., 2019) 
+        # obqa: OpenBookQA (Mihaylov et al., 2018)
         elif cfg['data_name'] == 'piqa':
-            pass
+            max_length = cfg[cfg['model_name']]['max_length']
+            def tokenize_function(examples):
+                batch_size = len(examples[label_column])
+                targets = examples[label_column]
+
+                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
+                          range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
+                                         return_tensors="pt")
+                labels = tokenizer(targets, max_length=3, padding="max_length", truncation=True, return_tensors="pt")
+                labels = labels["input_ids"]
+                labels[labels == tokenizer.pad_token_id] = -100
+                model_inputs["labels"] = labels
+                return model_inputs
+
+            processed_dataset = {}
+            processed_dataset['test'] = dataset['test'].map(
+                tokenize_function,
+                batched=True,
+                # batch_size=50,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset",
+                keep_in_memory=True,
+            )
         elif cfg['data_name'] == 'storycloze':
             pass
-        elif cfg['data_name'] == 'arc-e':
-            pass
-        elif cfg['data_name'] == 'arc-c':
-            pass
-        
+        elif cfg['data_name'] == 'arc':
+            max_length = cfg[cfg['model_name']]['max_length']
+            def tokenize_function(examples):
+                batch_size = len(examples[label_column])
+                targets = examples[label_column]
+
+                num_to_letter = {"1": "A", "2": "B", "3": "C", "4": "D", "5": "E"}
+                targets = num_to_letter.get(targets, targets)
+
+                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
+                          range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
+                                         return_tensors="pt")
+                labels = tokenizer(targets, max_length=3, padding="max_length", truncation=True, return_tensors="pt")
+                labels = labels["input_ids"]
+                labels[labels == tokenizer.pad_token_id] = -100
+                model_inputs["labels"] = labels
+                return model_inputs
+
+            processed_dataset = {}
+            processed_dataset['test'] = dataset['test'].map(
+                tokenize_function,
+                batched=True,
+                # batch_size=50,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset",
+                keep_in_memory=True,
+            )
+
+
         elif cfg['data_name'] == 'hellaswag':
             def preprocess(text):
                 text = text.strip()

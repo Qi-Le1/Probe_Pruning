@@ -14,12 +14,12 @@
             "justMyCode": true,
             "args": [
                 "--type",
-                "observe_pq",
+                "observe_llm",
             ],
         },
 
         {
-            "name": "process_ic",
+            "name": "process_computer_vision",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
@@ -27,7 +27,7 @@
             "justMyCode": true,
             "args": [
                 "--type",
-                "observe_ic",
+                "observe_cv",
             ],
         },
 

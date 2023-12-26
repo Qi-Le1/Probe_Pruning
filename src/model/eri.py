@@ -110,13 +110,14 @@ class EriModel(torch.nn.Module):
             self._replace_module(parent, target_name, new_module, target)
         if not is_target_modules_in_base_model:
             raise ValueError(
-                f"Target modules {TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_type']]} not found in the base model. "
+                f"Target modules {target_modules} not found in the base model. "
                 f"Please check the target modules and try again."
             )
 
     def _replace_module(self, parent_module, child_name, new_module, old_module):
         setattr(parent_module, child_name, new_module)
-        new_module.weight = transpose(old_module.weight, new_module.fan_in_fan_out)
+        fan_in_fan_out = getattr(new_module, "fan_in_fan_out", False)
+        new_module.weight = transpose(old_module.weight, fan_in_fan_out)
         if hasattr(old_module, "bias"):
             # if old_module.bias is not None:
             new_module.bias = old_module.bias
@@ -157,7 +158,7 @@ def _get_submodules(model, key):
 
 def _get_target_modules(cfg):
     target_modules = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_type']]
-    if 'cust_tgt_modules' in cfg and cfg['cust_tgt_modules'] is not None:
+    if 'cust_tgt_modules' in cfg and 'default' not in cfg['cust_tgt_modules']:
         target_modules = cfg['cust_tgt_modules']
     return target_modules
 
@@ -341,12 +342,19 @@ class Linear(nn.Linear, EriLayer):
             # print('input_shape: ', x.shape)
             # print("prev weight.shape", self.weight.shape)
             input_dim = x.dim()
+            if 'opt' in cfg['model_name']:
+                total_elements = x.numel()  # Total number of elements in the tensor
+                middle_dim_size = total_elements // (cfg['batch_size'] * x.size(-1))
+                x = x.view(cfg['batch_size'], middle_dim_size, x.size(-1))
             input_shape = x.shape
+            # print('input_shape: ', input_shape)
             linear_layer_info = {
                 'weight': self.weight.data,
                 # 'weight_norm_across_channel_dims': self.weight_norm_across_channel_dims,
             }
             pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key)
+            if 'opt' in cfg['model_name']:
+                pruned_h = pruned_h.view(-1, pruned_h.size(-1))
             weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
             
             result = F.linear(pruned_h, weight, bias=self.bias)
@@ -382,6 +390,7 @@ class Conv2d(nn.Conv2d, EriLayer):
             padding=padding,
             dilation=dilation,
             groups=groups,
+            **kwargs
         )
         # Freezing the pre-trained weight matrix
         self.weight.requires_grad = False   
@@ -403,7 +412,7 @@ class Conv2d(nn.Conv2d, EriLayer):
                 'weight': self.weight.data,
             }
             pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, conv2d_layer_info, self.key)
-            weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims)
+            weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
 
             result = F.conv2d(
                 pruned_h,
@@ -416,7 +425,7 @@ class Conv2d(nn.Conv2d, EriLayer):
             )
         elif self.prune_tgt == 'weight':
             pruned_h = self.extract_input(x, self.layer_type)
-            b = self.weight.shape
+            # b = self.weight.shape
             result = F.conv2d(
                 pruned_h,
                 self.weight,
@@ -447,6 +456,13 @@ class BasePruning:
         self.gamma = cfg['gamma']
         self.beta = cfg['beta']
         self.eta = self.prune_hyper
+
+        if self.batch_integ == 'inter' or self.batch_integ == 'union':
+            self.exclude_dim_to_aggregate = 0
+            self.calc_norm_dim = 1
+        elif self.batch_integ == 'full':
+            self.exclude_dim_to_aggregate = None
+            self.calc_norm_dim = 0
 
         self.bin_edges = [
             -1000, -900, -800, -700, -600, -500, -400, -300, -200, -100, # -1000 to -100
@@ -506,7 +522,11 @@ class HiddenRepresentationPruning(BasePruning):
     def batch_pruning(self, h, layer_type, layer_info, key):
         # Exclude the first dimension (batch size) and the prune_dim
         # calculate the pq-index per sample
-        exclude_dim = 0 if self.batch_integ in ['inter', 'union'] and h.dim() >= 3 else None
+        if h.dim() != 3 and layer_type == 'linear':
+            raise ValueError('Not valid input dimension for batch_pruning')
+        elif h.dim() != 4 and layer_type == 'conv2d':
+            raise ValueError('Not valid input dimension for batch_pruning')
+
         prune_channels_multi_dims = [None] * h.dim()
         saving_flops_multi_dims = [0] * h.dim()
         h_shape = h.shape
@@ -557,7 +577,7 @@ class HiddenRepresentationPruning(BasePruning):
                         raise ValueError('Not valid prune dim')
                     elif layer_type == 'conv2d' and prune_dim != 1:
                         raise ValueError('Not valid prune dim')
-                    prune_channels = self.apply_pruning(h, key, layer_info, prune_dim, exclude_dim)
+                    prune_channels = self.apply_pruning(h, key, layer_info, prune_dim)
                     prune_channels = self.apply_batch_integ(h_shape[prune_dim], prune_channels)
                     prune_channels_multi_dims[prune_dim] = prune_channels
 
@@ -606,7 +626,7 @@ class HiddenRepresentationPruning(BasePruning):
                 return pruned_h, pruned_dims, prune_channels_multi_dims
             elif self.prune_dim_select_mode == 'casc':
                 for prune_dim in self.prune_dim:
-                    prune_channels = self.apply_pruning(h, prune_dim, exclude_dim)
+                    prune_channels = self.apply_pruning(h, prune_dim)
                     prune_channels = self.apply_batch_integ(h_shape[prune_dim], prune_channels)
                     prune_channels_multi_dims[prune_dim] = prune_channels
                     
@@ -688,22 +708,22 @@ class HiddenRepresentationPruning(BasePruning):
             warnings.warn("Attempting to prune all channels. Keeping one channel for calculation.")
         return prune_channels
     
-    def apply_pruning(self, h, key, layer_info, prune_dim=None, exclude_dim=None):
+    def apply_pruning(self, h, key, layer_info, prune_dim=None):
         # print('apply_pruning', prune_dim, h.dim(), h.shape)
         if prune_dim >= h.dim():
             raise ValueError('Not valid pruning dimension')
             # prune_dim = h.dim() - 1
-        if exclude_dim is not None and exclude_dim != 0:
-            raise ValueError('Not valid exclude dimension')
         # No pruning
-        if self.prune_hyper == 9999:
-            return [torch.empty(0)]
 
         if 'pqstruct' in self.prune_name:
-            prune_channels = self.pq_struct(h, key, layer_info, prune_dim, exclude_dim)
+            prune_channels = self.pq_struct(h, key, layer_info, prune_dim)
+            if self.prune_hyper == 9999:
+                return [torch.empty(0)]
             return prune_channels
         elif 'magstruct' in self.prune_name:
-            prune_channels = self.mag_struct(h, key, prune_dim, exclude_dim)
+            if self.prune_hyper == 9999:
+                return [torch.empty(0)]
+            prune_channels = self.mag_struct(h, key, prune_dim)
             return prune_channels
         # elif 'magunstruct' in self.prune_name:
         #     pruned_indices = self.mag_unstruct(h, key)
@@ -712,13 +732,10 @@ class HiddenRepresentationPruning(BasePruning):
             raise ValueError('Not valid pruning method')
         
 
-    def pq_struct(self, h, key, layer_info, prune_dim, exclude_dim):
+    def pq_struct(self, h, key, layer_info, prune_dim):
         info = {}
-        calc_dim = 0
-        if exclude_dim != None and exclude_dim == 0:
-            calc_dim = 1
- 
-        dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != exclude_dim)
+        
+        dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != self.exclude_dim_to_aggregate)
         norm_across_other_dims = torch.linalg.vector_norm(h, ord=self.prune_norm, dim=dims_to_aggregate)     
 
         if 'w*pqstruct' in self.prune_name:
@@ -735,15 +752,15 @@ class HiddenRepresentationPruning(BasePruning):
         norm_across_other_dims = norm_across_other_dims + (norm_across_other_dims == 0) * 1e-9
         # Calculate norms only for non-zero channels
         # non_zero_norms = norm_across_other_dims[non_zero_mask]
-        norm_p = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=calc_dim)
-        norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=calc_dim) + 1e-10
+        norm_p = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=self.calc_norm_dim)
+        norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_q, dim=self.calc_norm_dim) + 1e-10
         
         dimension = h.shape[prune_dim]
-        pq_indices = (1 - dimension ** (1/self.pq_q - 1/self.pq_p) * norm_p / norm_q)
+        pq_indices = (1 - dimension ** (1/self.pq_q - 1/self.pq_p) * (norm_p / norm_q))
 
         # add additional dimension if dimension is 0
-        if pq_indices.dim() == 0:
-            pq_indices = pq_indices.unsqueeze(0)
+        if pq_indices.dim() == 0 or pq_indices.dim() == 1:
+            pq_indices.unsqueeze_(0)
 
         if torch.isnan(pq_indices).any():
             raise ValueError('pq_indices contains nan values')
@@ -752,35 +769,127 @@ class HiddenRepresentationPruning(BasePruning):
         beta_tensor = torch.full_like(lower_bound, self.beta)
         prune_channels_count = torch.floor(dimension * torch.min(self.gamma * (1 - lower_bound / dimension), beta_tensor))
 
-        _, sorted_channels = torch.sort(norm_across_other_dims, dim=calc_dim)
+        sorted_norm, sorted_channels = torch.sort(norm_across_other_dims, dim=self.calc_norm_dim)
 
-        if self.prune_hyper == 9999:
+        eta_zero_lower_bound = dimension * (1 + 0) ** (-self.pq_q / (self.pq_q - self.pq_p)) * (1 - pq_indices) ** (self.pq_q * self.pq_p / (self.pq_q - self.pq_p))
+        eta_zero_lower_bound = torch.floor(dimension * self.gamma * (1 - eta_zero_lower_bound / dimension))
+        # print('sorted_norm', sorted_norm.shape, sorted_norm)
+        if self.prune_hyper == 9999 and cfg['batch_size'] == 1:
+            # print('here', self.prune_hyper)
             start_time = time.time()
-            pq_indices_varying_lengths = [1]
-            # Iterate over the lengths
-            for length in range(1, norm_across_other_dims.size(calc_dim) + 1):
-                # Slicing the tensor up to the current length
-                current_norms = norm_across_other_dims.narrow(calc_dim, 0, length)
 
-                # Calculate norms
-                norm_p_current = torch.linalg.vector_norm(current_norms, ord=self.pq_p, dim=calc_dim)
-                norm_q_current = torch.linalg.vector_norm(current_norms, ord=self.pq_p, dim=calc_dim) + 1e-10
+            def parallel_cal_varying_length_norm(sorted_norm, norm):
+                if norm == 1:
+                    # Take the absolute value of each element
+                    processed_channels = sorted_norm.abs()
+                    varying_vector_norm = processed_channels.cumsum(dim=1)
+                elif norm == 2:
+                    # Take the square of each element
+                    processed_channels = sorted_norm.pow(2)
+                    # print('processed_channels', processed_channels.shape, processed_channels[0])
+                    varying_vector_norm = processed_channels.cumsum(dim=1).sqrt()
+                    # print('varying_vector_norm', varying_vector_norm.shape, varying_vector_norm[0])
+                else:
+                    # Handle other cases or throw an error
+                    raise ValueError('Not valid norm')
+                return varying_vector_norm
+            
+            def parallel_cal_varying_length_info(sorted_norm, reversed=False):
+                if reversed:
+                    sorted_norm = torch.flip(sorted_norm, [1])
+                nominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, self.pq_p)
+                denominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, self.pq_q)
 
-                # Calculate pq_indices for the current length
-                pq_indices_current = (1 - length ** (1/self.pq_q - 1/self.pq_p) * norm_p_current / norm_q_current)
+                nominator_varying_vector_norm = nominator_varying_vector_norm.to(cfg['device'])
+                denominator_varying_vector_norm = denominator_varying_vector_norm.to(cfg['device'])
+                # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm[0])
+                # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm[0])
 
-                # Add additional dimension if needed
-                # if pq_indices_current.dim() == 0:
-                #     pq_indices_current = pq_indices_current.unsqueeze(0)
+                num_rows, num_cols = nominator_varying_vector_norm.shape
 
-                # Check for NaN values
-                if torch.isnan(pq_indices_current).any():
-                    raise ValueError('pq_indices contains nan values')
+                # if reversed:
+                #     # Create a tensor where each row starts from 1 and decreases to the length of the row
+                #     dimension = torch.arange(num_cols, 0, -1).unsqueeze(0)
+                # else:
+                    # Create a tensor where each row starts from 1 and increases to the length of the row
+                dimension = torch.arange(1, num_cols + 1).unsqueeze(0)
+                dimension = dimension.expand(num_rows, -1).to(cfg['device'])
+                return nominator_varying_vector_norm, denominator_varying_vector_norm, dimension
+            
+            nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_norm)
+            # print('dimension', dimension.shape, dimension)
+            pq_indices_varying_length = (1 - dimension ** (1/self.pq_q - 1/self.pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
+            
+            reversed_nominator_varying_vector_norm, reversed_denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_norm, reversed=True)
 
-                # Store the pq_indices for the current length
-                pq_indices_varying_lengths.append(pq_indices_current.item())
-            info[f"{key}_pq_indices_varying_lengths"] = pq_indices_varying_lengths
+            reversed_pq_indices_varying_length = (1 - dimension ** (1/self.pq_q - 1/self.pq_p) * (reversed_nominator_varying_vector_norm / reversed_denominator_varying_vector_norm))
+            
+            # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm[0])
+            # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm[0])
+            
+            # exclude length 1 vector
+            pq_indices_varying_length_cut = pq_indices_varying_length[:, 1:pq_indices_varying_length.shape[1]-2]
+            # flip back, so it is the result counting from right to left
+            reversed_pq_indices_varying_length_cut = torch.flip(reversed_pq_indices_varying_length, [1])[:, 2:reversed_pq_indices_varying_length.shape[1]-1]
+            
+            nominator_varying_vector_norm_cut = nominator_varying_vector_norm[:, 1:nominator_varying_vector_norm.shape[1]-2]
+            reversed_nominator_varying_vector_norm_cut = torch.flip(reversed_nominator_varying_vector_norm, [1])[:, 2:reversed_nominator_varying_vector_norm.shape[1]-1]
+
+            denominator_varying_vector_norm_cut = denominator_varying_vector_norm[:, 1:denominator_varying_vector_norm.shape[1]-2]
+            reversed_denominator_varying_vector_norm_cut = torch.flip(reversed_denominator_varying_vector_norm, [1])[:, 2:reversed_denominator_varying_vector_norm.shape[1]-1]
+
+            pq_indices_ratio = pq_indices_varying_length_cut / reversed_pq_indices_varying_length_cut
+            p_norm_ratio = nominator_varying_vector_norm_cut / reversed_nominator_varying_vector_norm_cut
+            q_norm_ratio = denominator_varying_vector_norm_cut / reversed_denominator_varying_vector_norm_cut
+            pq_indices_varying_length = pq_indices_varying_length.mean(dim=0).tolist()
+            
+            # print('lower_bound', eta_zero_lower_bound[0][0])
+            info[f"{key}_pq_lower_bound"] = eta_zero_lower_bound[0][0].item()
+            info[f"{key}_pq_indices_varying_lengths"] = pq_indices_varying_length
+            reversed_pq_indices_varying_length = reversed_pq_indices_varying_length.mean(dim=0).tolist()
+            info[f"{key}_reversed_pq_indices_varying_lengths"] = reversed_pq_indices_varying_length
+            info[f"{key}_pq_indices_ratio"] = pq_indices_ratio.mean(dim=0).tolist()
+            info[f"{key}_p_norm_ratio"] = p_norm_ratio.mean(dim=0).tolist()
+            info[f"{key}_r_trend"] = q_norm_ratio.mean(dim=0).tolist()
+            info[f"{key}_q_norm_ratio"] = q_norm_ratio.mean(dim=0).tolist()
+            
+            # print('info[f"{key}_pq_indices_varying_lengths"]', info[f"{key}_pq_indices_varying_lengths"])
+            # print('info[f"{key}_reversed_pq_indices_varying_lengths"]', info[f"{key}_reversed_pq_indices_varying_lengths"])
+            # print('info[f"{key}_pq_indices_ratio"]', info[f"{key}_pq_indices_ratio"])
+            # print('info[f"{key}_p_norm_ratio"]', info[f"{key}_p_norm_ratio"])
+            # print('info[f"{key}_pq_indices_varying_lengths"]', info[f"{key}_pq_indices_varying_lengths"])
             self.logger_info_time_used += time.time() - start_time
+
+            # pq_indices_varying_lengths = []
+            # for i in range(sorted_channels.size(0)):
+            #     sub_varying_length = [1]
+            #     # Iterate over the lengths
+            #     for length in range(1, sorted_channels.size(1) + 1):
+            #         # Slicing the tensor up to the current length
+            #         # current_norms = sorted_channels.narrow(self.calc_norm_dim, 0, length)
+
+            #         current_channels = sorted_channels[i, :length]
+            #         current_channels_float = current_channels.float()
+            #         # print('current_channels_float', current_channels_float.shape, current_channels_float)
+            #         # Calculate norms
+            #         norm_p_current = torch.linalg.vector_norm(current_channels_float, ord=self.pq_p, dim=0)
+            #         norm_q_current = torch.linalg.vector_norm(current_channels_float, ord=self.pq_q, dim=0) + 1e-10
+            #         # print('norm_p_current', norm_p_current.shape, norm_p_current)
+            #         # Calculate pq_indices for the current length
+            #         pq_indices_current = (1 - length ** (1/self.pq_q - 1/self.pq_p) * norm_p_current / norm_q_current)
+            #         # print('pq_indices_current', pq_indices_current.shape, pq_indices_current)
+            #         # Check for NaN values
+            #         if torch.isnan(pq_indices_current).any():
+            #             raise ValueError('pq_indices contains nan values')
+
+            #         # Store the pq_indices for the current length
+            #         sub_varying_length.append(pq_indices_current.item())
+            #     pq_indices_varying_lengths.append(sub_varying_length)
+            # # print('pq_indices_varying_lengths', pq_indices_varying_lengths)
+            # info[f"{key}_pq_indices_varying_lengths"] = np.array(pq_indices_varying_lengths).mean(axis=0).tolist()
+            # print('2222 info[f"{key}_pq_indices_varying_lengths"]', info[f"{key}_pq_indices_varying_lengths"])
+            # self.logger_info_time_used += time.time() - start_time
+
         # print('sorted_channels', sorted_channels.shape, sorted_channels, prune_channels_count)
         if sorted_channels.dim() > 1:
             prune_channels = [sorted_channels[i, :int(count.item())] for i, count in enumerate(prune_channels_count)]
@@ -805,14 +914,12 @@ class HiddenRepresentationPruning(BasePruning):
     #     pruned_indices = sorted_indices[:, :num_indices_to_prune]
     #     return pruned_indices
     
-    def mag_struct(self, h, key, prune_dim, exclude_dim):
-        calc_dim = 0
-        if exclude_dim != None and exclude_dim == 0:
-            calc_dim = 1
-        dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != exclude_dim)
+    def mag_struct(self, h, key, prune_dim):
+
+        dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != self.exclude_dim_to_aggregate)
         norm_across_other_dims = torch.linalg.vector_norm(h, ord=self.prune_norm, dim=dims_to_aggregate)        
         prune_channels_count = int(self.prune_hyper * h.shape[prune_dim])
-        _, sorted_channels = torch.sort(norm_across_other_dims, dim=calc_dim)
+        _, sorted_channels = torch.sort(norm_across_other_dims, dim=self.calc_norm_dim)
         if sorted_channels.dim() > 1:
             prune_channels = [sorted_channels[i, :prune_channels_count] for i in range(sorted_channels.size(0))]
         else:
@@ -834,13 +941,22 @@ class WeightPruning(BasePruning):
             return
         if len(self.prune_dim) > 1 and self.prune_dim[0] != 1:
             raise ValueError('Not valid prune dim')
-        
+        import subprocess
         if 'unstruct' in self.prune_name:
             all_weights = []
             for name, module in model.named_modules():
                 if _check_target_module_exists(self.target_modules, name):
                     if hasattr(module, 'weight') and module.weight is not None:
                         all_weights.append(module.weight.data.reshape(-1))
+
+                # Run the nvidia-smi command
+                nvidia_smi_output = subprocess.check_output(['nvidia-smi', '--query-gpu=utilization.gpu', '--format=csv,noheader,nounits']).decode()
+                print('nvidia_smi_output', nvidia_smi_output)
+                # Process the output
+                gpu_utilizations = nvidia_smi_output.strip().split('\n')
+                gpu_utilizations = [int(utilization) for utilization in gpu_utilizations]
+
+                print("GPU Utilizations:", gpu_utilizations)
 
             all_weights_vector = torch.cat(all_weights)
             sorted_weights = torch.sort(torch.abs(all_weights_vector)).values

@@ -49,7 +49,7 @@ def make_hf_model(model_name, sub_model_name=None):
         if '1.3b' in model_name:
             cfg['model_name_or_path'] = 'facebook/opt-1.3b'
             cfg['tokenizer_name_or_path'] = 'facebook/opt-1.3b'
-    elif 'llama-2' in model_name:
+    elif 'llama-2-7b' in model_name:
         # https://huggingface.co/docs/transformers/main/model_doc/llama2
         # FOLLOW the instruction to run the script: python convert_llama_weights_to_hf.py --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir output/llama-2-7b
         # support ["llama-2-7b"]
