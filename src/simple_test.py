@@ -512,142 +512,175 @@ import torch
 
 
 
-import numpy as np
+# import numpy as np
 
-def compare_1d_vector_norms(v, p, q, gamma, beta):
-    pq_p = p
-    pq_q = q
-    p_norm = np.linalg.norm(v, p)
-    q_norm = np.linalg.norm(v, q)
+# def compare_1d_vector_norms(v, p, q, gamma, beta):
+#     pq_p = p
+#     pq_q = q
+#     p_norm = np.linalg.norm(v, p)
+#     q_norm = np.linalg.norm(v, q)
 
-    print(f"  {p} Norm: {p_norm}")
-    print(f"  {q} Norm: {q_norm}")
+#     print(f"  {p} Norm: {p_norm}")
+#     print(f"  {q} Norm: {q_norm}")
 
-    # Calculate and compare ratios of norms
-    dimension = len(v)
-    ratio = p_norm / q_norm
+#     # Calculate and compare ratios of norms
+#     dimension = len(v)
+#     ratio = p_norm / q_norm
 
-    print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
+#     print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
     
-    pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
-    pq_indices = 0.08
-    dimension = 8000
-    print(f"  pq_indices_{p}_{q}: {pq_indices}")
-    eta = 0
-    lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
-    beta_array = np.full_like(lower_bound, beta)
-    prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
-    print(f"ratio", {gamma * (1 - lower_bound / dimension)})
-    print(f"  Lower Bound: {lower_bound}")
-    print(f"  Prune Channels Count: {prune_channels_count}\n")
+#     pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
+#     pq_indices = 0.08
+#     dimension = 8000
+#     print(f"  pq_indices_{p}_{q}: {pq_indices}")
+#     eta = 0
+#     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
+#     beta_array = np.full_like(lower_bound, beta)
+#     prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
+#     print(f"ratio", {gamma * (1 - lower_bound / dimension)})
+#     print(f"  Lower Bound: {lower_bound}")
+#     print(f"  Prune Channels Count: {prune_channels_count}\n")
 
-# pq_p = 1
-# pq_q = 2
-gamma = 1
-beta = 0.9
-# Example usage
-vectors = [
-    # np.array([1, 1, 1,1, 0]),
-    # np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
-    np.array([0.1,0.1,0.1,0.1,0.1,0.2,0.2,0.2,0.2,0.2]),
-    # np.array([100,100,100,100,100,]),
-    # np.array([100,100,100,100,0]),
-    # np.array([-7, 8, -9])
-]
-#  (1,3), (2,3)
-for vector in vectors:
-    for comb in [(1,2)]:
-        p = comb[0]
-        q = comb[1]
-        compare_1d_vector_norms(vector, p, q, gamma, beta)
+# # pq_p = 1
+# # pq_q = 2
+# gamma = 1
+# beta = 0.9
+# # Example usage
+# vectors = [
+#     # np.array([1, 1, 1,1, 0]),
+#     # np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
+#     np.array([0.1,0.1,0.1,0.1,0.1,0.2,0.2,0.2,0.2,0.2]),
+#     # np.array([100,100,100,100,100,]),
+#     # np.array([100,100,100,100,0]),
+#     # np.array([-7, 8, -9])
+# ]
+# #  (1,3), (2,3)
+# for vector in vectors:
+#     for comb in [(1,2)]:
+#         p = comb[0]
+#         q = comb[1]
+#         compare_1d_vector_norms(vector, p, q, gamma, beta)
 
-import numpy as np
-import matplotlib.pyplot as plt
+# import numpy as np
+# import matplotlib.pyplot as plt
 
-# Define the PQ Index calculation
-def pq_index(w, p, q):
-    norm_p = np.linalg.norm(w, p)
-    norm_q = np.linalg.norm(w, q)
-    d = len(w)
-    return 1 - d ** (1/q - 1/p) * (norm_p / norm_q)
+# # Define the PQ Index calculation
+# def pq_index(w, p, q):
+#     norm_p = np.linalg.norm(w, p)
+#     norm_q = np.linalg.norm(w, q)
+#     d = len(w)
+#     return 1 - d ** (1/q - 1/p) * (norm_p / norm_q)
 
-# Create a Gaussian distribution
-length = 1000
-data = np.random.normal(size=length)
-data = np.abs(data)
-# Sort the data
-sorted_data = np.sort(data)
-print(sorted_data)
-# Calculate PQ Index for increasing length
-p = 1  # Example value for p
-q = 2    # Example value for q
-pq_indices = [pq_index(sorted_data[:i], p, q) for i in range(1, length + 1)]
-# print(pq_indices)
-# # Plot the trend of PQ Index
-# plt.plot(pq_indices)
+# # Create a Gaussian distribution
+# length = 1000
+# data = np.random.normal(size=length)
+# data = np.abs(data)
+# # Sort the data
+# sorted_data = np.sort(data)
+# print(sorted_data)
+# # Calculate PQ Index for increasing length
+# p = 1  # Example value for p
+# q = 2    # Example value for q
+# pq_indices = [pq_index(sorted_data[:i], p, q) for i in range(1, length + 1)]
+# # print(pq_indices)
+# # # Plot the trend of PQ Index
+# # plt.plot(pq_indices)
+# # plt.xlabel('Length of the vector')
+# # plt.ylabel('PQ Index')
+# # plt.title('PQ Index Trend for Sorted Gaussian Distribution')
+# # plt.show()
+
+
+
+
+# def parallel_cal_varying_length_norm(sorted_norm, norm):
+#     if norm == 1:
+#         # Take the absolute value of each element
+#         processed_channels = sorted_norm.abs()
+#         varying_vector_norm = processed_channels.cumsum(dim=1)
+#     elif norm == 2:
+#         # Take the square of each element
+#         processed_channels = sorted_norm.pow(2)
+#         # print('processed_channels', processed_channels.shape, processed_channels[0])
+#         varying_vector_norm = processed_channels.cumsum(dim=1).sqrt()
+#         # print('varying_vector_norm', varying_vector_norm.shape, varying_vector_norm[0])
+#     else:
+#         # Handle other cases or throw an error
+#         raise ValueError('Not valid norm')
+#     return varying_vector_norm
+
+# def parallel_cal_varying_length_info(sorted_norm, reversed=False):
+#     if reversed:
+#         sorted_norm = torch.flip(sorted_norm, [1])
+#     nominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, p)
+#     denominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, q)
+
+#     # nominator_varying_vector_norm = nominator_varying_vector_norm.to(cfg['device'])
+#     # denominator_varying_vector_norm = denominator_varying_vector_norm.to(cfg['device'])
+#     # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm[0])
+#     # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm[0])
+
+#     num_rows, num_cols = nominator_varying_vector_norm.shape
+
+#     # if reversed:
+#     #     # Create a tensor where each row starts from 1 and decreases to the length of the row
+#     #     dimension = torch.arange(num_cols, 0, -1).unsqueeze(0)
+#     # else:
+#         # Create a tensor where each row starts from 1 and increases to the length of the row
+#     dimension = torch.arange(1, num_cols + 1).unsqueeze(0)
+#     # dimension = dimension.expand(num_rows, -1).to(cfg['device'])
+#     return nominator_varying_vector_norm, denominator_varying_vector_norm, dimension
+
+# sorted_data = torch.from_numpy(sorted_data)
+# sorted_data.unsqueeze_(0)
+
+# nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_data)
+# # print('dimension', dimension.shape, dimension)
+# pq_indices_varying_length = (1 - dimension ** (1/q - 1/p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
+
+# pq_indices_varying_length = pq_indices_varying_length[0].tolist()
+
+# plt.plot(pq_indices_varying_length)
 # plt.xlabel('Length of the vector')
 # plt.ylabel('PQ Index')
 # plt.title('PQ Index Trend for Sorted Gaussian Distribution')
 # plt.show()
 
+# model_args = 'meta-llama/Llama-2-7b-hf'
+# from lm_eval import evaluator
+# results = evaluator.simple_evaluate(
+#     model="hf-causal-experimental",
+#     model_args=model_args,
+#     tasks=task_names,
+#     num_fewshot=num_fewshot,
+#     batch_size=None,
+#     device=None,
+#     no_cache=True,
+#     limit=limit,
+#     description_dict={},
+#     decontamination_ngrams_path=None,
+#     check_integrity=False,
+#     pretrained_model=model,
+#     tokenizer=tokenizer, 
+#     add_special_tokens=add_special_tokens
+# )
 
+# a = [[1,2,3,4], [5,6], [7]]
+# b = torch.cat(a, dim=0)
+# print('b', b)
 
+# loss_fct = CrossEntropyLoss()
+# a = [[0.5,0.4,0.3]]
+# b = [[0.5, 0.4, 0.3]]
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
-def parallel_cal_varying_length_norm(sorted_norm, norm):
-    if norm == 1:
-        # Take the absolute value of each element
-        processed_channels = sorted_norm.abs()
-        varying_vector_norm = processed_channels.cumsum(dim=1)
-    elif norm == 2:
-        # Take the square of each element
-        processed_channels = sorted_norm.pow(2)
-        # print('processed_channels', processed_channels.shape, processed_channels[0])
-        varying_vector_norm = processed_channels.cumsum(dim=1).sqrt()
-        # print('varying_vector_norm', varying_vector_norm.shape, varying_vector_norm[0])
-    else:
-        # Handle other cases or throw an error
-        raise ValueError('Not valid norm')
-    return varying_vector_norm
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+model = GPT2LMHeadModel.from_pretrained("gpt2")
 
-def parallel_cal_varying_length_info(sorted_norm, reversed=False):
-    if reversed:
-        sorted_norm = torch.flip(sorted_norm, [1])
-    nominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, p)
-    denominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, q)
-
-    # nominator_varying_vector_norm = nominator_varying_vector_norm.to(cfg['device'])
-    # denominator_varying_vector_norm = denominator_varying_vector_norm.to(cfg['device'])
-    # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm[0])
-    # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm[0])
-
-    num_rows, num_cols = nominator_varying_vector_norm.shape
-
-    # if reversed:
-    #     # Create a tensor where each row starts from 1 and decreases to the length of the row
-    #     dimension = torch.arange(num_cols, 0, -1).unsqueeze(0)
-    # else:
-        # Create a tensor where each row starts from 1 and increases to the length of the row
-    dimension = torch.arange(1, num_cols + 1).unsqueeze(0)
-    # dimension = dimension.expand(num_rows, -1).to(cfg['device'])
-    return nominator_varying_vector_norm, denominator_varying_vector_norm, dimension
-
-sorted_data = torch.from_numpy(sorted_data)
-sorted_data.unsqueeze_(0)
-
-nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_data)
-# print('dimension', dimension.shape, dimension)
-pq_indices_varying_length = (1 - dimension ** (1/q - 1/p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
-
-pq_indices_varying_length = pq_indices_varying_length[0].tolist()
-
-plt.plot(pq_indices_varying_length)
-plt.xlabel('Length of the vector')
-plt.ylabel('PQ Index')
-plt.title('PQ Index Trend for Sorted Gaussian Distribution')
-plt.show()
-
-
-# print(pq_indices[:10])
+inputs = tokenizer("Hello, my dog is cute and ", return_tensors="pt")
+generation_output = model.generate(**inputs, return_dict_in_generate=True, output_scores=True)
+print('generation_output', generation_output)
+# # print(pq_indices[:10])
 # print(pq_indices_varying_length[0][:10])
 # def compare_1d_vector_norms(v, p, q, gamma, beta, pq_indices):
 #     pq_p = p

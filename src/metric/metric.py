@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import torch.nn.functional as F
 import evaluate
 from collections import defaultdict
@@ -53,6 +54,15 @@ def make_metric(metric_name, tokenizer):
             pivot_name = 'Loss'
         else:
             raise ValueError('Not valid data name')
+    elif cfg['task_name'] == 'mc':
+        if cfg['data_name'] in ['piqa', 'storycloze', 'arc', 'hellaswag', 'obqa']:
+            pivot = -float('inf')
+            pivot_direction = 'up'
+            pivot_name = 'Accuracy'
+            for k in metric_name:
+                metric_name[k].extend(['McAccuracy'])
+        else:
+            raise ValueError('Not valid data name')
     else:
         raise ValueError('Not valid task name')
     metric = Metric(metric_name, pivot, pivot_direction, pivot_name, tokenizer)
@@ -86,26 +96,57 @@ def RMSE(output, target):
     return rmse
 
 
-class GLUE:
-    def __init__(self, subset_name):
-        self.metric = evaluate.load('glue', subset_name)
-        self.subset_name = subset_name
+class McAccuracy:
+    def __init__(self):
+        self.output_for_one_question = defaultdict(list)
+        self.correct_labels_for_one_question = defaultdict(list)
+        pass
+    
 
     def add(self, input, output):
-        if self.subset_name in ['stsb']:
-            predictions = output['target']
-        else:
-            predictions = output['target'].argmax(dim=-1)
-        references = input['target']
-        self.metric.add_batch(predictions=predictions, references=references)
-        return
+        # generate = output['generate'].detach().cpu()
+        # scores = output['scores']
+        # target = input['target'].detach().cpu()
 
+        # generate = generate[:, -cfg['max_new_tokens']:]
+        # def tuple_of_tensors_to_tensor(tuple_of_tensors):
+        #     return torch.stack(list(tuple_of_tensors), dim=0)
+        
+        # scores = tuple_of_tensors_to_tensor(scores)
+        # scores = scores.view(generate.shape[0], -1, scores.shape[-1]).detach().cpu()
+        # a = scores.shape
+        # scores = scores[:, -cfg['max_new_tokens']:, :]
+        # # scores = F.log_softmax(scores, dim=-1)
+        # target[target < 0] = cfg['pad_token_id']
+        # target = target[:, -cfg['max_new_tokens']:]
+
+        # non_pad_mask = target != cfg['pad_token_id']
+        lm_logits = output['target']
+        labels = input['target']
+        shift_logits = lm_logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        # shift_logits = F.log_softmax(shift_logits, dim=-1)
+        loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        # Reshape loss back to the batch size and sequence length
+        loss = loss.view(shift_labels.size())
+
+        # Sum loss over the sequence length for each sample in the batch
+        loss_per_sample = loss.sum(dim=1)
+        print('McAccuracy', loss_per_sample)
+
+        for i in range(input['input_indicies'].shape[0]):
+            self.output_for_one_question[input['input_indicies'][i].item()].append(loss_per_sample[i].item())
+            self.correct_labels_for_one_question[input['input_indicies'][i].item()].append(input['correct_labels'][i].item())
+        a = 5
     def __call__(self, *args, **kwargs):
-        glue = self.metric.compute()
-        metric_name = list(glue.keys())[0]
-        glue = glue[metric_name]
-        return glue
+        total_acc = 0
+        for key in self.output_for_one_question:
+            # argmin for positive loss
+            acc = 1 if np.argmin(self.output_for_one_question[key]) == self.correct_labels_for_one_question[key][0] else 0
+            total_acc += acc
 
+        return total_acc / len(self.output_for_one_question) * 100
 
 class ROUGE:
     def __init__(self, tokenizer, split_metric):
@@ -131,7 +172,26 @@ class ROUGE:
         rouge = self.metric.compute()['rougeL']
         return rouge
 
+class GLUE:
+    def __init__(self, subset_name):
+        self.metric = evaluate.load('glue', subset_name)
+        self.subset_name = subset_name
 
+    def add(self, input, output):
+        if self.subset_name in ['stsb']:
+            predictions = output['target']
+        else:
+            predictions = output['target'].argmax(dim=-1)
+        references = input['target']
+        self.metric.add_batch(predictions=predictions, references=references)
+        return
+
+    def __call__(self, *args, **kwargs):
+        glue = self.metric.compute()
+        metric_name = list(glue.keys())[0]
+        glue = glue[metric_name]
+        return glue
+    
 class Metric:
     def __init__(self, metric_name, pivot, pivot_direction, pivot_name, tokenizer):
         self.pivot, self.pivot_name, self.pivot_direction = pivot, pivot_name, pivot_direction
@@ -159,6 +219,8 @@ class Metric:
                     metric[split][m] = {'mode': 'full', 'metric': ROUGE(tokenizer, cfg['split_metric'])}
                 elif m == 'GLUE':
                     metric[split][m] = {'mode': 'full', 'metric': GLUE(cfg['hf_subset_name'])}
+                elif m == 'McAccuracy':
+                    metric[split][m] = {'mode': 'full', 'metric': McAccuracy()}
                 else:
                     raise ValueError('Not valid metric name')
         return metric

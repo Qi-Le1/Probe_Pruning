@@ -723,7 +723,7 @@ class HiddenRepresentationPruning(BasePruning):
         elif 'magstruct' in self.prune_name:
             if self.prune_hyper == 9999:
                 return [torch.empty(0)]
-            prune_channels = self.mag_struct(h, key, prune_dim)
+            prune_channels = self.mag_struct(h, key, layer_info, prune_dim)
             return prune_channels
         # elif 'magunstruct' in self.prune_name:
         #     pruned_indices = self.mag_unstruct(h, key)
@@ -891,12 +891,11 @@ class HiddenRepresentationPruning(BasePruning):
             # self.logger_info_time_used += time.time() - start_time
 
         # print('sorted_channels', sorted_channels.shape, sorted_channels, prune_channels_count)
-        if sorted_channels.dim() > 1:
-            prune_channels = [sorted_channels[i, :int(count.item())] for i, count in enumerate(prune_channels_count)]
-            logger_norm_across_other_dims = norm_across_other_dims.mean(dim=0).squeeze(0).tolist()
-        else:
-            prune_channels = [sorted_channels[:int(prune_channels_count[0].item())]]
-            logger_norm_across_other_dims = norm_across_other_dims.tolist()
+      
+        prune_channels = [sorted_channels[i, :int(count.item())] for i, count in enumerate(prune_channels_count)]
+        logger_norm_across_other_dims = norm_across_other_dims.mean(dim=0).squeeze(0).tolist()
+        
+            
 
         start_time = time.time()
         info[f"{key}_norm_across_other_dims"] = logger_norm_across_other_dims
@@ -914,16 +913,27 @@ class HiddenRepresentationPruning(BasePruning):
     #     pruned_indices = sorted_indices[:, :num_indices_to_prune]
     #     return pruned_indices
     
-    def mag_struct(self, h, key, prune_dim):
-
+    def mag_struct(self, h, key,layer_info, prune_dim):
+        info = {}
         dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != self.exclude_dim_to_aggregate)
-        norm_across_other_dims = torch.linalg.vector_norm(h, ord=self.prune_norm, dim=dims_to_aggregate)        
+        norm_across_other_dims = torch.linalg.vector_norm(h, ord=self.prune_norm, dim=dims_to_aggregate)   
+        # print('w*magstruct', self.prune_name)     
+        if 'w*magstruct' in self.prune_name:
+            # print('2222w*magstruct', self.prune_name)
+            if self.weight_norm_across_channel_dims is None:
+                self.cal_weight_norm_across_channel_dims(layer_info['weight'])
+                start_time = time.time()
+                info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
+                self.logger_info_time_used += time.time() - start_time
+            norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
         prune_channels_count = int(self.prune_hyper * h.shape[prune_dim])
         _, sorted_channels = torch.sort(norm_across_other_dims, dim=self.calc_norm_dim)
-        if sorted_channels.dim() > 1:
-            prune_channels = [sorted_channels[i, :prune_channels_count] for i in range(sorted_channels.size(0))]
-        else:
-            prune_channels = [sorted_channels[:prune_channels_count]]
+
+        if sorted_channels.dim() == 0 or sorted_channels.dim() == 1:
+            sorted_channels.unsqueeze_(0)
+        
+        prune_channels = [sorted_channels[i, :prune_channels_count] for i in range(sorted_channels.size(0))]
+        self.update_pruning_info(info)
         return prune_channels
 
         

@@ -116,10 +116,16 @@ def make_dataset(data_name, subset_name=None, verbose=True):
     elif data_name in ['dolly']:
         dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
         dataset_ = dataset_['train'].train_test_split(test_size=0.1, seed=cfg['seed'])
-    elif data_name in ['wikitext']:
+    # piqa: piqa
+    # storycloze: storycloze , 
+    # arc-e: arc-easy 
+    # arc-c: arc-challenge (Clark et al., 2018), 
+    # hellaswag: hellaswag (Zellers et al., 2019) 
+    # obqa: OpenBookQA (Mihaylov et al., 2018)
+    elif data_name in ['wikitext', 'storycloze', 'arc', 'obqa']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test')
-    elif data_name in ['arc']:
-        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test')
+    elif data_name in ['piqa', 'hellaswag']:
+        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
     elif data_name in ['dreambooth']:
         model, tokenizer = make_model(cfg['model_name'])
 
@@ -253,7 +259,7 @@ def collate(input):
 
 
 def process_dataset(dataset, tokenizer):
-    if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
         text_column = cfg['text_column']
         label_column = cfg['label_column']
         if cfg['data_name'] == 'fpb':
@@ -433,11 +439,23 @@ def process_dataset(dataset, tokenizer):
         # hellaswag: hellaswag (Zellers et al., 2019) 
         # obqa: OpenBookQA (Mihaylov et al., 2018)
         elif cfg['data_name'] == 'piqa':
+            '''
+            {
+                "goal": "How do I ready a guinea pig cage for it's new occupants?",
+                "sol1": "Provide the guinea pig with a cage full of a few inches of bedding made of ripped paper strips, you will also need to supply it with a water bottle and a food dish.",
+                "sol2": "Provide the guinea pig with a cage full of a few inches of bedding made of ripped jeans material, you will also need to supply it with a water bottle and a food dish.",
+                "label": 0,
+            }
+            '''
             max_length = cfg[cfg['model_name']]['max_length']
             def tokenize_function(examples):
                 batch_size = len(examples[label_column])
                 targets = examples[label_column]
 
+                # inputs = [
+                #     f"goal: {examples['goal'][i]} choices: [{examples['sol1'][i]}, {examples['sol2'][i]}] {label_column}: "
+                #     for i in range(batch_size)
+                # ]
                 inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
                           range(batch_size)]
                 model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
@@ -460,15 +478,22 @@ def process_dataset(dataset, tokenizer):
                 keep_in_memory=True,
             )
         elif cfg['data_name'] == 'storycloze':
-            pass
-        elif cfg['data_name'] == 'arc':
+            '''
+            {
+                'answer_right_ending': 1,
+                'input_sentence_1': 'Rick grew up in a troubled household.',
+                'input_sentence_2': 'He never found good support in family, and turned to gangs.',
+                'input_sentence_3': "It wasn't long before Rick got shot in a robbery.",
+                'input_sentence_4': 'The incident caused him to turn a new leaf.',
+                'sentence_quiz1': 'He is happy now.',
+                'sentence_quiz2': 'He joined a gang.',
+                'story_id': '138d5bfb-05cc-41e3-bf2c-fa85ebad14e2'
+            }
+            '''
             max_length = cfg[cfg['model_name']]['max_length']
             def tokenize_function(examples):
                 batch_size = len(examples[label_column])
                 targets = examples[label_column]
-
-                num_to_letter = {"1": "A", "2": "B", "3": "C", "4": "D", "5": "E"}
-                targets = num_to_letter.get(targets, targets)
 
                 inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
                           range(batch_size)]
@@ -491,9 +516,66 @@ def process_dataset(dataset, tokenizer):
                 desc="Running tokenizer on dataset",
                 keep_in_memory=True,
             )
+        elif cfg['data_name'] == 'arc':
+            '''
+            {
+                "answerKey": "B",
+                "choices": {
+                    "label": ["A", "B", "C", "D"],
+                    "text": ["Shady areas increased.", "Food sources increased.", "Oxygen levels increased.", "Available water increased."]
+                },
+                "id": "Mercury_SC_405487",
+                "question": "One year, the oak trees in a park began producing more acorns than usual. The next year, the population of chipmunks in the park also increased. Which best explains why there were more chipmunks the next year?"
+            }
+            '''
+            
+            max_length = cfg[cfg['model_name']]['max_length']
+            def tokenize_function(examples):
+                batch_size = len(examples[label_column])
+                targets = examples[label_column]
 
+                num_to_letter = {"1": "A", "2": "B", "3": "C", "4": "D", "5": "E"}
+                targets = [num_to_letter.get(target, target) for target in targets]
+                # Convert each target to its numerical index
+                targets = [["A", "B", "C", "D", "E"].index(target) for target in targets]
 
+                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
+                          range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
+                                         return_tensors="pt")
+                labels = tokenizer(targets, max_length=3, padding="max_length", truncation=True, return_tensors="pt")
+                labels = labels["input_ids"]
+                labels[labels == tokenizer.pad_token_id] = -100
+                model_inputs["labels"] = labels
+                return model_inputs
+
+            processed_dataset = {}
+            processed_dataset['test'] = dataset['test'].map(
+                tokenize_function,
+                batched=True,
+                # batch_size=50,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset",
+                keep_in_memory=True,
+            )
         elif cfg['data_name'] == 'hellaswag':
+            '''
+            This example was too long and was cropped:
+            {
+                "activity_label": "Removing ice from car",
+                "ctx": "Then, the man writes over the snow covering the window of a car, and a woman wearing winter clothes smiles. then",
+                "ctx_a": "Then, the man writes over the snow covering the window of a car, and a woman wearing winter clothes smiles.",
+                "ctx_b": "then",
+                "endings": "[\", the man adds wax to the windshield and cuts it.\", \", a person board a ski lift, while two men supporting the head of the per...",
+                "ind": 4,
+                "label": "3",
+                "source_id": "activitynet~v_-1IBHYS3L-Y",
+                "split": "train",
+                "split_type": "indomain"
+            }
+            '''
             def preprocess(text):
                 text = text.strip()
                 # NOTE: Brackets are artifacts of the WikiHow dataset portion of HellaSwag.
@@ -501,35 +583,26 @@ def process_dataset(dataset, tokenizer):
                 text = re.sub("\\[.*?\\]", "", text)
                 text = text.replace("  ", " ")
                 return text
-            
-            def preprocess_function_test(examples):   
-                ctx = examples["ctx_a"] + " " + examples["ctx_b"].capitalize()
-                out_doc = {
-                    "query": preprocess(examples["activity_label"] + ": " + ctx),
-                    "choices": [preprocess(ending) for ending in examples["endings"]],
-                    "gold": int(examples["label"]),
-                }
-                return out_doc
-                all_text = "\n\n".join(examples[text_column[0]])
-        
-                model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
+                
+            def tokenize_function(examples):
+                batch_size = len(examples[label_column])
+                targets = examples[label_column]
+                examples['ctx_b'] = [examples['ctx_b'][i].capitalize() for i in range(batch_size)]
+                targets = [int(targets[i]) for i in range(batch_size)]
 
-                input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
-                attention_mask = model_inputs['attention_mask'][0]
-
-                input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
-                mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
-
-                final_inputs = defaultdict(list)
-                for i in range(len(input_chunks)):
-                    if len(input_chunks[i]) == max_length:
-                        final_inputs['input_ids'].append(input_chunks[i])
-                        final_inputs['attention_mask'].append(mask_chunks[i])
-                        final_inputs['labels'].append(input_chunks[i])
+                inputs = [(preprocess(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ')) for i in
+                          range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
+                                         return_tensors="pt")
+                labels = tokenizer(targets, max_length=3, padding="max_length", truncation=True, return_tensors="pt")
+                labels = labels["input_ids"]
+                labels[labels == tokenizer.pad_token_id] = -100
+                model_inputs["labels"] = labels
+                return model_inputs
 
             processed_dataset = {}
             processed_dataset['test'] = dataset['test'].map(
-                preprocess_function_test,
+                tokenize_function,
                 batched=True,
                 # batch_size=50,
                 num_proc=1,
@@ -539,7 +612,70 @@ def process_dataset(dataset, tokenizer):
                 keep_in_memory=True,
             )
         elif cfg['data_name'] == 'obqa':
-            pass
+            '''
+            {
+                'id': '7-980',
+                'question_stem': 'The sun is responsible for',
+                'choices': {'text': ['puppies learning new tricks',
+                'children growing up and getting old',
+                'flowers wilting in a vase',
+                'plants sprouting, blooming and wilting'],
+                'label': ['A', 'B', 'C', 'D']},
+                'answerKey': 'D'
+            }
+            '''
+            max_length = cfg[cfg['model_name']]['max_length']
+            def tokenize_function(examples):
+                batch_size = len(examples[label_column])
+                correct_labels = examples[label_column]
+                # Convert each target to its numerical index
+                correct_labels = [["A", "B", "C", "D"].index(choice) for choice in correct_labels]
+
+                inputs = []
+                labels = []
+                correct_labels_extended = []
+                input_indicies = []
+                for i in range(batch_size):
+                    num_choices = len(examples['choices'][i]['text'])
+                    inputs.extend([f"{examples['question_stem'][i]}"] * num_choices)
+                    labels.extend(examples['choices'][i]['text'])
+                    correct_labels_extended.extend([correct_labels[i]] * num_choices)
+                    input_indicies.extend([i] * num_choices)
+                # inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
+                #           range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True)
+                labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
+
+                for i in range(len(correct_labels_extended)):
+                    sample_input_ids = model_inputs["input_ids"][i]
+                    sample_attention_mask = model_inputs["attention_mask"][i]
+                    label_input_ids = labels["input_ids"][i]
+                    label_attention_mask = labels["attention_mask"][i]
+                    model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
+                    model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
+                    labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
+                    # labels["input_ids"][i] = [-100] * (len(sample_input_ids)+1)
+                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
+                    # input_indicies[i] = torch.tensor(input_indicies[i])
+                    # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
+
+                model_inputs["labels"] = labels["input_ids"]
+                model_inputs['input_indicies'] = input_indicies
+                model_inputs["correct_labels"] = correct_labels_extended
+                return model_inputs
+
+            processed_dataset = {}
+            processed_dataset['test'] = dataset['test'].map(
+                tokenize_function,
+                batched=True,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset",
+                keep_in_memory=True,
+            )
         elif cfg['data_name'] == 'wikisql':
             '''
             This example was too long and was cropped:

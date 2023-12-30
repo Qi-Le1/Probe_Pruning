@@ -11,7 +11,7 @@ from .huggingface import make_hf_model
 
 
 def make_model(model_name, sub_model_name=None):
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i']:
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc', 't2i']:
         model, tokenizer = make_hf_model(model_name, sub_model_name)
         # base_model_name_or_path = model.__dict__.get("name_or_path", None)
         model_config = getattr(model, "config", {"model_type": "custom"})

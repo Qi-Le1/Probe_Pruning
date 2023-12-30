@@ -45,6 +45,19 @@
         },
 
         {
+            "name": "verify_obqa_gpt.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "obqa-main_gpt2_mc_2_pqstruct+h+1+0.2+1+max_inter_somemethods-3_default",
+            ],
+        },
+
+        {
             "name": "verify_w.py",
             "type": "python",
             "request": "launch",
@@ -274,6 +287,44 @@
             "args": [
                 "--control_name",
                 "dreambooth-dog_sdiffusion_t2i_cola-lowrank-1_1",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "lm_eval_hellaswag.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/lm_eval_main.py",
+            "justMyCode": true,
+            "args": [
+                "--model",
+                "hf-causal",
+                "--model_args",
+                "pretrained=gpt2",
+                "--tasks",
+                "hellaswag",
+                "--device",
+                "cpu"
+            ],
+        },
+
+        {
+            "name": "lm_eval_obqa.py",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/lm_eval_main.py",
+            "justMyCode": true,
+            "args": [
+                "--model",
+                "hf-causal",
+                "--model_args",
+                "pretrained=gpt2",
+                "--tasks",
+                "openbookqa",
                 "--device",
                 "cpu"
             ],

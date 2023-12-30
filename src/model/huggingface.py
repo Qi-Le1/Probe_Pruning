@@ -7,13 +7,19 @@ from diffusers import (
     DiffusionPipeline,
     UNet2DConditionModel,
 )
-from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification, AutoTokenizer, \
-    PretrainedConfig
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification, \
-    AutoTokenizer, LlamaTokenizer, LlamaForCausalLM
+    AutoTokenizer, LlamaTokenizer, LlamaForCausalLM, AutoModelForMultipleChoice, AutoModel
+from module import MULTIGPUS_MODEL_NAME_LIST
 
 
 def make_hf_model(model_name, sub_model_name=None):
+    if model_name in MULTIGPUS_MODEL_NAME_LIST:
+        device_map = "auto"
+        low_cpu_mem_usage = True
+    else:
+        device_map = cfg['device']
+        low_cpu_mem_usage = False
+
     if 'bart' in model_name:
         cfg['model_name_or_path'] = 'facebook/{}'.format(model_name)
         cfg['tokenizer_name_or_path'] = 'facebook/{}'.format(model_name)
@@ -61,12 +67,11 @@ def make_hf_model(model_name, sub_model_name=None):
     cfg['cache_tokenizer_path'] = os.path.join('output', 'tokenizer', model_name)
     if cfg['task_name'] == 'clm':
         if 'llama' in model_name:
-            # "Training Llama in float16 is not recommended and known to produce nan, as such the model should be trained in bfloat16.""
-            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.bfloat16,
-                                                     device_map=cfg['device'])
-            # cache_dir=cfg['cache_model_path']
+            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.float16,
+                                                    device_map=device_map, low_cpu_mem_usage=low_cpu_mem_usage)
         else:
-            model = AutoModelForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'])
+            model = AutoModelForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.float16, cache_dir=cfg['cache_model_path'],
+                                                         device_map=device_map, low_cpu_mem_usage=low_cpu_mem_usage)
     elif cfg['task_name'] == 's2s':
         model = AutoModelForSeq2SeqLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'])
     elif cfg['task_name'] == 'sc':
@@ -80,6 +85,15 @@ def make_hf_model(model_name, sub_model_name=None):
         else:
             model = AutoModelForSequenceClassification.from_pretrained(cfg['model_name_or_path'],
                                                                        cache_dir=cfg['cache_model_path'])
+    if cfg['task_name'] == 'mc':  # Assuming 'mc' stands for commonsense reasoning
+        if 'llama' in model_name:
+            # "Training Llama in float16 is not recommended and known to produce nan, as such the model should be trained in bfloat16.""
+            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.float16,
+                                                     device_map=device_map, low_cpu_mem_usage=low_cpu_mem_usage)
+            # cache_dir=cfg['cache_model_path']
+        else:
+            model = AutoModelForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.float16, cache_dir=cfg['cache_model_path'],
+                                                    device_map=device_map, low_cpu_mem_usage=low_cpu_mem_usage)
     elif cfg['task_name'] == 't2i':
         if sub_model_name is None:
             model = DiffusionPipeline.from_pretrained(cfg['model_name_or_path'], safety_checker=None,
@@ -96,12 +110,15 @@ def make_hf_model(model_name, sub_model_name=None):
     else:
         raise ValueError('Not valid task name')
     if any(k in cfg['model_name_or_path'] for k in ("gpt", "opt", "bloom", "llama")):
-        cfg[cfg['model_name']]['max_length'] = model.config.max_position_embeddings
-        # cfg[cfg['model_name']]['max_length'] = 512
+        
         padding_side = "left"
     else:
         padding_side = "right"
 
+    if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
+        cfg[cfg['model_name']]['max_length'] = model.config.max_position_embeddings
+        # cfg[cfg['model_name']]['max_length'] = 512
+        print('max_length', cfg[cfg['model_name']]['max_length'])
     if 'llama' in model_name:
         tokenizer = LlamaTokenizer.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_tokenizer_path'],
                                                    padding_side=padding_side)

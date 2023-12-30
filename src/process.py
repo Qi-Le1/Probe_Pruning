@@ -41,22 +41,22 @@ def make_control_list(file):
     controls = []
     if file == 'observe_llm':
         # ------- llama-2-7b
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3'], [f'magunstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3'], [f'magunstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0]],
         #         ['full'], ['somemethods-3'], ['down-proj']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
         
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3'], [f'magstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3'], [f'magstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0]],
         #         ['full'], ['somemethods-3'], ['down-proj']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0]],
         #         ['full'], ['somemethods-3'], ['down-proj']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5]],
         #         ['inter'], ['somemethods-3'], ['down-proj']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
@@ -71,16 +71,35 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
-                ['inter'], ['somemethods-3'], ['default', 'gate-proj+up-proj+down-proj', 'down-proj']]]
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
+        #         ['inter'], ['somemethods-3'], ['default', 'gate-proj+up-proj+down-proj', 'down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
+        #         ['inter'], ['somemethods-3'], ['default', 'gate-proj+up-proj+down-proj', 'down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+        #             ['inter'], ['somemethods-3'], ['gate-proj', 'up-proj', 'down-proj', 'gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'w*magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+        #             ['inter'], ['somemethods-3'], ['gate-proj', 'up-proj', 'down-proj', 'gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+        #             ['inter'], ['somemethods-3'], ['gate-proj', 'up-proj', 'down-proj', 'gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+        
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+                    ['inter'], ['somemethods-3'], ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
-                ['inter'], ['somemethods-3'], ['default', 'gate-proj+up-proj+down-proj', 'down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
         # ----- opt 1.3b
         # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magunstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
         #         ['full'], ['somemethods-3'], ['fc2']]]
@@ -97,7 +116,7 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5]],
         #         ['inter'], ['somemethods-3'], ['fc2']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
@@ -122,6 +141,25 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+        #             ['inter'], ['somemethods-3'], ['fc1', 'fc2', 'fc1+fc2']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w*magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+        #             ['inter'], ['somemethods-3'], ['fc1', 'fc2', 'fc1+fc2']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+        #             ['inter'], ['somemethods-3'], ['fc1', 'fc2', 'fc1+fc2']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+                    ['inter'], ['somemethods-3'], ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
     elif file == 'observe_cv':
         # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
         #                      ['inter'], ['somemethods-3'], ['default']]]
@@ -365,9 +403,7 @@ def make_df_history(extracted_processed_result_history):
                 # print(k)
                 df[df_name].append(
                     pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
-
                 # df[df_name] = df[df_name].append(pd.DataFrame(...))
-
         else:
             raise ValueError('Not valid control')
     # TODO, dont write into xlsx right now
@@ -422,7 +458,7 @@ def make_vis(df_exp, df_history):
         0.3: 'orange', 0.4: 'black', 0.5: 'purple', 0.6: 'black', 0.7: 'purple', 
         0.8: 'sienna', 0.9: 'green', 1.0: 'red', 9999: 'darkseagreen'
     }
-    prune_names = ['magstructglobal', 'magunstructglobal', 'pqstructlocal', 'magstructlocal', 'w*pqstructlocal']
+    prune_names = ['magstructglobal', 'magunstructglobal', 'pqstructlocal', 'w*pqstructlocal', 'magstructlocal', 'w*magstructlocal']
     total_layers = {
         'gpt2': 12,
         'opt-1.3b': 23,
@@ -438,7 +474,8 @@ def make_vis(df_exp, df_history):
     fontsize = {'legend': 14, 'label': 14, 'ticks': 14, 'group_x_ticks': 8}
     metric_name_list = ['test/Rouge', 'test/ROUGE', 'test/GLUE', 'test/Accuracy', 'test/Perplexity']
     
-    performance_metric_max = 500
+    plot_layer_detail = False
+    performance_metric_max = 70
     y_max_in_graph = 60
     fig = {}
     reorder_fig = []
@@ -463,6 +500,9 @@ def make_vis(df_exp, df_history):
             prune_dim_select_mode = prune_name_list[5] if len(prune_name_list) > 5 else 'max'
             
             def is_valid_layer_for_detailed_info(index, model_name):
+                if not plot_layer_detail:
+                    return False
+
                 if model_name in total_layers:
                     layer_number = int(index.split(".layers.")[1].split(".")[0])
                     if layer_number <= math.ceil(total_layers[model_name] * 0.05) or math.ceil(layer_number >= total_layers[model_name] * 0.95):
@@ -845,7 +885,7 @@ def make_vis(df_exp, df_history):
 
                     # for unstructure pruning, performance v.s. sparsity
                     if any(metric_name in index for metric_name in metric_name_list) or 'sparsity' in index:
-                        print('here')
+                        # print('here')
                         cur_metric_name = next((metric for metric in metric_name_list if metric in index), None)
                         if any(metric_name in index for metric_name in metric_name_list):
                             if performance_vs_sparsity[0] is None:
@@ -855,7 +895,7 @@ def make_vis(df_exp, df_history):
                                 performance_vs_sparsity[1] = row.tolist()[0]
                         print('performancevssparsity', performance_vs_sparsity)
                         if performance_vs_sparsity[0] is not None and performance_vs_sparsity[1] is not None:
-                            print('here1')
+                            # print('here1')
                             fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_name, prune_tgt, prune_norm, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:performance_vs_sparsity'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_sparsity[1]

@@ -104,7 +104,7 @@ def test(data_loader, model, model_prof, metric, logger):
         model = model.to(cfg['device'])
         model.train(False)
         for i, input in enumerate(data_loader):
-            if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+            if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                          'labels': input['labels']}

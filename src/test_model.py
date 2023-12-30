@@ -61,15 +61,15 @@ def runExperiment():
     vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
     # print('vanilla_info_list', vanilla_info_list[0], vanilla_info_list[1])
 
-    model, tokenizer = make_model(cfg['model_name'])
-    model = model.to(cfg['device'])
-    if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
-        model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
-    model = make_prune_model(model)
-    model_prof = FlopsProfiler(model)
-    test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    test(data_loader['test'], model, model_prof, metric, test_logger)
-    pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
+    # model, tokenizer = make_model(cfg['model_name'])
+    # model = model.to(cfg['device'])
+    # if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
+    #     model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
+    # model = make_prune_model(model)
+    # model_prof = FlopsProfiler(model)
+    # test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
+    # test(data_loader['test'], model, model_prof, metric, test_logger)
+    # pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
     
     # print('vanilla_info_list', vanilla_info_list[0], vanilla_info_list[1])
     batch_num = len(data_loader['test'])
@@ -77,7 +77,9 @@ def runExperiment():
 
     # thread lock bug
     test_logger.writer = None
-    result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger}}
+    result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
+              'vanilla_info_list': vanilla_info_list, 'pruned_info_list': pruned_info_list, \
+              'vanilla_duration': vanilla_duration, 'pruned_duration': pruned_duration, 'batch_num': batch_num}
     # result = {'cfg': cfg, 'epoch': cfg['epoch']}
     # for k,v in test_logger.history.items():
     #     print('k', k)
@@ -103,6 +105,16 @@ def test(data_loader, model, model_prof, metric, logger):
                 output = model(**input)
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
+            elif cfg['task_name'] in ['mc']:
+                input_size = input['labels'].size(0)
+                input_indicies = input['input_indicies']
+                correct_labels = input['correct_labels']
+                input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                        'labels': input['labels']}
+                input = to_device(input, cfg['device'])
+                output = model(**input)
+                input_ = {'input_indicies': input_indicies, 'target': input['labels'], 'correct_labels': correct_labels}
+                output_ = {'target': output['logits'], 'loss': output['loss']}
             else:
                 input = collate(input)
                 input_size = input['data'].size(0)
@@ -122,7 +134,7 @@ def test(data_loader, model, model_prof, metric, logger):
                                                         no_repeat_ngram_size=2)
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
-            print('evaluation', evaluation)
+            print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
             # return
@@ -132,6 +144,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
         evaluation = metric.evaluate('test', 'full')
+        print('evaluation_for_full', evaluation)
         logger.append(evaluation, 'test')
         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(cfg['epoch'], 100.)]}
         logger.append(info, 'test')

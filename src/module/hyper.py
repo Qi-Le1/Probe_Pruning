@@ -1,5 +1,6 @@
 from config import cfg
 
+MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70B', 'llama-30b', 'llama-65b']
 
 def process_control():
     cfg['model_name'] = cfg['control']['model_name']
@@ -37,7 +38,7 @@ def process_control():
     cfg['beta'] = 0.5
 
     make_data_name()
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i']:
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i', 'mc']:
         cfg['collate_mode'] = 'transformer'
         cfg['bart-base'] = {'max_length': 128}
         cfg['roberta-base'] = {'max_length': 128}
@@ -66,7 +67,7 @@ def process_control():
     if model_name not in cfg:
         cfg[model_name] = {}
     cfg[model_name]['shuffle'] = {'train': True, 'test': False}
-    if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
     elif cfg['task_name'] in ['ic']:
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
@@ -84,12 +85,13 @@ def process_control():
 
 def make_data_name():
     data_name_list = cfg['control']['data_name'].split('-')
+    print('data_name_list', data_name_list)
     if len(data_name_list) == 2:
         cfg['data_name'], cfg['subset_name'] = data_name_list
     else:
         cfg['data_name'] = data_name_list[0]
         cfg['subset_name'] = 'none'
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i']:
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc', 't2i']:
         data_name_dict = {
             # https://huggingface.co/datasets/financial_phrasebank
             'fpb': {'data_name': 'financial_phrasebank',
@@ -174,28 +176,28 @@ def make_data_name():
                                                    'label_column': None}
                                            }                       
                          },
-            '''
-            piqa: piqa
-            storycloze: storycloze , 
-            arc-e: arc-easy 
-            arc-c: arc-challenge (Clark et al., 2018), 
-            hellaswag: hellaswag (Zellers et al., 2019) 
-            obqa: OpenBookQA (Mihaylov et al., 2018)
-            '''
+            
+            # piqa: piqa
+            # storycloze: storycloze , 
+            # arc-e: arc-easy 
+            # arc-c: arc-challenge (Clark et al., 2018), 
+            # hellaswag: hellaswag (Zellers et al., 2019) 
+            # obqa: OpenBookQA (Mihaylov et al., 2018)
+            # preprocessing according to: https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/arc.py
             # https://huggingface.co/datasets/piqa
             'piqa': {'data_name': 'piqa',
                     'subset_name_dict': {
                         'none': {'subset_name': None,
-                              'text_column': ['story_id', 'sol1', 'sol2'],
+                              'text_column': ['goal', 'sol1', 'sol2'],
                               'label_column': 'label'}
                         },
             },       
             # https://huggingface.co/datasets/story_cloze
             'storycloze': {'data_name': 'story_cloze',
                     'subset_name_dict': {
-                        '2016': {'subset_name': None,
-                              'text_column': ['goal', 'sol1', 'sol2'],
-                              'label_column': 'label'}
+                        '2016': {'subset_name': '2016',
+                              'text_column': ['input_sentence_1', 'input_sentence_2', 'input_sentence_3', 'input_sentence_4', 'sentence_quiz1', 'sentence_quiz2'],
+                              'label_column': 'answer_right_ending'}
                         },
             },        
             # https://huggingface.co/datasets/ai2_arc          
@@ -209,7 +211,22 @@ def make_data_name():
                               'label_column': 'answerKey'}
                         },                        
             },
-
+            # https://huggingface.co/datasets/Rowan/hellaswag
+            'hellaswag': {'data_name': 'Rowan/hellaswag',
+                    'subset_name_dict': {
+                        'none': {'subset_name': None,
+                              'text_column': ['activity_label', 'ctx_a', 'ctx_b', 'endings'],
+                              'label_column': 'label'}, 
+                        },                        
+            },
+            # https://huggingface.co/datasets/openbookqa
+            'obqa': {'data_name': 'openbookqa',
+                    'subset_name_dict': {
+                        'main': {'subset_name': 'main',
+                              'text_column': ['id', 'question_stem', 'choices'],
+                              'label_column': 'answerKey'},    
+                        },                        
+            },
             # Dataset: https://github.com/google/dreambooth
             # DreamBooth paper: https://arxiv.org/pdf/2208.12242.pdf
             'dreambooth': {'data_name': 'DreamBooth',
