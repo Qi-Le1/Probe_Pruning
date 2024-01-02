@@ -17,7 +17,7 @@ def process_control():
         raise ValueError('Not valid prune target')
     cfg['prune_norm'] = int(prune_name_list[2])
     cfg['prune_hyper'] = float(prune_name_list[3])
-    cfg['prune_dim'] = [int(dim) for dim in prune_name_list[4].split('+')]
+    cfg['prune_dim'] = [int(dim) for dim in prune_name_list[4].split('+')] if len(prune_name_list) > 4 else None
     cfg['prune_dim_select_mode'] = prune_name_list[5] if len(prune_name_list) > 5 else 'max'
 
     cfg['batch_integ'] = cfg['control']['batch_integ']
@@ -34,11 +34,12 @@ def process_control():
 
     cfg['pq_p'] = 1
     cfg['pq_q'] = 2
-    cfg['gamma'] = 1
-    cfg['beta'] = 0.5
+    cfg['pq_gamma'] = 1
+    
 
     make_data_name()
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i', 'mc']:
+        cfg['pq_beta'] = 0.5
         cfg['collate_mode'] = 'transformer'
         cfg['bart-base'] = {'max_length': 128}
         cfg['roberta-base'] = {'max_length': 128}
@@ -49,6 +50,7 @@ def process_control():
             cfg[cfg['model_name']] = {'max_length': 512}
         # cfg['opt'] = {'max_length': 128}
     elif cfg['task_name'] in ['ic']:
+        cfg['pq_beta'] = 0.9
         cfg['collate_mode'] = 'dict'
         data_shape = {'MNIST': [1, 28, 28], 'FashionMNIST': [1, 28, 28], 'SVHN': [3, 32, 32], 'CIFAR10': [3, 32, 32],
                       'CIFAR100': [3, 32, 32]}

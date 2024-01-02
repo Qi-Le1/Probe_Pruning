@@ -24,10 +24,10 @@ class EriModel(torch.nn.Module):
         super().__init__()
         self.model = model
         self.forward = self.model.forward
-        self.add_pruner('pruner')
+        self.add_pruner(cfg['prune_name'])
 
-    def add_pruner(self, pruner_name):
-        self._find_and_replace(pruner_name)
+    def add_pruner(self, prune_name):
+        self._find_and_replace(prune_name)
         mark_no_trainable(self.model)
         if 'global' in cfg['prune_name'] and cfg['prune_tgt'] == 'weight':
             pruning_module = WeightPruning(cfg, 'global')
@@ -38,7 +38,7 @@ class EriModel(torch.nn.Module):
         loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
         loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
 
-    def _create_new_module(self, pruner_name, target, key):
+    def _create_new_module(self, prune_name, target, key):
         bias = hasattr(target, "bias") and target.bias is not None
         loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
         loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
@@ -52,17 +52,17 @@ class EriModel(torch.nn.Module):
         
         kwargs = {
             "prune_tgt": cfg['prune_tgt'],
-            "prune_name": cfg['prune_name'],
             "prune_norm": cfg['prune_norm'],
             "pruning_module": pruning_module,
             "key": key,
-            "fan_in_fan_out": False
+            "fan_in_fan_out": False,
+            "dev": target.weight.device,
         }
         # if isinstance(target, torch.nn.Embedding):
         #     embedding_kwargs = kwargs.copy()
         #     embedding_kwargs.pop("fan_in_fan_out", None)
         #     in_features, out_features = target.num_embeddings, target.embedding_dim
-        #     new_module = Embedding(pruner_name, in_features, out_features, **embedding_kwargs)
+        #     new_module = Embedding(prune_name, in_features, out_features, **embedding_kwargs)
         if isinstance(target, torch.nn.Conv2d):
             out_channels, in_channels = target.weight.size()[:2]
             kernel_size = target.weight.size()[2:]
@@ -70,7 +70,7 @@ class EriModel(torch.nn.Module):
             padding = target.padding
             dilation = target.dilation
             groups = target.groups
-            new_module = Conv2d(pruner_name, in_channels, out_channels, kernel_size, stride, padding, dilation, groups, **kwargs)
+            new_module = Conv2d(prune_name, in_channels, out_channels, kernel_size, stride, padding, dilation, groups, **kwargs)
         else:
             if isinstance(target, torch.nn.Linear):
                 in_features, out_features = target.in_features, target.out_features
@@ -85,11 +85,11 @@ class EriModel(torch.nn.Module):
                     f"Target module {target} is not supported. "
                     f"Currently, only `torch.nn.Linear` and `Conv1D` are supported."
                 )
-            new_module = Linear(pruner_name, in_features, out_features, bias=bias, **kwargs)
+            new_module = Linear(prune_name, in_features, out_features, bias=bias, **kwargs)
 
         return new_module
 
-    def _find_and_replace(self, pruner_name):
+    def _find_and_replace(self, prune_name):
         self._check_quantization_dependency()
         is_target_modules_in_base_model = False
         key_list = [key for key, _ in self.model.named_modules()]
@@ -106,7 +106,7 @@ class EriModel(torch.nn.Module):
             is_target_modules_in_base_model = True
             parent, target, target_name = _get_submodules(self.model, key)
             
-            new_module = self._create_new_module(pruner_name, target, key)
+            new_module = self._create_new_module(prune_name, target, key)
             self._replace_module(parent, target_name, new_module, target)
         if not is_target_modules_in_base_model:
             raise ValueError(
@@ -117,19 +117,29 @@ class EriModel(torch.nn.Module):
     def _replace_module(self, parent_module, child_name, new_module, old_module):
         setattr(parent_module, child_name, new_module)
         fan_in_fan_out = getattr(new_module, "fan_in_fan_out", False)
+        # if fan_in_fan_out is True, the layer is conv1d layer in GPT2
+        # which is a self-defined layer, not the traditional Conv1D
         new_module.weight = transpose(old_module.weight, fan_in_fan_out)
+        new_module.weight.requires_grad = False
+        new_module.device = old_module.weight.device
         if hasattr(old_module, "bias"):
-            # if old_module.bias is not None:
+            # old_module might not have bias, bias=None
+            # need to write into new_module, otherwise
+            # the parent class will assign bias
             new_module.bias = old_module.bias
 
-        if getattr(old_module, "state", None) is not None:
-            new_module.state = old_module.state
-            new_module.to(old_module.weight.device)
+        # if getattr(old_module, "state", None) is not None:
+        #     new_module.state = old_module.state
+        #     new_module.to(old_module.weight.device)
 
-        # dispatch to correct device
-        for name, module in new_module.named_modules():
-            if "pruner_" in name:
-                module.to(old_module.weight.device)
+        # a = new_module.named_modules()
+        # b = getattr(old_module, "state", None)
+        # # dispatch to correct device
+        # for name, module in new_module.named_modules():
+        #     if "pruner_" in name:
+        #         print('no')
+        #         module.to(old_module.weight.device)
+        #     print('name', name)
 
         if 'local' in cfg['prune_name'] and cfg['prune_tgt'] == 'weight':
             new_module.prune_weight(new_module.weight, new_module.layer_type)
@@ -186,7 +196,6 @@ def _check_target_module_exists(target_modules, key):
 
 class EriLayer:
     def __init__(self, in_features: int, out_features: int, **kwargs):
-        self.prune_name = kwargs['prune_name']
         self.prune_tgt = kwargs['prune_tgt']
         self.prune_norm = kwargs['prune_norm']
         self.pruning_module = kwargs['pruning_module']
@@ -195,6 +204,7 @@ class EriLayer:
         self.pruning_channel_ratio = []
         self.input_prune_channels = None
         self.weight_norm_across_channel_dims = None
+
         pass
     
 
@@ -308,13 +318,14 @@ class EriLayer:
 class Linear(nn.Linear, EriLayer):
     def __init__(
         self,
-        pruner_name,
+        prune_name,
         in_features,
         out_features,
         fan_in_fan_out: bool = False,  # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
         is_target_conv_1d_layer: bool = False,
         **kwargs,
     ):
+        self.prune_name = prune_name
         nn.Linear.__init__(self, in_features, out_features)
         EriLayer.__init__(self, in_features=in_features, out_features=out_features, **kwargs)
         # Freezing the pre-trained weight matrix
@@ -324,11 +335,10 @@ class Linear(nn.Linear, EriLayer):
         # print('fan_in_fan_out: ', fan_in_fan_out, self.weight.data.shape, self.weight.shape)
         # GPT2 has CON1D, which is a self-defined layer, not the traditional Conv1D
         print('self.weight')
-        if fan_in_fan_out:
-            self.weight.data = self.weight.data.T
+        # if fan_in_fan_out:
+        #     self.weight.data = self.weight.data.T
         # print('after fan_in_fan_out: ', fan_in_fan_out, self.weight.data.shape)
         self.is_target_conv_1d_layer = is_target_conv_1d_layer
-        
         self.layer_type = 'linear'
         
         # if 'local' in self.prune_name and self.prune_tgt == 'weight':
@@ -370,7 +380,7 @@ class Linear(nn.Linear, EriLayer):
 class Conv2d(nn.Conv2d, EriLayer):
     def __init__(
         self,
-        pruner_name,
+        prune_name,
         in_channels: int,
         out_channels: int,
         kernel_size: Union[int, Tuple[int]],
@@ -380,6 +390,7 @@ class Conv2d(nn.Conv2d, EriLayer):
         groups: int = 1,
         **kwargs,
     ):
+        self.prune_name = prune_name
         nn.Conv2d.__init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, groups)
         EriLayer.__init__(
             self,
@@ -453,8 +464,8 @@ class BasePruning:
 
         self.pq_p = cfg['pq_p']
         self.pq_q = cfg['pq_q']
-        self.gamma = cfg['gamma']
-        self.beta = cfg['beta']
+        self.pq_gamma = cfg['pq_gamma']
+        self.pq_beta = cfg['pq_beta']
         self.eta = self.prune_hyper
 
         if self.batch_integ == 'inter' or self.batch_integ == 'union':
@@ -766,13 +777,13 @@ class HiddenRepresentationPruning(BasePruning):
             raise ValueError('pq_indices contains nan values')
 
         lower_bound = dimension * (1 + self.eta) ** (-self.pq_q / (self.pq_q - self.pq_p)) * (1 - pq_indices) ** (self.pq_q * self.pq_p / (self.pq_q - self.pq_p))
-        beta_tensor = torch.full_like(lower_bound, self.beta)
-        prune_channels_count = torch.floor(dimension * torch.min(self.gamma * (1 - lower_bound / dimension), beta_tensor))
+        beta_tensor = torch.full_like(lower_bound, self.pq_beta)
+        prune_channels_count = torch.floor(dimension * torch.min(self.pq_gamma * (1 - lower_bound / dimension), beta_tensor))
 
         sorted_norm, sorted_channels = torch.sort(norm_across_other_dims, dim=self.calc_norm_dim)
 
         eta_zero_lower_bound = dimension * (1 + 0) ** (-self.pq_q / (self.pq_q - self.pq_p)) * (1 - pq_indices) ** (self.pq_q * self.pq_p / (self.pq_q - self.pq_p))
-        eta_zero_lower_bound = torch.floor(dimension * self.gamma * (1 - eta_zero_lower_bound / dimension))
+        eta_zero_lower_bound = torch.floor(dimension * self.pq_gamma * (1 - eta_zero_lower_bound / dimension))
         # print('sorted_norm', sorted_norm.shape, sorted_norm)
         if self.prune_hyper == 9999 and cfg['batch_size'] == 1:
             # print('here', self.prune_hyper)
@@ -995,8 +1006,8 @@ class WeightPruning(BasePruning):
                     raise ValueError('pq_indices contains nan values')
 
                 lower_bound = dimension * (1 + self.eta) ** (-self.pq_q / (self.pq_q - self.pq_p)) * (1 - pq_indices) ** (self.pq_q * self.pq_p / (self.pq_q - self.pq_p))
-                beta_tensor = torch.full_like(lower_bound, self.beta)
-                prune_channels_count = torch.floor(dimension * torch.min(self.gamma * (1 - lower_bound / dimension), beta_tensor))
+                beta_tensor = torch.full_like(lower_bound, self.pq_beta)
+                prune_channels_count = torch.floor(dimension * torch.min(self.pq_gamma * (1 - lower_bound / dimension), beta_tensor))
                 # threshold = torch.kthvalue(torch.abs(all_weights_vector), prune_channels_count).values
                 threshold = sorted_weights[num_weights_to_prune - 1] 
 
@@ -1049,7 +1060,7 @@ class WeightPruning(BasePruning):
                 pruning_threshold = channel_norms[num_channels_to_prune - 1][0] if num_channels_to_prune > 0 else float('inf')
             elif 'pqstruct' in self.prune_name:
                 norm_p = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=0)
-                norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=0) + 1e-10
+                norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_q, dim=0) + 1e-10
                 
                 dimension = len(channel_norms)
                 pq_indices = (1 - dimension ** (1/self.pq_q - 1/self.pq_p) * norm_p / norm_q)
@@ -1062,8 +1073,8 @@ class WeightPruning(BasePruning):
                     raise ValueError('pq_indices contains nan values')
 
                 lower_bound = dimension * (1 + self.eta) ** (-self.pq_q / (self.pq_q - self.pq_p)) * (1 - pq_indices) ** (self.pq_q * self.pq_p / (self.pq_q - self.pq_p))
-                beta_tensor = torch.full_like(lower_bound, self.beta)
-                prune_channels_count = torch.floor(dimension * torch.min(self.gamma * (1 - lower_bound / dimension), beta_tensor))
+                beta_tensor = torch.full_like(lower_bound, self.pq_beta)
+                prune_channels_count = torch.floor(dimension * torch.min(self.pq_gamma * (1 - lower_bound / dimension), beta_tensor))
                 pruning_threshold = channel_norms[prune_channels_count - 1][0] if num_channels_to_prune > 0 else float('inf')
 
             pruning_info = collections.defaultdict(list)
@@ -1235,7 +1246,7 @@ class WeightPruning(BasePruning):
         norm_across_other_dims = torch.linalg.vector_norm(w, ord=self.prune_norm, dim=dims_to_aggregate)     
         norm_across_other_dims = norm_across_other_dims + (norm_across_other_dims == 0) * 1e-9
         norm_p = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=calc_dim)
-        norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=calc_dim) + 1e-10
+        norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_q, dim=calc_dim) + 1e-10
         
         dimension = w.shape[prune_dim]
         pq_indices = (1 - dimension ** (1/self.pq_q - 1/self.pq_p) * norm_p / norm_q)
@@ -1248,8 +1259,8 @@ class WeightPruning(BasePruning):
             raise ValueError('pq_indices contains nan values')
 
         lower_bound = dimension * (1 + self.eta) ** (-self.pq_q / (self.pq_q - self.pq_p)) * (1 - pq_indices) ** (self.pq_q * self.pq_p / (self.pq_q - self.pq_p))
-        beta_tensor = torch.full_like(lower_bound, self.beta)
-        prune_channels_count = torch.floor(dimension * torch.min(self.gamma * (1 - lower_bound / dimension), beta_tensor))
+        beta_tensor = torch.full_like(lower_bound, self.pq_beta)
+        prune_channels_count = torch.floor(dimension * torch.min(self.pq_gamma * (1 - lower_bound / dimension), beta_tensor))
 
         _, sorted_channels = torch.sort(norm_across_other_dims, dim=calc_dim)
         prune_channels = sorted_channels[:int(prune_channels_count.item())]

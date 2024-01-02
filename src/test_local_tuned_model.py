@@ -64,7 +64,7 @@ def runExperiment():
     # if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
     #     result['model_state_dict'] = result['server'].server_model_state_dict
     model.load_state_dict(result['model_state_dict'])
-    model = model.to(cfg['device'])
+    
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     model_prof = FlopsProfiler(model)
@@ -74,10 +74,9 @@ def runExperiment():
 
     model, tokenizer = make_model(cfg['model_name'])
     model.load_state_dict(result['model_state_dict'])
-    model = model.to(cfg['device'])
+    
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
-    model = model.to("cpu")
     model = make_prune_model(model)
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
@@ -101,7 +100,7 @@ def test(data_loader, model, model_prof, metric, logger):
     start_time = time.time()
     with torch.no_grad():
         model_prof.start_profile()
-        model = model.to(cfg['device'])
+        
         model.train(False)
         for i, input in enumerate(data_loader):
             if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
@@ -131,7 +130,7 @@ def test(data_loader, model, model_prof, metric, logger):
                                                          no_repeat_ngram_size=2)
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
-            print('evaluation', evaluation)
+            # print('evaluation', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
             # print('output', output_)

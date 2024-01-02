@@ -53,7 +53,7 @@
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "obqa-main_gpt2_mc_2_pqstruct+h+1+0.2+1+max_inter_somemethods-3_default",
+                "obqa-main_gpt2_mc_1_pqstruct+h+1+0.2+-1+max_inter_somemethods-3_default",
             ],
         },
 
@@ -139,7 +139,7 @@
             "justMyCode": true,
             "args": [
                 "--control_name",
-                "CIFAR10_resnet18_ic_1_pqstruct-h-2-0-1-max_inter_somemethods-3_None",
+                "CIFAR100_resnet18_ic_1_pqstructlocal+h+2+9999+1+max_inter_somemethods-3_default",
                 "--device",
                 "cpu"
             ],

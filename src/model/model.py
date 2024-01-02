@@ -21,6 +21,7 @@ def make_model(model_name, sub_model_name=None):
         cfg['model_type'] = model_type
     else:
         model = eval('model.{}()'.format(model_name))
+        model = model.to(cfg['device'])
         tokenizer = None
         cfg['model_type'] = model_name
     return model, tokenizer

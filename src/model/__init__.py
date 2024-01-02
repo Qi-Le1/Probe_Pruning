@@ -6,3 +6,5 @@ from .cnn import *
 from .resnet import *
 from .wresnet import *
 from .eri import *
+from .ewi import *
+from .prune_fix_model import *

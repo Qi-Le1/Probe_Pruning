@@ -116,6 +116,12 @@ def make_dataset(data_name, subset_name=None, verbose=True):
     elif data_name in ['dolly']:
         dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
         dataset_ = dataset_['train'].train_test_split(test_size=0.1, seed=cfg['seed'])
+    elif data_name in ['c4']:
+        # please follow the instruction here: https://huggingface.co/datasets/allenai/c4
+        dataset_['train'] = load_dataset('json', data_files={'train': 'data/c4/c4-train.00000-of-01024.json.gz'}, split='train')
+        dataset_['test'] = load_dataset('json', data_files={'validation': 'data/c4/c4-validation.00000-of-00008.json.gz'}, split='validation')
+        # Randomly sample 128 examples
+        dataset_ = dataset_['train'].train_test_split(test_size=128, seed=cfg['seed'])["test"]
     # piqa: piqa
     # storycloze: storycloze , 
     # arc-e: arc-easy 
@@ -126,6 +132,9 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test')
     elif data_name in ['piqa', 'hellaswag']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
+    elif data_name in ['c4']:
+        dataset_['train'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='train[:10%]')
+        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation[:10%]')
     elif data_name in ['dreambooth']:
         model, tokenizer = make_model(cfg['model_name'])
 
@@ -258,6 +267,43 @@ def collate(input):
     return input
 
 
+def process_calibration_dataset(dataset, tokenizer):
+    if cfg['task_name'] in ['clm', 'mc']:
+        if cfg['data_name'] == 'c4':
+            max_length = cfg[cfg['model_name']]['max_length']
+            print('max_length', max_length)
+            def preprocess_function(examples):   
+                inputs = examples['text']
+                model_inputs = tokenizer(inputs, return_tensors='pt', truncation=False, padding=False)
+                labels = tokenizer(inputs, return_tensors='pt', truncation=False, padding=False)
+
+                model_inputs["labels"] = labels["input_ids"]
+                return model_inputs
+
+            processed_dataset = {}
+            processed_dataset['train'] = dataset['train'].map(
+                preprocess_function,
+                batched=True,
+                # batch_size=50,
+                num_proc=1,
+                remove_columns=dataset["train"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on sampled dataset",
+                keep_in_memory=True,
+            )
+
+            processed_dataset['test'] = dataset['test'].map(
+                preprocess_function,
+                batched=True,
+                # batch_size=50,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on sampled dataset",
+                keep_in_memory=True,
+            )
+        return processed_dataset
+    
 def process_dataset(dataset, tokenizer):
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
         text_column = cfg['text_column']

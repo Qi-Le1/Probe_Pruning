@@ -196,11 +196,41 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+            
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+            #         ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+            #         ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+            #         ['inter'], ['somemethods-3'], ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
+                    ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
                     ['inter'], ['somemethods-3'], ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+            #         ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+            #         ['inter'], ['somemethods-3'], ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             # # ----- opt 1.3b
             # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magunstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
             #         ['full'], ['somemethods-3'], ['fc2']]]
@@ -248,11 +278,42 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
+            #         ['inter'], ['somemethods-3'], ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+            #         ['inter'], ['somemethods-3'], ['out-proj+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+            #         ['inter'], ['somemethods-3'], ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
+                    ['inter'], ['somemethods-3'], ['out-proj+fc2']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
                     ['inter'], ['somemethods-3'], ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
-            
+
+
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+            #         ['inter'], ['somemethods-3'], ['out-proj+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+            #         ['inter'], ['somemethods-3'], ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
         elif 'ic' in data:
             # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
             #                  ['inter'], ['somemethods-3'], ['default']]]
@@ -280,18 +341,44 @@ def main():
             # controls.extend(CIFAR10_controls_9)
             
 
-            control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [9999]],
+            control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal+h+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 9999]],
                              ['inter'], ['somemethods-3'], ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'w*pqstructlocal:h:2:{x}:1:max' for x in [9999]],
+            control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'magstructlocal+h+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
                              ['inter'], ['somemethods-3'], ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'w*pqstructlocal:h:2:{x}:1:max' for x in [9999]],
+            #                  ['inter'], ['somemethods-3'], ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
         elif 'mc' in data:
-            control_name = [[['piqa', 'storycloze-2016', 'arc-e', 'arc-c', 'hellaswag', 'obqa-main'], ['llama-2-7b'], ['mc'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
-                             ['inter'], ['somemethods-3'], ['down-proj']]]
+            # control_name = [[['piqa', 'storycloze-2016', 'arc-e', 'arc-c', 'hellaswag', 'obqa-main'], ['llama-2-7b'], ['mc'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
+            #                  ['inter'], ['somemethods-3'], ['down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+
+            control_name = [[['obqa-main'], ['opt-1.3b'], ['mc'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+                    ['inter'], ['somemethods-3'], ['out-proj+fc2']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['obqa-main'], ['opt-1.3b'], ['mc'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+                    ['inter'], ['somemethods-3'], ['out-proj+fc2']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['obqa-main'], ['llama-2-7b'], ['mc'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+                    ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['obqa-main'], ['llama-2-7b'], ['mc'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
+                    ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
     else:
