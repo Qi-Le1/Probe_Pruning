@@ -490,7 +490,9 @@ def process_dataset(dataset, tokenizer):
                     if len(input_chunks[i]) == max_length:
                         final_inputs['input_ids'].append(input_chunks[i])
                         final_inputs['attention_mask'].append(mask_chunks[i])
-                        final_inputs['labels'].append(input_chunks[i])
+                        labels = copy.deepcopy(input_chunks[i])
+                        labels[:-1] = -100
+                        final_inputs['labels'].append(labels)
                 
                 return final_inputs
 

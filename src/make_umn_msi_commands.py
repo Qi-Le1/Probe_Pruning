@@ -399,20 +399,25 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['IFV+4', 'IFV+10', 'IFV+20', 'IFV+40'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.2, 0.3, 0.5]],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['WIFN+10'], [f'pq-nobias+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4]],
                     ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['WIFV+4', 'WIFV+10', 'WIFV+20', 'WIFV+40'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.2, 0.3, 0.5]],
-                    ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['IFV+4', 'IFV+10', 'IFV+20', 'IFV+40'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.2, 0.3, 0.5]],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['WIFN+4', 'WIFN+10', 'WIFN+20', 'WIFN+40', 'WIFN+100'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.2, 0.3, 0.5]],
-                    ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['WIFV+4', 'WIFV+10', 'WIFV+20', 'WIFV+40'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.2, 0.3, 0.5]],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['WIFN+4', 'WIFN+10', 'WIFN+20', 'WIFN+40', 'WIFN+100'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.2, 0.3, 0.5]],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['WIFN+4'], [f'mag-sp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5]],
             #         ['default']]]

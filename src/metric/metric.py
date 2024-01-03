@@ -74,9 +74,9 @@ def Loss(output):
     return loss
 
 
-def Perplexity(output):
-    ppl = torch.exp(output).item()
-    return ppl
+# def Perplexity(output):
+#     ppl = torch.exp(output).item()
+#     return ppl
 
 
 def Accuracy(output, target, topk=1):
@@ -95,6 +95,19 @@ def RMSE(output, target):
         rmse = F.mse_loss(output, target).sqrt().item()
     return rmse
 
+class Perplexity:
+    def __init__(self):
+        self.loss_list = []
+        return
+    
+    def add(self, input, output):
+        loss = output.item()
+        self.loss_list.append(loss)
+        return
+       
+    def __call__(self, *args, **kwargs):
+        return np.exp(np.array(self.loss_list).mean())
+
 
 class McAccuracy:
     def __init__(self):
@@ -102,7 +115,6 @@ class McAccuracy:
         self.correct_labels_for_one_question = defaultdict(list)
         pass
     
-
     def add(self, input, output):
         # generate = output['generate'].detach().cpu()
         # scores = output['scores']
@@ -205,7 +217,7 @@ class Metric:
                 if m == 'Loss':
                     metric[split][m] = {'mode': 'batch', 'metric': (lambda input, output: recur(Loss, output['loss']))}
                 elif m == 'Perplexity':
-                    metric[split][m] = {'mode': 'batch', 'metric': (lambda input,
+                    metric[split][m] = {'mode': 'full', 'metric': (lambda input,
                                                                            output: recur(Perplexity, output['loss']))}
                 elif m == 'Accuracy':
                     metric[split][m] = {'mode': 'batch',

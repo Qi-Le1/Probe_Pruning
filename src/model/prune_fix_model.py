@@ -74,6 +74,12 @@ def calibrate_model(model, tokenizer, dataloader, device):
         elif cfg['prune_name'] == "pq-bias":
             prune_pq_bias_llama(model, tokenizer, dataloader, device)
 
+    print("*"*30)
+    sparsity_ratio = check_sparsity(model)
+    print(f"sparsity sanity check {sparsity_ratio:.4f}")
+    print(f"model parameter {sum(p.numel() for p in model.parameters()) / 1024 ** 3:.2f}B")
+    print("*"*30)
+
 def check_sparsity(model):
     """
     Check the sparsity of the weights in different layers of the model.
@@ -99,21 +105,36 @@ def check_sparsity(model):
 
         sub_count = 0
         sub_params = 0
+
+        attn_sub_count = 0
+        attn_sub_params = 0
+
+        mlp_sub_count = 0
+        mlp_sub_params = 0
         for name in subset:
             W = subset[name].weight.data
             sub_count += W.numel()
             count += W.numel()
+
             if 'self_attn' in name:
                 total_params += hidden_size * hidden_size
                 sub_params += hidden_size * hidden_size
+
+                attn_sub_count += W.numel()
+                attn_sub_params += hidden_size * hidden_size
             else:
                 total_params += hidden_size * intermediate_size
                 sub_params += hidden_size * intermediate_size
+
+                mlp_sub_count += W.numel()
+                mlp_sub_params += hidden_size * intermediate_size
             if subset[name].bias is not None:
                 count += subset[name].bias.data.numel()
                 sub_count += subset[name].bias.data.numel()
             
         print(f"layer {i} sparsity {float(sub_count)/sub_params:.6f}")
+        print(f"layer {i} attn sparsity {float(attn_sub_count)/attn_sub_params:.6f}")
+        print(f"layer {i} mlp sparsity {float(mlp_sub_count)/mlp_sub_params:.6f}")
 
     model.config.use_cache = use_cache 
     return float(count)/total_params 
@@ -167,7 +188,7 @@ def prepare_calibration_input(model, dataloader, device):
         # print('batch', batch)
         try:
             batch_on_device = to_device(batch, device)
-            print('batch_on_device', batch_on_device)
+            # print('batch_on_device', batch_on_device)
             model(batch_on_device['input_ids'])
         except ValueError as e:
             print('ValueError: ', e)
@@ -261,10 +282,12 @@ def compress(layer, attn_mask, mlp_mask, attn_mean_inp, mlp_mean_inp, device, bi
             # Prune the output projection weight
             output_weight = layer.self_attn.o_proj.weight.data[:, torch.where(attn_mask)[0]]
             # Update layer configurations for the new output shape after pruning
-            # these 2 attributes currently have the same values
+            # num_heads and num_key_value_heads currently have the same values
             layer.self_attn.num_heads = retain_heads
             layer.self_attn.num_key_value_heads = retain_heads
-            layer.self_attn.hidden_size = retain_heads * 128
+            # flaps also change this, it shouldnt be changed since the input dimension is the same for qkv
+            # also the output dimension of o is the same too
+            # layer.self_attn.hidden_size = retain_heads * 128
             
             if bias:
                 # Re-initialize the Linear layer with new shape and bias
@@ -359,12 +382,20 @@ def prune_flap_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")
     attn_baseline_inp_list, mlp_baseline_inp_list = [], []
     attn_mask, mlp_mask = [], []
     
-    # Split into sub-problems, separate statistics for each module
+    target_modules = _get_target_modules(cfg)
+    layers = model.model.layers
     for i in tqdm(range(len(layers)), desc="Processing layers"):
         layer = layers[i]
         subset = {}
-        subset.update({'self_attn.o_proj': find_layers(layer)['self_attn.o_proj']})
-        subset.update({'mlp.down_proj': find_layers(layer)['mlp.down_proj']})
+        key_list = [key for key, _ in layer.named_modules()]
+        # print('key_list', key_list)
+        for key in key_list:
+            if not _check_target_module_exists(target_modules, key):
+                continue
+
+            # print('found_pruning_layers', key, flush=True)
+            _, target, _ = _get_submodules(layer, key)
+            subset[key] = target
 
         if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}):   ## handle the case for llama-30B and llama-65B, when the device map has multiple GPUs;
             dev = model.hf_device_map[f"model.layers.{i}"]
@@ -392,7 +423,7 @@ def prune_flap_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")
         for name in subset:
             if name == 'self_attn.o_proj':
                 W_metric = metrics[args.metrics](wrapped_layers, subset, name)
-                # flap's trick
+                # flap's trick, attention square the metric
                 if cfg['prune_metric'] == 'WIFN':
                     W_metric = W_metric ** 2
 
@@ -411,7 +442,7 @@ def prune_flap_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")
                 attn_baseline_inp_list.append(wrapped_layers[name].baseline_inp.type(torch.half))
             else:
                 W_metric = metrics[args.metrics](wrapped_layers, subset, name)
-                # flap's trick
+                # flap's trick, MLP doesnt square the metric
                 if cfg['prune_metric'] == 'IFV' or cfg['prune_metric'] == 'WIFV':
                     W_metric = torch.sqrt(W_metric)
                 if args.structure == "UL-UM":
@@ -453,7 +484,7 @@ def prune_flap_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")
             sorted_prune, indices = torch.sort(prune_metric, descending=True)
             compression_weight = torch.ones_like(indices)
             compression_weight[indices < attn_metric.numel()] = 512.0 / 3
-            threshold = sorted_prune[torch.argmin(torch.abs(torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper'])))]
+            threshold = sorted_prune[torch.argmin(torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper']) ))]
             attn_mask = (attn_metric > threshold)
             mlp_mask = (mlp_metric > threshold)
     else:
@@ -534,7 +565,7 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, device=torch.device("cud
             if not _check_target_module_exists(target_modules, key):
                 continue
 
-            print('found_pruning_layers', key, flush=True)
+            # print('found_pruning_layers', key, flush=True)
             _, target, _ = _get_submodules(layer, key)
             subset[key] = target
         
@@ -569,11 +600,11 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, device=torch.device("cud
         for name in subset:
             print(f"pruning layer {i} name {name}")
             W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
-            print('W_metric',  W_metric, type(W_metric))
-            print(W_metric.shape)
+            # print('W_metric',  W_metric, type(W_metric))
+            # print(W_metric.shape)
             if name == 'self_attn.o_proj':
                 W_metric = W_metric.reshape(-1, 128).sum(dim=1)
-                print('W_metric2', W_metric.shape, W_metric, type(W_metric))
+                # print('W_metric2', W_metric.shape, W_metric, type(W_metric))
                 pruned_count = cal_pruned_count_base_on_pq(torch.sort(W_metric.cuda())[0])
                 thresh = torch.sort(W_metric.cuda())[0][pruned_count].cpu()
                 W_mask = (W_metric>=thresh)

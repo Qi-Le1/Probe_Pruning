@@ -109,7 +109,7 @@ class EwiModel(torch.nn.Module):
         print('fan_in_fan_out', child_name, fan_in_fan_out)
         # if fan_in_fan_out is True, the layer is conv1d layer in GPT2
         # which is a self-defined layer, not the traditional Conv1D
-        print('old_module.weight', old_module.weight)
+        # print('old_module.weight', old_module.weight)
         new_module.weight = transpose(old_module.weight, fan_in_fan_out)
         new_module.weight.requires_grad = False
         new_module.device = old_module.weight.device

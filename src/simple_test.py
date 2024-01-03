@@ -680,10 +680,34 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 # inputs = tokenizer("Hello, my dog is cute and ", return_tensors="pt")
 # generation_output = model.generate(**inputs, return_dict_in_generate=True, output_scores=True)
 # print('generation_output', generation_output)
-a = nn.Linear(5, 10, bias=False)
-print('a.bias', a.bias)
-b = nn.Linear(5, 10, bias=True)
-print('b.bias', b.bias)
+# a = nn.Linear(5, 10, bias=False)
+# print('a.bias', a.bias)
+# b = nn.Linear(5, 10, bias=True)
+# print('b.bias', b.bias)
+# standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
+
+# attn_metric_list = [-0.2544, -0.4708, 1.1181, 0.9859, -0.0471]
+# mlp_metric_list = [-0.5982, 0.6976, 1.2438, -0.3796, 0.2794]
+
+# attn_metric = torch.stack(attn_metric_list)
+# attn_metric = standarlization(attn_metric)
+# attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
+
+# mlp_metric = torch.stack(mlp_metric_list)
+# mlp_metric = standarlization(mlp_metric)
+from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification, \
+    AutoTokenizer, LlamaTokenizer, LlamaForCausalLM, AutoModelForMultipleChoice, AutoModel
+traindata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
+testdata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
+
+# Encode datasets
+tokenizer = LlamaTokenizer.from_pretrained('output/llama-2-7b',
+                                                   padding_side='left')
+trainenc = tokenizer(" ".join(traindata['text']), return_tensors='pt')
+temp = trainenc.input_ids.shape
+a = 5
+
+
 # # print(pq_indices[:10])
 # print(pq_indices_varying_length[0][:10])
 # def compare_1d_vector_norms(v, p, q, gamma, beta, pq_indices):
