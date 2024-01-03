@@ -58,9 +58,11 @@ def process_control():
         cfg['roberta-base'] = {'max_length': 128}
         cfg['gpt2'] = {'max_length': 512}
         if 'llama' in cfg['model_name']:
-            cfg[cfg['model_name']] = {'max_length': 512}
+            # reassign in make_hf_model
+            cfg[cfg['model_name']] = {'max_length': None}
         if 'opt' in cfg['model_name']:
-            cfg[cfg['model_name']] = {'max_length': 512}
+            # reassign in make_hf_model
+            cfg[cfg['model_name']] = {'max_length': None}
         # cfg['opt'] = {'max_length': 128}
     elif cfg['task_name'] in ['ic']:
         cfg['pq_beta'] = 0.9
@@ -355,7 +357,7 @@ TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
 
 TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
     "opt": ["out_proj", "fc2"],
-    "llama": ["o_proj", "gate_proj"],
+    "llama": ["o_proj", "down_proj"],
     'resnet9': ['.shortcut', '.conv1', '.conv2'],
     # 'resnet9': ['.conv2'],
     'resnet18': ['.shortcut', '.conv1', '.conv2'],

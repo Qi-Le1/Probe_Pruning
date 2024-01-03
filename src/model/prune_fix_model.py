@@ -278,14 +278,14 @@ def compress(layer, attn_mask, mlp_mask, attn_mean_inp, mlp_mean_inp, device, bi
         # MLP Weight Pruning
         if mlp_mask is not None:
             # Prune the up and gate projection weights
-            print('before pruning layer.mlp.up_proj', layer.mlp.up_proj.weight.data.shape)
+            # print('before pruning layer.mlp.up_proj', layer.mlp.up_proj.weight.data.shape)
             # for i in range(layer.mlp.up_proj.weight.data.shape[0]):
             #     if i < 20:
             #         print('before pruning layer.mlp.up_proj', layer.mlp.up_proj.weight.data[i, :100])
             #     else:
             #         break
             layer.mlp.up_proj.weight.data = layer.mlp.up_proj.weight.data[torch.where(mlp_mask)[0]]
-            print('after pruning layer.mlp.up_proj', layer.mlp.up_proj.weight.data.shape)
+            # print('after pruning layer.mlp.up_proj', layer.mlp.up_proj.weight.data.shape)
             # for i in range(layer.mlp.up_proj.weight.data.shape[0]):
             #     if i < 20:
             #         print('after pruning layer.mlp.up_proj', layer.mlp.up_proj.weight.data[i, :100])
@@ -359,10 +359,6 @@ def prune_flap_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")
     attn_baseline_inp_list, mlp_baseline_inp_list = [], []
     attn_mask, mlp_mask = [], []
     
-    for i in range(len(layers)):
-        print(f"pruning layer {layers[i]}")
-        print(f"find layer {find_layers(layers[i])}")
-        print('------\n')
     # Split into sub-problems, separate statistics for each module
     for i in tqdm(range(len(layers)), desc="Processing layers"):
         layer = layers[i]
@@ -520,7 +516,6 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, device=torch.device("cud
     use_cache = model.config.use_cache 
     model.config.use_cache = False 
     
-    target_modules = _get_target_modules(cfg)
     # print("loading calibdation data")
     # dataloader, _ = get_loaders("c4",nsamples=128,seed=args.seed,seqlen=cfg[cfg['model_name']]['max_length'],tokenizer=tokenizer)
     # print("dataset loading complete")
@@ -528,6 +523,7 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, device=torch.device("cud
     with torch.no_grad():
         inps, outs, attention_mask, position_ids = prepare_calibration_input(model, dataloader, device)
 
+    target_modules = _get_target_modules(cfg)
     layers = model.model.layers
     for i in range(len(layers)):
         layer = layers[i]
@@ -539,7 +535,7 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, device=torch.device("cud
                 continue
 
             print('found_pruning_layers', key, flush=True)
-            _, target, target_name = _get_submodules(layer, key)
+            _, target, _ = _get_submodules(layer, key)
             subset[key] = target
         
         # subset.update({'self_attn.o_proj': find_layers(layer)['self_attn.o_proj']})
@@ -622,13 +618,22 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, device=torch.device("cuda
     with torch.no_grad():
         inps, outs, attention_mask, position_ids = prepare_calibration_input(model, dataloader, device)
 
+    target_modules = _get_target_modules(cfg)
     layers = model.model.layers
     for i in range(len(layers)):
         layer = layers[i]
         subset = {}
-        subset.update({'self_attn.o_proj': find_layers(layer)['self_attn.o_proj']})
-        subset.update({'mlp.down_proj': find_layers(layer)['mlp.down_proj']})
+        key_list = [key for key, _ in layer.named_modules()]
+        # print('key_list', key_list)
+        for key in key_list:
+            if not _check_target_module_exists(target_modules, key):
+                continue
 
+            print('found_pruning_layers', key, flush=True)
+            _, target, _ = _get_submodules(layer, key)
+            subset[key] = target
+
+        dev = device
         if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}):   ## handle the case for llama-30B and llama-65B, when the device map has multiple GPUs;
             dev = model.hf_device_map[f"model.layers.{i}"]
             inps, outs, attention_mask, position_ids = inps.to(dev), outs.to(dev), attention_mask.to(dev), position_ids.to(dev)
@@ -652,16 +657,16 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, device=torch.device("cuda
             h.remove()
 
         for name in subset:
-            print(f"pruning layer {i} name {name}")
-            W_metric = torch.abs(subset[name].weight.data) * torch.sqrt(wrapped_layers[name].scaler_row.reshape((1,-1)))
-            
+            print(f"pruning layer {i} name {name}", torch.abs(subset[name].weight.data))
+            # W_metric = torch.abs(subset[name].weight.data) * torch.sqrt(wrapped_layers[name].scaler_row.reshape((1,-1)))
+            W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
             if name == 'self_attn.o_proj':
-                W_metric = W_metric.mean(axis=0).reshape(-1, 128).sum(dim=1)    # importance score of each head
+                W_metric = W_metric.reshape(-1, 128).sum(dim=1)    # importance score of each head
                 thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
                 W_mask = (W_metric>=thresh)
                 compress(layer, W_mask, None, None, None, dev, bias=False, unstr=False)
             else:
-                W_metric = W_metric.mean(axis=0)
+                W_metric = W_metric
                 thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
                 W_mask = (W_metric>=thresh)
                 compress(layer, None, W_mask, None, None, dev, bias=False, unstr=False)
@@ -690,12 +695,19 @@ def prune_magnitude_sp_llama(model, tokenizer, dataloader, device=torch.device("
         device (torch.device, optional): Device to move tensors to. Defaults to CUDA device 0.
     """
     layers = model.model.layers 
-
+    target_modules = _get_target_modules(cfg)
     for i in range(len(layers)):
         layer = layers[i]
         subset = {}
-        subset.update({'self_attn.o_proj': find_layers(layer)['self_attn.o_proj']})
-        subset.update({'mlp.down_proj': find_layers(layer)['mlp.down_proj']})
+        key_list = [key for key, _ in layer.named_modules()]
+        # print('key_list', key_list)
+        for key in key_list:
+            if not _check_target_module_exists(target_modules, key):
+                continue
+
+            print('found_pruning_layers', key, flush=True)
+            _, target, _ = _get_submodules(layer, key)
+            subset[key] = target
 
         if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
             device = model.hf_device_map[f"model.layers.{i}"]

@@ -5,6 +5,7 @@ import copy
 import time
 import random
 import torch
+import torch.nn as nn
 import traceback
 import datetime
 import torch.backends.cudnn as cudnn
@@ -61,7 +62,12 @@ def runExperiment():
     # test(data_loader['test'], model, model_prof, metric, test_logger)
     # vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
 
+   
+
     model, tokenizer = make_model(cfg['model_name'])
+
+    
+
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     dataset = process_dataset(dataset, tokenizer)
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
@@ -142,6 +148,8 @@ def test(data_loader, model, model_prof, metric, logger):
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
             # return
+            if i % 50 == 0:
+                print("sample i", i)
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))

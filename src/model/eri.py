@@ -140,6 +140,7 @@ class EriModel(torch.nn.Module):
 
 def transpose(weight, fan_in_fan_out):
     transposed_weight = weight.T if fan_in_fan_out else weight
+    # return transposed_weight
     return nn.Parameter(transposed_weight)
 
 def mark_no_trainable(model: nn.Module) -> None:
@@ -308,7 +309,7 @@ class Linear(nn.Linear, EriLayer):
         **kwargs,
     ):
         self.prune_name = prune_name
-        nn.Linear.__init__(self, in_features, out_features)
+        nn.Linear.__init__(self, in_features, out_features, bias=False)
         EriLayer.__init__(self, in_features=in_features, out_features=out_features, **kwargs)
         # Freezing the pre-trained weight matrix
         self.weight.requires_grad = False
@@ -373,7 +374,7 @@ class Conv2d(nn.Conv2d, EriLayer):
         **kwargs,
     ):
         self.prune_name = prune_name
-        nn.Conv2d.__init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, groups)
+        nn.Conv2d.__init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias=False)
         EriLayer.__init__(
             self,
             in_features=in_channels,

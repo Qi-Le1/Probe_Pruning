@@ -674,12 +674,16 @@ import torch
 # b = [[0.5, 0.4, 0.3]]
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
-tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-model = GPT2LMHeadModel.from_pretrained("gpt2")
+# tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+# model = GPT2LMHeadModel.from_pretrained("gpt2")
 
-inputs = tokenizer("Hello, my dog is cute and ", return_tensors="pt")
-generation_output = model.generate(**inputs, return_dict_in_generate=True, output_scores=True)
-print('generation_output', generation_output)
+# inputs = tokenizer("Hello, my dog is cute and ", return_tensors="pt")
+# generation_output = model.generate(**inputs, return_dict_in_generate=True, output_scores=True)
+# print('generation_output', generation_output)
+a = nn.Linear(5, 10, bias=False)
+print('a.bias', a.bias)
+b = nn.Linear(5, 10, bias=True)
+print('b.bias', b.bias)
 # # print(pq_indices[:10])
 # print(pq_indices_varying_length[0][:10])
 # def compare_1d_vector_norms(v, p, q, gamma, beta, pq_indices):

@@ -120,6 +120,7 @@ def make_hf_model(model_name, sub_model_name=None):
 
     if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
         cfg[cfg['model_name']]['max_length'] = model.config.max_position_embeddings
+        # cfg[cfg['model_name']]['max_length'] = 128
         # cfg[cfg['model_name']]['max_length'] = 512
         print('max_length', cfg[cfg['model_name']]['max_length'])
     if 'llama' in model_name:

@@ -106,13 +106,20 @@ class EwiModel(torch.nn.Module):
     def _replace_module(self, parent_module, child_name, new_module, old_module):
         setattr(parent_module, child_name, new_module)
         fan_in_fan_out = getattr(new_module, "fan_in_fan_out", False)
+        print('fan_in_fan_out', child_name, fan_in_fan_out)
         # if fan_in_fan_out is True, the layer is conv1d layer in GPT2
         # which is a self-defined layer, not the traditional Conv1D
+        print('old_module.weight', old_module.weight)
         new_module.weight = transpose(old_module.weight, fan_in_fan_out)
         new_module.weight.requires_grad = False
         new_module.device = old_module.weight.device
         if hasattr(old_module, "bias"):
             # if old_module.bias is not None:
+            # print('old_module.bias', old_module.bias)
+            # print('old_module.bias.shape', old_module.bias.shape)
+            # print('new_module.bias', new_module.bias)
+            # print('new_module.bias.shape', new_module.bias.shape)
+            
             new_module.bias = old_module.bias
 
         # if getattr(old_module, "state", None) is not None:
@@ -135,6 +142,7 @@ class EwiModel(torch.nn.Module):
 def transpose(weight, fan_in_fan_out):
     transposed_weight = weight.T if fan_in_fan_out else weight
     return nn.Parameter(transposed_weight)
+    # return transposed_weight
 
 def mark_no_trainable(model: nn.Module) -> None:
     for n, p in model.named_parameters():
@@ -198,7 +206,7 @@ class Linear(nn.Linear, EwiLayer):
         **kwargs,
     ):
         self.prune_name = prune_name
-        nn.Linear.__init__(self, in_features, out_features)
+        nn.Linear.__init__(self, in_features, out_features, bias=False)
         EwiLayer.__init__(self, in_features=in_features, out_features=out_features, **kwargs)
         # Freezing the pre-trained weight matrix
         self.weight.requires_grad = False
@@ -214,97 +222,99 @@ class Linear(nn.Linear, EwiLayer):
         self.nsamples = 0
         self.device = kwargs['device']
 
-        if self.prune_name == "wanda-sp":
-            self.scaler_row = torch.zeros((self.columns), device=self.device)
-        elif self.prune_name == "flap":
-            self.baseline_inp = torch.zeros((self.in_dim), device=self.device)
-            if self.prune_metric == "WIFN":
-                self.scaler_inp = torch.zeros((self.in_dim), device=self.device)
-            elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
-                self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
-        elif self.prune_name == "pq-nobias" or self.prune_name == "pq-bias":
-            self.baseline_inp = torch.zeros((self.in_dim), device=self.device)
-            if self.prune_metric == "WIFN":
-                self.scaler_inp = torch.zeros((self.in_dim), device=self.device)
-            elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
-                self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
+        self.baseline_inp = torch.zeros((self.in_dim), device=self.device)
+        if self.prune_metric == "WIFN":
+            self.scaler_inp = torch.zeros((self.in_dim), device=self.device)
+        elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
+            self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
         else:
             raise ValueError(f"Unknown pruning method {self.prune_name}")
+        # if self.prune_name == "wanda-sp":
+        #     self.scaler_row = torch.zeros((self.columns), device=self.device)
+        # elif self.prune_name == "flap":
+            
+        # elif self.prune_name == "pq-nobias" or self.prune_name == "pq-bias":
+        #     self.baseline_inp = torch.zeros((self.in_dim), device=self.device)
+        #     if self.prune_metric == "WIFN":
+        #         self.scaler_inp = torch.zeros((self.in_dim), device=self.device)
+        #     elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
+        #         self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
+        
         
     def get_pre_hook(self):
-        if self.prune_name == "wanda-sp":
-            def add_batch(inp, out):
-                if len(inp.shape) == 2:
-                    inp = inp.unsqueeze(0)
-                tmp = inp.shape[0]
-                # if isinstance(self.layer, nn.Linear):
-                if len(inp.shape) == 3:
-                    inp = inp.reshape((-1, inp.shape[-1]))
-                inp = inp.t()
+        # if self.prune_name == "wanda-sp":
+        #     def add_batch(inp, out):
+        #         if len(inp.shape) == 2:
+        #             inp = inp.unsqueeze(0)
+        #         tmp = inp.shape[0]
+        #         # if isinstance(self.layer, nn.Linear):
+        #         if len(inp.shape) == 3:
+        #             inp = inp.reshape((-1, inp.shape[-1]))
+        #         inp = inp.t()
                 
-                self.scaler_row *= self.nsamples / (self.nsamples+tmp)
-                self.nsamples += tmp
+        #         self.scaler_row *= self.nsamples / (self.nsamples+tmp)
+        #         self.nsamples += tmp
 
+        #         inp = inp.type(torch.float32)
+
+        #         self.scaler_row += torch.norm(inp, p=2, dim=1) ** 2  / self.nsamples
+        # elif self.prune_name == "flap":
+        #     def add_batch(inp, out):
+        #         if len(inp.shape) == 2:
+        #             inp = inp.unsqueeze(0)
+        #         batch_size = inp.shape[0]
+        #         # if isinstance(self.layer, nn.Linear):
+        #         if len(inp.shape) == 3:
+        #             inp = inp.reshape((-1, inp.shape[-1]))
+        #         inp = inp.t()   # (dim, seqlen * batch_size)
+
+        #         old_baseline_inp = self.baseline_inp
+        #         self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
+        #         self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
+        #         if self.prune_metric == "WIFN":
+        #             inp = inp.type(torch.float32)
+        #             self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
+        #             self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
+        #         else:
+        #             if self.nsamples == 0:
+        #                 self.fluc_inp = 0
+        #             else:
+        #                 self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
+        #                 self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
+
+        #         self.nsamples += batch_size
+        # elif self.prune_name == "pq-nobias" or self.prune_name == "pq-bias":
+        def add_batch(inp, out):
+            if len(inp.shape) == 2:
+                inp = inp.unsqueeze(0)
+            batch_size = inp.shape[0]
+            # if isinstance(self.layer, nn.Linear):
+            if len(inp.shape) == 3:
+                inp = inp.reshape((-1, inp.shape[-1]))
+            inp = inp.t()   # (dim, seqlen * batch_size)
+
+            old_baseline_inp = self.baseline_inp
+            self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
+            self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
+            if self.prune_metric == "WIFN":
                 inp = inp.type(torch.float32)
-
-                self.scaler_row += torch.norm(inp, p=2, dim=1) ** 2  / self.nsamples
-        elif self.prune_name == "flap":
-            def add_batch(inp, out):
-                if len(inp.shape) == 2:
-                    inp = inp.unsqueeze(0)
-                batch_size = inp.shape[0]
-                # if isinstance(self.layer, nn.Linear):
-                if len(inp.shape) == 3:
-                    inp = inp.reshape((-1, inp.shape[-1]))
-                inp = inp.t()   # (dim, seqlen * batch_size)
-
-                old_baseline_inp = self.baseline_inp
-                self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
-                self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-                if self.prune_metric == "WIFN":
-                    inp = inp.type(torch.float32)
-                    self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
-                    self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
+                self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
+                self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
+            elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
+                if self.nsamples == 0:
+                    self.fluc_inp = 0
                 else:
-                    if self.nsamples == 0:
-                        self.fluc_inp = 0
-                    else:
-                        self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
-                        self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
+                    self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
+                    self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
+                    # print('inp', inp)
+                    # print('old_baseline_inp', old_baseline_inp)
+                    # print('self.baseline_inp: ', self.baseline_inp)
+                    # print('self.fluc_inp: ', self.fluc_inp)
+                    # print('self.baseline_inp: ', self.baseline_inp)
+                    # print('self.nsamples', self.nsamples)
+                    # print('coeff', (self.nsamples - 1) / (self.nsamples + batch_size - 1))
 
-                self.nsamples += batch_size
-        elif self.prune_name == "pq-nobias" or self.prune_name == "pq-bias":
-            def add_batch(inp, out):
-                if len(inp.shape) == 2:
-                    inp = inp.unsqueeze(0)
-                batch_size = inp.shape[0]
-                # if isinstance(self.layer, nn.Linear):
-                if len(inp.shape) == 3:
-                    inp = inp.reshape((-1, inp.shape[-1]))
-                inp = inp.t()   # (dim, seqlen * batch_size)
-
-                old_baseline_inp = self.baseline_inp
-                self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
-                self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-                if self.prune_metric == "WIFN":
-                    inp = inp.type(torch.float32)
-                    self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
-                    self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
-                else:
-                    if self.nsamples == 0:
-                        self.fluc_inp = 0
-                    else:
-                        self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
-                        self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
-                        # print('inp', inp)
-                        # print('old_baseline_inp', old_baseline_inp)
-                        # print('self.baseline_inp: ', self.baseline_inp)
-                        # print('self.fluc_inp: ', self.fluc_inp)
-                        # print('self.baseline_inp: ', self.baseline_inp)
-                        # print('self.nsamples', self.nsamples)
-                        # print('coeff', (self.nsamples - 1) / (self.nsamples + batch_size - 1))
-
-                self.nsamples += batch_size
+            self.nsamples += batch_size
 
         return add_batch
 
@@ -341,7 +351,7 @@ class Linear(nn.Linear, EwiLayer):
 #         groups: int = 1,
 #         **kwargs,
 #     ):
-#         nn.Conv2d.__init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, groups)
+#         nn.Conv2d.__init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias=False)
 #         EwiLayer.__init__(
 #             self,
 #             in_features=in_channels,
