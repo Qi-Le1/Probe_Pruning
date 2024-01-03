@@ -139,6 +139,17 @@ def make_hf_model(model_name, sub_model_name=None):
         model.config.end_token_id = tokenizer.eos_token_id
         model.config.pad_token_id = model.config.eos_token_id
     cfg['pad_token_id'] = tokenizer.pad_token_id    
+
+    # for attr in dir(model):
+    #     if not attr.startswith('__'):
+    #         print(f"{attr} = {getattr(model, attr)}")
+    # if hasattr(model, "model"):
+    #     for attr in dir(model.model):
+    #         if not attr.startswith('__'):
+    #             print(f"model.{attr} = {getattr(model.model, attr)}")
+    
+    # print('model.model.layers', model.model.layers)
+    print('model.config', model.config)
     return model, tokenizer
 
 

@@ -5,10 +5,11 @@ control:
   model_name: bart
   task_name: s2s
   batch_size: 8
-  prune_name: pq-w-l1-0.2-2#3#4-max/casc
-  batch_integ: inter / union / full
-  multibatch_integ: somemethods-intmutiples
+  prune_metric: l1+128
+  prune_name: pq+w+0.2+2#3#4+max/casc
   cust_tgt_modules: None
+  batch_integ: inter
+  multibatch_integ: somemethods-3
 # experiment
 pin_memory: True
 num_workers: 0

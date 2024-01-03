@@ -121,7 +121,7 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         dataset_['train'] = load_dataset('json', data_files={'train': 'data/c4/c4-train.00000-of-01024.json.gz'}, split='train')
         dataset_['test'] = load_dataset('json', data_files={'validation': 'data/c4/c4-validation.00000-of-00008.json.gz'}, split='validation')
         # Randomly sample 128 examples
-        dataset_ = dataset_['train'].train_test_split(test_size=128, seed=cfg['seed'])["test"]
+        # dataset_['train'] = dataset_['train'].train_test_split(test_size=cfg['nsamples'], seed=cfg['seed'])["test"]
     # piqa: piqa
     # storycloze: storycloze , 
     # arc-e: arc-easy 
@@ -260,31 +260,60 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
         cfg['num_steps'][k] = len(data_loader[k])
     return data_loader
 
+def make_calibration_dataloader(tokenizer):
+    dataset = make_dataset('c4')
+    dataset = process_calibration_dataset(dataset, tokenizer, 'c4')
+    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+    return data_loader
 
 def collate(input):
     for k in input:
         input[k] = torch.stack(input[k], 0)
     return input
 
-
-def process_calibration_dataset(dataset, tokenizer):
+processed_calibrate_sample_num = 0
+def process_calibration_dataset(dataset, tokenizer, dataset_name):
     if cfg['task_name'] in ['clm', 'mc']:
-        if cfg['data_name'] == 'c4':
+        if dataset_name == 'c4':
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
-            def preprocess_function(examples):   
-                inputs = examples['text']
-                model_inputs = tokenizer(inputs, return_tensors='pt', truncation=False, padding=False)
-                labels = tokenizer(inputs, return_tensors='pt', truncation=False, padding=False)
 
-                model_inputs["labels"] = labels["input_ids"]
+            def preprocess_function(examples):   
+                global processed_calibrate_sample_num
+                model_inputs = {
+                    'input_ids': [],
+                    'attention_mask': [],
+                    'labels': []
+                }
+                inputs = examples['text']
+                # print('input', len(inputs))
+                if processed_calibrate_sample_num > cfg['nsamples']:
+                    return model_inputs
+                for _ in range(cfg['nsamples']):
+                    while True:
+                        i = random.randint(0, len(inputs) - 1)
+                        trainenc = tokenizer(inputs[i], return_tensors='pt')
+                        if trainenc.input_ids.shape[1] > max_length:
+                            break
+                    processed_calibrate_sample_num += 1
+                    if processed_calibrate_sample_num > cfg['nsamples']:
+                        return model_inputs
+                    i = random.randint(0, trainenc.input_ids.shape[1] - max_length - 1)
+                    j = i + max_length
+                    inp = trainenc.input_ids[:, i:j]
+                    tar = inp.clone()
+                    tar[:, :-1] = -100
+                    
+                    model_inputs['input_ids'].append(inp)
+                    model_inputs['attention_mask'].append(trainenc.attention_mask[:, i:j])
+                    model_inputs['labels'].append(tar)
+
                 return model_inputs
 
             processed_dataset = {}
             processed_dataset['train'] = dataset['train'].map(
                 preprocess_function,
                 batched=True,
-                # batch_size=50,
                 num_proc=1,
                 remove_columns=dataset["train"].column_names,
                 load_from_cache_file=False,
@@ -292,17 +321,16 @@ def process_calibration_dataset(dataset, tokenizer):
                 keep_in_memory=True,
             )
 
-            processed_dataset['test'] = dataset['test'].map(
-                preprocess_function,
-                batched=True,
-                # batch_size=50,
-                num_proc=1,
-                remove_columns=dataset["test"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on sampled dataset",
-                keep_in_memory=True,
-            )
-        return processed_dataset
+            # processed_dataset['test'] = dataset['test'].map(
+            #     preprocess_function,
+            #     batched=True,
+            #     num_proc=1,
+            #     remove_columns=dataset["test"].column_names,
+            #     load_from_cache_file=False,
+            #     desc="Running tokenizer on sampled dataset",
+            #     keep_in_memory=True,
+            # )
+    return processed_dataset
     
 def process_dataset(dataset, tokenizer):
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
@@ -464,7 +492,6 @@ def process_dataset(dataset, tokenizer):
                         final_inputs['attention_mask'].append(mask_chunks[i])
                         final_inputs['labels'].append(input_chunks[i])
                 
-                print('length', len(final_inputs['input_ids']))
                 return final_inputs
 
             processed_dataset = {}

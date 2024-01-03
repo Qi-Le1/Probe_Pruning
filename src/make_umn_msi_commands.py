@@ -114,6 +114,7 @@ def main():
     filename = '{}'.format(file)
 
 
+    
     if file == 'test_model' or file == 'test_local_tuned_model':
         controls = []
         script_name = [[f'{filename}.py']]
@@ -148,7 +149,6 @@ def main():
                     ['inter'], ['somemethods-3'], ['output.dense']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
-
         elif 'clm' in data:
             # ------- llama-2-7b
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3'], [f'magunstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0]],
@@ -313,7 +313,6 @@ def main():
             #         ['inter'], ['somemethods-3'], ['default']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
-
         elif 'ic' in data:
             # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
             #                  ['inter'], ['somemethods-3'], ['default']]]
@@ -381,6 +380,14 @@ def main():
                     ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+    elif file == 'test_fix_pruned_model': 
+        controls = []
+        script_name = [[f'{filename}.py']]
+        if 'clm' in data:
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['IFV-1'], [f'pq-nobias+NA+{x}+-100+NA' for x in [0]],
+                    ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
     else:
         raise ValueError('Not valid file')
 
@@ -394,16 +401,7 @@ def main():
     print(res_path)
     makedir_exist_ok(res_folder)
 
-    if 's2s' in data:
-        bash_file_name = './{}.bash'.format(f'msi_s2s')
-    elif 'sc' in data:
-        bash_file_name = './{}.bash'.format(f'msi_sc')
-    elif 'clm' in data:
-        bash_file_name = './{}.bash'.format(f'msi_clm')
-    elif 'ic' in data:
-        bash_file_name = './{}.bash'.format(f'msi_ic')
-    elif 'mc' in data:
-        bash_file_name = './{}.bash'.format(f'msi_mc')
+    bash_file_name = './{}.bash'.format(f'msi_{file}_{data[0]}')
 
     # Check if the file exists
     if os.path.exists(bash_file_name):

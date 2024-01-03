@@ -16,10 +16,10 @@ from config import cfg
 from math import prod
 from .model import init_param, mse_loss
 from typing import List, Optional, Tuple, Union
-from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING
+from module import to_device, TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING
 from functools import reduce
 
-class EriModel(torch.nn.Module):
+class EwiModel(torch.nn.Module):
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -42,7 +42,7 @@ class EriModel(torch.nn.Module):
         
         kwargs = {
             "prune_tgt": cfg['prune_tgt'],
-            "prune_norm": cfg['prune_norm'],
+            "prune_metric": cfg['prune_metric'],
             "key": key,
             "fan_in_fan_out": False,
             "device": target.weight.device,
@@ -148,7 +148,7 @@ def _get_submodules(model, key):
     return parent, target, target_name
 
 def _get_target_modules(cfg):
-    target_modules = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_type']]
+    target_modules = TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING[cfg['model_type']]
     if 'cust_tgt_modules' in cfg and 'default' not in cfg['cust_tgt_modules']:
         target_modules = cfg['cust_tgt_modules']
     return target_modules
@@ -175,21 +175,19 @@ def _check_target_module_exists(target_modules, key):
     #         return False
     return target_module_found
 
-class EriLayer:
+class EwiLayer:
     def __init__(self, in_features: int, out_features: int, **kwargs):
         self.prune_tgt = kwargs['prune_tgt']
-        self.prune_norm = kwargs['prune_norm']
-        self.pruning_module = kwargs['pruning_module']
+        self.prune_metric = kwargs['prune_metric']
         self.key = kwargs['key']
 
         self.pruning_channel_ratio = []
         self.input_prune_channels = None
         self.weight_norm_across_channel_dims = None
-
-        pass
+        return
     
 
-class Linear(nn.Linear, EriLayer):
+class Linear(nn.Linear, EwiLayer):
     def __init__(
         self,
         prune_name,
@@ -201,7 +199,7 @@ class Linear(nn.Linear, EriLayer):
     ):
         self.prune_name = prune_name
         nn.Linear.__init__(self, in_features, out_features)
-        EriLayer.__init__(self, in_features=in_features, out_features=out_features, **kwargs)
+        EwiLayer.__init__(self, in_features=in_features, out_features=out_features, **kwargs)
         # Freezing the pre-trained weight matrix
         self.weight.requires_grad = False
 
@@ -212,7 +210,7 @@ class Linear(nn.Linear, EriLayer):
 
         self.out_dim = out_features
         self.in_dim = in_features
-        self.metric_type = cfg['metric_type']
+        self.prune_metric = cfg['prune_metric']
         self.nsamples = 0
         self.device = kwargs['device']
 
@@ -220,27 +218,29 @@ class Linear(nn.Linear, EriLayer):
             self.scaler_row = torch.zeros((self.columns), device=self.device)
         elif self.prune_name == "flap":
             self.baseline_inp = torch.zeros((self.in_dim), device=self.device)
-            if self.metric_type == "WIFN":
+            if self.prune_metric == "WIFN":
                 self.scaler_inp = torch.zeros((self.in_dim), device=self.device)
-            elif self.metric_type == "IFV" or self.metric_type == "WIFV":
+            elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
                 self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
-        elif self.prune_name == "pq":
+        elif self.prune_name == "pq-nobias" or self.prune_name == "pq-bias":
             self.baseline_inp = torch.zeros((self.in_dim), device=self.device)
-            if self.metric_type == "WIFN":
+            if self.prune_metric == "WIFN":
                 self.scaler_inp = torch.zeros((self.in_dim), device=self.device)
-            elif self.metric_type == "IFV" or self.metric_type == "WIFV":
+            elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
                 self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
-
+        else:
+            raise ValueError(f"Unknown pruning method {self.prune_name}")
+        
     def get_pre_hook(self):
         if self.prune_name == "wanda-sp":
-            def add_batch(self, inp, out):
+            def add_batch(inp, out):
                 if len(inp.shape) == 2:
                     inp = inp.unsqueeze(0)
                 tmp = inp.shape[0]
-                if isinstance(self.layer, nn.Linear):
-                    if len(inp.shape) == 3:
-                        inp = inp.reshape((-1, inp.shape[-1]))
-                    inp = inp.t()
+                # if isinstance(self.layer, nn.Linear):
+                if len(inp.shape) == 3:
+                    inp = inp.reshape((-1, inp.shape[-1]))
+                inp = inp.t()
                 
                 self.scaler_row *= self.nsamples / (self.nsamples+tmp)
                 self.nsamples += tmp
@@ -249,19 +249,19 @@ class Linear(nn.Linear, EriLayer):
 
                 self.scaler_row += torch.norm(inp, p=2, dim=1) ** 2  / self.nsamples
         elif self.prune_name == "flap":
-            def add_batch(self, inp, out):
+            def add_batch(inp, out):
                 if len(inp.shape) == 2:
                     inp = inp.unsqueeze(0)
                 batch_size = inp.shape[0]
-                if isinstance(self.layer, nn.Linear):
-                    if len(inp.shape) == 3:
-                        inp = inp.reshape((-1, inp.shape[-1]))
-                    inp = inp.t()   # (dim, seqlen * batch_size)
+                # if isinstance(self.layer, nn.Linear):
+                if len(inp.shape) == 3:
+                    inp = inp.reshape((-1, inp.shape[-1]))
+                inp = inp.t()   # (dim, seqlen * batch_size)
 
                 old_baseline_inp = self.baseline_inp
                 self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
                 self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-                if self.type == "WIFN":
+                if self.prune_metric == "WIFN":
                     inp = inp.type(torch.float32)
                     self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
                     self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
@@ -273,20 +273,20 @@ class Linear(nn.Linear, EriLayer):
                         self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
 
                 self.nsamples += batch_size
-        elif self.prune_name == "pq":
-            def add_batch(self, inp, out):
+        elif self.prune_name == "pq-nobias" or self.prune_name == "pq-bias":
+            def add_batch(inp, out):
                 if len(inp.shape) == 2:
                     inp = inp.unsqueeze(0)
                 batch_size = inp.shape[0]
-                if isinstance(self.layer, nn.Linear):
-                    if len(inp.shape) == 3:
-                        inp = inp.reshape((-1, inp.shape[-1]))
-                    inp = inp.t()   # (dim, seqlen * batch_size)
+                # if isinstance(self.layer, nn.Linear):
+                if len(inp.shape) == 3:
+                    inp = inp.reshape((-1, inp.shape[-1]))
+                inp = inp.t()   # (dim, seqlen * batch_size)
 
                 old_baseline_inp = self.baseline_inp
                 self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
                 self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-                if self.type == "WIFN":
+                if self.prune_metric == "WIFN":
                     inp = inp.type(torch.float32)
                     self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
                     self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
@@ -296,6 +296,13 @@ class Linear(nn.Linear, EriLayer):
                     else:
                         self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
                         self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
+                        # print('inp', inp)
+                        # print('old_baseline_inp', old_baseline_inp)
+                        # print('self.baseline_inp: ', self.baseline_inp)
+                        # print('self.fluc_inp: ', self.fluc_inp)
+                        # print('self.baseline_inp: ', self.baseline_inp)
+                        # print('self.nsamples', self.nsamples)
+                        # print('coeff', (self.nsamples - 1) / (self.nsamples + batch_size - 1))
 
                 self.nsamples += batch_size
 
@@ -321,75 +328,75 @@ class Linear(nn.Linear, EriLayer):
         return result
     
 
-class Conv2d(nn.Conv2d, EriLayer):
-    def __init__(
-        self,
-        prune_name,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: Union[int, Tuple[int]],
-        stride: Union[int, Tuple[int]] = 1,
-        padding: Union[int, Tuple[int]] = 0,
-        dilation: Union[int, Tuple[int]] = 1,
-        groups: int = 1,
-        **kwargs,
-    ):
-        nn.Conv2d.__init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, groups)
-        EriLayer.__init__(
-            self,
-            in_features=in_channels,
-            out_features=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=groups,
-            **kwargs
-        )
-        # Freezing the pre-trained weight matrix
-        self.weight.requires_grad = False   
+# class Conv2d(nn.Conv2d, EwiLayer):
+#     def __init__(
+#         self,
+#         prune_name,
+#         in_channels: int,
+#         out_channels: int,
+#         kernel_size: Union[int, Tuple[int]],
+#         stride: Union[int, Tuple[int]] = 1,
+#         padding: Union[int, Tuple[int]] = 0,
+#         dilation: Union[int, Tuple[int]] = 1,
+#         groups: int = 1,
+#         **kwargs,
+#     ):
+#         nn.Conv2d.__init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, groups)
+#         EwiLayer.__init__(
+#             self,
+#             in_features=in_channels,
+#             out_features=out_channels,
+#             kernel_size=kernel_size,
+#             stride=stride,
+#             padding=padding,
+#             dilation=dilation,
+#             groups=groups,
+#             **kwargs
+#         )
+#         # Freezing the pre-trained weight matrix
+#         self.weight.requires_grad = False   
 
-        self.layer_type = 'conv2d'
-        # if 'local' in self.prune_name and self.prune_tgt == 'weight':
-        #     self.prune_weight(self.weight, self.layer_type)
+#         self.layer_type = 'conv2d'
+#         # if 'local' in self.prune_name and self.prune_tgt == 'weight':
+#         #     self.prune_weight(self.weight, self.layer_type)
             
-    def forward(self, x: torch.Tensor):
-        # print('input_shape: ', x.shape)
-        # print('pruned_conv2d')
-        previous_dtype = x.dtype
-        if self.prune_tgt == 'hidden_repr':
-            # print('-----\n')
-            # print('input_shape: ', x.shape)
-            # print("prev weight.shape", self.weight.shape)
-            input_dim = x.dim()
-            conv2d_layer_info = {
-                'weight': self.weight.data,
-            }
-            pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, conv2d_layer_info, self.key)
-            weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
+#     def forward(self, x: torch.Tensor):
+#         # print('input_shape: ', x.shape)
+#         # print('pruned_conv2d')
+#         previous_dtype = x.dtype
+#         if self.prune_tgt == 'hidden_repr':
+#             # print('-----\n')
+#             # print('input_shape: ', x.shape)
+#             # print("prev weight.shape", self.weight.shape)
+#             input_dim = x.dim()
+#             conv2d_layer_info = {
+#                 'weight': self.weight.data,
+#             }
+#             pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, conv2d_layer_info, self.key)
+#             weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
 
-            result = F.conv2d(
-                pruned_h,
-                weight,
-                bias=self.bias,
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups,
-            )
-        elif self.prune_tgt == 'weight':
-            pruned_h = self.extract_input(x, self.layer_type)
-            # b = self.weight.shape
-            result = F.conv2d(
-                pruned_h,
-                self.weight,
-                bias=self.bias,
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups,
-            )
-        # self.pruning_module.cal_repr_distribution(pruned_h, f'{self.key}_pruned_hist')
-        result = result.to(previous_dtype)
-        return result
+#             result = F.conv2d(
+#                 pruned_h,
+#                 weight,
+#                 bias=self.bias,
+#                 stride=self.stride,
+#                 padding=self.padding,
+#                 dilation=self.dilation,
+#                 groups=self.groups,
+#             )
+#         elif self.prune_tgt == 'weight':
+#             pruned_h = self.extract_input(x, self.layer_type)
+#             # b = self.weight.shape
+#             result = F.conv2d(
+#                 pruned_h,
+#                 self.weight,
+#                 bias=self.bias,
+#                 stride=self.stride,
+#                 padding=self.padding,
+#                 dilation=self.dilation,
+#                 groups=self.groups,
+#             )
+#         # self.pruning_module.cal_repr_distribution(pruned_h, f'{self.key}_pruned_hist')
+#         result = result.to(previous_dtype)
+#         return result
 

@@ -9,13 +9,12 @@ import traceback
 import datetime
 import torch.backends.cudnn as cudnn
 from config import cfg, process_args
-from dataset import make_dataset, make_data_loader, process_dataset, collate, make_batchnorm_stats, process_calibration_dataset
+from dataset import make_dataset, make_data_loader, process_dataset, collate, make_batchnorm_stats, make_calibration_dataloader
 from metric import make_metric, make_logger
-from model import make_model, make_prune_model
+from model import make_model, make_calibration_prune_model, calibrate_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
     record_pruing_info, get_model_profile, summarize_info_list, match_prefix, MULTIGPUS_MODEL_NAME_LIST
 from deepspeed.profiling.flops_profiler import FlopsProfiler
-from model import calibrate_model
 
 
 
@@ -38,11 +37,7 @@ def main():
         runExperiment()
     return
 
-def make_calibration_dataloader(tokenizer):
-    dataset = make_dataset('c4')
-    dataset = process_calibration_dataset(dataset, tokenizer)
-    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
-    return data_loader
+
 
 # metric, nsamples
 # structure for flap maybe
@@ -53,34 +48,32 @@ def runExperiment():
     result_path = os.path.join('output', 'result')
     makedir_exist_ok(result_path)
     model, tokenizer = make_model(cfg['model_name'])
-    data_loader = make_calibration_dataloader(tokenizer)
-
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
-    if cfg['model_name'] in MULTIGPUS_MODEL_NAME_LIST:
-        device = model.hf_device_map["lm_head"] # for 30b and 65b we use device_map to load onto multiple A6000 GPUs, thus the processing here.
-
-    calibrate_model(model, tokenizer, data_loader['train'], device)
-
+    dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
+    dataset = process_dataset(dataset, tokenizer)
+    if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
+        model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
+    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
-    cfg['epoch'] = 0
+    cfg['epoch'] = 0  
 
-    
-    # model, tokenizer = make_model(cfg['model_name'])
-    # 
-    # if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
-    #     model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     # model_prof = FlopsProfiler(model)
     # test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     # test(data_loader['test'], model, model_prof, metric, test_logger)
     # vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
-    # print('vanilla_info_list', vanilla_info_list[0], vanilla_info_list[1])
 
     model, tokenizer = make_model(cfg['model_name'])
-    
+    dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
+    dataset = process_dataset(dataset, tokenizer)
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
-    model = make_prune_model(model)
-    model = calibrate_model(model, data_loader['train'])
+    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+    calibration_data_loader = make_calibration_dataloader(tokenizer)
+    model = make_calibration_prune_model(model)
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    if cfg['model_name'] in MULTIGPUS_MODEL_NAME_LIST:
+        device = model.hf_device_map["lm_head"] # for 30b and 65b we use device_map to load onto multiple A6000 GPUs, thus the processing here.
+    # wrap with EWI layer, so pass model.model
+    calibrate_model(model.model, tokenizer, calibration_data_loader['train'], device)
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     test(data_loader['test'], model, model_prof, metric, test_logger)
@@ -103,15 +96,11 @@ def runExperiment():
     return
 
 def test(data_loader, model, model_prof, metric, logger):
-    print("Debug 12.01: Test logger created", flush=True)
     start_time = time.time()
     with torch.no_grad():
         model_prof.start_profile()
-        
         model.train(False)
-        print("Debug 12.011: Test logger created", flush=True)
         for i, input in enumerate(data_loader):
-            print("Debug 12.1: Test logger created", flush=True)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],

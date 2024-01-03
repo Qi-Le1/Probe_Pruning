@@ -2,10 +2,21 @@ from config import cfg
 
 MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70B', 'llama-30b', 'llama-65b']
 
+# cfg['prune_norm']
+# self.prune_norm
+
 def process_control():
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
+
+    prune_metric_list = cfg['control']['prune_metric'].split('+')
+    cfg['prune_metric'] = prune_metric_list[0]
+    if len(prune_metric_list) == 1:
+        cfg['nsamples'] = None
+    else:
+        cfg['nsamples'] = int(prune_metric_list[1])
+
     prune_name_list = cfg['control']['prune_name'].split('+')
     cfg['prune_name'] = prune_name_list[0]
     cfg['prune_tgt'] = prune_name_list[1]
@@ -13,29 +24,31 @@ def process_control():
         cfg['prune_tgt'] = 'weight'
     elif cfg['prune_tgt'] == 'h':
         cfg['prune_tgt'] = 'hidden_repr'
+    elif cfg['prune_tgt'] == 'NA':
+        pass
     else:
         raise ValueError('Not valid prune target')
-    cfg['prune_norm'] = int(prune_name_list[2])
-    cfg['prune_hyper'] = float(prune_name_list[3])
-    cfg['prune_dim'] = [int(dim) for dim in prune_name_list[4].split('+')] if len(prune_name_list) > 4 else None
-    cfg['prune_dim_select_mode'] = prune_name_list[5] if len(prune_name_list) > 5 else 'max'
-
-    cfg['batch_integ'] = cfg['control']['batch_integ']
-    multibatch_integ_list = cfg['control']['multibatch_integ'].split('-')
-    cfg['multibatch_integ'] = multibatch_integ_list[0]
-    cfg['multibatch_factor'] = float(multibatch_integ_list[1])
+    cfg['prune_hyper'] = float(prune_name_list[2])
+    cfg['prune_dim'] = [int(dim) for dim in prune_name_list[3].split('+')] if len(prune_name_list) > 3 else None
+    cfg['prune_dim_select_mode'] = prune_name_list[4] if len(prune_name_list) > 4 else 'max'
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
     # if cfg['cust_tgt_modules'] == ['None']:
     #     cfg['cust_tgt_modules'] = None
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != 'default':
         cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
+
+    cfg['batch_integ'] = cfg['control']['batch_integ'] if 'batch_integ' in cfg['control'] else None
+    if 'multibatch_integ' in cfg['control']:
+        multibatch_integ_list = cfg['control']['multibatch_integ'].split('-')
+        cfg['multibatch_integ'] = multibatch_integ_list[0]
+        cfg['multibatch_factor'] = float(multibatch_integ_list[1])
+    
     cfg['split_metric'] = False
 
     cfg['pq_p'] = 1
     cfg['pq_q'] = 2
     cfg['pq_gamma'] = 1
-    
 
     make_data_name()
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i', 'mc']:
@@ -340,7 +353,14 @@ TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
     'test': ['fc']
 }
 
-
+TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
+    "opt": ["out_proj", "fc2"],
+    "llama": ["o_proj", "gate_proj"],
+    'resnet9': ['.shortcut', '.conv1', '.conv2'],
+    # 'resnet9': ['.conv2'],
+    'resnet18': ['.shortcut', '.conv1', '.conv2'],
+    'test': ['fc']
+}
 
 
 # gpt2 layer

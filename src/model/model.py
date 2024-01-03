@@ -31,6 +31,11 @@ def make_prune_model(model):
     model = EriModel(model)
     return model
 
+def make_calibration_prune_model(model):
+    from .ewi import EwiModel
+    model = EwiModel(model)
+    return model
+
 def make_loss(output, input):
     if 'target' in input:
         loss = loss_fn(output['target'], input['target'])

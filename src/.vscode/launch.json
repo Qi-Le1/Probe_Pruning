@@ -329,6 +329,21 @@
                 "cpu"
             ],
         },
+
+        {
+            "name": "verify_prune_fix_model_pq_nobias",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_fix_pruned_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "wikitext-2v1_llama-2-7b_clm_1_IFV-1_pq-nobias+NA+0+-100+NA_default",
+                "--device",
+                "cpu"
+            ],
+        },
     ]
 }
 

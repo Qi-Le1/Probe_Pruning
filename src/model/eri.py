@@ -52,7 +52,7 @@ class EriModel(torch.nn.Module):
         
         kwargs = {
             "prune_tgt": cfg['prune_tgt'],
-            "prune_norm": cfg['prune_norm'],
+            "prune_metric": cfg['prune_metric'],
             "pruning_module": pruning_module,
             "key": key,
             "fan_in_fan_out": False,
@@ -128,19 +128,6 @@ class EriModel(torch.nn.Module):
             # the parent class will assign bias
             new_module.bias = old_module.bias
 
-        # if getattr(old_module, "state", None) is not None:
-        #     new_module.state = old_module.state
-        #     new_module.to(old_module.weight.device)
-
-        # a = new_module.named_modules()
-        # b = getattr(old_module, "state", None)
-        # # dispatch to correct device
-        # for name, module in new_module.named_modules():
-        #     if "pruner_" in name:
-        #         print('no')
-        #         module.to(old_module.weight.device)
-        #     print('name', name)
-
         if 'local' in cfg['prune_name'] and cfg['prune_tgt'] == 'weight':
             new_module.prune_weight(new_module.weight, new_module.layer_type)
 
@@ -172,18 +159,13 @@ def _get_target_modules(cfg):
         target_modules = cfg['cust_tgt_modules']
     return target_modules
 
-global_only_one_module = True
+# global_only_one_module = True
 def _check_target_module_exists(target_modules, key):
     if isinstance(target_modules, str):
         target_module_found = re.fullmatch(target_modules, key)
     else:
         # target_module_found = any(key.endswith(target_key) for target_key in target_modules)
         target_module_found = any(key.endswith(target_key) for target_key in target_modules)
-
-    # TODO: hardcode for roberta
-    if cfg['model_type'] == 'roberta':
-        if cfg['cust_tgt_modules'] == ['output.dense'] and 'attention.output.dense' in key:
-            return False
 
     # if target_module_found:
     #     global global_only_one_module
@@ -197,7 +179,7 @@ def _check_target_module_exists(target_modules, key):
 class EriLayer:
     def __init__(self, in_features: int, out_features: int, **kwargs):
         self.prune_tgt = kwargs['prune_tgt']
-        self.prune_norm = kwargs['prune_norm']
+        self.prune_metric = kwargs['prune_metric']
         self.pruning_module = kwargs['pruning_module']
         self.key = kwargs['key']
 
@@ -455,7 +437,7 @@ class BasePruning:
     def __init__(self, cfg):
         self.prune_name = cfg['prune_name']
         self.prune_tgt = cfg['prune_tgt']
-        self.prune_norm = cfg['prune_norm']
+        self.prune_metric = cfg['prune_metric']
         self.prune_hyper = cfg['prune_hyper'] 
         self.prune_dim = cfg['prune_dim'] 
         self.prune_dim_select_mode = cfg['prune_dim_select_mode'] 
@@ -549,7 +531,10 @@ class HiddenRepresentationPruning(BasePruning):
                 raise ValueError('Not valid batch integration method')
             if 'magunstruct' in self.prune_name:
                 flattened_h = h.view(h.size(0), -1)
-                norm_along_dim_1 = torch.linalg.vector_norm(flattened_h, ord=self.prune_norm, dim=1)
+                if self.prune_metric == 'l1':
+                    norm_along_dim_1 = torch.linalg.vector_norm(flattened_h, ord=1, dim=1)
+                elif self.prune_metric == 'l2':
+                    norm_along_dim_1 = torch.linalg.vector_norm(flattened_h, ord=2, dim=1)
                 _, sorted_indices = torch.sort(norm_along_dim_1, dim=1)
                 num_indices_to_prune = int(self.prune_hyper * sorted_indices.size(1))
                 # Select the indices to prune (lowest norms)
@@ -747,7 +732,10 @@ class HiddenRepresentationPruning(BasePruning):
         info = {}
         
         dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != self.exclude_dim_to_aggregate)
-        norm_across_other_dims = torch.linalg.vector_norm(h, ord=self.prune_norm, dim=dims_to_aggregate)     
+        if self.prune_metric == 'l1':
+            norm_across_other_dims = torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate)
+        elif self.prune_metric == 'l2':
+            norm_across_other_dims = torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate)    
 
         if 'w*pqstruct' in self.prune_name:
             if self.weight_norm_across_channel_dims is None:
@@ -927,7 +915,11 @@ class HiddenRepresentationPruning(BasePruning):
     def mag_struct(self, h, key,layer_info, prune_dim):
         info = {}
         dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != self.exclude_dim_to_aggregate)
-        norm_across_other_dims = torch.linalg.vector_norm(h, ord=self.prune_norm, dim=dims_to_aggregate)   
+        if self.prune_metric == 'l1':
+            norm_across_other_dims = torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate)
+        elif self.prune_metric == 'l2':
+            norm_across_other_dims = torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate)
+
         # print('w*magstruct', self.prune_name)     
         if 'w*magstruct' in self.prune_name:
             # print('2222w*magstruct', self.prune_name)
@@ -1049,7 +1041,10 @@ class WeightPruning(BasePruning):
                     if hasattr(module, 'weight') and module.weight is not None:
                         dims_to_aggregate = tuple(i for i in range(module.weight.data.dim()) if i != self.prune_dim[0])
                         # print('dims_to_aggregate', dims_to_aggregate)
-                        norm_across_other_dims = torch.linalg.vector_norm(module.weight.data, ord=self.prune_norm, dim=dims_to_aggregate) 
+                        if self.prune_metric == 'l1':
+                            norm_across_other_dims = torch.linalg.vector_norm(module.weight.data, ord=1, dim=dims_to_aggregate)
+                        elif self.prune_metric == 'l2':
+                            norm_across_other_dims = torch.linalg.vector_norm(module.weight.data, ord=2, dim=dims_to_aggregate)
                         for i, norm in enumerate(norm_across_other_dims):
                             channel_norms.append((norm.item(), name, i, module.weight.shape))  # Store norm, layer name, channel index, and shape
                         info[f"{name}_weight_norm_across_channel_dims"] = norm_across_other_dims.tolist()
@@ -1243,7 +1238,10 @@ class WeightPruning(BasePruning):
         calc_dim = 0
         
         dims_to_aggregate = tuple(i for i in range(w.dim()) if i != prune_dim)
-        norm_across_other_dims = torch.linalg.vector_norm(w, ord=self.prune_norm, dim=dims_to_aggregate)     
+        if self.prune_metric == 'l1':
+            norm_across_other_dims = torch.linalg.vector_norm(w, ord=1, dim=dims_to_aggregate)
+        elif self.prune_metric == 'l2':
+            norm_across_other_dims = torch.linalg.vector_norm(w, ord=2, dim=dims_to_aggregate)   
         norm_across_other_dims = norm_across_other_dims + (norm_across_other_dims == 0) * 1e-9
         norm_p = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=calc_dim)
         norm_q = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_q, dim=calc_dim) + 1e-10
@@ -1273,7 +1271,10 @@ class WeightPruning(BasePruning):
     
     def mag_struct(self, w, key, prune_dim):
         dims_to_aggregate = tuple(i for i in range(w.dim()) if i != prune_dim)
-        norm_across_other_dims = torch.linalg.vector_norm(w, ord=self.prune_norm, dim=dims_to_aggregate)        
+        if self.prune_metric == 'l1':
+            norm_across_other_dims = torch.linalg.vector_norm(w, ord=1, dim=dims_to_aggregate)
+        elif self.prune_metric == 'l2':
+            norm_across_other_dims = torch.linalg.vector_norm(w, ord=2, dim=dims_to_aggregate)      
         _, sorted_channels = torch.sort(norm_across_other_dims, dim=0)
         prune_channels_count = int(self.prune_hyper * w.shape[prune_dim])
         prune_channels = sorted_channels[:int(prune_channels_count)]

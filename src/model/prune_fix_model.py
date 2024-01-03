@@ -3,21 +3,42 @@ import torch.nn as nn
 from .layerwrapper import WrappedGPT, BiasGPT
 # from .data import get_loaders 
 import math
+import re
 from config import cfg
 from tqdm import tqdm
-
+from module import to_device, TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING, to_device
 # create a dictionary to map the method name to the function
 """
+    'WIFN': Weighted Input Feature Norm
     'IFV': Input Feature Variance
     'WIFV': Weighted Input Feature Variance
-    'WIFN': Weighted Input Feature Norm
+    
 """
+
 metrics = {
-    'IFV': lambda wrapped_layers, subset, name: wrapped_layers[name].fluc_inp,
-    'WIFV': lambda wrapped_layers, subset, name: wrapped_layers[name].fluc_inp * torch.sum(subset[name].weight.data.pow(2), dim=0),
     'WIFN': lambda wrapped_layers, subset, name: (torch.abs(subset[name].weight.data) * torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1)))).mean(axis=0),
+    'IFV': lambda wrapped_layers, subset, name: (wrapped_layers[name].fluc_inp) ** 2,
+    'WIFV': lambda wrapped_layers, subset, name: (wrapped_layers[name].fluc_inp * torch.sum(subset[name].weight.data.pow(2), dim=0)) ** 2,
 }
 
+def _check_target_module_exists(target_modules, key):
+    if isinstance(target_modules, str):
+        target_module_found = re.fullmatch(target_modules, key)
+    else:
+        target_module_found = any(key.endswith(target_key) for target_key in target_modules)
+    return target_module_found
+
+def _get_submodules(model, key):
+    parent = model.get_submodule(".".join(key.split(".")[:-1]))
+    target_name = key.split(".")[-1]
+    target = model.get_submodule(key)
+    return parent, target, target_name
+
+def _get_target_modules(cfg):
+    target_modules = TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING[cfg['model_type']]
+    if 'cust_tgt_modules' in cfg and 'default' not in cfg['cust_tgt_modules']:
+        target_modules = cfg['cust_tgt_modules']
+    return target_modules
 
 def find_layers(module, layers=[nn.Linear], name=''):
     """
@@ -41,14 +62,17 @@ def find_layers(module, layers=[nn.Linear], name=''):
     return res
 
 def calibrate_model(model, tokenizer, dataloader, device):
-    if cfg['prune_name'] == "flap":
-        prune_flap(model, tokenizer, dataloader, device)
-    elif cfg['prune_name'] == "wanda_sp":
-        prune_wanda_sp(model, tokenizer, dataloader, device)
-    elif cfg['prune_name'] == "mag_sp":
-        prune_magnitude_sp(model, tokenizer, dataloader, device)
-    elif cfg['prune_name'] == "pq":
-        prune_pq(model, tokenizer, dataloader, device)
+    if 'llama' in cfg['model_name']:
+        if cfg['prune_name'] == "flap":
+            prune_flap_llama(model, tokenizer, dataloader, device)
+        elif cfg['prune_name'] == "wanda-sp":
+            prune_wanda_sp_llama(model, tokenizer, dataloader, device)
+        elif cfg['prune_name'] == "mag-sp":
+            prune_magnitude_sp_llama(model, tokenizer, dataloader, device)
+        elif cfg['prune_name'] == "pq-nobias":
+            prune_pq_nobias_llama(model, tokenizer, dataloader, device)
+        elif cfg['prune_name'] == "pq-bias":
+            prune_pq_bias_llama(model, tokenizer, dataloader, device)
 
 def check_sparsity(model):
     """
@@ -113,12 +137,12 @@ def prepare_calibration_input(model, dataloader, device):
     use_cache = model.config.use_cache
     model.config.use_cache = False
     layers = model.model.layers
-
+    print('fypemodel', type(model))
     if "model.embed_tokens" in getattr(model, 'hf_device_map', {}):
         device = model.hf_device_map["model.embed_tokens"]
 
     dtype = next(iter(model.parameters())).dtype
-    inps = torch.zeros((2048, model.seqlen, model.config.hidden_size), dtype=dtype, device=device)
+    inps = torch.zeros((cfg['nsamples'], cfg[cfg['model_name']]['max_length'], model.config.hidden_size), dtype=dtype, device=device)
     inps.requires_grad = False
     cache = {'i': 0, 'attention_mask': None, "position_ids": None}
 
@@ -127,6 +151,10 @@ def prepare_calibration_input(model, dataloader, device):
             super().__init__()
             self.module = module
         def forward(self, inp, **kwargs):
+            # print('inforward')
+            # print('catcherinp', inp, cache['i'])
+            # print("cache['i']", cache['i'])
+            # print('kwargs', kwargs)
             inps[cache['i']] = inp
             cache['i'] += 1
             cache['attention_mask'] = kwargs['attention_mask']
@@ -134,18 +162,22 @@ def prepare_calibration_input(model, dataloader, device):
             raise ValueError
         
     layers[0] = Catcher(layers[0])
-    for batch in dataloader:
+    # print('layers[0]', layers[0])
+    for i, batch in enumerate(dataloader):
+        # print('batch', batch)
         try:
-            model(batch[0].to(device))
-        except ValueError:
-            pass 
+            batch_on_device = to_device(batch, device)
+            print('batch_on_device', batch_on_device)
+            model(batch_on_device['input_ids'])
+        except ValueError as e:
+            print('ValueError: ', e)
     layers[0] = layers[0].module
 
     outs = torch.zeros_like(inps)
     attention_mask = cache['attention_mask']
     position_ids = cache['position_ids']
     model.config.use_cache = use_cache
-
+    # print('catcherinps', inps, outs, attention_mask, position_ids )
     return inps, outs, attention_mask, position_ids 
 
 
@@ -229,7 +261,9 @@ def compress(layer, attn_mask, mlp_mask, attn_mean_inp, mlp_mean_inp, device, bi
             # Prune the output projection weight
             output_weight = layer.self_attn.o_proj.weight.data[:, torch.where(attn_mask)[0]]
             # Update layer configurations for the new output shape after pruning
+            # these 2 attributes currently have the same values
             layer.self_attn.num_heads = retain_heads
+            layer.self_attn.num_key_value_heads = retain_heads
             layer.self_attn.hidden_size = retain_heads * 128
             
             if bias:
@@ -299,7 +333,7 @@ def cal_remove_neuron(args, model):
         return int((remove_params - remove_head_params) / (hidden_size * 3))
 
 
-def prune_flap(model, tokenizer, dataloader, device=torch.device("cuda:0")):
+def prune_flap_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     """
     Our FLAP Pruning.
     
@@ -314,7 +348,7 @@ def prune_flap(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     model.config.use_cache = False 
     
     # print("loading calibdation data")
-    # dataloader, _ = get_loaders("wikitext2", nsamples=cfg["nsamples"],seed=args.seed,seqlen=model.seqlen,tokenizer=tokenizer)
+    # dataloader, _ = get_loaders("wikitext2", nsamples=cfg["nsamples"],seed=args.seed,seqlen=cfg[cfg['model_name']]['max_length'],tokenizer=tokenizer)
     # print("dataset loading complete")
     
     with torch.no_grad():
@@ -361,7 +395,11 @@ def prune_flap(model, tokenizer, dataloader, device=torch.device("cuda:0")):
         # 'IFV': lambda wrapped_layers, subset, name: wrapped_layers[name].fluc_inp,
         for name in subset:
             if name == 'self_attn.o_proj':
-                W_metric = metrics[args.metrics](wrapped_layers, subset, name) ** 2
+                W_metric = metrics[args.metrics](wrapped_layers, subset, name)
+                # flap's trick
+                if cfg['prune_metric'] == 'WIFN':
+                    W_metric = W_metric ** 2
+
                 if args.structure == "UL-UM":
                     W_metric = W_metric.reshape(-1, 128).sum(dim=1)
                     thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
@@ -377,6 +415,9 @@ def prune_flap(model, tokenizer, dataloader, device=torch.device("cuda:0")):
                 attn_baseline_inp_list.append(wrapped_layers[name].baseline_inp.type(torch.half))
             else:
                 W_metric = metrics[args.metrics](wrapped_layers, subset, name)
+                # flap's trick
+                if cfg['prune_metric'] == 'IFV' or cfg['prune_metric'] == 'WIFV':
+                    W_metric = torch.sqrt(W_metric)
                 if args.structure == "UL-UM":
                     thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
                     W_mask = (W_metric>=thresh)
@@ -444,8 +485,6 @@ def cal_pruned_count_base_on_pq(sorted_tensor):
     eta = cfg['prune_hyper']
     pq_beta = cfg['pq_beta']
     pq_gamma = cfg['pq_gamma']
-    # dims_to_aggregate = tuple(i for i in range(sorted_tensor.dim()) if i != prune_dim and i != self.exclude_dim_to_aggregate)
-    # norm_across_other_dims = torch.linalg.vector_norm(h, ord=self.prune_norm, dim=dims_to_aggregate)     
 
     # norm_across_other_dims = norm_across_other_dims + (norm_across_other_dims == 0) * 1e-9
     # Calculate norms only for non-zero channels
@@ -466,11 +505,11 @@ def cal_pruned_count_base_on_pq(sorted_tensor):
     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
     beta_tensor = torch.full_like(lower_bound, pq_beta)
     prune_channels_count = torch.floor(dimension * torch.min(pq_gamma * (1 - lower_bound / dimension), beta_tensor))
-    return prune_channels_count
+    return int(prune_channels_count)
 
-def prune_pq(model, tokenizer, dataloader, device=torch.device("cuda:0")):
+def prune_pq_nobias_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     """
-    Wanda on structured pruning.
+    pq on structured pruning, no bias recover.
 
     Args:
         args (object): Command line arguments parsed via argparse.
@@ -481,9 +520,10 @@ def prune_pq(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     use_cache = model.config.use_cache 
     model.config.use_cache = False 
     
-    print("loading calibdation data")
-    # dataloader, _ = get_loaders("c4",nsamples=128,seed=args.seed,seqlen=model.seqlen,tokenizer=tokenizer)
-    print("dataset loading complete")
+    target_modules = _get_target_modules(cfg)
+    # print("loading calibdation data")
+    # dataloader, _ = get_loaders("c4",nsamples=128,seed=args.seed,seqlen=cfg[cfg['model_name']]['max_length'],tokenizer=tokenizer)
+    # print("dataset loading complete")
     
     with torch.no_grad():
         inps, outs, attention_mask, position_ids = prepare_calibration_input(model, dataloader, device)
@@ -492,9 +532,22 @@ def prune_pq(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     for i in range(len(layers)):
         layer = layers[i]
         subset = {}
-        subset.update({'self_attn.o_proj': find_layers(layer)['self_attn.o_proj']})
-        subset.update({'mlp.down_proj': find_layers(layer)['mlp.down_proj']})
+        key_list = [key for key, _ in layer.named_modules()]
+        # print('key_list', key_list)
+        for key in key_list:
+            if not _check_target_module_exists(target_modules, key):
+                continue
 
+            print('found_pruning_layers', key, flush=True)
+            _, target, target_name = _get_submodules(layer, key)
+            subset[key] = target
+        
+        # subset.update({'self_attn.o_proj': find_layers(layer)['self_attn.o_proj']})
+        # subset.update({'mlp.down_proj': find_layers(layer)['mlp.down_proj']})
+
+        # for key in subset:
+        #     print('subset_key', key)
+        dev = device
         if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}):   ## handle the case for llama-30B and llama-65B, when the device map has multiple GPUs;
             dev = model.hf_device_map[f"model.layers.{i}"]
             inps, outs, attention_mask, position_ids = inps.to(dev), outs.to(dev), attention_mask.to(dev), position_ids.to(dev)
@@ -519,21 +572,21 @@ def prune_pq(model, tokenizer, dataloader, device=torch.device("cuda:0")):
 
         for name in subset:
             print(f"pruning layer {i} name {name}")
-            W_metric = torch.abs(subset[name].weight.data) * torch.sqrt(wrapped_layers[name].scaler_row.reshape((1,-1)))
-            
+            W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
+            print('W_metric',  W_metric, type(W_metric))
+            print(W_metric.shape)
             if name == 'self_attn.o_proj':
-                W_metric = W_metric.mean(axis=0).reshape(-1, 128).sum(dim=1)    # importance score of each head
+                W_metric = W_metric.reshape(-1, 128).sum(dim=1)
+                print('W_metric2', W_metric.shape, W_metric, type(W_metric))
                 pruned_count = cal_pruned_count_base_on_pq(torch.sort(W_metric.cuda())[0])
                 thresh = torch.sort(W_metric.cuda())[0][pruned_count].cpu()
                 W_mask = (W_metric>=thresh)
                 compress(layer, W_mask, None, None, None, dev, bias=False, unstr=False)
             else:
-                W_metric = W_metric.mean(axis=0)
                 pruned_count = cal_pruned_count_base_on_pq(torch.sort(W_metric.cuda())[0])
                 thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
                 W_mask = (W_metric>=thresh)
                 compress(layer, None, W_mask, None, None, dev, bias=False, unstr=False)
-                # compress(layer, attn_mask, mlp_mask, attn_mean_inp, mlp_mean_inp, device, bias=True, unstr=False):
             wrapped_layers[name].free()
 
         for j in range(cfg["nsamples"]):
@@ -546,7 +599,10 @@ def prune_pq(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     model.config.use_cache = use_cache 
     torch.cuda.empty_cache()
 
-def prune_wanda_sp(model, tokenizer, dataloader, device=torch.device("cuda:0")):
+def prune_pq_bias_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")):
+    return
+
+def prune_wanda_sp_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     """
     Wanda on structured pruning.
 
@@ -560,7 +616,7 @@ def prune_wanda_sp(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     model.config.use_cache = False 
     
     print("loading calibdation data")
-    # dataloader, _ = get_loaders("c4",nsamples=128,seed=args.seed,seqlen=model.seqlen,tokenizer=tokenizer)
+    # dataloader, _ = get_loaders("c4",nsamples=128,seed=args.seed,seqlen=cfg[cfg['model_name']]['max_length'],tokenizer=tokenizer)
     print("dataset loading complete")
     
     with torch.no_grad():
@@ -623,7 +679,7 @@ def prune_wanda_sp(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     torch.cuda.empty_cache()
     
     
-def prune_magnitude_sp(model, tokenizer, dataloader, device=torch.device("cuda:0")):
+def prune_magnitude_sp_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")):
     """
     Magnitude Pruning on structured pruning.
     
