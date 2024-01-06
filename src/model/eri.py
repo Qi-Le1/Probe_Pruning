@@ -16,7 +16,7 @@ from config import cfg
 from math import prod
 from .model import init_param, mse_loss
 from typing import List, Optional, Tuple, Union
-from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING
+from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING, TRANSFORMERS_MODELS_PRUNE_OUTPUT_DIM_MAPPING
 from functools import reduce
 
 class EriModel(torch.nn.Module):
@@ -103,10 +103,18 @@ class EriModel(torch.nn.Module):
                 continue
 
             print('Replaced Layer Keys', key, flush=True)
+
             is_target_modules_in_base_model = True
             parent, target, target_name = _get_submodules(self.model, key)
             
             new_module = self._create_new_module(prune_name, target, key)
+
+            if 'out' in cfg['prune_name']:
+                new_module.prune_out_dim = False
+                out_dim_target_modules = TRANSFORMERS_MODELS_PRUNE_OUTPUT_DIM_MAPPING[cfg['model_type']]
+                if _check_target_module_exists(out_dim_target_modules, key):
+                    new_module.prune_out_dim = True
+
             self._replace_module(parent, target_name, new_module, target)
         if not is_target_modules_in_base_model:
             raise ValueError(
@@ -239,7 +247,7 @@ class EriLayer:
         else:
             raise ValueError('Not valid layer type')
     
-    def extract_weight(self, input_dim, pruned_dims, prune_channels_multi_dims, layer_type):
+    def extract_weight(self, input_dim, pruned_dims, prune_channels_multi_dims, layer_type, prune_out_dim=None):
         # unstruct pruning
         if pruned_dims is None:
             return self.weight
@@ -267,18 +275,35 @@ class EriLayer:
 
                 # Return the modified copy
                 return weight
-            if pruned_dims[-1] is None or prune_channels_multi_dims[-1] is None:
-                # print('zzzzz')
-                return self.weight
+            if 'out' not in cfg['prune_name']:
+                if pruned_dims[-1] is None or prune_channels_multi_dims[-1] is None:
+                    # print('zzzzz')
+                    return self.weight
+                else:
+                    extract_weight_dim = 1
+                    # weight dim 1 should have same size as original h dim 2
+                    mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
+                    # Mark the indices to be pruned as False
+                    mask[prune_channels_multi_dims[-1]] = False
+                    # Use the mask to index the tensor
+                    weight = torch.index_select(self.weight, dim=extract_weight_dim, index=mask.nonzero().squeeze().to(self.weight.device))
+                    return weight
             else:
-                extract_weight_dim = 1
-                # weight dim 1 should have same size as original h dim 2
-                mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
-                # Mark the indices to be pruned as False
-                mask[prune_channels_multi_dims[-1]] = False
-                # Use the mask to index the tensor
-                weight = torch.index_select(self.weight, dim=extract_weight_dim, index=mask.nonzero().squeeze().to(self.weight.device))
-                return weight
+                if pruned_dims[-1] is None or prune_channels_multi_dims[-1] is None:
+                    # print('zzzzz')
+                    return self.weight
+                else:
+                    if prune_out_dim:
+                        extract_weight_dim = 0
+                        # weight dim 1 should have same size as original h dim 2
+                        mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
+                        # Mark the indices to be pruned as False
+                        mask[prune_channels_multi_dims[-1]] = False
+
+                        self.out_selected_dim = ~mask
+                        # Use the mask to index the tensor
+                        weight = torch.index_select(self.weight, dim=extract_weight_dim, index=mask.nonzero().squeeze().to(self.weight.device))
+                        return weight
         elif layer_type == 'conv2d':
             # [batch_size, in_channels, h, w]
             if input_dim != 4:
@@ -324,6 +349,7 @@ class Linear(nn.Linear, EriLayer):
         self.is_target_conv_1d_layer = is_target_conv_1d_layer
         self.layer_type = 'linear'
         
+        self.prune_metric = cfg['prune_metric']
         # if 'local' in self.prune_name and self.prune_tgt == 'weight':
         #     self.prune_weight(self.weight, self.layer_type)
     
@@ -345,12 +371,25 @@ class Linear(nn.Linear, EriLayer):
                 'weight': self.weight.data,
                 # 'weight_norm_across_channel_dims': self.weight_norm_across_channel_dims,
             }
+            # if 'out' in cfg['prune_name'] and self.prune_out_dim == False:
+
             pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key)
             if 'opt' in cfg['model_name']:
                 pruned_h = pruned_h.view(-1, pruned_h.size(-1))
             weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
             
             result = F.linear(pruned_h, weight, bias=self.bias)
+            if 'out' in cfg['prune_name'] and self.prune_out_dim:
+
+                # Create a tensor of zeros with the original output size
+                # Assuming pruned_h has shape [batch_size, ...], modify accordingly if different
+                extended_output = torch.zeros(pruned_h.shape[0], self.out_features, device=pruned_h.device)
+
+                # Insert the output from the pruned layer into the correct positions in the extended tensor
+                extended_output[:, self.out_selected_dim] = result
+
+                # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
+                result = extended_output
         elif self.prune_tgt == 'weight':
             pruned_h = self.extract_input(x, self.layer_type)
             result = F.linear(pruned_h, self.weight, bias=self.bias)
@@ -509,9 +548,11 @@ class BasePruning:
 class HiddenRepresentationPruning(BasePruning):
 
     def __init__(self, cfg, key):
-        BasePruning.__init__(self, cfg)
+        BasePruning.__init__(self, cfg, in_dim, out_dim, device)
         self.key = key
-        
+        self.device = device
+        self.scaler_in = torch.zeros((self.out_dim), device=self.device)
+        self.nsamples = 0
 
     def batch_pruning(self, h, layer_type, layer_info, key):
         # Exclude the first dimension (batch size) and the prune_dim
@@ -651,29 +692,7 @@ class HiddenRepresentationPruning(BasePruning):
         pruned_h = h.index_select(dim=prune_dim, index=mask.nonzero().squeeze().to(h.device))
         return pruned_h
 
-    def linear_flops_compute(self, input, weight, bias=None):
-        out_features = weight.shape[0]
-        macs = input.numel() * out_features
-        return 2 * macs, macs
-
-    def cal_saving_flops(self, h, prune_dim, prune_channels, layer_type, layer_info):
-        if prune_channels is None:
-            return 0
-        if layer_type == 'linear':
-            weight = layer_info['weight']
-
-            rest_dim_sizes = [h.shape[i] for i in range(h.dim()) if i != prune_dim]
-            product_of_rest_dims = prod(rest_dim_sizes)
-
-            out_features = weight.shape[0]
-            saving_flops = 2 * len(prune_channels) * product_of_rest_dims * out_features
-        elif layer_type == 'conv2d':
-            saving_flops = 0
-        else:
-            raise ValueError('Not valid layer type')
-        # rest_dims = tuple(i for i in range(h.dim()) if i != prune_dim)
-        # prune_eles = len(prune_channels) * reduce(lambda x, y: x * y, h.shape[rest_dims])
-        return saving_flops
+    
     
     def apply_batch_integ(self, cur_total_channels, prune_channels):
         if prune_channels[0].numel() == 0:  # Check if the tensor is empty
@@ -745,6 +764,11 @@ class HiddenRepresentationPruning(BasePruning):
                 info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
                 self.logger_info_time_used += time.time() - start_time
             norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
+        elif 'out' in cfg['prune_name'] and cfg['prune_metric'] == 'WIFN':
+            self.scaler_in *= self.nsamples / (self.nsamples + h.shape[0])
+            # self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
+            self.scaler_in += torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) ** 2 / (self.nsamples + h.shape[0])
+            norm_across_other_dims = torch.abs(layer_info['weight']) * torch.sqrt(self.scaler_in.reshape((1,-1))).mean(axis=1)
             # info[f"{key}_weight_norm_across_channel_dims"] = list(layer_info['weight_norm_across_channel_dims'])
             # print('norm_across_other_dims', norm_across_other_dims.shape, norm_across_other_dims.dim())
         # print('norm_across_other_dims', norm_across_other_dims.shape, norm_across_other_dims.dim())
@@ -1281,7 +1305,29 @@ class WeightPruning(BasePruning):
         prune_channels = sorted_channels[:int(prune_channels_count)]
         return prune_channels
 
+# def linear_flops_compute(self, input, weight, bias=None):
+#         out_features = weight.shape[0]
+#         macs = input.numel() * out_features
+#         return 2 * macs, macs
 
+#     def cal_saving_flops(self, h, prune_dim, prune_channels, layer_type, layer_info):
+#         if prune_channels is None:
+#             return 0
+#         if layer_type == 'linear':
+#             weight = layer_info['weight']
+
+#             rest_dim_sizes = [h.shape[i] for i in range(h.dim()) if i != prune_dim]
+#             product_of_rest_dims = prod(rest_dim_sizes)
+
+#             out_features = weight.shape[0]
+#             saving_flops = 2 * len(prune_channels) * product_of_rest_dims * out_features
+#         elif layer_type == 'conv2d':
+#             saving_flops = 0
+#         else:
+#             raise ValueError('Not valid layer type')
+#         # rest_dims = tuple(i for i in range(h.dim()) if i != prune_dim)
+#         # prune_eles = len(prune_channels) * reduce(lambda x, y: x * y, h.shape[rest_dims])
+#         return saving_flops
 
 
     # def cal_saving_flops(self, h, prune_dim, prune_channels, layer_type, layer_info):

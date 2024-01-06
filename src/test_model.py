@@ -44,15 +44,14 @@ def runExperiment():
     torch.cuda.manual_seed(cfg['seed'])
     result_path = os.path.join('output', 'result')
     makedir_exist_ok(result_path)
+
+    cfg['epoch'] = 0 
+
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
     dataset = process_dataset(dataset, tokenizer)
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
-    cfg['epoch'] = 0
-
-    model, tokenizer = make_model(cfg['model_name'])
-    
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     model_prof = FlopsProfiler(model)
@@ -60,8 +59,11 @@ def runExperiment():
     test(data_loader['test'], model, model_prof, metric, test_logger)
     vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
 
+    dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
-    
+    dataset = process_dataset(dataset, tokenizer)
+    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+    metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     model = make_prune_model(model)

@@ -101,12 +101,19 @@ class Perplexity:
         return
     
     def add(self, input, output):
-        loss = output.item()
+        loss = output['loss'].item()
         self.loss_list.append(loss)
         return
        
     def __call__(self, *args, **kwargs):
-        return np.exp(np.array(self.loss_list).mean())
+        # print('self.loss_list', self.loss_list, torch.tensor(self.loss_list))
+        # print('Perplexity', torch.mean(torch.tensor(self.loss_list)))
+        # print('res', torch.exp(torch.mean(torch.tensor(self.loss_list))))
+        # print('0', self.loss_list)
+        # print('a', np.array(self.loss_list).mean())
+        # print('res', torch.exp(torch.tensor(np.array(self.loss_list).mean())))
+        return torch.exp(torch.tensor(np.array(self.loss_list).mean())).item()
+        # return torch.exp(torch.mean(torch.tensor(self.loss_list))).item()
 
 
 class McAccuracy:
@@ -217,8 +224,9 @@ class Metric:
                 if m == 'Loss':
                     metric[split][m] = {'mode': 'batch', 'metric': (lambda input, output: recur(Loss, output['loss']))}
                 elif m == 'Perplexity':
-                    metric[split][m] = {'mode': 'full', 'metric': (lambda input,
-                                                                           output: recur(Perplexity, output['loss']))}
+                    # metric[split][m] = {'mode': 'batch', 'metric': (lambda input,
+                    #                                                        output: recur(Perplexity, output['loss']))}
+                    metric[split][m] = {'mode': 'full', 'metric': Perplexity()}
                 elif m == 'Accuracy':
                     metric[split][m] = {'mode': 'batch',
                                         'metric': (

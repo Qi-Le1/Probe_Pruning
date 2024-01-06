@@ -298,16 +298,15 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     processed_calibrate_sample_num += 1
                     if processed_calibrate_sample_num > cfg['nsamples']:
                         return model_inputs
+                    
                     i = random.randint(0, trainenc.input_ids.shape[1] - max_length - 1)
                     j = i + max_length
-                    inp = trainenc.input_ids[:, i:j]
+                    inp = trainenc.input_ids[0][i:j]
                     tar = inp.clone()
-                    tar[:, :-1] = -100
-                    
+                    tar[:-1] = -100
                     model_inputs['input_ids'].append(inp)
                     model_inputs['attention_mask'].append(trainenc.attention_mask[:, i:j])
                     model_inputs['labels'].append(tar)
-
                 return model_inputs
 
             processed_dataset = {}
@@ -331,7 +330,8 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
             #     keep_in_memory=True,
             # )
     return processed_dataset
-    
+
+processed_wikitext_sample_num = 0
 def process_dataset(dataset, tokenizer):
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
         text_column = cfg['text_column']
@@ -472,14 +472,15 @@ def process_dataset(dataset, tokenizer):
             )
             cfg['max_new_tokens'] = 40
         elif cfg['data_name'] == 'wikitext':
+
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
             def preprocess_function_test(examples):   
                 all_text = "\n\n".join(examples[text_column[0]])
-        
+
                 model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
 
-                input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
+                input_ids = model_inputs['input_ids'][0]
                 attention_mask = model_inputs['attention_mask'][0]
 
                 input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
@@ -491,7 +492,6 @@ def process_dataset(dataset, tokenizer):
                         final_inputs['input_ids'].append(input_chunks[i])
                         final_inputs['attention_mask'].append(mask_chunks[i])
                         labels = copy.deepcopy(input_chunks[i])
-                        labels[:-1] = -100
                         final_inputs['labels'].append(labels)
                 
                 return final_inputs

@@ -9,6 +9,7 @@ def process_control():
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
+    cfg['seq_len'] = int(cfg['control']['seq_len'])
 
     prune_metric_list = cfg['control']['prune_metric'].split('+')
     cfg['prune_metric'] = prune_metric_list[0]
@@ -19,6 +20,13 @@ def process_control():
 
     prune_name_list = cfg['control']['prune_name'].split('+')
     cfg['prune_name'] = prune_name_list[0]
+    prune_name = cfg['prune_name'].split('-')
+    if len(prune_name) > 1:
+        cfg['prune_name'] = prune_name[0]
+        cfg['attn_pq_beta'] = float(prune_name[1])
+        cfg['global_pq_beta'] = cfg['attn_pq_beta'] 
+        cfg['mlp_pq_beta'] = float(prune_name[2]) if len(prune_name) > 2 else None
+
     cfg['prune_tgt'] = prune_name_list[1]
     if cfg['prune_tgt'] == 'w':
         cfg['prune_tgt'] = 'weight'
@@ -52,7 +60,7 @@ def process_control():
 
     make_data_name()
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i', 'mc']:
-        cfg['pq_beta'] = 0.5
+        cfg['pq_beta'] = 0.7
         cfg['collate_mode'] = 'transformer'
         cfg['bart-base'] = {'max_length': 128}
         cfg['roberta-base'] = {'max_length': 128}
@@ -83,7 +91,7 @@ def process_control():
     model_name = cfg['model_name']
     if model_name not in cfg:
         cfg[model_name] = {}
-    cfg[model_name]['shuffle'] = {'train': True, 'test': False}
+    cfg[model_name]['shuffle'] = {'train': False, 'test': False}
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
     elif cfg['task_name'] in ['ic']:
@@ -356,6 +364,12 @@ TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
 }
 
 TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
+    "opt": [ "fc1"],
+    "llama": [ "gate_proj", "up_proj"],
+    
+}
+
+TRANSFORMERS_MODELS_PRUNE_OUTPUT_DIM_MAPPING = {
     "opt": ["out_proj", "fc2"],
     "llama": ["o_proj", "down_proj"],
     'resnet9': ['.shortcut', '.conv1', '.conv2'],
@@ -363,8 +377,6 @@ TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
     'resnet18': ['.shortcut', '.conv1', '.conv2'],
     'test': ['fc']
 }
-
-
 # gpt2 layer
 '''
 key:  transformer.h.3 <class 'transformers.models.gpt2.modeling_gpt2.GPT2Block'>

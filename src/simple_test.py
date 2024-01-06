@@ -700,14 +700,17 @@ from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelF
 traindata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
 testdata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
 
-# Encode datasets
+# # Encode datasets
 tokenizer = LlamaTokenizer.from_pretrained('output/llama-2-7b',
                                                    padding_side='left')
 trainenc = tokenizer(" ".join(traindata['text']), return_tensors='pt')
 temp = trainenc.input_ids.shape
 a = 5
 
-
+a = [1,2,3]
+b = torch.tensor(a)
+c = torch.mean(b)
+d = 6
 # # print(pq_indices[:10])
 # print(pq_indices_varying_length[0][:10])
 # def compare_1d_vector_norms(v, p, q, gamma, beta, pq_indices):

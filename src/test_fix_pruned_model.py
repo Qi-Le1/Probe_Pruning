@@ -14,7 +14,7 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_calibration_prune_model, calibrate_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, MULTIGPUS_MODEL_NAME_LIST
+    record_pruing_info, get_model_profile, summarize_info_list, MULTIGPUS_MODEL_NAME_LIST
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 
 
@@ -48,6 +48,9 @@ def runExperiment():
     torch.cuda.manual_seed(cfg['seed'])
     result_path = os.path.join('output', 'result')
     makedir_exist_ok(result_path)
+
+    cfg['epoch'] = 0  
+
     model, tokenizer = make_model(cfg['model_name'])
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     dataset = process_dataset(dataset, tokenizer)
@@ -55,33 +58,29 @@ def runExperiment():
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
-    cfg['epoch'] = 0  
-
-    # model_prof = FlopsProfiler(model)
-    # test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    # test(data_loader['test'], model, model_prof, metric, test_logger)
-    # vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
-
-   
+    model_prof = FlopsProfiler(model)
+    test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
+    test(data_loader['test'], model, model_prof, metric, test_logger)
+    vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
 
     model, tokenizer = make_model(cfg['model_name'])
-
-    
-
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     dataset = process_dataset(dataset, tokenizer)
+    metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     calibration_data_loader = make_calibration_dataloader(tokenizer)
+    print('calibration_data_loaderlen', calibration_data_loader['train'], len(calibration_data_loader['train']))
     model = make_calibration_prune_model(model)
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     if cfg['model_name'] in MULTIGPUS_MODEL_NAME_LIST:
         device = model.hf_device_map["lm_head"] # for 30b and 65b we use device_map to load onto multiple A6000 GPUs, thus the processing here.
     # wrap with EWI layer, so pass model.model
-    calibrate_model(model.model, tokenizer, calibration_data_loader['train'], device)
+    logger_info = calibrate_model(model.model, tokenizer, calibration_data_loader['train'], device)
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
+    test_logger.append(logger_info, 'test', 1)
     test(data_loader['test'], model, model_prof, metric, test_logger)
     pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
     
@@ -144,7 +143,7 @@ def test(data_loader, model, model_prof, metric, logger):
                                                         no_repeat_ngram_size=2)
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
-            print('evaluation_for_batch', evaluation)
+            # print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
             # return
@@ -155,6 +154,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
+            # break
         evaluation = metric.evaluate('test', 'full')
         print('evaluation_for_full', evaluation)
         logger.append(evaluation, 'test')

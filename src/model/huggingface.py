@@ -119,7 +119,11 @@ def make_hf_model(model_name, sub_model_name=None):
         padding_side = "right"
 
     if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
-        cfg[cfg['model_name']]['max_length'] = model.config.max_position_embeddings
+        if cfg['seq_len'] > model.config.max_position_embeddings:
+            raise ValueError(
+                f"seq_len ({cfg['seq_len']}) is larger than max_position_embeddings ({model.config.max_position_embeddings})."
+            )
+        cfg[cfg['model_name']]['max_length'] = cfg['seq_len'] 
         # cfg[cfg['model_name']]['max_length'] = 128
         # cfg[cfg['model_name']]['max_length'] = 512
         print('max_length', cfg[cfg['model_name']]['max_length'])

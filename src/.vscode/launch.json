@@ -19,6 +19,19 @@
         },
 
         {
+            "name": "process_fix_pruned_llm",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--type",
+                "observe_fix_pruned_llm",
+            ],
+        },
+
+        {
             "name": "process_computer_vision",
             "type": "python",
             "request": "launch",
