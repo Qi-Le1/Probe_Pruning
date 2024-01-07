@@ -1,4 +1,5 @@
 import os
+import re
 import math
 import itertools
 import json
@@ -17,6 +18,7 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 parser = argparse.ArgumentParser(description='analyze_data')
 parser.add_argument('--type', default='dp', type=str)
+parser.add_argument('--detail', default='True', type=str)
 args = vars(parser.parse_args())
 
 save_format = 'png'
@@ -26,11 +28,7 @@ vis_path = './output/vis/{}'.format(save_format)
 num_experiments = 1
 exp = [str(x) for x in list(range(num_experiments))]
 
-performance_metric_max_dict = {
-    'wikitext-2v1': 100,
-    'CIFAR10': 100,
-    'CIFAR100': 90,
-}
+
 
 def make_controls(control_name):
     control_names = []
@@ -287,20 +285,61 @@ def make_control_list(file):
         # controls.extend(CIFAR10_controls_9)
     elif file == 'observe_fix_pruned_llm':
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4]],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4]],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128'], [f'pq-nobias+NA+{x}+-100+NA' for x in [0]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+24', 'WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
                     ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
                 ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128'], [f'pq-nobias+NA+{x}+-100+NA' for x in [0]],
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], [ 'WIFN+128'], [f'pqnobias-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+        
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobias-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobiasglobal-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
                 ['default']]]
         CIFAR10_controls_9 = make_controls( control_name)
         controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobiasnormhead-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', ], ['WIFV+24',], [f'flap+NA+{x}+-100+NA' for x in [0.3, 0.4, ]],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
     return controls
 
 
@@ -375,8 +414,12 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
                 #     processed_result_history[metric_name]['history'][exp_idx] = base_result['logger']['train'].history[k]
                 
             for k in base_result['logger']['test'].history:
-                # if 'norm_across_other_dims' in k:
-                #     continue
+                if args['detail'].lower() == 'false':
+                    if 'pq_indices_varying_lengths' in k:
+                        continue
+                    if 'norm_across_other_dims' in k:
+                        continue
+                print('k', k)
                 metric_name = k
                 if metric_name not in processed_result_exp:
                     # processed_result_exp[metric_name] = {'exp': [None for _ in range(num_experiments)]}
@@ -457,6 +500,10 @@ def summarize_result(processed_result):
             # if 'norm_across_other_dims' in k:
             #     print('kkkk', k)
             #     continue
+            # if 'pq_indices_varying_lengths' in k:
+            #     continue
+            # if 'norm_across_other_dims' in k:
+            #     continue
             summarize_result(v)
         return
     return
@@ -505,10 +552,10 @@ def make_df_history(extracted_processed_result_history):
             for k in extracted_processed_result_history[exp_name]:
                 # print(f'k: {k}')
                 index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, k])]
-                # print(k)
+                # print(k)  
                 df[df_name].append(
                     pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
-        if len(control) == 10:
+        elif len(control) == 10:
             data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ  = control
             df_name = '_'.join(
                 [data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ])
@@ -539,6 +586,12 @@ def label_exists(plt, label):
         existing_labels = [t.get_text() for t in legend.get_texts()]
         return label in existing_labels
     return False
+
+performance_metric_max_dict = {
+    'wikitext-2v1': 100,
+    'CIFAR10': 100,
+    'CIFAR100': 90,
+}
 
 def make_vis(df_exp, df_history):
     color = {
@@ -589,19 +642,32 @@ def make_vis(df_exp, df_history):
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
             color[f"{name}_{hyper}"] = color_patterns.get(hyper, 'orange')
 
+    backup_color_set = {'orange', 'green', 'red', 'purple', 'black', 'brown', 'crimson', 'teal', 'dodgerblue', 'sienna', 'darkseagreen'}
+    backup_linestyle_set = {(0, (5, 5, 4)), (6, (1, 1, 1, 1)), (0, (1, 1, 10)), (0, (2, 2, 2)), (5, (5, 1)), (10, (5, 1)), (10, (5, 3)), (0, (1, 1))}
     color['Our'] = 'orange'
     color['Mag'] = 'green'
     color['Dense'] = 'red'
+    color['flap'] = 'orange'
+    color['wandasp'] = 'green'
+    color['pqnobias-0.5-0.5'] = 'red'
+    color['pqnobiasglobal-0.5-0.5'] = 'purple'
+    color['pqnobiasnormhead-0.5-0.5'] = 'brown'
     linestyle['Our'] = (0, (1, 1, 10))
     linestyle['Mag'] = (6, (1, 1, 1, 1))
     linestyle['Dense'] = '--'
+    linestyle['flap'] = '-.'
+    linestyle['wandasp'] = '-.'
+    # linestyle['pqnobias-0.5-0.5'] = '-.'
+    # linestyle['pqnobiasglobal-0.5-0.5'] = '-.'
     loc_dict = {'test/Rouge': 'lower left', 'test/ROUGE': 'lower left', 'test/GLUE': 'lower left', 'test/Accuracy': 'lower left', 'test/Perplexity': 'lower left', 'label': 'center left'}
     fontsize = {'legend': 17, 'label': 17, 'ticks': 14, 'group_x_ticks': 8}
     metric_name_list = ['test/Rouge', 'test/ROUGE', 'test/GLUE', 'test/Accuracy', 'test/Perplexity']
     
-    plot_layer_detail = False
+    plot_layer_detail = True
+    if 'detail' in args:
+        plot_layer_detail = args['detail'].lower() == 'false'
     # performance_metric_max = None
-    y_max_in_graph = 60
+    y_max_in_graph = 100
     fig = {}
     reorder_fig = []
     global performance_metric_max_dict
@@ -611,8 +677,15 @@ def make_vis(df_exp, df_history):
             return False
 
         if model_name in total_layers:
-            layer_number = int(index.split(".layers.")[1].split(".")[0])
-            if layer_number <= math.ceil(total_layers[model_name] * 0) or math.ceil(layer_number >= total_layers[model_name] * 1):
+            # layer_number = int(index.split(".layers.")[1].split(".")[0])
+            layer_number = index.split('/')[1]
+
+            # Find all numbers in the string
+            layer_number = re.findall(r'\d+', layer_number)
+
+            # Join the number strings and convert to an integer
+            layer_number = int(''.join(layer_number)) if layer_number else None
+            if layer_number <= math.ceil(total_layers[model_name] * 0.05) or math.ceil(layer_number >= total_layers[model_name] * 0.95):
                 # print(f'layer_number: {layer_number}')
                 return True
         # print(f'False layer_number: {layer_number}')
@@ -622,15 +695,21 @@ def make_vis(df_exp, df_history):
 
 
     def draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy'):
-        color = color.get(key_for_dict, random.choice(['orange', 'green', 'red', 'purple', 'black']))
-        linestyle = linestyle.get(key_for_dict, random.choice(['-', '--', ':', '-.']))
+        fig_color = color.get(key_for_dict, random.choice(list(backup_color_set)))
+        fig_linestyle = linestyle.get(key_for_dict, random.choice(list(backup_linestyle_set)))
+        if key_for_dict not in color:
+            color[key_for_dict] = fig_color
+            linestyle[key_for_dict] = fig_linestyle
+
+            backup_color_set.remove(fig_color)
+            backup_linestyle_set.remove(fig_linestyle)
         if label_exists(plt, key_for_dict):
-            plt.scatter(x, y, color=color, linestyle=linestyle)
+            plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
         else:
-            plt.scatter(x, y, color=color, linestyle=linestyle, label=key_for_dict)
-        plt.plot(x, y, color=color, linestyle=linestyle)
+            plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle, label=key_for_dict)
+        plt.plot(x, y, color=fig_color, linestyle=fig_linestyle)
         # plt.fill_between(x, (y - yerr), (y + yerr), color=color[algo_mode], alpha=.1)
-        plt.errorbar(x, y, yerr=yerr, color=color, linestyle=linestyle)
+        plt.errorbar(x, y, yerr=yerr, color=fig_color, linestyle=fig_linestyle)
         plt.xlabel(x_label, fontsize=fontsize['label'])
         plt.ylabel(y_label, fontsize=fontsize['label'])
         plt.xticks(fontsize=fontsize['ticks'])
@@ -664,19 +743,25 @@ def make_vis(df_exp, df_history):
 
 
     def draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, annotation='default', x_label='Activation Layers in Order', y_label='Accuracy'):
-        color = color.get(key_for_dict, random.choice(['orange', 'green', 'red', 'purple', 'black']))
-        linestyle = linestyle.get(key_for_dict, random.choice(['-', '--', ':', '-.']))
+        fig_color = color.get(key_for_dict, random.choice(list(backup_color_set)))
+        fig_linestyle = linestyle.get(key_for_dict, random.choice(list(backup_linestyle_set)))
+        if key_for_dict not in color:
+            color[key_for_dict] = fig_color
+            linestyle[key_for_dict] = fig_linestyle
+
+            backup_color_set.remove(fig_color)
+            backup_linestyle_set.remove(fig_linestyle)
         # temp = range(len(x))
         if label_exists(plt, key_for_dict):
-            plt.scatter(x, y, color=color, linestyle=linestyle)
+            plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
         else:
-            plt.scatter(x, y, color=color, linestyle=linestyle, label=key_for_dict)
+            plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle, label=key_for_dict)
         # plt.plot(x, y, color=color, linestyle=linestyle)
         # TODO: comment out
         # plt.annotate(annotation, (x, y))
         # plt.fill_between(x, (y - yerr), (y + yerr), color=color[algo_mode], alpha=.1)
 
-        plt.errorbar(x, y, yerr=yerr, color=color, linestyle=linestyle)
+        plt.errorbar(x, y, yerr=yerr, color=fig_color, linestyle=fig_linestyle)
         
         plt.xlabel(x_label, fontsize=fontsize['label'])
         plt.ylabel(y_label, fontsize=fontsize['label'])
@@ -718,12 +803,12 @@ def make_vis(df_exp, df_history):
             elif prune_tgt == 'h':
                 prune_tgt = 'hidden_repr'
             else:
-                raise ValueError('Not valid prune target')
+                pass
             prune_hyper = prune_name_list[2] if len(prune_name_list) > 2 else '0'
             prune_dim = prune_name_list[3] if len(prune_name_list) > 3 else '0'
             prune_dim_select_mode = prune_name_list[4] if len(prune_name_list) > 4 else 'max'
             
-            
+            nsamples = prune_metric.split('+')[1]
             # if isinstance(df_history[df_name], list):
             #     # Handle the case where it's a list
             #     temp = df_history[df_name]
@@ -763,48 +848,54 @@ def make_vis(df_exp, df_history):
                     
                     if 'mean' not in index:
                         continue
-
+                    
+                    print('index', index)
                     index_list = index.split('/')
                     temp_key = index_list[-1]
 
-                    if 'norm_across_other_dims_mean' in index:
-                        if not is_valid_layer_for_detailed_info(index, model_name):
-                            continue
-                        # temp_key = index_list[-1]
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:',temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        data = row.tolist()
-                        # key_for_dict = f"{prune_name}_{prune_hyper}"
-                        draw_histogram(plt, data)
-                        zero_num = np.array(data)[np.array(data) == 0].shape[0]
-                        plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
+                    # if 'norm_across_other_dims_mean' in index:
+                    #     if not is_valid_layer_for_detailed_info(index, model_name):
+                    #         continue
+                    #     # temp_key = index_list[-1]
+                        
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:',temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     data = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                    #     # key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     draw_histogram(plt, data)
+                    #     zero_num = np.array(data)[np.array(data) == 0].shape[0]
+                    #     plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
                     
-                    # only for y: pq, x: eta
-                    if 'pq_indices_mean' in index:
-                        # one prune_hyper for all layers (1 figure the whole model for each prune_hyper)
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:', 'all_layer_pq_indices_mean'])
-                        fig[fig_name] = plt.figure(fig_name)
-                        x = pq_indices_order
-                        pq_indices_order += 1
-                        y = row.tolist()[0]
-                        key_for_dict = f"{prune_name}_{prune_hyper}"
-                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'PQ_index')
+                    # # only for y: pq, x: eta
+                    # if 'pq_indices_mean' in index:
+                    #     # one prune_hyper for all layers (1 figure the whole model for each prune_hyper)
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:', 'all_layer_pq_indices_mean'])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     x = pq_indices_order
+                    #     pq_indices_order += 1
+                    #     y = row.tolist()[0]
+                    #     print('y', y)
+                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'PQ_index')
 
 
-                    if '_pq_lower_bound_mean' in index:
-                        if not is_valid_layer_for_detailed_info(index, model_name):
-                            continue
-                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-                        cur_temp_key = temp_key.replace('_pq_lower_bound_mean', '_pq_indices_varying_lengths_mean')
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:', cur_temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        x = int(row.tolist()[0])
-                        print('lower_bound', x)
-                        plt.text(x, 0.03, f'B', ha='center', va='bottom')
+                    # if '_pq_lower_bound_mean' in index:
+                    #     if not is_valid_layer_for_detailed_info(index, model_name):
+                    #         continue
+                    #     # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                    #     cur_temp_key = temp_key.replace('_pq_lower_bound_mean', '_pq_indices_varying_lengths_mean')
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:', cur_temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     x = int(row.tolist()[0])
+                    #     print('lower_bound', x)
+                    #     plt.text(x, 0.03, f'B', ha='center', va='bottom')
 
                     # if "_pq_indices_varying_lengths_mean" in index:
                     #     if not is_valid_layer_for_detailed_info(index, model_name):
                     #         continue
+
+                    #     if 'attn' in index:
+                    #         a = 5
                     #     # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
                     #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG:', temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
@@ -819,18 +910,29 @@ def make_vis(df_exp, df_history):
                     #     x = list(range(len(row.tolist())))
                     #     y = row.tolist()
                     #     y = np.log(y)
+                    #     y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
                     #     key_for_dict = f"{prune_name}_{prune_hyper}"
                     #     draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index (log scale)')
 
-                    if 'pruned_ratio_mean' in index:
-                        # one prune_hyper for all layers
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:','all_layer_pruned_ratio_mean'])
-                        fig[fig_name] = plt.figure(fig_name)
-                        x = pruned_ratio_order
-                        pruned_ratio_order += 1
-                        y = row.tolist()[0]
-                        key_for_dict = f"{prune_name}_{prune_hyper}"
-                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'Pruned ratio')
+                    # if 'pruned_FLOPs_ratio_mean' in index:
+                    #     # one prune_hyper for all layers
+                    #     if 'wanda' in prune_name:
+                    #         continue
+
+                    #     if '2048' not in seq_len:
+                    #         continue
+
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, nsamples, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:','all_layer_pruned_ratio_mean'])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     x = pruned_ratio_order
+                    #     pruned_ratio_order += 1
+                    #     y = row.tolist()[0]
+                    #     if 'attn' in index:
+                    #         key_for_dict = 'attn'
+                    #     else:
+                    #         key_for_dict = 'mlp'
+                    #     # key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'Remaining ratio')
 
                         # if not is_valid_layer_for_detailed_info(index, model_name):
                         #     continue
@@ -860,19 +962,19 @@ def make_vis(df_exp, df_history):
                             # prune_tgt, 
                             # prune_dim, 
                             # batch_integ, 
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, prune_metric,   prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_prunedflops[1]
                             y = performance_vs_prunedflops[0]
-                            key_for_dict = f"{prune_name}_{prune_hyper}"
-                            if 'pq' in prune_name:
-                                key_for_dict = f"Our"
-                            elif 'mag' in prune_name:
-                                # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
-                                if float(prune_hyper) == 0:
-                                    key_for_dict = f"Dense"
-                                else:
-                                    key_for_dict = f"Mag"
+                            key_for_dict = f"{prune_name}"
+                            # if 'pq' in prune_name:
+                            #     key_for_dict = f"Our"
+                            # elif 'mag' in prune_name:
+                            #     # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
+                            #     if float(prune_hyper) == 0:
+                            #         key_for_dict = f"Dense"
+                            #     else:
+                            #         key_for_dict = f"Mag"
                             draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'Relative FLOPs ratio', flops_metric_name)
                             performance_vs_prunedflops = [None, None]
 
@@ -1300,7 +1402,7 @@ def make_vis(df_exp, df_history):
         FIG_NAME = fig_name.split('FIG:')[-1]
         data_name = fig_name_list[0]
         model_name = fig_name_list[1]
-        vis_path = os.path.join('output', 'vis', '{}'.format(save_format), data_name, model_name, FIG_NAME)
+        vis_path = os.path.join('output', 'vis', '{}'.format(save_format), args['type'], data_name, model_name, FIG_NAME)
         fig_path = '{}/{}.{}'.format(vis_path, fig_name, save_format)
         makedir_exist_ok(vis_path)
         plt.savefig(fig_path, dpi=400, bbox_inches='tight', pad_inches=0)

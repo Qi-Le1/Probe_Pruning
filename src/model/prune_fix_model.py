@@ -340,6 +340,7 @@ def compress(idx, layer, attn_mask, mlp_mask, attn_mean_inp, mlp_mean_inp, devic
             #         print('before pruning layer.mlp.up_proj', layer.mlp.up_proj.weight.data[i, :100])
             #     else:
             #         break
+            # print('layer.mlp.up_proj.weight.data.shape', layer.mlp.up_proj.weight.data.shape, torch.where(mlp_mask)[0].shape)
             layer.mlp.up_proj.weight.data = layer.mlp.up_proj.weight.data[torch.where(mlp_mask)[0]]
             # print('after pruning layer.mlp.up_proj', layer.mlp.up_proj.weight.data.shape)
             # for i in range(layer.mlp.up_proj.weight.data.shape[0]):
@@ -347,6 +348,7 @@ def compress(idx, layer, attn_mask, mlp_mask, attn_mean_inp, mlp_mean_inp, devic
             #         print('after pruning layer.mlp.up_proj', layer.mlp.up_proj.weight.data[i, :100])
             #     else:
             #         break
+            # print('layer.mlp.up_proj.weight.data.shape', layer.mlp.gate_proj.weight.data.shape, torch.where(mlp_mask)[0].shape)
             layer.mlp.gate_proj.weight.data = layer.mlp.gate_proj.weight.data[torch.where(mlp_mask)[0]]
             
             # Update output dimensions of up and gate projections based on the mlp mask
@@ -532,11 +534,11 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
             compression_weight = torch.ones_like(indices)
             compression_weight[indices < attn_metric.numel()] = 512.0 / 3
 
-            print('attn_metric.numel()', attn_metric.numel())
-            print('mlp_metric.numel()', mlp_metric.numel())
-            print('compression_weight', compression_weight.shape, compression_weight, torch.sum(compression_weight), torch.sum(compression_weight)*(1 - cfg['prune_hyper']) )
-            print('zzz', torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper']) ))
-            print('final index', torch.argmin(torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper']) )))
+            # print('attn_metric.numel()', attn_metric.numel())
+            # print('mlp_metric.numel()', mlp_metric.numel())
+            # print('compression_weight', compression_weight.shape, compression_weight, torch.sum(compression_weight), torch.sum(compression_weight)*(1 - cfg['prune_hyper']) )
+            # print('zzz', torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper']) ))
+            # print('final index', torch.argmin(torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper']) )))
             threshold = sorted_prune[torch.argmin(torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper']) ))]
             attn_mask = (attn_metric > threshold)
             mlp_mask = (mlp_metric > threshold)
@@ -593,7 +595,7 @@ def parallel_cal_varying_length_info(sorted_norm, pq_p, pq_q, reversed=False):
     #     dimension = torch.arange(num_cols, 0, -1).unsqueeze(0)
     # else:
         # Create a tensor where each row starts from 1 and increases to the length of the row
-    dimension = torch.arange(1, nominator_varying_vector_norm.shape[0] + 1).unsqueeze(0).to(cfg['device'])
+    dimension = torch.arange(1, nominator_varying_vector_norm.shape[0] + 1).to(cfg['device'])
     # dimension = dimension.expand(nominator_varying_vector_norm.shape[0], -1).to(cfg['device'])
     return nominator_varying_vector_norm, denominator_varying_vector_norm, dimension
 
@@ -609,14 +611,14 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     pq_indices = (1 - dimension ** (1/pq_q - 1/pq_p) * (norm_p / norm_q))
     
     # add additional dimension if dimension is 0
-    if pq_indices.dim() == 0 or pq_indices.dim() == 1:
-        pq_indices.unsqueeze_(0)
+    # if pq_indices.dim() == 0 or pq_indices.dim() == 1:
+    #     pq_indices.unsqueeze_(0)
     print('pq_indices', pq_indices, dimension)
     if torch.isnan(pq_indices).any():
         raise ValueError('pq_indices contains nan values')
 
-    lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
-    print('lower_bound', lower_bound)
+    lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p)))
+    print('lower_bound', lower_bound, dimension)
     beta_tensor = torch.full_like(lower_bound, pq_beta)
     prune_channels_count = torch.floor(dimension * torch.min(pq_gamma * (1 - lower_bound / dimension), beta_tensor))
     print('prune_channels_count', prune_channels_count)
@@ -713,42 +715,49 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
                         W_metric = W_metric.reshape(-1, 128).sum(dim=1)
                     # print('W_metric2', W_metric.shape, W_metric, type(W_metric))
                     prune_count, pq_indices = cal_prune_count_base_on_pq(torch.sort(W_metric.cuda())[0], pq_p, pq_q, eta, pq_attn_beta, pq_gamma)
-                    print('atten', torch.sort(W_metric.cuda())[0], prune_count)
+                    print('atten', torch.sort(W_metric.cuda())[0], W_metric.tolist(), prune_count)
                     thresh = torch.sort(W_metric.cuda())[0][prune_count].cpu()
                     W_mask = (W_metric>=thresh)
-                    compress(idx,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
+                    compress(i,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
 
                     nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(torch.sort(W_metric.cuda())[0], pq_p, pq_q)
                     # print('dimension', dimension.shape, dimension)
                     pq_indices_varying_length = (1 - dimension ** (1/pq_q - 1/pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
 
                     info = {
-                        f'{logger_key}_norm_across_other_dims': W_metric.mean(dim=0).tolist(),
-                        f'{logger_key}_pq_indices_varying_lengths"': pq_indices_varying_length.mean(dim=0).tolist(),
-                        f'{logger_key}_pq_lower_bound"': prune_count.item(),
-                        f'{logger_key}_pq_indices"': pq_indices.mean(dim=0).squeeze(0).tolist()
+                        f'{logger_key}_norm_across_other_dims': W_metric.tolist(),
+                        f'{logger_key}_pq_indices_varying_lengths': pq_indices_varying_length.tolist(),
+                        f'{logger_key}_pq_lower_bound': prune_count,
+                        f'{logger_key}_pq_indices': pq_indices.tolist()
                     }
                     update_pruning_info(logger_info, info)
+                    # print('attnW_metric.tolist()', W_metric.tolist())
+                    # print('attnpq_indices_varying_length.tolist()',  pq_indices_varying_length.tolist())
             else:
                 if 'global' in cfg['prune_name']:
                     mlp_metric_list.append(W_metric.cpu())
                 else:
-                    prune_count, pq_indices = cal_prune_count_base_on_pq(torch.sort(W_metric.cuda())[0], pq_p, pq_q, eta, pq_mlp_beta, pq_gamma)
-                    print('mlp', torch.sort(W_metric.cuda())[0], prune_count)
-                    thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
+                    # print('mlpW_metric', W_metric.shape, W_metric)
+                    sorted_prune = torch.sort(W_metric.cuda())[0]
+                    prune_count, pq_indices = cal_prune_count_base_on_pq(sorted_prune, pq_p, pq_q, eta, pq_mlp_beta, pq_gamma)
+                    # print('mlp', sorted_prune, sorted_prune.shape, prune_count)
+                    thresh = sorted_prune[prune_count].cpu()
                     W_mask = (W_metric>=thresh)
-                    compress(idx,layer, None, W_mask, None, None, dev, bias=False, unstr=False)
+                    # print('W_mask', W_mask.shape, )
+                    compress(i,layer, None, W_mask, None, None, dev, bias=False, unstr=False)
 
                     nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(torch.sort(W_metric.cuda())[0], pq_p, pq_q)
                     # print('dimension', dimension.shape, dimension)
                     pq_indices_varying_length = (1 - dimension ** (1/pq_q - 1/pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
                     info = {
-                        f'{logger_key}_norm_across_other_dims': W_metric.mean(dim=0).tolist(),
-                        f'{logger_key}_pq_indices_varying_lengths"': pq_indices_varying_length.mean(dim=0).tolist(),
-                        f'{logger_key}_pq_lower_bound"': prune_count.item(),
-                        f'{logger_key}_pq_indices"': pq_indices.mean(dim=0).squeeze(0).tolist()
+                        f'{logger_key}_norm_across_other_dims': W_metric.tolist(),
+                        f'{logger_key}_pq_indices_varying_lengths': pq_indices_varying_length.tolist(),
+                        f'{logger_key}_pq_lower_bound': prune_count,
+                        f'{logger_key}_pq_indices': pq_indices.tolist()
                     }
                     update_pruning_info(logger_info, info)
+                    # print('mlpW_metric.tolist()', W_metric.tolist())
+                    # print(' mlppq_indices_varying_length.tolist()',  pq_indices_varying_length.tolist())
                     
             wrapped_layers[name].free()
 
@@ -781,10 +790,10 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
         pq_indices_varying_length = (1 - dimension ** (1/pq_q - 1/pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
         
         info = {
-            f'global_norm_across_other_dims': W_metric.mean(dim=0).tolist(),
-            f'global_pq_indices_varying_lengths"': pq_indices_varying_length.mean(dim=0).tolist(),
-            f'global_pq_lower_bound"': prune_count.item(),
-            f'global_pq_indices"': pq_indices.mean(dim=0).squeeze(0).tolist()
+            f'global_norm_across_other_dims': W_metric.tolist(),
+            f'global_pq_indices_varying_lengths': pq_indices_varying_length.tolist(),
+            f'global_pq_lower_bound': prune_count,
+            f'global_pq_indices': pq_indices.tolist()
         }
         update_pruning_info(logger_info, info)
         for idx in range(len(layers)):
@@ -881,7 +890,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
                 W_mask = (W_metric>=thresh)
                 compress(i,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
             else:
-                W_metric = W_metric
+                # print('mlpW_metric', W_metric.shape, W_metric, int(W_metric.numel()))
                 thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
                 W_mask = (W_metric>=thresh)
                 compress(i,layer, None, W_mask, None, None, dev, bias=False, unstr=False)

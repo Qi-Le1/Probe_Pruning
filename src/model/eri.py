@@ -44,7 +44,9 @@ class EriModel(torch.nn.Module):
         loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
 
         if cfg['prune_tgt'] == 'hidden_repr':
-            pruning_module = HiddenRepresentationPruning(cfg, key)
+            in_features = getattr(target, 'in_features', None)
+            out_features = getattr(target, 'out_features', None)
+            pruning_module = HiddenRepresentationPruning(cfg, key,target.weight.device, in_features, out_features)
         elif cfg['prune_tgt'] == 'weight':
             pruning_module = WeightPruning(cfg, key)
         else:
@@ -373,11 +375,20 @@ class Linear(nn.Linear, EriLayer):
             }
             # if 'out' in cfg['prune_name'] and self.prune_out_dim == False:
 
-            pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key)
-            if 'opt' in cfg['model_name']:
-                pruned_h = pruned_h.view(-1, pruned_h.size(-1))
-            weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
+            if 'out' in cfg['prune_name'] and self.prune_out_dim == False:
+                non_zero_indices = torch.nonzero(x[..., -1], as_tuple=True)[0]
+
+                # Extract corresponding weights using index_select
+                # Assuming we're selecting along the last dimension of self.weight
+                # The dimension number might need to be adjusted depending on the shape of self.weight
+                weight = torch.index_select(self.weight, dim=-1, index=non_zero_indices)
+            else:
+                pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key)
+                if 'opt' in cfg['model_name']:
+                    pruned_h = pruned_h.view(-1, pruned_h.size(-1))
+                weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
             
+
             result = F.linear(pruned_h, weight, bias=self.bias)
             if 'out' in cfg['prune_name'] and self.prune_out_dim:
 
@@ -547,11 +558,12 @@ class BasePruning:
     
 class HiddenRepresentationPruning(BasePruning):
 
-    def __init__(self, cfg, key):
-        BasePruning.__init__(self, cfg, in_dim, out_dim, device)
+    def __init__(self, cfg, key, device, in_dim=None, out_dim=None):
+        BasePruning.__init__(self, cfg)
         self.key = key
         self.device = device
-        self.scaler_in = torch.zeros((self.out_dim), device=self.device)
+        if out_dim:
+            self.scaler_in = torch.zeros((self.out_dim), device=self.device)
         self.nsamples = 0
 
     def batch_pruning(self, h, layer_type, layer_info, key):
@@ -765,9 +777,10 @@ class HiddenRepresentationPruning(BasePruning):
                 self.logger_info_time_used += time.time() - start_time
             norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
         elif 'out' in cfg['prune_name'] and cfg['prune_metric'] == 'WIFN':
-            self.scaler_in *= self.nsamples / (self.nsamples + h.shape[0])
+            batch_size = h.shape[0]
+            self.scaler_in *= self.nsamples / (self.nsamples + batch_size)
             # self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
-            self.scaler_in += torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) ** 2 / (self.nsamples + h.shape[0])
+            self.scaler_in += torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) ** 2 / (self.nsamples + batch_size)
             norm_across_other_dims = torch.abs(layer_info['weight']) * torch.sqrt(self.scaler_in.reshape((1,-1))).mean(axis=1)
             # info[f"{key}_weight_norm_across_channel_dims"] = list(layer_info['weight_norm_across_channel_dims'])
             # print('norm_across_other_dims', norm_across_other_dims.shape, norm_across_other_dims.dim())

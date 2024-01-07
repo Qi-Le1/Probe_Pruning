@@ -475,6 +475,17 @@ def process_dataset(dataset, tokenizer):
 
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
+
+            # for _ in range(nsamples):
+            #     i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
+            #     # i = 0
+            #     j = i + seqlen
+            #     inp = trainenc.input_ids[:, i:j]
+            #     tar = inp.clone()
+            #     tar[:, :-1] = -100
+            #     trainloader.append((inp, tar))
+            # return trainloader, testenc
+
             def preprocess_function_test(examples):   
                 all_text = "\n\n".join(examples[text_column[0]])
 

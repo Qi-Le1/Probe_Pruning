@@ -364,12 +364,6 @@ TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
 }
 
 TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
-    "opt": [ "fc1"],
-    "llama": [ "gate_proj", "up_proj"],
-    
-}
-
-TRANSFORMERS_MODELS_PRUNE_OUTPUT_DIM_MAPPING = {
     "opt": ["out_proj", "fc2"],
     "llama": ["o_proj", "down_proj"],
     'resnet9': ['.shortcut', '.conv1', '.conv2'],
@@ -377,6 +371,14 @@ TRANSFORMERS_MODELS_PRUNE_OUTPUT_DIM_MAPPING = {
     'resnet18': ['.shortcut', '.conv1', '.conv2'],
     'test': ['fc']
 }
+
+TRANSFORMERS_MODELS_PRUNE_OUTPUT_DIM_MAPPING = {
+    "opt": [ "fc1"],
+    "llama": [ "gate_proj", "up_proj"],
+    
+}
+
+
 # gpt2 layer
 '''
 key:  transformer.h.3 <class 'transformers.models.gpt2.modeling_gpt2.GPT2Block'>
