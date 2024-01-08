@@ -721,9 +721,13 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
         for h in handles:
             h.remove()
 
+        standarlization = lambda x: (x - torch.mean(x, axis=0, keepdim=True)) / torch.std(x, axis=0, keepdim=True)
+
         for name in subset:
             print(f"pruning layer {i} name {name}")
             W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
+            if 'std' in cfg['prune_name']:
+                W_metric = standarlization(W_metric)
             # print('W_metric',  W_metric, type(W_metric))
             # print(W_metric.shape)
             logger_key = f"layer{i}_{name}"
@@ -849,8 +853,6 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
     model.config.use_cache = use_cache 
     torch.cuda.empty_cache()
 
-def prune_pq_bias_llama(model, tokenizer, dataloader, device=torch.device("cuda:0")):
-    return
 
 def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch.device("cuda:0")):
     """
@@ -917,14 +919,18 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
         for h in handles:
             h.remove()
 
+        standarlization = lambda x: (x - torch.mean(x, axis=0, keepdim=True)) / torch.std(x, axis=0, keepdim=True)
+
         for name in subset:
             print(f"pruning layer {i} name {name}")
             W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
+            if 'std' in cfg['prune_name']:
+                W_metric = standarlization(W_metric)
             # print('torch.abs(subset[name].weight.data)', torch.abs(subset[name].weight.data))
             # print('sqrt scalar row', torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))))
             # print('W_metric', W_metric)
-            # W_metric = torch.abs(subset[name].weight.data) * torch.sqrt(wrapped_layers[name].scaler_row.reshape((1,-1)))
-            
+            # W_metric = torch.abs(subset[name].weight.data) * torch.sqrt(wrapped_layers[name].scaler_row.reshape((1,-1)))            
+
             if name == 'self_attn.o_proj':
                 if 'global' in cfg['prune_name']:
                     attn_metric_list.append(W_metric.cpu())
@@ -952,9 +958,13 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
         
         torch.cuda.empty_cache()
 
+    standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
+
     if 'global' in cfg['prune_name']:
         if len(attn_metric_list) > 0:
             attn_metric = torch.stack(attn_metric_list)
+            if 'std' in cfg['prune_name']:
+                attn_metric = standarlization(attn_metric)
             attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
         else:
             attn_metric = None
@@ -962,6 +972,8 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
         # Check if len(mlp_metric_list) > 0 is not empty and process
         if len(mlp_metric_list) > 0:
             mlp_metric = torch.stack(mlp_metric_list)
+            if 'std' in cfg['prune_name']:
+                mlp_metric = standarlization(mlp_metric)
         else:
             mlp_metric = None
 
@@ -1021,11 +1033,20 @@ def prune_magnitude_sp_llama(model, tokenizer, dataloader, device=torch.device("
 
         if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
             device = model.hf_device_map[f"model.layers.{i}"]
-            
+        
+        standarlization = lambda x: (x - torch.mean(x, axis=0, keepdim=True)) / torch.std(x, axis=0, keepdim=True)
+
+        # for name in subset:
+        #     print(f"pruning layer {i} name {name}")
+        #     W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
+        #     if 'std' in cfg['prune_name']:
+        #         W_metric = standarlization(W_metric)
+
         for name in subset:
             print(f"pruning layer {i} name {name}")
             W_metric = torch.norm(subset[name].weight.data, dim=0)
-
+            if 'std' in cfg['prune_name']:
+                W_metric = standarlization(W_metric)
             if name == 'self_attn.o_proj':
                 W_metric = W_metric.reshape(-1, 128).sum(dim=1) # importance score of each head
                 thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()

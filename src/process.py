@@ -290,36 +290,51 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flapnosquare+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flapnosquare+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
                 ['default']]]
         CIFAR10_controls_9 = make_controls( control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
                 ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flapnosquarenobias+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flapnosquarenobias+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
                 ['default']]]
         CIFAR10_controls_9 = make_controls( control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flapnobias+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'flapnobias+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
                 ['default']]]
         CIFAR10_controls_9 = make_controls( control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20','WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
                     ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+128'], [f'wandaspglobal+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20','WIFN+128'], [f'wandaspglobal+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                ['default']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pqnobias-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                ['default']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pqnobiasstd-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'wandaspglobalstd+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                ['default']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
 
         # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4]],
         #             ['default']]]
@@ -685,7 +700,7 @@ def make_vis(df_exp, df_history):
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
             color[f"{name}_{hyper}"] = color_patterns.get(hyper, 'orange')
 
-    backup_color_set = {'red', 'purple', 'black', 'brown', 'crimson', 'teal', 'dodgerblue', 'sienna', 'darkseagreen'}
+    backup_color_set = {'red', 'purple', 'black', 'brown', 'blue', 'pink', 'teal','grey', 'darkseagreen'}
     backup_linestyle_set = {(0, (5, 5, 4)), (6, (1, 1, 1, 1)), (0, (1, 1, 10)), (0, (2, 2, 2)), (5, (5, 1)), (10, (5, 1)), (10, (5, 3)), (0, (1, 1))}
     color['Our'] = 'orange'
     color['Mag'] = 'green'
@@ -785,7 +800,7 @@ def make_vis(df_exp, df_history):
 
 
 
-    def draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, annotation='default', x_label='Activation Layers in Order', y_label='Accuracy'):
+    def draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, annotation='default', x_label='Activation Layers in Order', y_label='Accuracy', y_lim=None):
         fig_color = color.get(key_for_dict, random.choice(list(backup_color_set)))
         fig_linestyle = linestyle.get(key_for_dict, random.choice(list(backup_linestyle_set)))
         if key_for_dict not in color:
@@ -805,12 +820,13 @@ def make_vis(df_exp, df_history):
         # plt.fill_between(x, (y - yerr), (y + yerr), color=color[algo_mode], alpha=.1)
 
         plt.errorbar(x, y, yerr=yerr, color=fig_color, linestyle=fig_linestyle)
-        
+        if y_lim:
+            plt.ylim(0, y_lim+5)
         plt.xlabel(x_label, fontsize=fontsize['label'])
         plt.ylabel(y_label, fontsize=fontsize['label'])
         plt.xticks(fontsize=10)
         plt.yticks(fontsize=10)
-        plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'])
+        plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'], bbox_to_anchor=(1, 0.5))
         return
     
     def process_distri(data, left_range=-1, right_range=1):
@@ -1025,7 +1041,7 @@ def make_vis(df_exp, df_history):
                             #         key_for_dict = f"Dense"
                             #     else:
                             #         key_for_dict = f"Mag"
-                            draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, prune_hyper, 'Relative FLOPs ratio', flops_metric_name)
+                            draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, prune_hyper, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
                             performance_vs_prunedflops = [None, None, None]
 
 

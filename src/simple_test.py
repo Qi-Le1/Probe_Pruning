@@ -77,7 +77,12 @@ d = 5
 # print(c, c.numel())
 # print(d, d.numel())
 
-
+a = torch.tensor([[1,2,5,9,10], [1,3, 8, 15, 20]], dtype=torch.float32)
+standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
+b = a ** 2
+c = standarlization(a)
+d = standarlization(b)
+e = 5
 # import torch
 
 # # Define dimensions
