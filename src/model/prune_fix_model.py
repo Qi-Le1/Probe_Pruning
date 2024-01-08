@@ -70,10 +70,8 @@ def calibrate_model(model, tokenizer, dataloader, device):
             prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device)
         elif "magsp" in cfg['prune_name']:
             prune_magnitude_sp_llama(model, tokenizer, dataloader, logger_info, device)
-        elif "pqnobias" in cfg['prune_name']:
-            prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device)
-        elif "pqbias" in cfg['prune_name']:
-            prune_pq_bias_llama(model, tokenizer, dataloader, logger_info, device)
+        elif "pq" in cfg['prune_name']:
+            prune_pq_llama(model, tokenizer, dataloader, logger_info, device)
         else:
             raise ValueError('Not valid prune_name')
 
@@ -404,6 +402,21 @@ def cal_remove_neuron(args, model):
         return int((remove_params - remove_head_params) / (hidden_size * 3))
 
 
+def if_add_bias():
+    if bias in cfg['prune_name']:
+        return True
+    return False
+
+def if_standardize():
+    if 'std' in cfg['prune_name']:
+        return True
+    return False
+
+def if_global_prune():
+    if 'global' in cfg['prune_name']:
+        return True
+    return False
+
 def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.device("cuda:0")):
     """
     Our FLAP Pruning.
@@ -414,7 +427,9 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
         tokenizer (Tokenizer): Tokenizer associated with the model.
         device (torch.device, optional): Device to move tensors to. Defaults to CUDA device 0.
     """
-    hardcode_struct = 'AL-AM'
+    hardcode_struct = 'UL-UM'
+    if 'global' in cfg['prune_name']:
+        hardcode_struct = 'AL-AM'
     use_cache = model.config.use_cache 
     model.config.use_cache = False 
     
@@ -430,6 +445,10 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
     attn_baseline_inp_list, mlp_baseline_inp_list = [], []
     attn_mask, mlp_mask = [], []
     
+    add_bias = if_add_bias()
+    standardize = if_standardize()
+    global_prune = if_global_prune()
+
     target_modules = _get_target_modules(cfg)
     layers = model.model.layers
     for i in tqdm(range(len(layers)), desc="Processing layers"):
@@ -474,15 +493,18 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
                 # flap's trick, attention square the metric
                 if cfg['prune_metric'] == 'WIFN':
                     W_metric = W_metric ** 2
-                if 'nosquare' in cfg['prune_name']:
-                    print('nosquare')
-                    W_metric = torch.sqrt(W_metric)
+                
+                W_metric = torch.sqrt(W_metric)
+                if 'square' in cfg['prune_name']:
+                    print('square')
+                    W_metric = W_metric ** 2
                 # print('W_metric', W_metric.shape, W_metric)
                 if hardcode_struct == "UL-UM":
                     W_metric = W_metric.reshape(-1, 128).sum(dim=1)
                     thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
                     W_mask = (W_metric>=thresh)
                     attn_mask.append(W_mask)
+                    compress(i,layer, W_mask, None, None, None, dev, bias=add_bias, unstr=False)
                 elif hardcode_struct == "UL-MM":
                     W_metric = W_metric.reshape(-1, 128).sum(dim=1)
                     thresh = torch.sort(W_metric.cuda())[0][args.remove_heads // len(layers)].cpu()
@@ -500,6 +522,7 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
                     thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
                     W_mask = (W_metric>=thresh)
                     mlp_mask.append(W_mask)
+                    compress(i, layer, None, W_mask, None, None, dev, bias=add_bias, unstr=False)
                 elif hardcode_struct == "UL-MM":
                     thresh = torch.sort(W_metric.cuda())[0][cal_remove_neuron(args, model)].cpu()
                     W_mask = (W_metric>=thresh)
@@ -509,6 +532,10 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
                 mlp_baseline_inp_list.append(wrapped_layers[name].baseline_inp.type(torch.half))
             wrapped_layers[name].free()
 
+
+        for j in range(cfg["nsamples"]):
+            with torch.no_grad():
+                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]        
         inps, outs = outs, inps # Use the original output as input to the next layer
         torch.cuda.empty_cache()
 
@@ -517,7 +544,8 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
     if hardcode_struct in ["AL-MM", "AL-AM"]:
         if len(attn_metric_list) > 0:
             attn_metric = torch.stack(attn_metric_list)
-            attn_metric = standarlization(attn_metric)
+            if standardize:
+                attn_metric = standarlization(attn_metric)
             attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
             print('attn_metric', attn_metric.shape, attn_metric)
         else:
@@ -526,7 +554,8 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
         # Check if len(mlp_metric_list) > 0 is not empty and process
         if len(mlp_metric_list) > 0:
             mlp_metric = torch.stack(mlp_metric_list)
-            mlp_metric = standarlization(mlp_metric)
+            if standardize:
+                mlp_metric = standarlization(mlp_metric)
             print('mlp_metric', mlp_metric.shape, mlp_metric)
         else:
             mlp_metric = None
@@ -566,20 +595,18 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
         attn_mask = torch.stack(attn_mask) 
         mlp_mask = torch.stack(mlp_mask)
     
-    bias = True
-    if 'nobias' in cfg['prune_name']:
-        print('nobias')
-        bias = False
-    for idx in range(len(layers)):
-        if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
-            compress(idx, model.model.layers[idx], attn_mask[idx], None, attn_baseline_inp_list[idx], None, model.hf_device_map[f"model.layers.{idx}"], bias=bias, unstr=False)
-        else:
-            compress(idx, model.model.layers[idx], attn_mask[idx], None, attn_baseline_inp_list[idx], None, device, bias=bias, unstr=False)
-                
-        if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
-            compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, mlp_baseline_inp_list[idx], model.hf_device_map[f"model.layers.{idx}"], bias=bias, unstr=False)
-        else:
-            compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, mlp_baseline_inp_list[idx], device, bias=bias, unstr=False)
+
+    if 'global' in cfg['prune_name']:
+        for idx in range(len(layers)):
+            if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
+                compress(idx, model.model.layers[idx], attn_mask[idx], None, attn_baseline_inp_list[idx], None, model.hf_device_map[f"model.layers.{idx}"], bias=add_bias, unstr=False)
+            else:
+                compress(idx, model.model.layers[idx], attn_mask[idx], None, attn_baseline_inp_list[idx], None, device, bias=add_bias, unstr=False)
+                    
+            if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
+                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, mlp_baseline_inp_list[idx], model.hf_device_map[f"model.layers.{idx}"], bias=add_bias, unstr=False)
+            else:
+                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, mlp_baseline_inp_list[idx], device, bias=add_bias, unstr=False)
             # compress(layer, attn_mask, mlp_mask, attn_mean_inp, mlp_mean_inp, device, bias=True, unstr=False):
     model.config.use_cache = use_cache 
     torch.cuda.empty_cache()
@@ -649,7 +676,7 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     return int(prune_channels_count), pq_indices
 
 
-def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torch.device("cuda:0")):
+def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.device("cuda:0")):
     """
     pq on structured pruning, no bias recover.
 
@@ -672,6 +699,9 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
     # print("loading calibdation data")
     # dataloader, _ = get_loaders("c4",nsamples=128,seed=args.seed,seqlen=cfg[cfg['model_name']]['max_length'],tokenizer=tokenizer)
     # print("dataset loading complete")
+    add_bias = if_add_bias()
+    standardize = if_standardize()
+    global_prune = if_global_prune()
     
     with torch.no_grad():
         inps, outs, attention_mask, position_ids = prepare_calibration_input(model, dataloader, device)
@@ -726,13 +756,14 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
         for name in subset:
             print(f"pruning layer {i} name {name}")
             W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
-            if 'std' in cfg['prune_name']:
+            if standardize:
+                print('local standardize', standardize)
                 W_metric = standarlization(W_metric)
             # print('W_metric',  W_metric, type(W_metric))
             # print(W_metric.shape)
             logger_key = f"layer{i}_{name}"
             if name == 'self_attn.o_proj':
-                if 'global' in cfg['prune_name']:
+                if global_prune:
                     attn_metric_list.append(W_metric.cpu())
                 else:
                     if 'normhead' in cfg['prune_name']:
@@ -746,7 +777,7 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
                     print('atten', torch.sort(W_metric.cuda())[0], W_metric.tolist(), prune_count)
                     thresh = torch.sort(W_metric.cuda())[0][prune_count].cpu()
                     W_mask = (W_metric>=thresh)
-                    compress(i,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
+                    compress(i,layer, W_mask, None, None, None, dev, bias=add_bias, unstr=False)
 
                     nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(torch.sort(W_metric.cuda())[0], pq_p, pq_q)
                     # print('dimension', dimension.shape, dimension)
@@ -762,7 +793,7 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
                     # print('attnW_metric.tolist()', W_metric.tolist())
                     # print('attnpq_indices_varying_length.tolist()',  pq_indices_varying_length.tolist())
             else:
-                if 'global' in cfg['prune_name']:
+                if global_prune:
                     mlp_metric_list.append(W_metric.cpu())
                 else:
                     # print('mlpW_metric', W_metric.shape, W_metric)
@@ -772,7 +803,7 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
                     thresh = sorted_prune[prune_count].cpu()
                     W_mask = (W_metric>=thresh)
                     # print('W_mask', W_mask.shape, )
-                    compress(i,layer, None, W_mask, None, None, dev, bias=False, unstr=False)
+                    compress(i,layer, None, W_mask, None, None, dev, bias=add_bias, unstr=False)
 
                     nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(torch.sort(W_metric.cuda())[0], pq_p, pq_q)
                     # print('dimension', dimension.shape, dimension)
@@ -797,10 +828,12 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
         
         torch.cuda.empty_cache()
 
-    if 'global' in cfg['prune_name']:
-
+    if global_prune:
         if len(attn_metric_list) > 0:
             attn_metric = torch.stack(attn_metric_list)
+            if standardize:
+                print('global standardize', standardize)
+                attn_metric = standarlization(attn_metric)
             if 'normhead' in cfg['prune_name']:
                 attn_metric = attn_metric.reshape(len(layers), -1, 128)
                 attn_metric = torch.norm(attn_metric, p=2, dim=2)
@@ -812,6 +845,8 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
         # Check if len(mlp_metric_list) > 0 is not empty and process
         if len(mlp_metric_list) > 0:
             mlp_metric = torch.stack(mlp_metric_list)
+            if standardize:
+                mlp_metric = standarlization(mlp_metric)
         else:
             mlp_metric = None
 
@@ -842,14 +877,14 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
         update_pruning_info(logger_info, info)
         for idx in range(len(layers)):
             if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
-                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, model.hf_device_map[f"model.layers.{idx}"], bias=False, unstr=False)
+                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, model.hf_device_map[f"model.layers.{idx}"], bias=add_bias, unstr=False)
             else:
-                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, device, bias=False, unstr=False)
+                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, device, bias=add_bias, unstr=False)
                     
             if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
-                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, model.hf_device_map[f"model.layers.{idx}"], bias=False, unstr=False)
+                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, model.hf_device_map[f"model.layers.{idx}"], bias=add_bias, unstr=False)
             else:
-                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, device, bias=False, unstr=False)
+                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, device, bias=add_bias, unstr=False)
     model.config.use_cache = use_cache 
     torch.cuda.empty_cache()
 
@@ -868,25 +903,20 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
     model.config.use_cache = False 
     
     attn_metric_list, mlp_metric_list = [], []
-    print("loading calibdation data")
-    # dataloader, _ = get_loaders("c4",nsamples=128,seed=args.seed,seqlen=cfg[cfg['model_name']]['max_length'],tokenizer=tokenizer)
-    print("dataset loading complete")
     
     with torch.no_grad():
         inps, outs, attention_mask, position_ids = prepare_calibration_input(model, dataloader, device)
 
-    # print('inps', inps)
-    # print('outs', outs)
-    # print('attention_mask', attention_mask)
-    # print('position_ids', position_ids)
+    add_bias = if_add_bias()
+    standardize = if_standardize()
+    global_prune = if_global_prune()
     target_modules = _get_target_modules(cfg)
     layers = model.model.layers
-    print('inps', inps)
+
     for i in range(len(layers)):
         layer = layers[i]
         subset = {}
         key_list = [key for key, _ in layer.named_modules()]
-        # print('key_list', key_list)
         for key in key_list:
             if not _check_target_module_exists(target_modules, key):
                 continue
@@ -924,7 +954,8 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
         for name in subset:
             print(f"pruning layer {i} name {name}")
             W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
-            if 'std' in cfg['prune_name']:
+            if standardize:
+                print('local standardize', standardize)
                 W_metric = standarlization(W_metric)
             # print('torch.abs(subset[name].weight.data)', torch.abs(subset[name].weight.data))
             # print('sqrt scalar row', torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))))
@@ -932,7 +963,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
             # W_metric = torch.abs(subset[name].weight.data) * torch.sqrt(wrapped_layers[name].scaler_row.reshape((1,-1)))            
 
             if name == 'self_attn.o_proj':
-                if 'global' in cfg['prune_name']:
+                if global_prune:
                     attn_metric_list.append(W_metric.cpu())
                 else:
                     W_metric = W_metric.reshape(-1, 128).sum(dim=1)    # importance score of each head
@@ -941,7 +972,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
                     W_mask = (W_metric>=thresh)
                     compress(i,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
             else:
-                if 'global' in cfg['prune_name']:
+                if global_prune:
                     mlp_metric_list.append(W_metric.cpu())
                 else:
                     print('mlpW_metric', W_metric.shape, W_metric, int(W_metric.numel()))
@@ -960,10 +991,11 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
 
     standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
 
-    if 'global' in cfg['prune_name']:
+    if global_prune:
         if len(attn_metric_list) > 0:
             attn_metric = torch.stack(attn_metric_list)
-            if 'std' in cfg['prune_name']:
+            if standardize:
+                print('global standardize', standardize)
                 attn_metric = standarlization(attn_metric)
             attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
         else:
@@ -972,7 +1004,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
         # Check if len(mlp_metric_list) > 0 is not empty and process
         if len(mlp_metric_list) > 0:
             mlp_metric = torch.stack(mlp_metric_list)
-            if 'std' in cfg['prune_name']:
+            if standardize:
                 mlp_metric = standarlization(mlp_metric)
         else:
             mlp_metric = None
@@ -994,14 +1026,14 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
         print('mlp_mask', mlp_mask.shape, mlp_mask)
         for idx in range(len(layers)):
             if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
-                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, model.hf_device_map[f"model.layers.{idx}"], bias=False, unstr=False)
+                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, model.hf_device_map[f"model.layers.{idx}"], bias=add_bias, unstr=False)
             else:
-                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, device, bias=False, unstr=False)
+                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, device, bias=add_bias, unstr=False)
                     
             if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
-                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, model.hf_device_map[f"model.layers.{idx}"], bias=False, unstr=False)
+                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, model.hf_device_map[f"model.layers.{idx}"], bias=add_bias, unstr=False)
             else:
-                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, device, bias=False, unstr=False)
+                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, device, bias=add_bias, unstr=False)
     model.config.use_cache = use_cache 
     torch.cuda.empty_cache()
     
@@ -1016,6 +1048,9 @@ def prune_magnitude_sp_llama(model, tokenizer, dataloader, device=torch.device("
         tokenizer (Tokenizer): Tokenizer associated with the model.
         device (torch.device, optional): Device to move tensors to. Defaults to CUDA device 0.
     """
+    add_bias = if_add_bias()
+    standardize = if_standardize()
+    global_prune = if_global_prune()
     layers = model.model.layers 
     target_modules = _get_target_modules(cfg)
     for i in range(len(layers)):
@@ -1034,14 +1069,6 @@ def prune_magnitude_sp_llama(model, tokenizer, dataloader, device=torch.device("
         if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
             device = model.hf_device_map[f"model.layers.{i}"]
         
-        standarlization = lambda x: (x - torch.mean(x, axis=0, keepdim=True)) / torch.std(x, axis=0, keepdim=True)
-
-        # for name in subset:
-        #     print(f"pruning layer {i} name {name}")
-        #     W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
-        #     if 'std' in cfg['prune_name']:
-        #         W_metric = standarlization(W_metric)
-
         for name in subset:
             print(f"pruning layer {i} name {name}")
             W_metric = torch.norm(subset[name].weight.data, dim=0)

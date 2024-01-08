@@ -465,17 +465,17 @@ def main():
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'pqnobias+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'pq+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
                     ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'pqnobiasglobalstd+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'pqglobalstd+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
                     ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pqnobiasglobalstd+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pqglobalstd+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
                     ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -571,10 +571,13 @@ def main():
 
     bash_file_name = './{}.bash'.format(f'msi_{file}_{data[0]}')
 
-    # Check if the file exists
-    if os.path.exists(bash_file_name):
+    def delete_file_if_exist(file_name)
+        if os.path.exists(file_name):
         # Delete the file if it exists
-        os.remove(bash_file_name)
+            os.remove(file_name)
+    # Check if the file exists
+    
+    delete_file_if_exist(bash_file_name)
 
     task_parallel_num = int(round / num_gpus)
     mem = 15
@@ -668,8 +671,14 @@ def main():
         run_file.write(s)
         run_file.close()
 
+        with open(bash_file_name, 'r') as file:
+            line_count = sum(1 for line in file)
+        if line_count == 100:
+            bash_file_name = './{}.bash'.format(f'msi_{file}_{data[0]}_{i}')
+            delete_file_if_exist(bash_file_name)
+
         run_file = open(bash_file_name, 'a')
-        command = f'mkdir {res_path}\nsbatch {filename}.pbs --wait\n'
+        command = f'sbatch {filename}.pbs --wait\n'
         run_file.write(command)
         run_file.close()
     return
