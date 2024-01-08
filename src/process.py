@@ -285,6 +285,42 @@ def make_control_list(file):
         # controls.extend(CIFAR10_controls_9)
     elif file == 'observe_fix_pruned_llm':
 
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [ '2048'], ['WIFV+128'], [f'flapnosquare+NA+{x}+-100+NA' for x in [0.5]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flapnosquare+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                ['default']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flapnosquarenobias+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                ['default']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flapnobias+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                ['default']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+128'], [f'wandaspglobal+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
         # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4]],
         #             ['default']]]
         # CIFAR10_controls_9 = make_controls(control_name)
@@ -305,15 +341,19 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+24', 'WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                    ['default']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+24', 'WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                ['default']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flapnosquare+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
 
         # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], [ 'WIFN+128'], [f'pqnobias-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
@@ -321,15 +361,15 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
         
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobias-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                    ['default']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobias-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobiasglobal-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                ['default']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobiasglobal-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
         # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobiasnormhead-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
         #         ['default']]]
@@ -352,7 +392,7 @@ def main():
     files = [args['type']]
 
     if 'observe' in args['type']:
-        num_experiments = 1
+        num_experiments = 2
     else:
         raise ValueError('Not valid type')
     exp = [str(x) for x in list(range(num_experiments))]
@@ -376,10 +416,10 @@ def process_result(controls):
     for control in controls:
         model_tag = '_'.join(control)
         extract_result(list(control), model_tag, processed_result_exp, processed_result_history)
-    if processed_result_exp:
-        summarize_result(processed_result_exp)
+    # if processed_result_exp:
+    #     summarize_result(processed_result_exp)
     if processed_result_history:
-        summarize_result(processed_result_history)
+        summarize_result(processed_result_history, None)
     return processed_result_exp, processed_result_history
 
 
@@ -419,9 +459,9 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
                         continue
                     if 'norm_across_other_dims' in k:
                         continue
-                print('k', k)
+                # print('k', k)
                 metric_name = k
-                if metric_name not in processed_result_exp:
+                if metric_name not in processed_result_history:
                     # processed_result_exp[metric_name] = {'exp': [None for _ in range(num_experiments)]}
                     processed_result_history[metric_name] = {'history': [None for _ in range(num_experiments)]}
 
@@ -441,7 +481,7 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
 def cal_se(std, sample_nums):
     return std / np.sqrt(sample_nums)
 
-def summarize_result(processed_result):
+def summarize_result(processed_result, key):
     # print(f'processed_result: {processed_result}')
     if 'exp' in processed_result:
         pivot = 'exp'
@@ -484,6 +524,8 @@ def summarize_result(processed_result):
         processed_result[pivot] = np.stack(processed_result[pivot], axis=0)
         processed_result['mean'] = np.mean(processed_result[pivot], axis=0)
         # TODO: for inference
+        if 'Perplexity' in key:
+            print('mean', processed_result[pivot], cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot])))
         processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot]))
         processed_result['max'] = np.max(processed_result[pivot], axis=1)
         processed_result['min'] = np.min(processed_result[pivot], axis=1)
@@ -504,7 +546,8 @@ def summarize_result(processed_result):
             #     continue
             # if 'norm_across_other_dims' in k:
             #     continue
-            summarize_result(v)
+            # print('k', k)
+            summarize_result(v, k)
         return
     return
 
@@ -642,16 +685,16 @@ def make_vis(df_exp, df_history):
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
             color[f"{name}_{hyper}"] = color_patterns.get(hyper, 'orange')
 
-    backup_color_set = {'orange', 'green', 'red', 'purple', 'black', 'brown', 'crimson', 'teal', 'dodgerblue', 'sienna', 'darkseagreen'}
+    backup_color_set = {'red', 'purple', 'black', 'brown', 'crimson', 'teal', 'dodgerblue', 'sienna', 'darkseagreen'}
     backup_linestyle_set = {(0, (5, 5, 4)), (6, (1, 1, 1, 1)), (0, (1, 1, 10)), (0, (2, 2, 2)), (5, (5, 1)), (10, (5, 1)), (10, (5, 3)), (0, (1, 1))}
     color['Our'] = 'orange'
     color['Mag'] = 'green'
     color['Dense'] = 'red'
     color['flap'] = 'orange'
     color['wandasp'] = 'green'
-    color['pqnobias-0.5-0.5'] = 'red'
-    color['pqnobiasglobal-0.5-0.5'] = 'purple'
-    color['pqnobiasnormhead-0.5-0.5'] = 'brown'
+    # color['pqnobias-0.5-0.5'] = 'red'
+    # color['pqnobiasglobal-0.5-0.5'] = 'purple'
+    # color['pqnobiasnormhead-0.5-0.5'] = 'brown'
     linestyle['Our'] = (0, (1, 1, 10))
     linestyle['Mag'] = (6, (1, 1, 1, 1))
     linestyle['Dense'] = '--'
@@ -836,11 +879,14 @@ def make_vis(df_exp, df_history):
             pq_indices_order = 0
             pruned_ratio_order = 0
             pruned_FLOPs_ratio_order = 0
-            performance_vs_total_FLOPs_ratio = [None, None]
-            performance_vs_prunedflops = [None, None]
-            for i in range(len(temp)):
+            performance_vs_total_FLOPs_ratio = [None, None, None]
+            performance_vs_prunedflops = [None, None, None]
+            for i in range(0, len(temp), 2):
                 cur_item = temp[i]
-                for index, row in cur_item.iterrows():
+                cur_se_item = temp[i+1]
+                # temp = df_history[df_name].iterrows()
+                for ((index, row), (index_se, row_se)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
+                # for index, row in cur_item.iterrows():
             # for ((index, row), (index_se, row_se)) in zip(temp, temp):
                     # print(f'index: {index}')
                     if 'of_max' in index:
@@ -849,7 +895,7 @@ def make_vis(df_exp, df_history):
                     if 'mean' not in index:
                         continue
                     
-                    print('index', index)
+                    # print('index', index)
                     index_list = index.split('/')
                     temp_key = index_list[-1]
 
@@ -952,11 +998,13 @@ def make_vis(df_exp, df_history):
                             flops_metric_name = flops_metric_name.split('/')[1]
                             if performance_vs_prunedflops[0] is None:
                                 performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
+                                performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
+                                a = 5
                         elif 'FLOPs_for_pruned_layers' in index:
-                            if performance_vs_prunedflops[1] is None:
-                                performance_vs_prunedflops[1] = row.tolist()[0]
+                            if performance_vs_prunedflops[2] is None:
+                                performance_vs_prunedflops[2] = row.tolist()[0]
                         
-                        if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[1] is not None:
+                        if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
                             print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
                             # print('here1')
                             # prune_tgt, 
@@ -964,8 +1012,10 @@ def make_vis(df_exp, df_history):
                             # batch_integ, 
                             fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
                             fig[fig_name] = plt.figure(fig_name)
-                            x = performance_vs_prunedflops[1]
+                            x = performance_vs_prunedflops[2]
+                            
                             y = performance_vs_prunedflops[0]
+                            yerr = performance_vs_prunedflops[1]
                             key_for_dict = f"{prune_name}"
                             # if 'pq' in prune_name:
                             #     key_for_dict = f"Our"
@@ -975,8 +1025,8 @@ def make_vis(df_exp, df_history):
                             #         key_for_dict = f"Dense"
                             #     else:
                             #         key_for_dict = f"Mag"
-                            draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'Relative FLOPs ratio', flops_metric_name)
-                            performance_vs_prunedflops = [None, None]
+                            draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, prune_hyper, 'Relative FLOPs ratio', flops_metric_name)
+                            performance_vs_prunedflops = [None, None, None]
 
 
 

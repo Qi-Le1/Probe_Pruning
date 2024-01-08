@@ -2,7 +2,7 @@
 
 
 # import torch
-
+import numpy as np
 
 # a = torch.tensor([])
 
@@ -65,7 +65,12 @@ import torch.nn as nn
 # print(b)
 # print(b.numel())
 
+a = [[0.40625],
+ [0.4375 ]]
 
+b = np.std(a, axis=1)
+c = np.std(a, axis=0)
+d = 5
 # c = torch.empty(0)
 # d = torch.empty(3, 0, 2)
 

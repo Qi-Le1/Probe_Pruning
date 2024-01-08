@@ -262,6 +262,7 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
 
 def make_calibration_dataloader(tokenizer):
     dataset = make_dataset('c4')
+    print('c4len', len(dataset['train']))
     dataset = process_calibration_dataset(dataset, tokenizer, 'c4')
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     return data_loader
@@ -286,19 +287,22 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     'labels': []
                 }
                 inputs = examples['text']
-                # print('input', len(inputs))
-                if processed_calibrate_sample_num > cfg['nsamples']:
+                print('input', len(inputs))
+                if processed_calibrate_sample_num >= cfg['nsamples']:
                     return model_inputs
                 for _ in range(cfg['nsamples']):
                     while True:
+
                         i = random.randint(0, len(inputs) - 1)
+                        # i = 1
                         trainenc = tokenizer(inputs[i], return_tensors='pt')
+                        # print('trainenc.input_ids.shape[1]', trainenc.input_ids.shape[1])
                         if trainenc.input_ids.shape[1] > max_length:
                             break
                     processed_calibrate_sample_num += 1
                     if processed_calibrate_sample_num > cfg['nsamples']:
                         return model_inputs
-                    
+                    # i = 1
                     i = random.randint(0, trainenc.input_ids.shape[1] - max_length - 1)
                     j = i + max_length
                     inp = trainenc.input_ids[0][i:j]
@@ -313,6 +317,7 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
             processed_dataset['train'] = dataset['train'].map(
                 preprocess_function,
                 batched=True,
+                batch_size=356317,
                 num_proc=1,
                 remove_columns=dataset["train"].column_names,
                 load_from_cache_file=False,
@@ -476,17 +481,9 @@ def process_dataset(dataset, tokenizer):
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
 
-            # for _ in range(nsamples):
-            #     i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
-            #     # i = 0
-            #     j = i + seqlen
-            #     inp = trainenc.input_ids[:, i:j]
-            #     tar = inp.clone()
-            #     tar[:, :-1] = -100
-            #     trainloader.append((inp, tar))
-            # return trainloader, testenc
-
+    
             def preprocess_function_test(examples):   
+                print('times')
                 all_text = "\n\n".join(examples[text_column[0]])
 
                 model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
@@ -499,6 +496,7 @@ def process_dataset(dataset, tokenizer):
 
                 final_inputs = defaultdict(list)
                 for i in range(len(input_chunks)):
+                    # print('len(input_chunks[i])', len(input_chunks[i]))
                     if len(input_chunks[i]) == max_length:
                         final_inputs['input_ids'].append(input_chunks[i])
                         final_inputs['attention_mask'].append(mask_chunks[i])
@@ -511,7 +509,7 @@ def process_dataset(dataset, tokenizer):
             processed_dataset['test'] = dataset['test'].map(
                 preprocess_function_test,
                 batched=True,
-                # batch_size=50,
+                batch_size=10000,
                 num_proc=1,
                 remove_columns=dataset["test"].column_names,
                 load_from_cache_file=False,

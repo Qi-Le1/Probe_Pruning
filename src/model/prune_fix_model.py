@@ -64,16 +64,18 @@ def find_layers(module, layers=[nn.Linear], name=''):
 def calibrate_model(model, tokenizer, dataloader, device):
     logger_info = {}
     if 'llama' in cfg['model_name']:
-        if cfg['prune_name'] == "flap": 
+        if 'flap' in cfg['prune_name']: 
             prune_flap_llama(model, tokenizer, dataloader, logger_info, device)
-        elif cfg['prune_name'] == "wandasp":
+        elif "wandasp" in cfg['prune_name']:
             prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device)
-        elif cfg['prune_name'] == "magsp":
+        elif "magsp" in cfg['prune_name']:
             prune_magnitude_sp_llama(model, tokenizer, dataloader, logger_info, device)
         elif "pqnobias" in cfg['prune_name']:
             prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device)
         elif "pqbias" in cfg['prune_name']:
             prune_pq_bias_llama(model, tokenizer, dataloader, logger_info, device)
+        else:
+            raise ValueError('Not valid prune_name')
 
     print("*"*30)
     sparsity_ratio = check_sparsity(model)
@@ -472,7 +474,9 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
                 # flap's trick, attention square the metric
                 if cfg['prune_metric'] == 'WIFN':
                     W_metric = W_metric ** 2
-
+                if 'nosquare' in cfg['prune_name']:
+                    print('nosquare')
+                    W_metric = torch.sqrt(W_metric)
                 # print('W_metric', W_metric.shape, W_metric)
                 if hardcode_struct == "UL-UM":
                     W_metric = W_metric.reshape(-1, 128).sum(dim=1)
@@ -511,14 +515,30 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
     standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
 
     if hardcode_struct in ["AL-MM", "AL-AM"]:
-        attn_metric = torch.stack(attn_metric_list)
-        attn_metric = standarlization(attn_metric)
-        attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
-        
-        print('attn_metric', attn_metric.shape, attn_metric)
-        mlp_metric = torch.stack(mlp_metric_list)
-        mlp_metric = standarlization(mlp_metric)
-        print('mlp_metric', mlp_metric.shape, mlp_metric)
+        if len(attn_metric_list) > 0:
+            attn_metric = torch.stack(attn_metric_list)
+            attn_metric = standarlization(attn_metric)
+            attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
+            print('attn_metric', attn_metric.shape, attn_metric)
+        else:
+            attn_metric = None
+
+        # Check if len(mlp_metric_list) > 0 is not empty and process
+        if len(mlp_metric_list) > 0:
+            mlp_metric = torch.stack(mlp_metric_list)
+            mlp_metric = standarlization(mlp_metric)
+            print('mlp_metric', mlp_metric.shape, mlp_metric)
+        else:
+            mlp_metric = None
+
+        # Concatenate the metrics, handling cases where one or both may be None
+        if attn_metric is not None and mlp_metric is not None:
+            prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
+        elif attn_metric is not None:
+            prune_metric = attn_metric.view(-1)
+        elif mlp_metric is not None:
+            prune_metric = mlp_metric.view(-1)
+
         if hardcode_struct == "AL-MM":
             sorted_attn = torch.sort(attn_metric.view(-1), descending=True)[0]
             attn_thres = sorted_attn[-int(args.remove_heads)]
@@ -528,7 +548,7 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
             mlp_thres = sorted_mlp[-cal_remove_neuron(args, model)]
             mlp_mask = (mlp_metric > mlp_thres)
         else:
-            prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
+            # prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
             print('prune_metric', prune_metric.shape, prune_metric)
             sorted_prune, indices = torch.sort(prune_metric, descending=True)
             compression_weight = torch.ones_like(indices)
@@ -546,16 +566,20 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
         attn_mask = torch.stack(attn_mask) 
         mlp_mask = torch.stack(mlp_mask)
     
+    bias = True
+    if 'nobias' in cfg['prune_name']:
+        print('nobias')
+        bias = False
     for idx in range(len(layers)):
         if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
-            compress(idx, model.model.layers[idx], attn_mask[idx], None, attn_baseline_inp_list[idx], None, model.hf_device_map[f"model.layers.{idx}"], unstr=False)
+            compress(idx, model.model.layers[idx], attn_mask[idx], None, attn_baseline_inp_list[idx], None, model.hf_device_map[f"model.layers.{idx}"], bias=bias, unstr=False)
         else:
-            compress(idx, model.model.layers[idx], attn_mask[idx], None, attn_baseline_inp_list[idx], None, device, unstr=False)
+            compress(idx, model.model.layers[idx], attn_mask[idx], None, attn_baseline_inp_list[idx], None, device, bias=bias, unstr=False)
                 
         if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
-            compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, mlp_baseline_inp_list[idx], model.hf_device_map[f"model.layers.{idx}"], unstr=False)
+            compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, mlp_baseline_inp_list[idx], model.hf_device_map[f"model.layers.{idx}"], bias=bias, unstr=False)
         else:
-            compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, mlp_baseline_inp_list[idx], device, unstr=False)
+            compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, mlp_baseline_inp_list[idx], device, bias=bias, unstr=False)
             # compress(layer, attn_mask, mlp_mask, attn_mean_inp, mlp_mean_inp, device, bias=True, unstr=False):
     model.config.use_cache = use_cache 
     torch.cuda.empty_cache()
@@ -770,15 +794,31 @@ def prune_pq_nobias_llama(model, tokenizer, dataloader, logger_info, device=torc
         torch.cuda.empty_cache()
 
     if 'global' in cfg['prune_name']:
-        attn_metric = torch.stack(attn_metric_list)
-        if 'normhead' in cfg['prune_name']:
-            attn_metric = attn_metric.reshape(len(layers), -1, 128)
-            attn_metric = torch.norm(attn_metric, p=2, dim=2)
-        else:
-            attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
 
-        mlp_metric = torch.stack(mlp_metric_list)
-        prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
+        if len(attn_metric_list) > 0:
+            attn_metric = torch.stack(attn_metric_list)
+            if 'normhead' in cfg['prune_name']:
+                attn_metric = attn_metric.reshape(len(layers), -1, 128)
+                attn_metric = torch.norm(attn_metric, p=2, dim=2)
+            else:
+                attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
+        else:
+            attn_metric = None
+
+        # Check if len(mlp_metric_list) > 0 is not empty and process
+        if len(mlp_metric_list) > 0:
+            mlp_metric = torch.stack(mlp_metric_list)
+        else:
+            mlp_metric = None
+
+        # Concatenate the metrics, handling cases where one or both may be None
+        if attn_metric is not None and mlp_metric is not None:
+            prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
+        elif attn_metric is not None:
+            prune_metric = attn_metric.view(-1)
+        elif mlp_metric is not None:
+            prune_metric = mlp_metric.view(-1)
+
         sorted_prune, indices = torch.sort(prune_metric)
         prune_count, pq_indices = cal_prune_count_base_on_pq(sorted_prune, pq_p, pq_q, eta, pq_global_beta, pq_gamma)
         threshold = sorted_prune[prune_count]
@@ -825,6 +865,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
     use_cache = model.config.use_cache 
     model.config.use_cache = False 
     
+    attn_metric_list, mlp_metric_list = [], []
     print("loading calibdation data")
     # dataloader, _ = get_loaders("c4",nsamples=128,seed=args.seed,seqlen=cfg[cfg['model_name']]['max_length'],tokenizer=tokenizer)
     print("dataset loading complete")
@@ -838,6 +879,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
     # print('position_ids', position_ids)
     target_modules = _get_target_modules(cfg)
     layers = model.model.layers
+    print('inps', inps)
     for i in range(len(layers)):
         layer = layers[i]
         subset = {}
@@ -865,8 +907,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
                 # print(f"{name} tmp inp", inp)
                 wrapped_layers[name].get_pre_hook()(inp[0].data, out.data)
             return tmp
-
-        # print('inps', inps)
+        
         handles = []
         for name in wrapped_layers:
             handles.append(subset[name].register_forward_hook(add_batch(name)))
@@ -885,15 +926,22 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
             # W_metric = torch.abs(subset[name].weight.data) * torch.sqrt(wrapped_layers[name].scaler_row.reshape((1,-1)))
             
             if name == 'self_attn.o_proj':
-                W_metric = W_metric.reshape(-1, 128).sum(dim=1)    # importance score of each head
-                thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
-                W_mask = (W_metric>=thresh)
-                compress(i,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
+                if 'global' in cfg['prune_name']:
+                    attn_metric_list.append(W_metric.cpu())
+                else:
+                    W_metric = W_metric.reshape(-1, 128).sum(dim=1)    # importance score of each head
+                    print('attnW_metric', W_metric.shape, W_metric)
+                    thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
+                    W_mask = (W_metric>=thresh)
+                    compress(i,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
             else:
-                # print('mlpW_metric', W_metric.shape, W_metric, int(W_metric.numel()))
-                thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
-                W_mask = (W_metric>=thresh)
-                compress(i,layer, None, W_mask, None, None, dev, bias=False, unstr=False)
+                if 'global' in cfg['prune_name']:
+                    mlp_metric_list.append(W_metric.cpu())
+                else:
+                    print('mlpW_metric', W_metric.shape, W_metric, int(W_metric.numel()))
+                    thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
+                    W_mask = (W_metric>=thresh)
+                    compress(i, layer, None, W_mask, None, None, dev, bias=False, unstr=False)
                 # compress(layer, attn_mask, mlp_mask, attn_mean_inp, mlp_mean_inp, device, bias=True, unstr=False):
             wrapped_layers[name].free()
 
@@ -904,6 +952,44 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
         
         torch.cuda.empty_cache()
 
+    if 'global' in cfg['prune_name']:
+        if len(attn_metric_list) > 0:
+            attn_metric = torch.stack(attn_metric_list)
+            attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
+        else:
+            attn_metric = None
+
+        # Check if len(mlp_metric_list) > 0 is not empty and process
+        if len(mlp_metric_list) > 0:
+            mlp_metric = torch.stack(mlp_metric_list)
+        else:
+            mlp_metric = None
+
+        # Concatenate the metrics, handling cases where one or both may be None
+        if attn_metric is not None and mlp_metric is not None:
+            print('both not none')
+            prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
+        elif attn_metric is not None:
+            prune_metric = attn_metric.view(-1)
+        elif mlp_metric is not None:
+            prune_metric = mlp_metric.view(-1)
+        sorted_prune, indices = torch.sort(prune_metric)
+        threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
+        print('threshold', threshold)
+        attn_mask = (attn_metric > threshold)
+        mlp_mask = (mlp_metric > threshold)
+        print('attn_mask', attn_mask.shape, attn_mask)
+        print('mlp_mask', mlp_mask.shape, mlp_mask)
+        for idx in range(len(layers)):
+            if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
+                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, model.hf_device_map[f"model.layers.{idx}"], bias=False, unstr=False)
+            else:
+                compress(idx,model.model.layers[idx], attn_mask[idx], None, None, None, device, bias=False, unstr=False)
+                    
+            if f"model.layers.{i}" in getattr(model, 'hf_device_map', {}): 
+                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, model.hf_device_map[f"model.layers.{idx}"], bias=False, unstr=False)
+            else:
+                compress(idx,model.model.layers[idx], None, mlp_mask[idx], None, None, device, bias=False, unstr=False)
     model.config.use_cache = use_cache 
     torch.cuda.empty_cache()
     

@@ -71,7 +71,8 @@ def runExperiment():
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     calibration_data_loader = make_calibration_dataloader(tokenizer)
-    print('calibration_data_loaderlen', calibration_data_loader['train'], len(calibration_data_loader['train']))
+    # return
+    # print('calibration_data_loaderlen', calibration_data_loader['train'], len(calibration_data_loader['train']))
     model = make_calibration_prune_model(model)
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     if cfg['model_name'] in MULTIGPUS_MODEL_NAME_LIST:
@@ -110,10 +111,16 @@ def test(data_loader, model, model_prof, metric, logger):
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
+                # print('input id', input['input_ids'] )
                 input = to_device(input, cfg['device'])
                 output = model(**input)
+                # for name, param in model.named_parameters():
+                #     print('name', name)
+                #     print('param', param)
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
+                # print('outputloss', output['loss'])
+                # print('outputlogits', output['logits'])
             elif cfg['task_name'] in ['mc']:
                 input_size = input['labels'].size(0)
                 input_indicies = input['input_indicies']
@@ -143,7 +150,7 @@ def test(data_loader, model, model_prof, metric, logger):
                                                         no_repeat_ngram_size=2)
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
-            # print('evaluation_for_batch', evaluation)
+            print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
             # return

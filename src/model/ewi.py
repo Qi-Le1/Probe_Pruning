@@ -300,6 +300,7 @@ class Linear(nn.Linear, EwiLayer):
                 inp = inp.type(torch.float32)
                 self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
                 self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
+                # print('self.scaler_inp', self.scaler_inp)
             elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
                 if self.nsamples == 0:
                     self.fluc_inp = 0
