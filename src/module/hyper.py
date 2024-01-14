@@ -20,12 +20,13 @@ def process_control():
 
     prune_name_list = cfg['control']['prune_name'].split('+')
     cfg['prune_name'] = prune_name_list[0]
-    prune_name = cfg['prune_name'].split('-')
-    if len(prune_name) > 1:
-        cfg['prune_name'] = prune_name[0]
-        cfg['attn_pq_beta'] = float(prune_name[1])
-        cfg['global_pq_beta'] = cfg['attn_pq_beta'] 
-        cfg['mlp_pq_beta'] = float(prune_name[2]) if len(prune_name) > 2 else None
+    prune_name_sub_list = cfg['prune_name'].split('-')
+    if len(prune_name_sub_list) > 1:
+        # cfg['prune_name'] = prune_name[0]
+        if 'pq' in cfg['prune_name']:
+            cfg['attn_pq_beta'] = float(prune_name_sub_list[1])
+            cfg['global_pq_beta'] = cfg['attn_pq_beta'] 
+            cfg['mlp_pq_beta'] = float(prune_name_sub_list[2]) if len(prune_name_sub_list) > 2 else None
 
     cfg['prune_tgt'] = prune_name_list[1]
     if cfg['prune_tgt'] == 'w':
@@ -60,7 +61,7 @@ def process_control():
 
     make_data_name()
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i', 'mc']:
-        cfg['pq_beta'] = 0.7
+        cfg['pq_beta'] = 0.9
         cfg['collate_mode'] = 'transformer'
         cfg['bart-base'] = {'max_length': 128}
         cfg['roberta-base'] = {'max_length': 128}

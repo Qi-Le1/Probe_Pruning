@@ -371,6 +371,21 @@
                 "cpu"
             ],
         },
+
+        {
+            "name": "verify_predict_out_dim",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_model.py",
+            "justMyCode": true,
+            "args": [
+                "--control_name",
+                "wikitext-2v1_opt-1.3b_clm_1_20_l2_pqstructlocalout+h+0+1+max_fc1+fc2_full_somemethods-3",
+                "--device",
+                "cpu"
+            ],
+        },
     ]
 }
 

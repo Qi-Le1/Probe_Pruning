@@ -77,12 +77,86 @@ d = 5
 # print(c, c.numel())
 # print(d, d.numel())
 
-a = torch.tensor([[1,2,5,9,10], [1,3, 8, 15, 20]], dtype=torch.float32)
-standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
-b = a ** 2
-c = standarlization(a)
-d = standarlization(b)
-e = 5
+# a = torch.tensor([[1,2,5,9,10], [1,3, 8, 15, 20]], dtype=torch.float32)
+# standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
+# b = a ** 2
+# c = standarlization(a)
+# d = standarlization(b)
+# e = 5
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+
+# Settings for the network
+# layer_sizes = [5, 8, 8, 5]  # Example layer sizes
+# n_layers = len(layer_sizes)
+# layer_positions = range(n_layers)
+# node_radius = 0.05
+
+# # Create the plot
+# fig, ax = plt.subplots()
+
+# # Function to draw nodes
+# def draw_layer(y, size, label):
+#     x_values = [x * 0.2 for x in range(size)]
+#     for x in x_values:
+#         circle = plt.Circle((x, y), node_radius, color='blue', fill=True)
+#         ax.add_artist(circle)
+#     # Optionally add a label for the layer
+#     ax.text(x_values[-1] + 0.15, y, label, fontsize=12)
+
+# # Draw the layers
+# for i, size in enumerate(layer_sizes):
+#     draw_layer(layer_positions[i], size, f'Layer {i+1}')
+
+# # Highlight the middle layer
+# middle_layer_index = n_layers // 2 - 1
+# highlight_rect = patches.Rectangle((-0.1, middle_layer_index - 0.1), 
+#                                    layer_sizes[middle_layer_index] * 0.2, 
+#                                    0.3, linewidth=2, edgecolor='r', facecolor='none')
+# ax.add_patch(highlight_rect)
+
+# # Annotate
+# ax.annotate('Our theory-guided adaptive pruning', 
+#             xy=(layer_sizes[middle_layer_index] * 0.1, middle_layer_index), 
+#             xytext=(layer_sizes[middle_layer_index] * 0.5, middle_layer_index + 1),
+#             arrowprops=dict(facecolor='black', shrink=0.05))
+
+# # Set the limits and labels
+# ax.set_xlim(-0.2, max(layer_sizes) * 0.2)
+# ax.set_ylim(-1, n_layers)
+# ax.set_aspect('equal', adjustable='datalim')
+# ax.axis('off')
+
+# class Fulei:
+#     def __init__(self):
+#         pass
+
+#     def fuleicall(self):
+#         print(self.weight)
+
+# class zilei(Fulei):
+#     def __init__(self):
+#         super().__init__()
+#         self.weight = 16
+
+#     def zileicall(self):
+#         self.fuleicall()
+
+
+# a = zilei()
+# a.zileicall()
+# b = 5
+
+a = torch.tensor([[1, 2, 3, 4, 5], [6,7,8,9,10]])
+
+b = torch.tensor([[11, 12, 13], [16,17,18]])
+
+a[..., [1,2,3]] = b
+
+print(a[0], a[1])
+c = 5
+# plt.show()
+
 # import torch
 
 # # Define dimensions
@@ -707,20 +781,20 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 # mlp_metric = standarlization(mlp_metric)
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification, \
     AutoTokenizer, LlamaTokenizer, LlamaForCausalLM, AutoModelForMultipleChoice, AutoModel
-traindata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
-testdata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
+# traindata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
+# testdata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
 
-# # Encode datasets
-tokenizer = LlamaTokenizer.from_pretrained('output/llama-2-7b',
-                                                   padding_side='left')
-trainenc = tokenizer(" ".join(traindata['text']), return_tensors='pt')
-temp = trainenc.input_ids.shape
-a = 5
+# # # Encode datasets
+# tokenizer = LlamaTokenizer.from_pretrained('output/llama-2-7b',
+#                                                    padding_side='left')
+# trainenc = tokenizer(" ".join(traindata['text']), return_tensors='pt')
+# temp = trainenc.input_ids.shape
+# a = 5
 
-a = [1,2,3]
-b = torch.tensor(a)
-c = torch.mean(b)
-d = 6
+# a = [1,2,3]
+# b = torch.tensor(a)
+# c = torch.mean(b)
+# d = 6
 # # print(pq_indices[:10])
 # print(pq_indices_varying_length[0][:10])
 # def compare_1d_vector_norms(v, p, q, gamma, beta, pq_indices):
@@ -867,7 +941,10 @@ import torch
 # # Move the model back to CPU
 # model.to('cpu')
 
-
+a = torch.randn((3, 5))
+# torch.sum((torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))).reshape(-1, 1, 1) * torch.linalg.vector_norm(subset[name].weight.data, ord=1, dim=1)), dim=1)
+b = torch.linalg.vector_norm(a, ord=1, dim=1)
+c = 5
 # def compare_norms_multi_dim(tensor, dims):
 #     # Calculate the norm using .norm()
 #     norm_result = tensor.norm(dim=dims)

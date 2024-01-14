@@ -18,7 +18,7 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 parser = argparse.ArgumentParser(description='analyze_data')
 parser.add_argument('--type', default='dp', type=str)
-parser.add_argument('--detail', default='True', type=str)
+parser.add_argument('--detail', default='False', type=str)
 args = vars(parser.parse_args())
 
 save_format = 'png'
@@ -294,117 +294,155 @@ def make_control_list(file):
 
 
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap-global-bias-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                        ['default']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap-square-global-bias-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                ['default']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                ['default']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'flap-square-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                ['default']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20','WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                    ['default']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20','WIFN+128'], [f'wandasp-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                ['default']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'wandasp-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                ['default']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                ['default']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pq-std-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                ['default']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
 
 
 
-
-
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128'], [f'wanda-sp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4]],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap-global-bias-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap-square-global-bias-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
         #         ['default']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128'], [f'pq-nobias+NA+{x}+-100+NA' for x in [0]],
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
         #         ['default']]]
         # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'flap-square-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20','WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
         #             ['default']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+24', 'WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20','WIFN+128'], [f'wandasp-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'flapnosquare+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'wandasp-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pq-std-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
         #         ['default']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], [ 'WIFN+128'], [f'pqnobias-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
         #             ['default']]]
         # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], [ 'WIFN+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], [ 'WIFN+128'], [f'wandasp-global-bias-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+
+
+
+
+
+
+
+
+
+
+        # only mlp
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                    ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], [ 'WIFN+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                    ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
         
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobias-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobiasglobal-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+24', 'WIFN+128'], [f'pqnobiasnormhead-0.5-0.5+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', ], ['WIFV+24',], [f'flap+NA+{x}+-100+NA' for x in [0.3, 0.4, ]],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
     return controls
 
 
@@ -416,12 +454,14 @@ def main():
     vis_path = './output/vis/{}'.format(args['type'])
     files = [args['type']]
 
-    if 'observe' in args['type']:
+    if 'observe_llm' in args['type']:
+        num_experiments = 1
+    elif 'observe_fix_pruned_llm' in args['type']:
         num_experiments = 2
     else:
         raise ValueError('Not valid type')
     exp = [str(x) for x in list(range(num_experiments))]
-
+    # exp = ['1']
     controls = []
     for file in files:
         controls += make_control_list(file)
@@ -440,6 +480,10 @@ def process_result(controls):
     processed_result_exp, processed_result_history = {}, {}
     for control in controls:
         model_tag = '_'.join(control)
+        check_missing_files(list(control), model_tag, processed_result_exp, processed_result_history)
+    print('----- check missing files done\n')
+    for control in controls:
+        model_tag = '_'.join(control)
         extract_result(list(control), model_tag, processed_result_exp, processed_result_history)
     # if processed_result_exp:
     #     summarize_result(processed_result_exp)
@@ -447,6 +491,24 @@ def process_result(controls):
         summarize_result(processed_result_history, None)
     return processed_result_exp, processed_result_history
 
+
+def check_missing_files(control, model_tag, processed_result_exp, processed_result_history):
+    # print('check_missing_files', control)
+    if len(control) == 1:
+        exp_idx = exp.index(control[0])
+        base_result_path_i = os.path.join(result_path, '{}'.format(model_tag))
+        if os.path.exists(base_result_path_i):
+            # base_result = load(base_result_path_i)
+            pass
+        else:
+            print('Missing {}'.format(base_result_path_i))
+    else:
+        if control[1] not in processed_result_exp:
+            processed_result_exp[control[1]] = {}
+            processed_result_history[control[1]] = {}
+        check_missing_files([control[0]] + control[2:], model_tag, processed_result_exp[control[1]],
+                       processed_result_history[control[1]])
+    return
 
 def extract_result(control, model_tag, processed_result_exp, processed_result_history):
     if len(control) == 1:
@@ -680,7 +742,7 @@ def make_vis(df_exp, df_history):
                 'vanilla': '--',
                 'pruned': '-.'
                 }
-        
+    marker = {}
     prune_hypers = [0, 0.001, 0.01, 0.03, 0.05, 0.06, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 9999]
     linestyle_patterns = {
         0: (0, (5, 5, 4)), 0.001: (6, (1, 1, 1, 1)), 0.01: (0, (2, 2, 2)), 0.03: (5, (5, 1)),
@@ -711,21 +773,24 @@ def make_vis(df_exp, df_history):
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
             color[f"{name}_{hyper}"] = color_patterns.get(hyper, 'orange')
 
-    backup_color_set = {'orange', 'green', 'red', 'purple', 'black', 'brown', 'blue', 'pink', 'teal','grey'}
-    backup_linestyle_set = {(0, (5, 5, 4)), (6, (1, 1, 1, 1)), (0, (1, 1, 10)), (0, (2, 2, 2)), (5, (5, 1)), (10, (5, 1)), (10, (5, 3)), (0, (1, 1))}
-    color['Our'] = 'orange'
-    color['Mag'] = 'green'
-    color['Dense'] = 'red'
+    backup_color_set = {'orange', 'green', 'red', 'purple', 'black', 'brown', 'blue', 'pink', 'teal','grey', 'cyan', 'magenta', 'yellow', 'indigo', 'silver', 'gold', 'maroon'}
+    backup_linestyle_set = {(0, (5, 5, 4)), (6, (1, 1, 1, 1)), (0, (1, 1, 10)), (0, (2, 2, 2)), (5, (5, 1)), (10, (5, 1)), (10, (5, 3)), (0, (1, 1)), '-.', '--', (2, (3, 5, 1, 5)), (1, (4, 10)), (3, (1, 1)), (3, (5, 10, 1)), (2, (5, 2, 1, 2)), (4, (5, 5, 1, 5)), (3, (1, 1, 1, 1))}
+    backup_marker_set = {'o', 'v', 's', 'p', '*', 'h', 'H', 'D', 'd', 'P', 'X', '^', '<', '>', '1', '2', '3', '4'}
+    color['Proposed'] = 'orange'
+    color['State-of-the-art'] = 'green'
+    color['Full model'] = 'red'
+
     # color['flap'] = 'orange'
     # color['wandasp'] = 'green'
     # color['pqnobias-0.5-0.5'] = 'red'
     # color['pqnobiasglobal-0.5-0.5'] = 'purple'
     # color['pqnobiasnormhead-0.5-0.5'] = 'brown'
-    linestyle['Our'] = (0, (1, 1, 10))
-    linestyle['Mag'] = (6, (1, 1, 1, 1))
-    linestyle['Dense'] = '--'
-    linestyle['flap'] = '-.'
-    linestyle['wandasp'] = '-.'
+    linestyle['Proposed'] = (0, (1, 1, 10))
+    linestyle['State-of-the-art'] = (6, (1, 1, 1, 1))
+    linestyle['Full model'] = '--'
+    marker['Proposed'] = 'D'
+    marker['State-of-the-art'] = 's'
+    marker['Full model'] = '*'
     # linestyle['pqnobias-0.5-0.5'] = '-.'
     # linestyle['pqnobiasglobal-0.5-0.5'] = '-.'
     loc_dict = {'test/Rouge': 'lower left', 'test/ROUGE': 'lower left', 'test/GLUE': 'lower left', 'test/Accuracy': 'lower left', 'test/Perplexity': 'lower left', 'label': 'center left'}
@@ -738,9 +803,21 @@ def make_vis(df_exp, df_history):
     # performance_metric_max = None
     y_max_in_graph = 100
     fig = {}
+    fig_data_across_multi_indices = collections.defaultdict(dict)
     reorder_fig = []
     global performance_metric_max_dict
 
+    def record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, **kwargs):
+        if fig_name not in fig_data_across_multi_indices:
+            fig_data_across_multi_indices[fig_name] = collections.defaultdict(dict)
+        if key_for_dict not in fig_data_across_multi_indices[fig_name]:
+            for key in kwargs:
+                fig_data_across_multi_indices[fig_name][key_for_dict][key] = []
+        
+        for key in kwargs:
+            fig_data_across_multi_indices[fig_name][key_for_dict][key].append(kwargs[key])
+        return
+    
     def is_valid_layer_for_detailed_info(index, model_name):
         if not plot_layer_detail:
             return False
@@ -766,24 +843,28 @@ def make_vis(df_exp, df_history):
     def draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy'):
         fig_color = color.get(key_for_dict, random.choice(list(backup_color_set)))
         fig_linestyle = linestyle.get(key_for_dict, random.choice(list(backup_linestyle_set)))
+        fig_marker = marker.get(key_for_dict, random.choice(list(backup_marker_set)))
         if key_for_dict not in color:
             color[key_for_dict] = fig_color
             linestyle[key_for_dict] = fig_linestyle
+            marker[key_for_dict] = fig_marker
 
             backup_color_set.remove(fig_color)
             backup_linestyle_set.remove(fig_linestyle)
-        if label_exists(plt, key_for_dict):
-            plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
-        else:
-            plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle, label=key_for_dict)
-        plt.plot(x, y, color=fig_color, linestyle=fig_linestyle)
+            backup_marker_set.remove(fig_marker)
+        # if label_exists(plt, key_for_dict):
+        #     plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
+        # else:
+        #     plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle, label=key_for_dict)
+            # plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
+        plt.plot(x, y, color=fig_color, linestyle=fig_linestyle, marker=fig_marker, label=key_for_dict)
         # plt.fill_between(x, (y - yerr), (y + yerr), color=color[algo_mode], alpha=.1)
         plt.errorbar(x, y, yerr=yerr, color=fig_color, linestyle=fig_linestyle)
         plt.xlabel(x_label, fontsize=fontsize['label'])
         plt.ylabel(y_label, fontsize=fontsize['label'])
         plt.xticks(fontsize=fontsize['ticks'])
         plt.yticks(fontsize=fontsize['ticks'])
-        plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'])
+        plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'], bbox_to_anchor=(1, 0.5))
         return
     
     def draw_histogram(plt, data, bins=500, density=False, x_label='Value', y_label='Frequency', title='Data Distribution'):
@@ -811,7 +892,7 @@ def make_vis(df_exp, df_history):
 
 
 
-    def draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, annotation='default', x_label='Activation Layers in Order', y_label='Accuracy', y_lim=None):
+    def draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy', y_lim=None):
         fig_color = color.get(key_for_dict, random.choice(list(backup_color_set)))
         fig_linestyle = linestyle.get(key_for_dict, random.choice(list(backup_linestyle_set)))
         if key_for_dict not in color:
@@ -825,7 +906,7 @@ def make_vis(df_exp, df_history):
             plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
         else:
             plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle, label=key_for_dict)
-        # plt.plot(x, y, color=color, linestyle=linestyle)
+        plt.plot(x, y, color=color, linestyle=linestyle)
         # TODO: comment out
         # plt.annotate(annotation, (x, y))
         # plt.fill_between(x, (y - yerr), (y + yerr), color=color[algo_mode], alpha=.1)
@@ -860,6 +941,8 @@ def make_vis(df_exp, df_history):
 
     for df_name in df_history:
         df_name_list = df_name.split('_')
+        performance_vs_total_FLOPs_ratio = [None, None, None]
+        performance_vs_prunedflops = [None, None, None]
         if len(df_name_list) == 8:
             # data_name, model_name, task_name, batch_size, prune_name, batch_integ, multibatch_integ, cust_tgt_modules = df_name_list
             data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules = df_name_list
@@ -906,8 +989,6 @@ def make_vis(df_exp, df_history):
             pq_indices_order = 0
             pruned_ratio_order = 0
             pruned_FLOPs_ratio_order = 0
-            performance_vs_total_FLOPs_ratio = [None, None, None]
-            performance_vs_prunedflops = [None, None, None]
             for i in range(0, len(temp), 2):
                 cur_item = temp[i]
                 cur_se_item = temp[i+1]
@@ -1026,7 +1107,6 @@ def make_vis(df_exp, df_history):
                             if performance_vs_prunedflops[0] is None:
                                 performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
                                 performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
-                                a = 5
                         elif 'FLOPs_for_pruned_layers' in index:
                             if performance_vs_prunedflops[2] is None:
                                 performance_vs_prunedflops[2] = row.tolist()[0]
@@ -1057,7 +1137,8 @@ def make_vis(df_exp, df_history):
                             #         key_for_dict = f"Dense"
                             #     else:
                             #         key_for_dict = f"Mag"
-                            draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, prune_hyper, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                            # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
                             performance_vs_prunedflops = [None, None, None]
 
 
@@ -1113,11 +1194,11 @@ def make_vis(df_exp, df_history):
             pq_indices_order = 0
             pruned_ratio_order = 0
             pruned_FLOPs_ratio_order = 0
-            performance_vs_total_FLOPs_ratio = [None, None]
-            performance_vs_prunedflops = [None, None]
-            for i in range(len(temp)):
+            for i in range(0, len(temp), 2):
                 cur_item = temp[i]
-                for index, row in cur_item.iterrows():
+                cur_se_item = temp[i+1]
+                # temp = df_history[df_name].iterrows()
+                for ((index, row), (index_se, row_se)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
             # for ((index, row), (index_se, row_se)) in zip(temp, temp):
                     # print(f'index: {index}')
                     if 'of_max' in index:
@@ -1300,13 +1381,16 @@ def make_vis(df_exp, df_history):
                         y = row.tolist()[0]
                         key_for_dict = f"{prune_name}_{prune_hyper}"
                         if 'pq' in prune_name:
-                            key_for_dict = f"Our"
+                            key_for_dict = f"Proposed"
                         elif 'mag' in prune_name:
+                            # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
                             if float(prune_hyper) == 0:
-                                key_for_dict = f"Dense"
+                                key_for_dict = f"Full model"
                             else:
-                                key_for_dict = f"Mag"
-                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'Pruned ratio')
+                                key_for_dict = f"State-of-the-art"
+                        # draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'Pruned ratio')
+
+                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=0, x_label='Layer order', y_label='Pruned ratio')
 
                         if not is_valid_layer_for_detailed_info(index, model_name):
                             continue
@@ -1362,7 +1446,7 @@ def make_vis(df_exp, df_history):
                             x = performance_vs_total_FLOPs_ratio[1]
                             y = performance_vs_total_FLOPs_ratio[0]
                             key_for_dict = f"{prune_name}_{prune_hyper}"
-                            draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'FLOPs_ratio', total_FLOPs_ratio_metric_name)
+                            draw_macs_perform_figure(plt, x, y, 0, key_for_dict, 'FLOPs_ratio', total_FLOPs_ratio_metric_name)
                             performance_vs_total_FLOPs_ratio = [None, None]
                     
                     # if any(metric_name in index for metric_name in metric_name_list) or 'total_FLOPs_ratio' in index:
@@ -1425,22 +1509,18 @@ def make_vis(df_exp, df_history):
                     #         draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'Sparsity', cur_metric_name)
                             # performance_vs_prunedflops = [None, None]
 
-                    # several methods for all layers on 1 plot
                     if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_for_pruned_layers' in index:
-                        # print('here')
-                        # if any(metric_name in index for metric_name in metric_name_list):
-                        #     cur_metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                        #     cur_metric_name = cur_metric_name.split('/')[1]
                         if any(metric_name in index for metric_name in metric_name_list):
                             flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
                             flops_metric_name = flops_metric_name.split('/')[1]
                             if performance_vs_prunedflops[0] is None:
                                 performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
+                                performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
                         elif 'FLOPs_for_pruned_layers' in index:
-                            if performance_vs_prunedflops[1] is None:
-                                performance_vs_prunedflops[1] = row.tolist()[0]
+                            if performance_vs_prunedflops[2] is None:
+                                performance_vs_prunedflops[2] = row.tolist()[0]
                         
-                        if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[1] is not None:
+                        if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
                             print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
                             # print('here1')
                             # prune_tgt, 
@@ -1448,20 +1528,50 @@ def make_vis(df_exp, df_history):
                             # batch_integ, 
                             fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, prune_metric,   prune_dim_select_mode, multibatch_integ, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
                             fig[fig_name] = plt.figure(fig_name)
-                            x = performance_vs_prunedflops[1]
+                            
+                            x = performance_vs_prunedflops[2]
                             y = performance_vs_prunedflops[0]
-                            key_for_dict = f"{prune_name}_{prune_hyper}"
+                            yerr = performance_vs_prunedflops[1]
+                            
                             if 'pq' in prune_name:
-                                key_for_dict = f"Our"
+                                key_for_dict = f"Proposed"
                             elif 'mag' in prune_name:
                                 # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
                                 if float(prune_hyper) == 0:
-                                    key_for_dict = f"Dense"
+                                    key_for_dict = f"Full model"
                                 else:
-                                    key_for_dict = f"Mag"
-                            draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'Relative FLOPs ratio', flops_metric_name)
-                            performance_vs_prunedflops = [None, None]
+                                    key_for_dict = f"State-of-the-art"
+ 
+                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                            # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, prune_hyper, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                            performance_vs_prunedflops = [None, None, None]
 
+    for fig_name in fig_data_across_multi_indices:
+        fig[fig_name] = plt.figure(fig_name)
+        for key_for_dict in fig_data_across_multi_indices[fig_name]:
+            x = fig_data_across_multi_indices[fig_name][key_for_dict]['x']
+            y = fig_data_across_multi_indices[fig_name][key_for_dict]['y']
+            yerr = fig_data_across_multi_indices[fig_name][key_for_dict]['yerr']
+            x_label = fig_data_across_multi_indices[fig_name][key_for_dict]['x_label'][0]
+            y_label = fig_data_across_multi_indices[fig_name][key_for_dict]['y_label'][0]
+
+            if 'all_methods_performance_vs_FLOPs_for_pruned_layers' in fig_name:
+                # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, y_lim=performance_metric_max)
+                draw_str_x_figure(plt, x, y, 0, key_for_dict, x_label, y_label)
+            if 'all_layer_pruned_ratio_mean' in fig_name:
+                draw_str_x_figure(plt, x, y, 0, key_for_dict, x_label, y_label)
+                # point = (x[40],y[40])
+                # ax = plt.gca()
+                # circle_rad = 50
+                # ax.plot(point[0], point[1], 'o',
+                # ms=circle_rad * 2, mec='r', mfc='none', mew=2)
+                # ax.annotate('Our theory-guided adaptive pruning', xy=point, xytext=(-90, 100),
+                #             textcoords='offset points',
+                #             color='b', size='large',
+                #             arrowprops=dict(
+                #                 arrowstyle='simple,tail_width=0.3,head_width=0.8,head_length=0.5',
+                #                 facecolor='b', shrinkB=circle_rad * 1.2)
+                # )
     def write_xlsx(path, df, startrow=0):
         writer = pd.ExcelWriter(path, engine='xlsxwriter')
         for df_name in df:

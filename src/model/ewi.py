@@ -223,7 +223,7 @@ class Linear(nn.Linear, EwiLayer):
         self.device = kwargs['device']
 
         self.baseline_inp = torch.zeros((self.in_dim), device=self.device)
-        if self.prune_metric == "WIFN":
+        if 'IFN' in self.prune_metric:
             self.scaler_inp = torch.zeros((self.in_dim), device=self.device)
         elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
             self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
@@ -242,48 +242,6 @@ class Linear(nn.Linear, EwiLayer):
         
         
     def get_pre_hook(self):
-        # if self.prune_name == "wanda-sp":
-        #     def add_batch(inp, out):
-        #         if len(inp.shape) == 2:
-        #             inp = inp.unsqueeze(0)
-        #         tmp = inp.shape[0]
-        #         # if isinstance(self.layer, nn.Linear):
-        #         if len(inp.shape) == 3:
-        #             inp = inp.reshape((-1, inp.shape[-1]))
-        #         inp = inp.t()
-                
-        #         self.scaler_row *= self.nsamples / (self.nsamples+tmp)
-        #         self.nsamples += tmp
-
-        #         inp = inp.type(torch.float32)
-
-        #         self.scaler_row += torch.norm(inp, p=2, dim=1) ** 2  / self.nsamples
-        # elif self.prune_name == "flap":
-        #     def add_batch(inp, out):
-        #         if len(inp.shape) == 2:
-        #             inp = inp.unsqueeze(0)
-        #         batch_size = inp.shape[0]
-        #         # if isinstance(self.layer, nn.Linear):
-        #         if len(inp.shape) == 3:
-        #             inp = inp.reshape((-1, inp.shape[-1]))
-        #         inp = inp.t()   # (dim, seqlen * batch_size)
-
-        #         old_baseline_inp = self.baseline_inp
-        #         self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
-        #         self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-        #         if self.prune_metric == "WIFN":
-        #             inp = inp.type(torch.float32)
-        #             self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
-        #             self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
-        #         else:
-        #             if self.nsamples == 0:
-        #                 self.fluc_inp = 0
-        #             else:
-        #                 self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
-        #                 self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
-
-        #         self.nsamples += batch_size
-        # elif self.prune_name == "pq-nobias" or self.prune_name == "pq-bias":
         def add_batch(inp, out):
             if len(inp.shape) == 2:
                 inp = inp.unsqueeze(0)
@@ -296,7 +254,7 @@ class Linear(nn.Linear, EwiLayer):
             old_baseline_inp = self.baseline_inp
             self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
             self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-            if self.prune_metric == "WIFN":
+            if 'IFN' in self.prune_metric:
                 inp = inp.type(torch.float32)
                 self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
                 self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)

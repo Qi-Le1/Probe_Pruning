@@ -88,6 +88,9 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, p
         sub_pruned_info = pruned_info_list[i+1]
         if sub_pruned_info[-1] == True:
             info[f"{sub_pruned_info[-2]}_pruned_FLOPs_ratio"] = sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6)
+            # [name, module.__flops__, module.__duration__, module.__params__, module.__macs__, type(module)]
+            print('sub_pruned_info', sub_pruned_info)
+            print('sub_vanilla_info', sub_vanilla_info, sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6))
             total_target_used_params += sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6) * sub_vanilla_info[3]
             total_target_params += sub_vanilla_info[3]
         print('----\n')
