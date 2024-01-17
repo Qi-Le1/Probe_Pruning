@@ -846,10 +846,10 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
                     mlp_metric_list.append(W_metric.cpu())
                 else:
                     print('mlpW_metric', W_metric.shape, W_metric)
-                    a = (torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))).reshape(-1, 1) * torch.linalg.vector_norm(subset[name].weight.data, ord=1, dim=1).reshape(1, -1))
-                    print('mlpW_metric2', a.shape, a)
-                    b = torch.sum(a, dim=1)
-                    print('mlpW_metric3', b.shape, b)
+                    # a = (torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))).reshape(-1, 1) * torch.linalg.vector_norm(subset[name].weight.data, ord=1, dim=1).reshape(1, -1))
+                    # print('mlpW_metric2', a.shape, a)
+                    # b = torch.sum(a, dim=1)
+                    # print('mlpW_metric3', b.shape, b)
                     sorted_prune = torch.sort(W_metric.cuda())[0]
                     prune_count, pq_indices = cal_prune_count_base_on_pq(sorted_prune, pq_p, pq_q, eta, pq_mlp_beta, pq_gamma)
                     # print('mlp', sorted_prune, sorted_prune.shape, prune_count)
@@ -897,6 +897,8 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
         if len(mlp_metric_list) > 0:
             mlp_metric = torch.stack(mlp_metric_list)
             mlp_metric = metric_process(mysetting, mlp_metric)
+            for i in range(mlp_metric.shape[0]):
+                print('mlp_metric for each layer', i, mlp_metric[i].shape, mlp_metric[i], torch.sort(mlp_metric[i])[0])
         else:
             mlp_metric = None
 
@@ -909,6 +911,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
             prune_metric = mlp_metric.view(-1)
 
         sorted_prune, indices = torch.sort(prune_metric)
+        print('sorted_prune', sorted_prune.shape, sorted_prune)
         prune_count, pq_indices = cal_prune_count_base_on_pq(sorted_prune, pq_p, pq_q, eta, pq_global_beta, pq_gamma)
         
         threshold = sorted_prune[prune_count]
@@ -920,7 +923,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
         nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(torch.sort(sorted_prune.cuda())[0], pq_p, pq_q)
         # print('dimension', dimension.shape, dimension)
         pq_indices_varying_length = (1 - dimension ** (1/pq_q - 1/pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
-        
+        print('pq_indices_varying_length', pq_indices_varying_length)
         info = {
             f'global_norm_across_other_dims': W_metric.tolist(),
             f'global_pq_indices_varying_lengths': pq_indices_varying_length.tolist(),

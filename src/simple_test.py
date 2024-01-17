@@ -64,13 +64,85 @@ import torch.nn as nn
 # b = a[0:0]
 # print(b)
 # print(b.numel())
+import copy
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
-a = [[0.40625],
- [0.4375 ]]
+# input_data = np.array([0.1 for i in range(100053)])
 
-b = np.std(a, axis=1)
-c = np.std(a, axis=0)
-d = 5
+# # input_data_length = len(input_data)
+# compress_ratio = 1000
+# pace = int(len(input_data) // compress_ratio)
+# simplified_input_data = np.array([input_data[i] for i in range(0, len(input_data), pace)])
+# x = np.array(list(range(len(simplified_input_data)+1)))
+# y = np.array(list(range(len(simplified_input_data)+1)))
+# x, y = np.meshgrid(x, y)
+# eta = np.full(x.shape, np.nan)
+# # eta = np.full(x.shape, 6, dtype=float)
+# # mask = y < x
+# print('eta', eta.shape)
+# mask = y < x
+
+# # Applying the mask
+# x = np.where(mask, x, np.nan)  # Replace values not in the upper triangle with NaN
+# y = np.where(mask, y, np.nan)
+
+# pq_p = 1
+# pq_q = 2
+
+# # print(len(x), len(x[0]))
+# for d in range(1, len(x)):
+#     # m at most equals to d-1
+#     cur_dimension = d * pace
+#     pq_index = simplified_input_data[d-1]
+#     for m in range(1, d):
+#     # for m in range(1, len(x[0])):
+#         cur_rest_dimension = m * pace
+
+#         sub_eta = ((cur_rest_dimension / (((1 - pq_index) ** (pq_q * pq_p / (pq_q - pq_p))) * cur_dimension)) ** (-(pq_q - pq_p) / pq_q)) - 1
+#         # print('sub_eta', sub_eta)
+#         # print(d, m, sub_eta)
+#         if sub_eta < -1:
+#             sub_eta = -1
+#         elif sub_eta > 2:
+#             sub_eta = 2
+#         # print(type(sub_eta))
+
+#         # print('d', d, 'm', m, 'sub_eta', sub_eta, type(d), type(m))
+#         eta[m][d] = sub_eta
+
+# # for i in range(1, len(x[0])):
+# #     # fix = i
+# #     # for j in range(1, fix):
+# #     for j in range(1, len(x[0])):
+# #         eta[i][j] = 3
+
+# z = np.sin(np.sqrt(x**2 + y**2))
+# print('z', z.shape)
+# # Create a figure and a 3D axis
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# print('eta', eta)
+# # Plot a 3D surface
+# surf = ax.plot_surface(x, y, eta, cmap='viridis')
+# # surf = ax.plot_surface(x, y, z, cmap='viridis')
+# # Add a color bar which maps values to colors
+# fig.colorbar(surf, shrink=0.5, aspect=5)
+
+# ax.set_title('3D Heatmap')
+# ax.set_xlabel('d dimension')
+# ax.set_ylabel('m dimension')
+# ax.set_zlabel('eta')
+# plt.show()
+
+a = 5
+# a = [[0.40625],
+#  [0.4375 ]]
+
+# b = np.std(a, axis=1)
+# c = np.std(a, axis=0)
+# d = 5
 # c = torch.empty(0)
 # d = torch.empty(3, 0, 2)
 
@@ -126,7 +198,11 @@ import matplotlib.patches as patches
 # ax.set_ylim(-1, n_layers)
 # ax.set_aspect('equal', adjustable='datalim')
 # ax.axis('off')
-
+a = torch.tensor([[0.6815, 0.7796, 0.9360, 0.5866, 1.8860],
+ [0.1141, 0.1273, 0.4898, 1.0005, 0.2570],
+ [0.2012, 0.2757, 0.2001, 1.2834, 0.4445]])
+b = a / torch.sum(a, axis=-1, keepdim=True)
+print('a', a, 'b', b)
 # class Fulei:
 #     def __init__(self):
 #         pass
@@ -147,14 +223,14 @@ import matplotlib.patches as patches
 # a.zileicall()
 # b = 5
 
-a = torch.tensor([[1, 2, 3, 4, 5], [6,7,8,9,10]])
+# a = torch.tensor([[1, 2, 3, 4, 5], [6,7,8,9,10]])
 
-b = torch.tensor([[11, 12, 13], [16,17,18]])
+# b = torch.tensor([[11, 12, 13], [16,17,18]])
 
-a[..., [1,2,3]] = b
+# a[..., [1,2,3]] = b
 
-print(a[0], a[1])
-c = 5
+# print(a[0], a[1])
+# c = 5
 # plt.show()
 
 # import torch
@@ -357,12 +433,12 @@ import time
 # # Now you can use log from the math module
 # print(-math.log(0.1))
 
-# # Normalize tensor2 by dividing each element by the sum
-# # normalized_tensor2 = tensor1 / sum_tensor2
-# # Stack the tensors to create a batched tensor
-# # The resulting tensor will have shape [2, 10]
+# Normalize tensor2 by dividing each element by the sum
+# normalized_tensor2 = tensor1 / sum_tensor2
+# Stack the tensors to create a batched tensor
+# The resulting tensor will have shape [2, 10]
 # batched_tensor = torch.stack([tensor1, tensor2])
-# # batched_tensor = torch.stack([tensor1, normalized_tensor2])
+# batched_tensor = torch.stack([tensor1, normalized_tensor2])
 # pq_struct(batched_tensor, 'w', 1)
 
 import numpy as np
@@ -598,53 +674,123 @@ import torch
 
 # import numpy as np
 
-# def compare_1d_vector_norms(v, p, q, gamma, beta):
-#     pq_p = p
-#     pq_q = q
-#     p_norm = np.linalg.norm(v, p)
-#     q_norm = np.linalg.norm(v, q)
+def compare_1d_vector_norms(v, p, q, gamma, beta):
+    pq_p = p
+    pq_q = q
+    p_norm = np.linalg.norm(v, p)
+    q_norm = np.linalg.norm(v, q)
 
-#     print(f"  {p} Norm: {p_norm}")
-#     print(f"  {q} Norm: {q_norm}")
+    print(f"  {p} Norm: {p_norm}")
+    print(f"  {q} Norm: {q_norm}")
 
-#     # Calculate and compare ratios of norms
-#     dimension = len(v)
-#     ratio = p_norm / q_norm
+    # Calculate and compare ratios of norms
+    dimension = len(v)
+    ratio = p_norm / q_norm
 
-#     print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
+    print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
     
-#     pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
-#     pq_indices = 0.08
-#     dimension = 8000
-#     print(f"  pq_indices_{p}_{q}: {pq_indices}")
-#     eta = 0
-#     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
-#     beta_array = np.full_like(lower_bound, beta)
-#     prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
-#     print(f"ratio", {gamma * (1 - lower_bound / dimension)})
-#     print(f"  Lower Bound: {lower_bound}")
-#     print(f"  Prune Channels Count: {prune_channels_count}\n")
+    pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
+    # pq_indices = 0.08
+    # dimension = 8000
+    print('scaling', dimension ** (1/q - 1/p))
+    print(f"  pq_indices_{p}_{q}: {pq_indices}")
+    eta = 0
+    lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
+    beta_array = np.full_like(lower_bound, beta)
+    prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
+    print(f"ratio", {gamma * (1 - lower_bound / dimension)})
+    print(f"  Lower Bound: {lower_bound}")
+    print(f"  Prune Channels Count: {prune_channels_count}\n")
+    return pq_indices, lower_bound
 
+
+def compare_1d_vector_norms_si(v, p, q, gamma, beta):
+    pq_p = p
+    pq_q = q
+    p_norm = np.linalg.norm(v, p)
+    q_norm = np.linalg.norm(v, q)
+
+    print(f"  {p} Norm: {p_norm}")
+    print(f"  {q} Norm: {q_norm}")
+
+    # Calculate and compare ratios of norms
+    dimension = len(v)
+    ratio = p_norm / q_norm
+
+    print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
+    
+    si_indices = p_norm / q_norm
+    # pq_indices = 0.08
+    # dimension = 8000
+    print('scaling', dimension ** (1/q - 1/p))
+    print(f"  pq_indices_{p}_{q}: {si_indices}")
+    eta = 0
+    lower_bound = si_indices ** (-pq_q / (1 - pq_q)) * (1 + eta) ** (-1 / (1 - pq_q))
+    beta_array = np.full_like(lower_bound, beta)
+    prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
+    print(f"ratio", {gamma * (1 - lower_bound / dimension)})
+    print(f"  Lower Bound: {lower_bound}")
+    print(f"  Prune Channels Count: {prune_channels_count}\n")
+    return si_indices, lower_bound
 # # pq_p = 1
 # # pq_q = 2
-# gamma = 1
-# beta = 0.9
+gamma = 1
+beta = 0.9
 # # Example usage
-# vectors = [
-#     # np.array([1, 1, 1,1, 0]),
-#     # np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
-#     np.array([0.1,0.1,0.1,0.1,0.1,0.2,0.2,0.2,0.2,0.2]),
-#     # np.array([100,100,100,100,100,]),
-#     # np.array([100,100,100,100,0]),
-#     # np.array([-7, 8, -9])
-# ]
-# #  (1,3), (2,3)
-# for vector in vectors:
-#     for comb in [(1,2)]:
-#         p = comb[0]
-#         q = comb[1]
-#         compare_1d_vector_norms(vector, p, q, gamma, beta)
+vectors = [
+    # np.array([1, 1, 1,1, 0]),
+    # np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
+    # np.array([0.1,0.1,0.1,0.1,0.1,10]),
+    np.array([0.1 for i in range(1000)] + [100]),
+    # np.array([100,100,100,100,100,]),
+    # np.array([100,100,100,100,0]),
+    # np.array([-7, 8, -9])
+    np.random.normal(loc=0, scale=1, size=1000),
+    np.array(list(np.random.normal(loc=0, scale=1, size=1000)) + [20, 30, 30, 30, 30, 30, 30, 30, 30, 30, 1000])
+]
+#  (1,3), (2,3)
+pq_indices_list = []
+lower_bound_list = []
+p_values = []
+color = ['blue', 'green', 'red']
+# norm_comb = []
+norm_comb = [(p, 2) for p in np.arange(0.02, 1.01, 0.02)]
+norm_comb = [(p, 1) for p in np.arange(0.02, 1.01, 0.02)]
+# for i in range(2, len(vectors)):
+i = 2
+vector = vectors[i]
+for comb in norm_comb:
+    p = comb[0]
+    q = comb[1]
+    if p < q:
+        pq_indices, lower_bound = compare_1d_vector_norms(vector, p, q, gamma, beta)
+    else:
+        # p, q = q, p
+        pq_indices, lower_bound = compare_1d_vector_norms_si(vector, q, p, gamma, beta)
+    pq_indices_list.append(pq_indices)
+    lower_bound_list.append(lower_bound)
+    p_values.append(p)
 
+# Plotting
+    plt.figure(num=f'PQ Indices - Vector {i}', figsize=(10, 5))
+    plt.plot(p_values, pq_indices_list, label=f'PQ Indices - Vector {i}', color=color[i])
+    plt.xlabel('p value')
+    plt.ylabel('PQ Index Value')
+    plt.title('PQ Indices for Different p Values')
+    plt.legend()
+    plt.savefig(f'./simple_test_folder/PQ_Indices_Graph_{i}.png')  # Saving the graph
+
+    # Graph for Lower Bound
+    plt.figure(num=f'Lower Bound - Vector {i}', figsize=(10, 5))
+    plt.plot(p_values, lower_bound_list, label=f'Lower Bound - Vector {i}', color=color[i])
+    plt.xlabel('p value')
+    plt.ylabel('Lower Bound Value')
+    plt.title('Lower Bound for Different p Values')
+    plt.legend()
+    plt.savefig(f'./simple_test_folder/Lower_Bound_Graph_{i}.png')
+
+
+z = 6
 # import numpy as np
 # import matplotlib.pyplot as plt
 

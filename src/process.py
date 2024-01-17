@@ -4,6 +4,7 @@ import math
 import itertools
 import json
 import copy
+import torch
 import numpy as np
 import pandas as pd
 from module import save, load, makedir_exist_ok
@@ -377,72 +378,110 @@ def make_control_list(file):
 
 
         # only mlp
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                    ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #             ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], [ 'WIFN+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], [ 'WIFN+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                    ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #             ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
         
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #             ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #             ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+        
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+        
+
+
+        # for 3d heatmap
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['O1WIFN+128', 'WIFV+128', 'WIFN+128', 'IFN+128',  'O2WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+
     return controls
 
 
@@ -457,11 +496,11 @@ def main():
     if 'observe_llm' in args['type']:
         num_experiments = 1
     elif 'observe_fix_pruned_llm' in args['type']:
-        num_experiments = 2
+        num_experiments = 1
     else:
         raise ValueError('Not valid type')
     exp = [str(x) for x in list(range(num_experiments))]
-    # exp = ['1']
+    exp = ['3']
     controls = []
     for file in files:
         controls += make_control_list(file)
@@ -543,6 +582,8 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
                 
             for k in base_result['logger']['test'].history:
                 if args['detail'].lower() == 'false':
+                    # if 'FLOPs_for_pruned_layers' not in k:
+                    #     continue
                     if 'pq_indices_varying_lengths' in k:
                         continue
                     if 'norm_across_other_dims' in k:
@@ -773,9 +814,12 @@ def make_vis(df_exp, df_history):
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
             color[f"{name}_{hyper}"] = color_patterns.get(hyper, 'orange')
 
-    backup_color_set = {'orange', 'green', 'red', 'purple', 'black', 'brown', 'blue', 'pink', 'teal','grey', 'cyan', 'magenta', 'yellow', 'indigo', 'silver', 'gold', 'maroon'}
-    backup_linestyle_set = {(0, (5, 5, 4)), (6, (1, 1, 1, 1)), (0, (1, 1, 10)), (0, (2, 2, 2)), (5, (5, 1)), (10, (5, 1)), (10, (5, 3)), (0, (1, 1)), '-.', '--', (2, (3, 5, 1, 5)), (1, (4, 10)), (3, (1, 1)), (3, (5, 10, 1)), (2, (5, 2, 1, 2)), (4, (5, 5, 1, 5)), (3, (1, 1, 1, 1))}
-    backup_marker_set = {'o', 'v', 's', 'p', '*', 'h', 'H', 'D', 'd', 'P', 'X', '^', '<', '>', '1', '2', '3', '4'}
+    backup_color_set = {'orange', 'green', 'red', 'purple', 'black', 'brown', 'blue', 'pink', 'teal','grey', 'cyan', 'magenta', 'yellow', 'indigo', 'silver', 'gold', 'maroon', 'lime', 'navy', 'olive', 'coral', 'steelblue'}
+    backup_linestyle_set = {(0, (3, 10, 1, 10)), (0, (3, 1, 2, 1)), '-.', (1, (5, 5)), (0, (1, 10)), (0, (5, 5, 4)), (6, (1, 1, 1, 1)), (0, (1, 1, 10)), (0, (2, 2, 2)), (5, (5, 1)), (10, (5, 1)), (10, (5, 3)),
+                             (0, (1, 1)), '-.', '--', (2, (3, 5, 1, 5)), (1, (4, 10)), (3, (1, 1)), (3, (5, 10, 1)), (2, (5, 2, 1, 2)), (4, (5, 5, 1, 5)), (3, (1, 1, 1, 1)),(0, (1, 1, 15)), (0, (1, 2, 10)) }
+    # backup_marker_set = {'o', 'v', 's', 'p', '*', 'h', 'H', 'D', 'd', 'P', 'X', '^', '<', '>', '1', '2', '3', '4', '8', 'B', 'C', 'E', 'F'}
+    backup_marker_set = {'o', 'v', 's', 'p', '*', 'h', 'H', 'D', 'd', 'P', 'X', '^', '<', '>', '1', '2', '3', '4', '+', '_', '|', 'x'}
+
     color['Proposed'] = 'orange'
     color['State-of-the-art'] = 'green'
     color['Full model'] = 'red'
@@ -799,7 +843,7 @@ def make_vis(df_exp, df_history):
     
     plot_layer_detail = True
     if 'detail' in args:
-        plot_layer_detail = args['detail'].lower() == 'false'
+        plot_layer_detail = args['detail'].lower() == 'true'
     # performance_metric_max = None
     y_max_in_graph = 100
     fig = {}
@@ -821,6 +865,9 @@ def make_vis(df_exp, df_history):
     def is_valid_layer_for_detailed_info(index, model_name):
         if not plot_layer_detail:
             return False
+        
+        if 'global' in index:
+            return True
 
         if model_name in total_layers:
             # layer_number = int(index.split(".layers.")[1].split(".")[0])
@@ -831,7 +878,7 @@ def make_vis(df_exp, df_history):
 
             # Join the number strings and convert to an integer
             layer_number = int(''.join(layer_number)) if layer_number else None
-            if layer_number <= math.ceil(total_layers[model_name] * 0.05) or math.ceil(layer_number >= total_layers[model_name] * 0.95):
+            if layer_number <= math.ceil(total_layers[model_name] * 0.1) or math.ceil(layer_number >= total_layers[model_name] * 0.90):
                 # print(f'layer_number: {layer_number}')
                 return True
         # print(f'False layer_number: {layer_number}')
@@ -867,6 +914,64 @@ def make_vis(df_exp, df_history):
         plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'], bbox_to_anchor=(1, 0.5))
         return
     
+    def draw_3d_heatmap(plt, fig, x, x_label='Activation Layers in Order', y_label='Accuracy', z_label='Accuracy', index=None):
+        granuality = 3000
+        dimension = len(x)
+        print('len(x)', len(x), x[-1000:])
+        pace = int(len(x) // granuality)
+        simplified_input_data = [x[i] for i in range(pace, dimension, pace)]
+        if simplified_input_data[-1] != x[-1]:
+            simplified_input_data.append(x[-1])
+        simplified_input_data = np.array(simplified_input_data)
+        x = np.array(list(range(len(simplified_input_data)+1)))
+        y = np.array(list(range(len(simplified_input_data)+1)))
+        x, y = np.meshgrid(x, y)
+        eta = np.full(x.shape, np.nan)
+        mask = y < x
+
+        # Applying the mask
+        x = np.where(mask, x, np.nan)  # Replace values not in the upper triangle with NaN
+        y = np.where(mask, y, np.nan)
+
+        pq_p = 1
+        pq_q = 2
+
+        # print(len(x), len(x[0]))
+        for d in range(1, len(x)):
+            # m at most equals to d-1
+            cur_dimension = min(d * pace, dimension)
+            pq_index = simplified_input_data[d-1]
+            for m in range(1, d):
+                cur_rest_dimension = m * pace
+
+                sub_eta = ((cur_rest_dimension / (((1 - pq_index) ** (pq_q * pq_p / (pq_q - pq_p))) * cur_dimension)) ** (-(pq_q - pq_p) / pq_q)) - 1
+                lower_bound = cur_dimension * (1 + 0) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_index) ** (pq_q * pq_p / (pq_q - pq_p)))
+                if sub_eta < 0:
+                    sub_eta = -1
+                elif sub_eta > 2:
+                    sub_eta = 2
+                # if d > 3400:
+                eta[m][d] = sub_eta
+                # if d > 3665 and m < 1000:
+                #     print(d, m, cur_dimension, cur_rest_dimension, 'eta', eta[m][d], 'lower_bound', lower_bound, lower_bound/pace, pq_index)
+
+        ax = fig.add_subplot(111, projection='3d')
+        surf = ax.plot_surface(x, y, eta, cmap='viridis')
+        fig.colorbar(surf, shrink=0.5, aspect=5)
+
+        elev = 18  # Elevation angle in degrees
+        azim = 45  # Azimuth angle in degrees
+        ax.view_init(elev=elev, azim=azim)
+        ax.set_title('3D Heatmap')
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+        ax.set_zlabel(z_label)
+        # plt.show()
+        return
+
+
+
+
     def draw_histogram(plt, data, bins=500, density=False, x_label='Value', y_label='Frequency', title='Data Distribution'):
         plt.hist(data, bins=bins, density=density, color='blue', edgecolor='black')
         plt.xlabel(x_label, fontsize=fontsize['label'])
@@ -938,6 +1043,36 @@ def make_vis(df_exp, df_history):
         right_index = next(i for i, x in enumerate(bin_edges) if x >= right_range)
         return data[left_index:right_index+1], bin_edges[left_index:right_index+2]
     
+    def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma, return_norm='p'):
+
+        # norm_across_other_dims = norm_across_other_dims + (norm_across_other_dims == 0) * 1e-9
+        # Calculate norms only for non-zero channels
+        # non_zero_norms = norm_across_other_dims[non_zero_mask]
+        norm_p = torch.linalg.vector_norm(sorted_tensor, ord=pq_p, dim=0)
+        norm_q = torch.linalg.vector_norm(sorted_tensor, ord=pq_q, dim=0) + 1e-10
+        
+        dimension = sorted_tensor.shape[0]
+        pq_indices = (1 - dimension ** (1/pq_q - 1/pq_p) * (norm_p / norm_q))
+        
+        # add additional dimension if dimension is 0
+        # if pq_indices.dim() == 0 or pq_indices.dim() == 1:
+        #     pq_indices.unsqueeze_(0)
+        print('pq_indices', pq_indices, dimension)
+        if torch.isnan(pq_indices).any() or torch.isinf(pq_indices).any():
+            # pq_indices = torch.min(pq_indices, torch.ones_like(pq_indices))
+            pq_indices = torch.tensor(1)
+            # raise ValueError('pq_indices contains nan values')
+
+        lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p)))
+        print('lower_bound', lower_bound, dimension)
+        beta_tensor = torch.full_like(lower_bound, pq_beta)
+        prune_channels_count = torch.floor(dimension * torch.min(pq_gamma * (1 - lower_bound / dimension), beta_tensor))
+        print('prune_channels_count', prune_channels_count)
+        if return_norm == 'p':
+            return int(lower_bound), pq_indices, norm_p
+        elif return_norm == 'q':
+            return int(lower_bound), pq_indices, norm_q
+
 
     for df_name in df_history:
         df_name_list = df_name.split('_')
@@ -989,6 +1124,8 @@ def make_vis(df_exp, df_history):
             pq_indices_order = 0
             pruned_ratio_order = 0
             pruned_FLOPs_ratio_order = 0
+            norm_across_other_dims = None
+            temp_norm_across_other_dims_key = None
             for i in range(0, len(temp), 2):
                 cur_item = temp[i]
                 cur_se_item = temp[i+1]
@@ -1007,18 +1144,85 @@ def make_vis(df_exp, df_history):
                     index_list = index.split('/')
                     temp_key = index_list[-1]
 
-                    # if 'norm_across_other_dims_mean' in index:
-                    #     if not is_valid_layer_for_detailed_info(index, model_name):
-                    #         continue
-                    #     # temp_key = index_list[-1]
+                    if 'norm_across_other_dims_mean' in index:
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
+                        # temp_key = index_list[-1]
                         
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:',temp_key])
-                    #     fig[fig_name] = plt.figure(fig_name)
-                    #     data = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-                    #     # key_for_dict = f"{prune_name}_{prune_hyper}"
-                    #     draw_histogram(plt, data)
-                    #     zero_num = np.array(data)[np.array(data) == 0].shape[0]
-                    #     plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
+                        data = torch.tensor(row.tolist())
+                       
+                        norm_comb = [(p, 2) for p in np.arange(0.2, 1.01, 0.04)]
+                        lower_bound_list = []
+                        pq_indices_list = []
+                        p_values = []
+                        return_norm_list = []
+                        for comb in norm_comb:
+                            p = comb[0]
+                            q = comb[1]
+                            lower_bound, pq_indices, return_norm = cal_prune_count_base_on_pq(data, p, q, 0, 0.9, 1, 'p')
+                            lower_bound_list.append(lower_bound)
+                            pq_indices_list.append(pq_indices)
+                            p_values.append(p)
+                            return_norm_list.append(return_norm)
+
+                        key_for_dict = prune_name + prune_metric
+
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pq',temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        draw_str_x_figure(plt, p_values, pq_indices_list, None, key_for_dict, 'P', 'PQ_index')
+
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-lb',temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        draw_str_x_figure(plt, p_values, lower_bound_list, None, key_for_dict, 'P', 'Lower bound')
+
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pnorm',temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        draw_str_x_figure(plt, p_values, return_norm_list, None, key_for_dict, 'P', 'P norm')
+
+                        norm_comb = [(1, q) for q in np.arange(1.04, 2.01, 0.04)]
+                        lower_bound_list = []
+                        pq_indices_list = []
+                        q_values = []
+                        return_norm_list = []
+                        for comb in norm_comb:
+                            p = comb[0]
+                            q = comb[1]
+                            lower_bound, pq_indices, return_norm = cal_prune_count_base_on_pq(data, p, q, 0, 0.9, 1, 'q')
+                            lower_bound_list.append(lower_bound)
+                            pq_indices_list.append(pq_indices)
+                            q_values.append(q)
+                            return_norm_list.append(return_norm)
+
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-pq',temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        draw_str_x_figure(plt, q_values, pq_indices_list, None, key_for_dict, 'Q', 'PQ_index')
+
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-lb',temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        draw_str_x_figure(plt, q_values, lower_bound_list, None, key_for_dict, 'Q', 'Lower bound')
+
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-qnorm',temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        draw_str_x_figure(plt, q_values, return_norm_list, None, key_for_dict, 'Q', 'Q norm')
+
+                        data = data.tolist()
+                        data.sort()
+                        norm_across_other_dims = data
+                        temp_norm_across_other_dims_key = temp_key
+                        # key_for_dict = f"{prune_name}_{prune_hyper}"
+                        x = list(range(len(data)))
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        draw_str_x_figure(plt, x, data, None, key_for_dict, 'varying length', 'norm_across_other_dims')
+
+
+                        # draw_histogram(plt, data)
+                        # zero_num = np.array(data)[np.array(data) == 0].shape[0]
+                        # plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
+                        # key_for_dict = f"{prune_name}_{prune_hyper}"
+                        # draw_histogram(plt, data)
+                        # zero_num = np.array(data)[np.array(data) == 0].shape[0]
+                        # plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
                     
                     # # only for y: pq, x: eta
                     # if 'pq_indices_mean' in index:
@@ -1044,29 +1248,102 @@ def make_vis(df_exp, df_history):
                     #     print('lower_bound', x)
                     #     plt.text(x, 0.03, f'B', ha='center', va='bottom')
 
-                    # if "_pq_indices_varying_lengths_mean" in index:
-                    #     if not is_valid_layer_for_detailed_info(index, model_name):
-                    #         continue
+                    if "_pq_indices_varying_lengths_mean" in index:
+                        print('index', index)
+                        print('pqqq', is_valid_layer_for_detailed_info(index, model_name))
+                        if not is_valid_layer_for_detailed_info(index, model_name):
+                            continue
 
-                    #     if 'attn' in index:
-                    #         a = 5
-                    #     # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG:', temp_key])
-                    #     fig[fig_name] = plt.figure(fig_name)
-                    #     x = list(range(len(row.tolist())))
-                    #     y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
-                    #     draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: 3dheatmap', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        # y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                        y = np.array(row.tolist())
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        # draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
+                        draw_3d_heatmap(plt, fig[fig_name], y, 'd dimension', 'm dimension', 'eta', index)
 
-                    #     # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size,seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: log', temp_key])
-                    #     fig[fig_name] = plt.figure(fig_name)
-                    #     x = list(range(len(row.tolist())))
-                    #     y = row.tolist()
-                    #     y = np.log(y)
-                    #     y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
-                    #     draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index (log scale)')
+
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG:', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
+
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: lowerbound', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        y = np.array(row.tolist())
+                        dimension = np.arange(1, len(y) + 1)
+                        pq_p, pq_q = 1, 2
+                        lower_bound = dimension * (1 + 0) ** (-pq_q / (pq_q - pq_p)) * ((1 - y) ** (pq_q * pq_p / (pq_q - pq_p)))
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        draw_str_x_figure(plt, x, lower_bound, None, key_for_dict, 'vector_length', 'Lower bound')
+
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: slope_lowerbound', temp_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = list(range(len(row.tolist())))
+                        y = np.array(row.tolist())
+                        dimension = np.arange(1, len(y) + 1)
+                        pq_p, pq_q = 1, 2
+                        lower_bound = dimension * (1 + 0) ** (-pq_q / (pq_q - pq_p)) * ((1 - y) ** (pq_q * pq_p / (pq_q - pq_p)))
+                        dx = np.diff(x)
+                        dy = np.diff(lower_bound)
+
+                        # Compute slope
+                        slopes = dy / dx
+                        print('slopes', slopes)
+                        temp_slopes = np.clip(dy / dx, -200, 20)
+                        key_for_dict = f"{prune_name}_{prune_hyper}"
+                        draw_str_x_figure(plt, list(range(len(dx))), temp_slopes, None, key_for_dict, 'vector_length', 'Lower bound slope')
+          
+                        # norm_across_other_dims.sort()
+                        # slopes = -slopes
+                        # zero_slope_indices = np.where(np.isclose(slopes, 0, atol=1e-4))
+        
+
+                        window_size = 21  # 10 neighbors on each side + the element itself
+
+                        # Create a window with equal weights
+                        window = np.ones(window_size) / window_size
+
+                        # Calculate the moving average using convolution
+                        averages = np.convolve(slopes, window, 'same')
+
+                        abs_averages_slopes = np.abs(averages)
+
+                        # Find the index of the minimum value in abs_slopes
+                        first_point = np.argmin(abs_averages_slopes)
+                            # if slopes[index] < -0.5:
+                            #     # first_point = index
+                            #     break
+                        threshold = 0.05 * len(slopes)
+                        second_point = 0
+                        for index in range(len(slopes)):
+                            if np.abs(slopes[index]) >= threshold:
+                                second_point = index
+                                break
+                        
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_norm_across_other_dims_key])
+                        fig[fig_name] = plt.figure(fig_name)
+                        plt.text(first_point, 0, f'first {first_point}', ha='center', va='bottom')
+                        # plt.show()
+                        plt.text(second_point, 0, f'second {second_point}', ha='center', va='bottom')
+                        # plt.show()
+                        print('first_point', first_point, 'second_point', second_point)
+
+                        # draw_3d_heatmap(plt, fig[fig_name], y, 'd dimension', 'm dimension', 'eta')
+                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                        # fig_name = '_'.join([data_name, model_name, task_name, batch_size,seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: log', temp_key])
+                        # fig[fig_name] = plt.figure(fig_name)
+                        # x = list(range(len(row.tolist())))
+                        # y = row.tolist()
+                        # y = np.log(y)
+                        # y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                        # key_for_dict = f"{prune_name}_{prune_hyper}"
+                        # draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index (log scale)')
 
                     # if 'pruned_FLOPs_ratio_mean' in index:
                     #     # one prune_hyper for all layers
@@ -1100,46 +1377,50 @@ def make_vis(df_exp, df_history):
                         # draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_hypers', 'pruned_ratio')
 
                     # several methods for all layers on 1 plot
-                    if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_for_pruned_layers' in index:
-                        if any(metric_name in index for metric_name in metric_name_list):
-                            flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                            flops_metric_name = flops_metric_name.split('/')[1]
-                            if performance_vs_prunedflops[0] is None:
-                                performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
-                                performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
-                        elif 'FLOPs_for_pruned_layers' in index:
-                            if performance_vs_prunedflops[2] is None:
-                                performance_vs_prunedflops[2] = row.tolist()[0]
+                    # if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_for_pruned_layers' in index:
+                    #     if any(metric_name in index for metric_name in metric_name_list):
+                    #         flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                    #         flops_metric_name = flops_metric_name.split('/')[1]
+                    #         if performance_vs_prunedflops[0] is None:
+                    #             performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
+                    #             performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
+                    #     elif 'FLOPs_for_pruned_layers' in index:
+                    #         if performance_vs_prunedflops[2] is None:
+                    #             performance_vs_prunedflops[2] = row.tolist()[0]
                         
-                        if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
-                            print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
-                            # print('here1')
-                            # prune_tgt, 
-                            # prune_dim, 
-                            # batch_integ, 
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
-                            fig[fig_name] = plt.figure(fig_name)
-                            x = performance_vs_prunedflops[2]
+                    #     if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
+                    #         print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
+                    #         # print('here1')
+                    #         # prune_tgt, 
+                    #         # prune_dim, 
+                    #         # batch_integ, 
+                    #         fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
+                    #         fig[fig_name] = plt.figure(fig_name)
+                    #         x = performance_vs_prunedflops[2]
                             
-                            y = performance_vs_prunedflops[0]
-                            yerr = performance_vs_prunedflops[1]
-                            if 'pq' in prune_name and 'WIFV' in prune_metric:
-                                prune_name += '-flap'
-                            elif 'pq' in prune_name and 'WIFN' in prune_metric:
-                                prune_name += '-wanda'
-                            key_for_dict = f"{prune_name}"
+                    #         y = performance_vs_prunedflops[0]
+                    #         yerr = performance_vs_prunedflops[1]
+                    #         if 'pq' in prune_name and 'WIFV' in prune_metric:
+                    #             prune_name += '-flap'
+                    #         elif 'O1WIFN' in prune_metric or 'O2WIFN' in prune_metric:
+                    #             prune_name += prune_metric
+                    #         elif 'pq' in prune_name and 'WIFN' in prune_metric:
+                    #             prune_name += '-wanda'
+                    #         elif 'IFN' in prune_metric:
+                    #             prune_name += prune_metric
+                    #         key_for_dict = f"{prune_name}"
                             
-                            # if 'pq' in prune_name:
-                            #     key_for_dict = f"Our"
-                            # elif 'mag' in prune_name:
-                            #     # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
-                            #     if float(prune_hyper) == 0:
-                            #         key_for_dict = f"Dense"
-                            #     else:
-                            #         key_for_dict = f"Mag"
-                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
-                            # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
-                            performance_vs_prunedflops = [None, None, None]
+                    #         # if 'pq' in prune_name:
+                    #         #     key_for_dict = f"Our"
+                    #         # elif 'mag' in prune_name:
+                    #         #     # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
+                    #         #     if float(prune_hyper) == 0:
+                    #         #         key_for_dict = f"Dense"
+                    #         #     else:
+                    #         #         key_for_dict = f"Mag"
+                    #         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                    #         # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                    #         performance_vs_prunedflops = [None, None, None]
 
 
 
