@@ -19,6 +19,22 @@ import collections
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+import torch
+
+# 假设 a 和 b 是两个三维张量
+# a = torch.rand(2, 3)
+# b = torch.rand(3, 4)
+
+# c = F.linear(a, b.T)
+# d = torch.tensordot(a, b, dims=[[1]])
+# dd = c == d
+# ddd = d.shape
+# # 在 a 的最后一个维度和 b 的第一个维度上进行点积
+# e = 5
+
+
 
 # # Example instances
 # embedding_layer = nn.Embedding(num_embeddings=10, embedding_dim=3)
@@ -158,6 +174,67 @@ a = 5
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+
+import torch
+import psutil
+import os
+
+def memory_usage_in_MB():
+    process = psutil.Process(os.getpid())
+    return process.memory_info().rss / (1024 * 1024)  # Memory in MB
+
+# Memory usage before the operation
+
+
+# Your PyTorch code
+a = torch.randn(40, 1100)
+b = torch.randn(1100, 40)
+
+temp_a = copy.deepcopy(a)
+temp_b = copy.deepcopy(b)
+memory_before = memory_usage_in_MB()
+c = torch.matmul(a, b)
+
+# Memory usage after the operation
+memory_after = memory_usage_in_MB()
+
+# Calculate the difference
+memory_consumed = memory_after - memory_before
+print(f"Memory consumed: {memory_consumed:.2f} MB")
+
+
+memory_before = memory_usage_in_MB()
+a = a.unsqueeze(-1)
+b = b.unsqueeze(0)
+result = a * b
+print('result', result.shape)
+memory_after = memory_usage_in_MB()
+
+# Calculate the difference
+memory_consumed = memory_after - memory_before
+print(f"Memory consumed broadcast: {memory_consumed:.2f} MB")
+
+
+memory_before = memory_usage_in_MB()
+result = (a * b).sum(dim=(0,2))
+print('result', result.shape)
+
+# result2 = a.sum(dim=0) * b.sum(dim=1)
+# print('result2', result2.shape)
+
+result3 = temp_a.sum(0) * temp_b.sum(1)
+print('result3', result3.shape)
+dd = result == result3
+
+result4 = (temp_a * temp_b.sum(1)).sum(0)
+ddd = result == result4
+memory_after = memory_usage_in_MB()
+
+# Calculate the difference
+memory_consumed = memory_after - memory_before
+print(f"Memory consumed 2: {memory_consumed:.2f} MB")
+
+a = 6
 # Settings for the network
 # layer_sizes = [5, 8, 8, 5]  # Example layer sizes
 # n_layers = len(layer_sizes)
@@ -674,123 +751,123 @@ import torch
 
 # import numpy as np
 
-def compare_1d_vector_norms(v, p, q, gamma, beta):
-    pq_p = p
-    pq_q = q
-    p_norm = np.linalg.norm(v, p)
-    q_norm = np.linalg.norm(v, q)
+# def compare_1d_vector_norms(v, p, q, gamma, beta):
+#     pq_p = p
+#     pq_q = q
+#     p_norm = np.linalg.norm(v, p)
+#     q_norm = np.linalg.norm(v, q)
 
-    print(f"  {p} Norm: {p_norm}")
-    print(f"  {q} Norm: {q_norm}")
+#     print(f"  {p} Norm: {p_norm}")
+#     print(f"  {q} Norm: {q_norm}")
 
-    # Calculate and compare ratios of norms
-    dimension = len(v)
-    ratio = p_norm / q_norm
+#     # Calculate and compare ratios of norms
+#     dimension = len(v)
+#     ratio = p_norm / q_norm
 
-    print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
+#     print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
     
-    pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
-    # pq_indices = 0.08
-    # dimension = 8000
-    print('scaling', dimension ** (1/q - 1/p))
-    print(f"  pq_indices_{p}_{q}: {pq_indices}")
-    eta = 0
-    lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
-    beta_array = np.full_like(lower_bound, beta)
-    prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
-    print(f"ratio", {gamma * (1 - lower_bound / dimension)})
-    print(f"  Lower Bound: {lower_bound}")
-    print(f"  Prune Channels Count: {prune_channels_count}\n")
-    return pq_indices, lower_bound
+#     pq_indices = (1 - dimension ** (1/q - 1/p) * p_norm / q_norm)
+#     # pq_indices = 0.08
+#     # dimension = 8000
+#     print('scaling', dimension ** (1/q - 1/p))
+#     print(f"  pq_indices_{p}_{q}: {pq_indices}")
+#     eta = 0
+#     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
+#     beta_array = np.full_like(lower_bound, beta)
+#     prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
+#     print(f"ratio", {gamma * (1 - lower_bound / dimension)})
+#     print(f"  Lower Bound: {lower_bound}")
+#     print(f"  Prune Channels Count: {prune_channels_count}\n")
+#     return pq_indices, lower_bound
 
 
-def compare_1d_vector_norms_si(v, p, q, gamma, beta):
-    pq_p = p
-    pq_q = q
-    p_norm = np.linalg.norm(v, p)
-    q_norm = np.linalg.norm(v, q)
+# def compare_1d_vector_norms_si(v, p, q, gamma, beta):
+#     pq_p = p
+#     pq_q = q
+#     p_norm = np.linalg.norm(v, p)
+#     q_norm = np.linalg.norm(v, q)
 
-    print(f"  {p} Norm: {p_norm}")
-    print(f"  {q} Norm: {q_norm}")
+#     print(f"  {p} Norm: {p_norm}")
+#     print(f"  {q} Norm: {q_norm}")
 
-    # Calculate and compare ratios of norms
-    dimension = len(v)
-    ratio = p_norm / q_norm
+#     # Calculate and compare ratios of norms
+#     dimension = len(v)
+#     ratio = p_norm / q_norm
 
-    print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
+#     print(f"  {p}/{q} Norm Ratio: {ratio}", len(v) ** (1/q - 1/p))
     
-    si_indices = p_norm / q_norm
-    # pq_indices = 0.08
-    # dimension = 8000
-    print('scaling', dimension ** (1/q - 1/p))
-    print(f"  pq_indices_{p}_{q}: {si_indices}")
-    eta = 0
-    lower_bound = si_indices ** (-pq_q / (1 - pq_q)) * (1 + eta) ** (-1 / (1 - pq_q))
-    beta_array = np.full_like(lower_bound, beta)
-    prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
-    print(f"ratio", {gamma * (1 - lower_bound / dimension)})
-    print(f"  Lower Bound: {lower_bound}")
-    print(f"  Prune Channels Count: {prune_channels_count}\n")
-    return si_indices, lower_bound
-# # pq_p = 1
-# # pq_q = 2
-gamma = 1
-beta = 0.9
-# # Example usage
-vectors = [
-    # np.array([1, 1, 1,1, 0]),
-    # np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
-    # np.array([0.1,0.1,0.1,0.1,0.1,10]),
-    np.array([0.1 for i in range(1000)] + [100]),
-    # np.array([100,100,100,100,100,]),
-    # np.array([100,100,100,100,0]),
-    # np.array([-7, 8, -9])
-    np.random.normal(loc=0, scale=1, size=1000),
-    np.array(list(np.random.normal(loc=0, scale=1, size=1000)) + [20, 30, 30, 30, 30, 30, 30, 30, 30, 30, 1000])
-]
-#  (1,3), (2,3)
-pq_indices_list = []
-lower_bound_list = []
-p_values = []
-color = ['blue', 'green', 'red']
-# norm_comb = []
-norm_comb = [(p, 2) for p in np.arange(0.02, 1.01, 0.02)]
-norm_comb = [(p, 1) for p in np.arange(0.02, 1.01, 0.02)]
-# for i in range(2, len(vectors)):
-i = 2
-vector = vectors[i]
-for comb in norm_comb:
-    p = comb[0]
-    q = comb[1]
-    if p < q:
-        pq_indices, lower_bound = compare_1d_vector_norms(vector, p, q, gamma, beta)
-    else:
-        # p, q = q, p
-        pq_indices, lower_bound = compare_1d_vector_norms_si(vector, q, p, gamma, beta)
-    pq_indices_list.append(pq_indices)
-    lower_bound_list.append(lower_bound)
-    p_values.append(p)
+#     si_indices = p_norm / q_norm
+#     # pq_indices = 0.08
+#     # dimension = 8000
+#     print('scaling', dimension ** (1/q - 1/p))
+#     print(f"  pq_indices_{p}_{q}: {si_indices}")
+#     eta = 0
+#     lower_bound = si_indices ** (-pq_q / (1 - pq_q)) * (1 + eta) ** (-1 / (1 - pq_q))
+#     beta_array = np.full_like(lower_bound, beta)
+#     prune_channels_count = np.floor(dimension * np.minimum(gamma * (1 - lower_bound / dimension), beta_array))
+#     print(f"ratio", {gamma * (1 - lower_bound / dimension)})
+#     print(f"  Lower Bound: {lower_bound}")
+#     print(f"  Prune Channels Count: {prune_channels_count}\n")
+#     return si_indices, lower_bound
+# # # pq_p = 1
+# # # pq_q = 2
+# gamma = 1
+# beta = 0.9
+# # # Example usage
+# vectors = [
+#     # np.array([1, 1, 1,1, 0]),
+#     # np.array([1, 1, 1,1, 0,1, 1, 1,1, 0]),
+#     # np.array([0.1,0.1,0.1,0.1,0.1,10]),
+#     np.array([0.1 for i in range(1000)] + [100]),
+#     # np.array([100,100,100,100,100,]),
+#     # np.array([100,100,100,100,0]),
+#     # np.array([-7, 8, -9])
+#     np.random.normal(loc=0, scale=1, size=1000),
+#     np.array(list(np.random.normal(loc=0, scale=1, size=1000)) + [20, 30, 30, 30, 30, 30, 30, 30, 30, 30, 1000])
+# ]
+# #  (1,3), (2,3)
+# pq_indices_list = []
+# lower_bound_list = []
+# p_values = []
+# color = ['blue', 'green', 'red']
+# # norm_comb = []
+# norm_comb = [(p, 2) for p in np.arange(0.02, 1.01, 0.02)]
+# norm_comb = [(p, 1) for p in np.arange(0.02, 1.01, 0.02)]
+# # for i in range(2, len(vectors)):
+# i = 2
+# vector = vectors[i]
+# for comb in norm_comb:
+#     p = comb[0]
+#     q = comb[1]
+#     if p < q:
+#         pq_indices, lower_bound = compare_1d_vector_norms(vector, p, q, gamma, beta)
+#     else:
+#         # p, q = q, p
+#         pq_indices, lower_bound = compare_1d_vector_norms_si(vector, q, p, gamma, beta)
+#     pq_indices_list.append(pq_indices)
+#     lower_bound_list.append(lower_bound)
+#     p_values.append(p)
 
-# Plotting
-    plt.figure(num=f'PQ Indices - Vector {i}', figsize=(10, 5))
-    plt.plot(p_values, pq_indices_list, label=f'PQ Indices - Vector {i}', color=color[i])
-    plt.xlabel('p value')
-    plt.ylabel('PQ Index Value')
-    plt.title('PQ Indices for Different p Values')
-    plt.legend()
-    plt.savefig(f'./simple_test_folder/PQ_Indices_Graph_{i}.png')  # Saving the graph
+# # Plotting
+#     plt.figure(num=f'PQ Indices - Vector {i}', figsize=(10, 5))
+#     plt.plot(p_values, pq_indices_list, label=f'PQ Indices - Vector {i}', color=color[i])
+#     plt.xlabel('p value')
+#     plt.ylabel('PQ Index Value')
+#     plt.title('PQ Indices for Different p Values')
+#     plt.legend()
+#     plt.savefig(f'./simple_test_folder/PQ_Indices_Graph_{i}.png')  # Saving the graph
 
-    # Graph for Lower Bound
-    plt.figure(num=f'Lower Bound - Vector {i}', figsize=(10, 5))
-    plt.plot(p_values, lower_bound_list, label=f'Lower Bound - Vector {i}', color=color[i])
-    plt.xlabel('p value')
-    plt.ylabel('Lower Bound Value')
-    plt.title('Lower Bound for Different p Values')
-    plt.legend()
-    plt.savefig(f'./simple_test_folder/Lower_Bound_Graph_{i}.png')
+#     # Graph for Lower Bound
+#     plt.figure(num=f'Lower Bound - Vector {i}', figsize=(10, 5))
+#     plt.plot(p_values, lower_bound_list, label=f'Lower Bound - Vector {i}', color=color[i])
+#     plt.xlabel('p value')
+#     plt.ylabel('Lower Bound Value')
+#     plt.title('Lower Bound for Different p Values')
+#     plt.legend()
+#     plt.savefig(f'./simple_test_folder/Lower_Bound_Graph_{i}.png')
 
 
-z = 6
+# z = 6
 # import numpy as np
 # import matplotlib.pyplot as plt
 
@@ -969,7 +1046,46 @@ from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelF
 #     print(f"  Lower Bound: {lower_bound}")
 #     print(f"  Prune Channels Count: {prune_channels_count}\n")
 
-# # pq_p = 1
+
+# slopes = torch.tensor([-10, 1, 1, 1, 1, 10, 10, 10, 10, 10],  dtype=torch.float32)
+
+#     # if 'low' in cfg['prune_name']:
+#         # Avoid edge case of slope
+# window_size = 4  # 10 neighbors on each side + the element itself
+
+# # Create a window with equal weights
+# window = torch.ones(window_size, dtype=torch.float32) / window_size
+# # window = window.to(lower_bound.device)  # Ensure window is on the same device as lower_bound
+
+# # Calculate the moving average using convolution
+# # PyTorch's conv1d expects a 3D tensor (batch, channel, length), so we need to add extra dimensions
+# slopes = slopes.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+# window = window.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+
+# # Use conv1d for moving average
+# averages = torch.nn.functional.conv1d(slopes, window, padding=int(window_size//2))
+# averages = averages.squeeze()  # 
+# negative_values = averages[averages < 0]
+
+# # Check if there are any negative values
+# if len(negative_values) > 0:
+#     # Find the maximum among the negative values (closest to zero)
+#     closest_negative = torch.max(negative_values)
+#     b = torch.where(averages == closest_negative)
+#     # Get the index of this value in the original 'averages' tensor
+#     first_phase_transition = torch.where(averages == closest_negative)[0][0]
+# else:
+#     first_phase_transition = None  # or handle the case where there are no negative values
+#     raise ValueError('No negative values found in averages')
+
+# pq_p = 1
+
+
+
+load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
+
+
+
 # # pq_q = 2
 # gamma = 1
 # beta = 0.9

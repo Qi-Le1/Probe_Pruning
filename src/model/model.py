@@ -28,7 +28,11 @@ def make_model(model_name, sub_model_name=None):
 
 def make_prune_model(model):
     from .eri import EriModel
-    model = EriModel(model)
+    from .llama_eri import LlamaEriModel
+    if 'llama' in cfg['model_name']:
+        model = LlamaEriModel(model)
+    else:
+        model = EriModel(model)
     return model
 
 def make_calibration_prune_model(model):

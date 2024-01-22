@@ -4,6 +4,7 @@ from .layerwrapper import WrappedGPT, BiasGPT
 # from .data import get_loaders 
 import math
 import re
+import numpy as np
 from config import cfg
 from tqdm import tqdm
 from .ewi import Linear
@@ -104,8 +105,8 @@ def find_layers(module, layers=[nn.Linear, Linear], name=''):
     Returns:
         dict: Dictionary of layers of the given type(s) within the module.
     """
-    print('name', name)
-    print('type(module)', type(module), module)
+    # print('name', name)
+    # print('type(module)', type(module), module)
     if type(module) in layers:
         return {name: module}
     res = {}
@@ -671,19 +672,10 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
 
 
 def parallel_cal_varying_length_norm(sorted_norm, norm):
-    if norm == 1:
-        # Take the absolute value of each element
-        processed_channels = sorted_norm.abs()
-        varying_vector_norm = processed_channels.cumsum(dim=0)
-    elif norm == 2:
-        # Take the square of each element
-        processed_channels = sorted_norm.pow(2)
-        # print('processed_channels', processed_channels.shape, processed_channels[0])
-        varying_vector_norm = processed_channels.cumsum(dim=0).sqrt()
-        # print('varying_vector_norm', varying_vector_norm.shape, varying_vector_norm[0])
-    else:
-        # Handle other cases or throw an error
-        raise ValueError('Not valid norm')
+    # sorted_norm is non-negative
+    processed_channels = sorted_norm.pow(norm)
+    # print('processed_channels', processed_channels.shape, processed_channels[0])
+    varying_vector_norm = torch.pow(processed_channels.cumsum(dim=0), 1/norm)
     return varying_vector_norm
             
 def parallel_cal_varying_length_info(sorted_norm, pq_p, pq_q, reversed=False):
@@ -713,25 +705,122 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     # norm_across_other_dims = norm_across_other_dims + (norm_across_other_dims == 0) * 1e-9
     # Calculate norms only for non-zero channels
     # non_zero_norms = norm_across_other_dims[non_zero_mask]
-    norm_p = torch.linalg.vector_norm(sorted_tensor, ord=pq_p, dim=0)
-    norm_q = torch.linalg.vector_norm(sorted_tensor, ord=pq_q, dim=0) + 1e-10
-    
-    dimension = sorted_tensor.shape[0]
-    pq_indices = (1 - dimension ** (1/pq_q - 1/pq_p) * (norm_p / norm_q))
-    
-    # add additional dimension if dimension is 0
-    # if pq_indices.dim() == 0 or pq_indices.dim() == 1:
-    #     pq_indices.unsqueeze_(0)
-    print('pq_indices', pq_indices, dimension)
-    if torch.isnan(pq_indices).any():
-        pq_indices = torch.min(pq_indices, torch.ones_like(pq_indices))
-        raise ValueError('pq_indices contains nan values')
 
-    lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p)))
-    print('lower_bound', lower_bound, dimension)
+    # norm_p = torch.linalg.vector_norm(sorted_tensor, ord=pq_p, dim=0)
+    # norm_q = torch.linalg.vector_norm(sorted_tensor, ord=pq_q, dim=0) + 1e-10
+    
+    # dimension = sorted_tensor.shape[0]
+    # pq_indices = (1 - dimension ** (1/pq_q - 1/pq_p) * (norm_p / norm_q))
+    
+    # # add additional dimension if dimension is 0
+    # # if pq_indices.dim() == 0 or pq_indices.dim() == 1:
+    # #     pq_indices.unsqueeze_(0)
+    # print('pq_indices', pq_indices, dimension)
+    # if torch.isnan(pq_indices).any():
+    #     pq_indices = torch.min(pq_indices, torch.ones_like(pq_indices))
+    #     raise ValueError('pq_indices contains nan values')
+
+    # lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p)))
+    # print('lower_bound', lower_bound, dimension)
+    # beta_tensor = torch.full_like(lower_bound, pq_beta)
+    # prune_channels_count = torch.floor(dimension * torch.min(pq_gamma * (1 - lower_bound / dimension), beta_tensor))
+    # print('prune_channels_count', prune_channels_count)
+
+    # return int(prune_channels_count), pq_indices
+
+    nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_tensor, pq_p, pq_q)
+    pq_indices_varying_length = (1 - dimension ** (1/pq_q - 1/pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
+    lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_indices_varying_length) ** (pq_q * pq_p / (pq_q - pq_p)))
+    
+    # lower_bound = lower_bound.cpu().numpy()
+    # x = list(range(len(lower_bound.tolist())))
+    # dx = np.diff(x)
+    # dy = np.diff(lower_bound)
+
+    # # Compute slope
+    # slopes = dy / dx
+    
+    # if 'low' in cfg['prune_name']:
+    #     # avoid edge case of slope
+    #     window_size = 21  # 10 neighbors on each side + the element itself
+
+    #     # Create a window with equal weights
+    #     window = np.ones(window_size) / window_size
+    #     # Calculate the moving average using convolution
+    #     averages = np.convolve(slopes, window, 'same')
+    #     abs_averages_slopes = np.abs(averages)
+    #     # Find the index of the minimum value in abs_slopes
+    #     first_phase_transition = np.argmin(abs_averages_slopes)
+    #     pq_indices = pq_indices_varying_length[first_phase_transition]
+    #     lower_bound = lower_bound[first_phase_transition]
+    x = torch.arange(len(lower_bound), dtype=torch.float32, device=lower_bound.device)
+
+    # Calculate differences (equivalent to np.diff)
+    dx = x[1:] - x[:-1]
+    dy = lower_bound[1:] - lower_bound[:-1]
+
+    # Compute slope
+    slopes = dy / dx
+
+    if 'low' in cfg['prune_name']:
+        # Avoid edge case of slope, just randomly pick this number
+        window_size = 20  # 10 neighbors on each side + the element itself
+
+        # Create a window with equal weights
+        window = torch.ones(window_size, dtype=torch.float32,  device=lower_bound.device) / window_size
+        window = window.to(lower_bound.device)  # Ensure window is on the same device as lower_bound
+
+        # Calculate the moving average using convolution
+        # PyTorch's conv1d expects a 3D tensor (batch, channel, length), so we need to add extra dimensions
+        slopes = slopes.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+        window = window.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+
+        # Use conv1d for moving average
+        averages = torch.nn.functional.conv1d(slopes, window, padding=window_size//2)
+        averages = averages.squeeze()  # Remove extra dimensions
+
+        negative_values = averages[averages <= 0]
+
+        # Check if there are any negative values
+        if len(negative_values) > 0:
+            # Find the maximum among the negative values (closest to zero)
+            closest_negative = torch.max(negative_values)
+
+            # Get the index of this value in the original 'averages' tensor
+            first_phase_transition = torch.where(averages == closest_negative)[0][0]
+        else:
+            first_phase_transition = None  # or handle the case where there are no negative values
+            raise ValueError('No negative values found in averages')
+
+        print("Index of negative value closest to zero:", first_phase_transition, sorted_tensor.shape[0])
+        pq_indices = pq_indices_varying_length[first_phase_transition]
+        lower_bound = lower_bound[first_phase_transition]
+        dimension = dimension[first_phase_transition]
+    elif 'high' in cfg['prune_name']:
+        slopes = torch.abs(dy / dx)
+        threshold = 0.05 * slopes.shape[0]
+        indices = torch.where(slopes > threshold)[0]
+        if len(indices) > 0:
+            second_phase_transition = indices[0].item()  # Get the first index as a Python scalar
+        else:
+            print('dont find second phase transition')
+            second_phase_transition = lower_bound.shape[0] - 1  # or handle the case where there are no negative values
+
+        pq_indices = pq_indices_varying_length[second_phase_transition]
+        lower_bound = lower_bound[second_phase_transition]
+        dimension = dimension[second_phase_transition]
+        print("Index of negative value closest to zero:", second_phase_transition, sorted_tensor.shape[0])
+    else:
+        pq_indices = pq_indices_varying_length[-1]
+        lower_bound = lower_bound[-1]
+        dimension = dimension[-1]
+        print("Index of negative value closest to zero:", pq_indices, dimension, sorted_tensor.shape[0])
+
     beta_tensor = torch.full_like(lower_bound, pq_beta)
     prune_channels_count = torch.floor(dimension * torch.min(pq_gamma * (1 - lower_bound / dimension), beta_tensor))
-    print('prune_channels_count', prune_channels_count)
+
+    prune_channels_count = prune_channels_count.to(cfg['device'])
+    pq_indices = pq_indices_varying_length.to(cfg['device'])
     return int(prune_channels_count), pq_indices
 
 
@@ -925,7 +1014,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
         pq_indices_varying_length = (1 - dimension ** (1/pq_q - 1/pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
         print('pq_indices_varying_length', pq_indices_varying_length)
         info = {
-            f'global_norm_across_other_dims': W_metric.tolist(),
+            f'global_norm_across_other_dims': sorted_prune.tolist(),
             f'global_pq_indices_varying_lengths': pq_indices_varying_length.tolist(),
             f'global_pq_lower_bound': prune_count,
             f'global_pq_indices': pq_indices.tolist()
@@ -1010,6 +1099,16 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
             print(f"pruning layer {i} name {name}")
             W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
             W_metric = metric_process(mysetting, W_metric)         
+
+            # test ratio
+            if 'gate_proj' in name:
+                temp = subset[name].baseline_inp
+                print('self.baseline_inp', subset[name].baseline_inp.shape, outs.shape, outs.mean(dim=(0,1)).shape, subset[name].baseline_inp)
+                temp_out = outs.mean(dim=(0,1)) - temp
+                print('temp_out', temp_out.shape, temp_out, temp_out.mean())
+                ratio = temp / temp_out
+                print('ratio', outs.mean(dim=0).shape, temp_out.shape, ratio.shape, ratio, ratio.mean())
+                continue
 
             if name == 'self_attn.o_proj':
                 if mysetting.global_prune:

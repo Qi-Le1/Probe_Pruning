@@ -463,7 +463,65 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
         
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #             ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #             ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #             ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], [ 'WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                    ['down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128',  'O2WIFN+128'], [f'pq-0.9-0.9-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128',  'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                    ['down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128','O2WIFN+128'], [f'pq-0.9-0.9-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128',  'O2WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                    ['down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128','O2WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                ['down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
 
         # for 3d heatmap
         # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0]],
@@ -471,12 +529,17 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
         # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['O1WIFN+128', 'WIFV+128', 'WIFN+128', 'IFN+128',  'O2WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0]],
+        #         ['down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+# 'IFN+128',  'O2WIFN+128''WIFV+128', 
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['O1WIFN+128', 'WIFN+128', ], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0.1, 0.2, 0.3]],
         #         ['down-proj']]]
         # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
@@ -496,11 +559,11 @@ def main():
     if 'observe_llm' in args['type']:
         num_experiments = 1
     elif 'observe_fix_pruned_llm' in args['type']:
-        num_experiments = 1
+        num_experiments = 2
     else:
         raise ValueError('Not valid type')
     exp = [str(x) for x in list(range(num_experiments))]
-    exp = ['3']
+    # exp = ['3']
     controls = []
     for file in files:
         controls += make_control_list(file)
@@ -878,7 +941,7 @@ def make_vis(df_exp, df_history):
 
             # Join the number strings and convert to an integer
             layer_number = int(''.join(layer_number)) if layer_number else None
-            if layer_number <= math.ceil(total_layers[model_name] * 0.1) or math.ceil(layer_number >= total_layers[model_name] * 0.90):
+            if layer_number <= math.ceil(total_layers[model_name] * 0.05) or math.ceil(layer_number >= total_layers[model_name] * 0.95):
                 # print(f'layer_number: {layer_number}')
                 return True
         # print(f'False layer_number: {layer_number}')
@@ -1206,6 +1269,7 @@ def make_vis(df_exp, df_history):
                         draw_str_x_figure(plt, q_values, return_norm_list, None, key_for_dict, 'Q', 'Q norm')
 
                         data = data.tolist()
+                        print('data', len(data), data[:10])
                         data.sort()
                         norm_across_other_dims = data
                         temp_norm_across_other_dims_key = temp_key
@@ -1312,10 +1376,18 @@ def make_vis(df_exp, df_history):
                         # Calculate the moving average using convolution
                         averages = np.convolve(slopes, window, 'same')
 
-                        abs_averages_slopes = np.abs(averages)
+                        negative_values = averages[averages < 0]
 
-                        # Find the index of the minimum value in abs_slopes
-                        first_point = np.argmin(abs_averages_slopes)
+                        # Check if there are any negative values
+                        if len(negative_values) > 0:
+                            # Find the maximum among the negative values (closest to zero)
+                            closest_negative = np.max(negative_values)
+
+                            # Get the index of this value in the original 'averages' tensor
+                            first_point = np.where(averages == closest_negative)
+                        else:
+                            first_point = None  # or handle the case where there are no negative values
+                            raise ValueError('No negative values found in averages')
                             # if slopes[index] < -0.5:
                             #     # first_point = index
                             #     break
@@ -1377,50 +1449,50 @@ def make_vis(df_exp, df_history):
                         # draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_hypers', 'pruned_ratio')
 
                     # several methods for all layers on 1 plot
-                    # if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_for_pruned_layers' in index:
-                    #     if any(metric_name in index for metric_name in metric_name_list):
-                    #         flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                    #         flops_metric_name = flops_metric_name.split('/')[1]
-                    #         if performance_vs_prunedflops[0] is None:
-                    #             performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
-                    #             performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
-                    #     elif 'FLOPs_for_pruned_layers' in index:
-                    #         if performance_vs_prunedflops[2] is None:
-                    #             performance_vs_prunedflops[2] = row.tolist()[0]
+                    if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_for_pruned_layers' in index:
+                        if any(metric_name in index for metric_name in metric_name_list):
+                            flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                            flops_metric_name = flops_metric_name.split('/')[1]
+                            if performance_vs_prunedflops[0] is None:
+                                performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
+                                performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
+                        elif 'FLOPs_for_pruned_layers' in index:
+                            if performance_vs_prunedflops[2] is None:
+                                performance_vs_prunedflops[2] = row.tolist()[0]
                         
-                    #     if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
-                    #         print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
-                    #         # print('here1')
-                    #         # prune_tgt, 
-                    #         # prune_dim, 
-                    #         # batch_integ, 
-                    #         fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
-                    #         fig[fig_name] = plt.figure(fig_name)
-                    #         x = performance_vs_prunedflops[2]
+                        if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
+                            print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
+                            # print('here1')
+                            # prune_tgt, 
+                            # prune_dim, 
+                            # batch_integ, 
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
+                            fig[fig_name] = plt.figure(fig_name)
+                            x = performance_vs_prunedflops[2]
                             
-                    #         y = performance_vs_prunedflops[0]
-                    #         yerr = performance_vs_prunedflops[1]
-                    #         if 'pq' in prune_name and 'WIFV' in prune_metric:
-                    #             prune_name += '-flap'
-                    #         elif 'O1WIFN' in prune_metric or 'O2WIFN' in prune_metric:
-                    #             prune_name += prune_metric
-                    #         elif 'pq' in prune_name and 'WIFN' in prune_metric:
-                    #             prune_name += '-wanda'
-                    #         elif 'IFN' in prune_metric:
-                    #             prune_name += prune_metric
-                    #         key_for_dict = f"{prune_name}"
+                            y = performance_vs_prunedflops[0]
+                            yerr = performance_vs_prunedflops[1]
+                            if 'pq' in prune_name and 'WIFV' in prune_metric:
+                                prune_name += '-flap'
+                            elif 'O1WIFN' in prune_metric or 'O2WIFN' in prune_metric:
+                                prune_name += prune_metric
+                            elif 'pq' in prune_name and 'WIFN' in prune_metric:
+                                prune_name += '-wanda'
+                            elif 'IFN' in prune_metric:
+                                prune_name += prune_metric
+                            key_for_dict = f"{prune_name}"
                             
-                    #         # if 'pq' in prune_name:
-                    #         #     key_for_dict = f"Our"
-                    #         # elif 'mag' in prune_name:
-                    #         #     # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
-                    #         #     if float(prune_hyper) == 0:
-                    #         #         key_for_dict = f"Dense"
-                    #         #     else:
-                    #         #         key_for_dict = f"Mag"
-                    #         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
-                    #         # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
-                    #         performance_vs_prunedflops = [None, None, None]
+                            # if 'pq' in prune_name:
+                            #     key_for_dict = f"Our"
+                            # elif 'mag' in prune_name:
+                            #     # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
+                            #     if float(prune_hyper) == 0:
+                            #         key_for_dict = f"Dense"
+                            #     else:
+                            #         key_for_dict = f"Mag"
+                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                            # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                            performance_vs_prunedflops = [None, None, None]
 
 
 

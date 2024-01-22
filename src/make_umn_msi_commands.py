@@ -244,15 +244,15 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '5', '10'], ['128', '512', '1024'], ['WIFN'], [f'pqstructlocalout+h+{x}+-1+max' for x in [0, 0.1]],
-                    ['up-proj+down-proj'], ['full'], ['somemethods-3']]]
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['2'], ['128'], ['IF2N'], [f'magstructlocalfcstpar+h+{x}+-1+max' for x in [0.1]],
+                    ['gate-proj+up-proj+down-proj'], ['full'], ['somemethods-3']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '5', '10'], ['128', '512', '1024'], ['WIFN'], [f'pqstructlocalout+h+{x}+-1+max' for x in [0, 0.1]],
-                    ['gate-proj+down-proj'], ['full'], ['somemethods-3']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '5', '10'], ['128', '512', '1024'], ['WIFN'], [f'pqstructlocalout+h+{x}+-1+max' for x in [0, 0.1]],
+            #         ['gate-proj+down-proj'], ['full'], ['somemethods-3']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
 
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
@@ -678,15 +678,15 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                    ['down-proj']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+            #         ['down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                    ['down-proj']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+            #         ['down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
 
             # for many random seed
@@ -696,11 +696,25 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
             #         ['down-proj']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+            #         ['down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+            #         ['down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+            #         ['down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
             #         ['down-proj']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
@@ -741,6 +755,12 @@ def main():
             #         ['down-proj']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
+
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
+                    ['gate-proj+down-proj']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
 
         elif 'missing' in data:
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode)
@@ -820,10 +840,10 @@ def main():
         s += f'#SBATCH --ntasks={task_parallel_num}\n'
         # s += '#SBATCH --cpus-per-task=2'
         s += '#SBATCH --gres=gpu:a100:1\n'
-        s += '#SBATCH --partition=a100-4\n'
+        s += '#SBATCH --partition=a100-8\n'
         s += f'#SBATCH --mem={temp_mem}gb\n'
-        s += '#SBATCH --mail-type=ALL \n'
-        s += '#SBATCH --mail-user=le000288@umn.edu\n'
+        # s += '#SBATCH --mail-type=ALL \n'
+        # s += '#SBATCH --mail-user=le000288@umn.edu\n'
         s += f'#SBATCH -o {res_path}/{filename}_%j.out\n'
         s += f'#SBATCH -e {res_path}/{filename}_%j.err\n'
         s += '\n'

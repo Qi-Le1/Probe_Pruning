@@ -674,14 +674,39 @@ def process_dataset(dataset, tokenizer):
                 examples['ctx_b'] = [examples['ctx_b'][i].capitalize() for i in range(batch_size)]
                 targets = [int(targets[i]) for i in range(batch_size)]
 
-                inputs = [(preprocess(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ')) for i in
-                          range(batch_size)]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                labels = tokenizer(targets, max_length=3, padding="max_length", truncation=True, return_tensors="pt")
-                labels = labels["input_ids"]
-                labels[labels == tokenizer.pad_token_id] = -100
-                model_inputs["labels"] = labels
+                inputs = []
+                labels = []
+                correct_labels_extended = []
+                input_indicies = []
+                for i in range(batch_size):
+                    num_choices = len(examples['endings'][i])
+                    inputs.extend([examples['ctx_a'][i] + " " + examples['ctx_b'][i]] * num_choices)
+                    labels.extend(targets[i])
+                    correct_labels_extended.extend([targets[i]] * num_choices)
+                    input_indicies.extend([i] * num_choices)
+                # inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
+                #           range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True)
+                labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
+
+                for i in range(len(correct_labels_extended)):
+                    sample_input_ids = model_inputs["input_ids"][i]
+                    sample_attention_mask = model_inputs["attention_mask"][i]
+                    label_input_ids = labels["input_ids"][i]
+                    label_attention_mask = labels["attention_mask"][i]
+                    model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
+                    model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
+                    labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
+                    # labels["input_ids"][i] = [-100] * (len(sample_input_ids)+1)
+                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
+                    # input_indicies[i] = torch.tensor(input_indicies[i])
+                    # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
+
+                model_inputs["labels"] = labels["input_ids"]
+                model_inputs['input_indicies'] = input_indicies
+                model_inputs["correct_labels"] = correct_labels_extended
                 return model_inputs
 
             processed_dataset = {}
@@ -754,6 +779,7 @@ def process_dataset(dataset, tokenizer):
             processed_dataset['test'] = dataset['test'].map(
                 tokenize_function,
                 batched=True,
+                batch_size=100000,
                 num_proc=1,
                 remove_columns=dataset["test"].column_names,
                 load_from_cache_file=False,

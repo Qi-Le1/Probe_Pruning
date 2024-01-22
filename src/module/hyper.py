@@ -241,8 +241,8 @@ def make_data_name():
             'hellaswag': {'data_name': 'Rowan/hellaswag',
                     'subset_name_dict': {
                         'none': {'subset_name': None,
-                              'text_column': ['activity_label', 'ctx_a', 'ctx_b', 'endings'],
-                              'label_column': 'label'}, 
+                              'text_column': 'hardcode, complex structure',
+                              'label_column': 'hardcode, complex structure'}, 
                         },                        
             },
             # https://huggingface.co/datasets/openbookqa
@@ -373,9 +373,8 @@ TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
     'test': ['fc']
 }
 
-TRANSFORMERS_MODELS_PRUNE_OUTPUT_DIM_MAPPING = {
-    "opt": [ "fc1"],
-    "llama": [ "gate_proj", "up_proj"],
+TRANSFORMERS_MODELS_FCST = {
+    # "llama": [ "gate_proj", "up_proj"],
     
 }
 

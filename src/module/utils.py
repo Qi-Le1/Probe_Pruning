@@ -18,6 +18,16 @@ FLOPS_UNIT = (1000000, 'Million')
 # already in seconds unit
 TIME_UNIT = (1, 's')
 
+def identity_function(x):
+    return x
+
+def alternate_broadcast(tensor1, tensor2):
+    if tensor1.device != tensor2.device:
+        # Move tensor2 to the device of tensor1
+        tensor2 = tensor2.to(tensor1.device)
+    tensor1 = tensor1.sum(0)
+    # Calculate the total number of dimensions after broadcasting
+    return tensor1 * tensor2
 
 def record_pruing_info(model, logger):
     for name, module in model.named_modules():

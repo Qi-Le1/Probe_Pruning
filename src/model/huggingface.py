@@ -9,7 +9,7 @@ from diffusers import (
 )
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification, \
     AutoTokenizer, LlamaTokenizer, LlamaForCausalLM, AutoModelForMultipleChoice, AutoModel
-from module import MULTIGPUS_MODEL_NAME_LIST
+from module import MULTIGPUS_MODEL_NAME_LIST, TRANSFORMERS_MODELS_FCST, alternate_broadcast
 
 
 def make_hf_model(model_name, sub_model_name=None):
@@ -155,6 +155,7 @@ def make_hf_model(model_name, sub_model_name=None):
     
     # print('model.model.layers', model.model.layers)
     print('model.config', model.config)
+       
     return model, tokenizer
 
 
