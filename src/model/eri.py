@@ -111,7 +111,7 @@ class EriModel(torch.nn.Module):
             
             new_module = self._create_new_module(prune_name, target, key)
 
-            if 'out' in cfg['prune_name']:
+            if 'WO' in cfg['prune_metric']:
                 new_module.prune_out_dim = False
                 out_dim_target_modules = TRANSFORMERS_MODELS_PRUNE_OUTPUT_DIM_MAPPING[cfg['model_type']]
                 if _check_target_module_exists(out_dim_target_modules, key):
@@ -376,10 +376,10 @@ class Linear(nn.Linear, EriLayer):
                     'weight': self.weight.data,
                     # 'weight_norm_across_channel_dims': self.weight_norm_across_channel_dims,
                 }
-                # if 'out' in cfg['prune_name'] and self.prune_out_dim == False:
+                # if 'WO' in cfg['prune_metric'] and self.prune_out_dim == False:
 
                 # down-proj
-                if 'out' in cfg['prune_name'] and self.prune_out_dim == False:
+                if 'WO' in cfg['prune_metric'] and self.prune_out_dim == False:
                     # print('key', self.key)
                     # torch.cuda.empty_cache()
                     non_zero_indices = torch.nonzero(torch.sum(x, dim=(0,1)), as_tuple=True)[-1]
@@ -408,7 +408,7 @@ class Linear(nn.Linear, EriLayer):
                 # mask[prune_channels_multi_dims[-1]] = False
                 # # Use the mask to index the tensor
                 # weight = torch.index_select(self.weight, dim=extract_weight_dim, index=mask.nonzero().squeeze().to(self.weight.device))
-                if 'out' in cfg['prune_name'] and self.prune_out_dim == True:
+                if 'WO' in cfg['prune_metric'] and self.prune_out_dim == True:
                     print('pruned_h.shape: ', pruned_h.shape)
                     print('weight.shape: ', weight.shape)
                     print('result.shape: ', result.shape)
@@ -715,7 +715,7 @@ class HiddenRepresentationPruning(BasePruning):
             torch.cuda.empty_cache()
 
     def prune_h(self, h, prune_dim, prune_channels):
-        if 'out' in cfg['prune_name'] and cfg['prune_metric'] == 'WIFN':
+        if 'WO' in cfg['prune_metric'] and cfg['prune_metric'] == 'WIFN':
             return h
         # Create a boolean mask for all indices
         mask = torch.ones(h.size(prune_dim), dtype=torch.bool)
@@ -800,7 +800,7 @@ class HiddenRepresentationPruning(BasePruning):
                 info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
                 self.logger_info_time_used += time.time() - start_time
             norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
-        elif 'out' in cfg['prune_name'] and cfg['prune_metric'] == 'WIFN':
+        elif 'WO' in cfg['prune_metric'] and cfg['prune_metric'] == 'WIFN':
             batch_size = h.shape[0]
             # self.scaler_in *= self.nsamples / (self.nsamples + batch_size)
             # self.scaler_in += torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) ** 2 / (self.nsamples + batch_size)
@@ -958,7 +958,7 @@ class HiddenRepresentationPruning(BasePruning):
             # self.logger_info_time_used += time.time() - start_time
 
         # print('sorted_channels', sorted_channels.shape, sorted_channels, prune_channels_count)
-        # if 'out' in cfg['prune_name']:
+        # if 'WO' in cfg['prune_metric']:
         #     prune_channels = []
         # else:
         # print('sorted_channels', sorted_channels.shape, sorted_channels, prune_channels_count)

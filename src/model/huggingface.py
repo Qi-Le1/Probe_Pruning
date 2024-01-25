@@ -8,8 +8,9 @@ from diffusers import (
     UNet2DConditionModel,
 )
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification, \
-    AutoTokenizer, LlamaTokenizer, LlamaForCausalLM, AutoModelForMultipleChoice, AutoModel
-from module import MULTIGPUS_MODEL_NAME_LIST, TRANSFORMERS_MODELS_FCST, alternate_broadcast
+    AutoTokenizer, LlamaTokenizer, AutoModelForMultipleChoice, AutoModel
+from .hf.modeling_llama import LlamaForCausalLM
+from module import MULTIGPUS_MODEL_NAME_LIST, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING, alternate_broadcast
 
 
 def make_hf_model(model_name, sub_model_name=None):

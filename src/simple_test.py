@@ -33,9 +33,39 @@ import torch
 # ddd = d.shape
 # # 在 a 的最后一个维度和 b 的第一个维度上进行点积
 # e = 5
+import torch
+import torch.nn as nn
+
+# class SimpleModel(nn.Module):
+#     def __init__(self):
+#         super(SimpleModel, self).__init__()
+#         # self.fc1 = nn.Linear(100, 200)
+#         # self.relu = nn.ReLU()
+#         # self.fc2 = nn.Linear(200, 10)
+
+#     def forward(self, x):
+#         return torch.matmul(x[0], x[1])
+#         # return x[0] * x[1]
+
+# # Instantiate the model
+# model = SimpleModel()
 
 
+# from deepspeed.profiling.flops_profiler import get_model_profile
 
+# # Define a batch size and input tensor
+# # batch_size = 32
+# # input_tensor = torch.randn(batch_size, 100)
+# x = torch.randn(2, 100)
+# # y = torch.randn(100)
+# # Use the profiler to get FLOPs and parameter counts
+# flops, macs, params = get_model_profile(model=model, 
+#                                  input_shape=(2,100))
+                                
+
+# print(f"MACs: {macs}")
+# print(f"Parameters: {params}")
+# c = 6
 # # Example instances
 # embedding_layer = nn.Embedding(num_embeddings=10, embedding_dim=3)
 # linear_layer = nn.Linear(in_features=10, out_features=5)
@@ -107,6 +137,31 @@ from mpl_toolkits.mplot3d import Axes3D
 # pq_p = 1
 # pq_q = 2
 
+import torchvision.models as models
+import torch
+
+
+def new_forward(self, x):
+    x = self.conv1(x)
+    x = self.bn1(x)
+    x = self.relu(x)
+    x = self.maxpool(x)
+
+    x = self.layer1(x)
+    x = self.layer2(x)
+    x = self.layer3(x)
+    x = self.layer4(x)
+    return x
+
+
+# define a resnet instance
+resnet = models.resnet18()
+
+# add new_forward function to the resnet instance as a class method
+bound_method = new_forward.__get__(resnet, resnet.__class__)
+setattr(resnet, 'forward', bound_method)
+aa = resnet.forward
+a = 5
 # # print(len(x), len(x[0]))
 # for d in range(1, len(x)):
 #     # m at most equals to d-1

@@ -13,7 +13,7 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load
+    record_pruing_info, get_model_profile, summarize_info_list, match_prefix
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 
 
@@ -46,14 +46,7 @@ def runExperiment():
     makedir_exist_ok(result_path)
 
     cfg['epoch'] = 0 
-    vanilla_name_list = cfg['model_tag'].split('_')
-    vanilla_name_list[4] = '1'
-    vanilla_name_list[7] = 'vanilla+h+0+-1+max'
-    vanilla_name_list[8] = 'None'
-    vanilla_name_list[9] = 'full'
-    vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
-    vanilla_info_list, vanilla_duration = vanilla_res['vanilla_info_list'], vanilla_res['vanilla_duration']
-
+    
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
     dataset = process_dataset(dataset, tokenizer)
@@ -61,21 +54,15 @@ def runExperiment():
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
-    model = make_prune_model(model)
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     test(data_loader['test'], model, model_prof, metric, test_logger)
-    pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
-    
-    # print('vanilla_info_list', vanilla_info_list[0], vanilla_info_list[1])
-    batch_num = len(data_loader['test'])
-    summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, pruned_duration, batch_num, test_logger)
+    vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
 
     # thread lock bug
     test_logger.writer = None
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
-              'vanilla_info_list': vanilla_info_list, 'pruned_info_list': pruned_info_list, \
-              'vanilla_duration': vanilla_duration, 'pruned_duration': pruned_duration, 'batch_num': batch_num}
+              'vanilla_info_list': vanilla_info_list, 'vanilla_duration': vanilla_duration}
 
     save(result, os.path.join(result_path, cfg['model_tag']))
     return

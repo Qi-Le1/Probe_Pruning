@@ -44,14 +44,12 @@ def process_control():
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
     # if cfg['cust_tgt_modules'] == ['None']:
     #     cfg['cust_tgt_modules'] = None
-    if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != 'default':
-        cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
 
     cfg['batch_integ'] = cfg['control']['batch_integ'] if 'batch_integ' in cfg['control'] else None
-    if 'multibatch_integ' in cfg['control']:
-        multibatch_integ_list = cfg['control']['multibatch_integ'].split('-')
-        cfg['multibatch_integ'] = multibatch_integ_list[0]
-        cfg['multibatch_factor'] = float(multibatch_integ_list[1])
+    # if 'multibatch_integ' in cfg['control']:
+    #     multibatch_integ_list = cfg['control']['multibatch_integ'].split('-')
+    #     cfg['multibatch_integ'] = multibatch_integ_list[0]
+    #     cfg['multibatch_factor'] = float(multibatch_integ_list[1])
     
     cfg['split_metric'] = False
 
@@ -373,8 +371,8 @@ TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
     'test': ['fc']
 }
 
-TRANSFORMERS_MODELS_FCST = {
-    # "llama": [ "gate_proj", "up_proj"],
+TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING = {
+    "llama": ["gate_proj", "up_proj"],
     
 }
 

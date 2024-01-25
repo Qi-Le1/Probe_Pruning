@@ -16,7 +16,7 @@ from config import cfg
 from math import prod
 from .model import init_param, mse_loss
 from typing import List, Optional, Tuple, Union
-from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING, TRANSFORMERS_MODELS_FCST, alternate_broadcast, identity_function
+from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING
 from functools import reduce
 
 class LlamaEriModel(torch.nn.Module):
@@ -33,30 +33,6 @@ class LlamaEriModel(torch.nn.Module):
             pruning_module = WeightPruning(cfg, 'global')
             pruning_module.global_pruning(self.model)
         
-        if 'fcst' in cfg['prune_name'] and 'llama' in cfg['model_name']:
-            num_layers = len(self.model.model.layers)
-            TRANSFORMERS_MODELS_FCST[cfg['model_name']] = {'gate_proj': [[] for _ in range(num_layers)], 'up_proj': [[] for _ in range(num_layers)]}
-            for i in range(num_layers):
-                layer = self.model.model.layers[i]
-                # gate proj and up proj will consider both effect since they are parallel
-                if 'par' in cfg['prune_name']:
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['gate_proj'][i].append((layer.mlp.gate_proj, layer.mlp.up_proj))
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['up_proj'][i].append((layer.mlp.gate_proj, layer.mlp.up_proj))
-
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['gate_proj'][i].append((layer.mlp.act_fn, identity_function))
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['up_proj'][i].append((layer.mlp.act_fn, identity_function))
-
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['gate_proj'][i].append((torch.mul))
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['up_proj'][i].append((torch.mul))
-                    
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['gate_proj'][i].append((alternate_broadcast))
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['up_proj'][i].append((alternate_broadcast))
-
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['gate_proj'][i].append((layer.mlp.down_proj.weight.data.sum(axis=0)))
-                    TRANSFORMERS_MODELS_FCST[cfg['model_name']]['up_proj'][i].append((layer.mlp.down_proj.weight.data.sum(axis=0)))
-                    
-                    layer.mlp.gate_proj.fcst = TRANSFORMERS_MODELS_FCST[cfg['model_name']]['gate_proj'][i]
-                    layer.mlp.up_proj.fcst = TRANSFORMERS_MODELS_FCST[cfg['model_name']]['up_proj'][i]
         return
     
     def _check_quantization_dependency(self):
@@ -134,14 +110,21 @@ class LlamaEriModel(torch.nn.Module):
             is_target_modules_in_base_model = True
             parent, target, target_name = _get_submodules(self.model, key)
             
-            new_module = self._create_new_module(prune_name, target, key)
-
-            # if 'fcst' in cfg['prune_name']:
-            #     new_module.prune_out_dim = False
-            #     out_dim_target_modules = TRANSFORMERS_MODELS_PRUNE_OUTPUT_DIM_MAPPING[cfg['model_type']]
+            # if 'WO' in cfg['prune_metric']:
+            #     new_module.is_prune_out_dim = False
+            #     out_dim_target_modules = TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING[cfg['model_type']]
             #     if _check_target_module_exists(out_dim_target_modules, key):
             #         print('out_dim_target_modules', key)
-            #         new_module.prune_out_dim = True
+            #         new_module.is_prune_out_dim = True
+
+            new_module = self._create_new_module(prune_name, target, key)
+
+            if 'WO' in cfg['prune_metric']:
+                new_module.is_prune_out_dim = False
+                out_dim_target_modules = TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING[cfg['model_type']]
+                if _check_target_module_exists(out_dim_target_modules, key):
+                    print('out_dim_target_modules', key)
+                    new_module.is_prune_out_dim = True
 
             self._replace_module(parent, target_name, new_module, target)
         if not is_target_modules_in_base_model:
@@ -274,7 +257,7 @@ class EriLayer:
         else:
             raise ValueError('Not valid layer type')
     
-    def extract_weight(self, input_dim, pruned_dims, prune_channels_multi_dims, layer_type, prune_out_dim=None):
+    def extract_in_weight(self, input_dim, pruned_dims, prune_channels_multi_dims, layer_type, is_prune_out_dim=None):
         # unstruct pruning
         if pruned_dims is None:
             return self.weight
@@ -302,42 +285,8 @@ class EriLayer:
 
                 # Return the modified copy
                 return weight
-            if 'fcst' not in cfg['prune_name']:
-                if pruned_dims[-1] is None or prune_channels_multi_dims[-1] is None:
-                    # print('zzzzz')
-                    return self.weight
-                else:
-                    extract_weight_dim = 1
-                    # weight dim 1 should have same size as original h dim 2
-                    mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
-                    # Mark the indices to be pruned as False
-                    mask[prune_channels_multi_dims[-1]] = False
-                    # Use the mask to index the tensor
-                    weight = torch.index_select(self.weight, dim=extract_weight_dim, index=mask.nonzero().squeeze().to(self.weight.device))
-                    return weight
-            else:
-                if pruned_dims[-1] is None or prune_channels_multi_dims[-1] is None:
-                    # print('zzzzz')
-                    return self.weight
-                else:
-                    if prune_out_dim:
-                        extract_weight_dim = 0
-                        # weight dim 1 should have same size as original h dim 2
-                        mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
-                        # Mark the indices to be pruned as False
-                        mask[prune_channels_multi_dims[-1]] = False
-
-                        self.out_selected_dim = mask
-                        # print('self.out_selected_dim', self.out_selected_dim)
-                        # Use the mask to index the tensor
-                        weight = torch.index_select(self.weight, dim=extract_weight_dim, index=mask.nonzero().squeeze().to(self.weight.device))
-                        return weight
-        elif layer_type == 'conv2d':
-            # [batch_size, in_channels, h, w]
-            if input_dim != 4:
-                raise ValueError('Not valid input dimension')
             
-            if pruned_dims[1] is None or prune_channels_multi_dims[1] is None:
+            if pruned_dims[-1] is None or prune_channels_multi_dims[-1] is None:
                 # print('zzzzz')
                 return self.weight
             else:
@@ -345,8 +294,53 @@ class EriLayer:
                 # weight dim 1 should have same size as original h dim 2
                 mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
                 # Mark the indices to be pruned as False
-                mask[prune_channels_multi_dims[1]] = False
-                # print('prune_channel', self.key, prune_channels_multi_dims[1])
+                mask[prune_channels_multi_dims[-1]] = False
+                # Use the mask to index the tensor
+                weight = torch.index_select(self.weight, dim=extract_weight_dim, index=mask.nonzero().squeeze().to(self.weight.device))
+                return weight
+           
+        
+    def extract_out_weight(self, input_dim, pruned_dims, prune_channels_multi_dims, layer_type, is_prune_out_dim=None):
+        # unstruct pruning
+        if pruned_dims is None:
+            return self.weight
+        
+        if layer_type == 'linear':
+            # [batch_size, in_features] / [batch_size, seq_lens, token_lens]
+            if input_dim != 2 and input_dim != 3:
+                raise ValueError('Not valid input dimension')
+            
+            if 'wandaunstrcut' in pruned_dims:
+                # new_weight = self.weight.clone()
+
+                src_tensor = torch.tensor(0, dtype=self.weight.dtype, device=self.weight.device)
+                # Perform the scatter operation on the new tensor
+                # new_weight.scatter_(dim=1, index=prune_channels_multi_dims, src=src_tensor)
+
+                # Create a mask with all elements set to True
+                mask = torch.ones_like(self.weight, dtype=self.weight.dtype, device=self.weight.device)
+
+                # Set the specified indices in the mask to False
+                mask.scatter_(dim=1, index=prune_channels_multi_dims, src=src_tensor)
+
+                # Apply the mask to the tensor
+                weight = self.weight * mask
+
+                # Return the modified copy
+                return weight
+            
+            if pruned_dims[-1] is None or prune_channels_multi_dims[-1] is None:
+                # print('zzzzz')
+                return self.weight
+            else:
+                extract_weight_dim = 0
+                # weight dim 1 should have same size as original h dim 2
+                mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
+                # Mark the indices to be pruned as False
+                mask[prune_channels_multi_dims[-1]] = False
+
+                self.out_selected_dim = mask
+                # print('self.out_selected_dim', self.out_selected_dim)
                 # Use the mask to index the tensor
                 weight = torch.index_select(self.weight, dim=extract_weight_dim, index=mask.nonzero().squeeze().to(self.weight.device))
                 return weight
@@ -370,7 +364,7 @@ class Linear(nn.Linear, EriLayer):
         self.fan_in_fan_out = fan_in_fan_out
         # print('fan_in_fan_out: ', fan_in_fan_out, self.weight.data.shape, self.weight.shape)
         # GPT2 has CON1D, which is a self-defined layer, not the traditional Conv1D
-        print('self.weight')
+        # print('self.weight')
         # if fan_in_fan_out:
         #     self.weight.data = self.weight.data.T
         # print('after fan_in_fan_out: ', fan_in_fan_out, self.weight.data.shape)
@@ -382,29 +376,34 @@ class Linear(nn.Linear, EriLayer):
         #     self.prune_weight(self.weight, self.layer_type)
     
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, **kwargs):
         with torch.no_grad():
             previous_dtype = x.dtype
             if self.prune_tgt == 'hidden_repr':
+                if 'fcst' in cfg['prune_name'] and 'cal_fcst_out_dim_metric' in kwargs:
+                    # broadcast and return out_dim * in_dim matrix
+                    return x * self.weight
                 # print('-----\n')
                 # print('input_shape: ', x.shape)
                 # print("prev weight.shape", self.weight.shape)
+                batch_size = x.size(0)
                 input_dim = x.dim()
                 seq_len = x.size(1)
                 input_shape = x.shape
-                # print('input_shape: ', input_shape)
+                # print('input_shape: ', input_shape, self.key)
                 linear_layer_info = {
                     'weight': self.weight.data,
                     # 'weight_norm_across_channel_dims': self.weight_norm_across_channel_dims,
                 }
-                # if 'fcst' in cfg['prune_name'] and self.prune_out_dim == False:
+                # if 'fcst' in cfg['prune_name'] and self.is_prune_out_dim == False:
 
                 # down-proj
-                if 'fcst' in cfg['prune_name'] and getattr(self, 'fcst', None) is None:
+                if 'WO' in cfg['prune_metric'] and self.is_prune_out_dim == False:
                     # print('key', self.key)
                     # torch.cuda.empty_cache()
                     non_zero_indices = torch.nonzero(torch.sum(x, dim=(0,1)), as_tuple=True)[-1]
-                    print('non_zero_indices ratio', non_zero_indices.numel()/x.size(-1))
+                    # print('non_zero_indices ratio', non_zero_indices.numel()/x.size(-1))
+                    # print('x.shape', x.shape)
                     # Extract corresponding weights using index_select
                     # Assuming we're selecting along the last dimension of self.weight
                     # The dimension number might need to be adjusted depending on the shape of self.weight
@@ -414,31 +413,27 @@ class Linear(nn.Linear, EriLayer):
                     weight = torch.index_select(self.weight, dim=1, index=non_zero_indices.to(self.weight.device))
                     pruned_h = x[..., non_zero_indices]
                 else:
-                    pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.fcst)
-                    weight = self.extract_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type, getattr(self, 'fcst', None) is not None)
-                
+                    fcst_out_dim_metric = kwargs.get('fcst_out_dim_metric', None)
+                    pruned_h, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.is_prune_out_dim, fcst_out_dim_metric)
+                    if 'fcst_out_dim_metric' in kwargs or 'WO' in cfg['prune_metric']:
+                        weight = self.extract_out_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
+                    else:
+                        weight = self.extract_in_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
                 
                 result = F.linear(pruned_h, weight, bias=self.bias)
                 # refill the pruned output dim with 0
                 # gate-proj & up-proj
-
-                # mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
-                # # Mark the indices to be pruned as False
-                # mask[prune_channels_multi_dims[-1]] = False
-                # # Use the mask to index the tensor
-                # weight = torch.index_select(self.weight, dim=extract_weight_dim, index=mask.nonzero().squeeze().to(self.weight.device))
-                if 'fcst' in cfg['prune_name'] and getattr(self, 'fcst', None) is not None:
-                    print('pruned_h.shape: ', pruned_h.shape)
-                    print('weight.shape: ', weight.shape)
-                    print('result.shape: ', result.shape)
+                if 'WO' in cfg['prune_metric'] and self.is_prune_out_dim == True:
+                    # print('pruned_h.shape: ', pruned_h.shape)
                     # Create a tensor of zeros with the original output size    
                     # Assuming pruned_h has shape [batch_size, ...], modify accordingly if different
-                    recovered_output = torch.zeros(cfg['batch_size'],seq_len, self.out_features, device=result.device, dtype=result.dtype)
+                    recovered_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
 
                     # Insert the output from the pruned layer into the correct positions in the extended tensor
                     # print('extended_output.shape', extended_output.shape)
                     # print('key', self.key)
                     # print('self.out_selected_dim', torch.nonzero(self.out_selected_dim).squeeze())
+                    # print('gate&up', (self.out_selected_dim.shape[0] - torch.sum(self.out_selected_dim))/self.weight.shape[0], self.key)
                     recovered_output[..., self.out_selected_dim] = result
 
                     # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
@@ -449,6 +444,7 @@ class Linear(nn.Linear, EriLayer):
             
             self.pruning_module.cal_repr_distribution(pruned_h, f'{self.key}_pruned_hist')
             result = result.to(previous_dtype)
+            # print('result.shape: ', result.shape, self.key)
         return result
     
 
@@ -606,7 +602,7 @@ class HiddenRepresentationPruning(BasePruning):
             self.scaler_in = torch.zeros((in_dim), device=self.device)
         self.nsamples = 0
 
-    def batch_pruning(self, h, layer_type, layer_info, key, fcst=None):
+    def batch_pruning(self, h, layer_type, layer_info, key, is_prune_out_dim, fcst):
         # Exclude the first dimension (batch size) and the prune_dim
         # calculate the pq-index per sample
         if h.dim() != 3 and layer_type == 'linear':
@@ -668,7 +664,7 @@ class HiddenRepresentationPruning(BasePruning):
                             raise ValueError('Not valid prune dim')
                         elif layer_type == 'conv2d' and prune_dim != 1:
                             raise ValueError('Not valid prune dim')
-                        prune_channels = self.apply_pruning(h, key, layer_info, prune_dim, fcst)
+                        prune_channels = self.apply_pruning(h, key, layer_info, prune_dim, is_prune_out_dim, fcst)
                         prune_channels = self.apply_batch_integ(h_shape[prune_dim], prune_channels)
                         prune_channels_multi_dims[prune_dim] = prune_channels
 
@@ -715,26 +711,15 @@ class HiddenRepresentationPruning(BasePruning):
                     # print('saving_flops_multi_dims', saving_flops_multi_dims)
                     # print('prune_channels_multi_dims', prune_channels_multi_dims)
                     return pruned_h, pruned_dims, prune_channels_multi_dims
-                elif self.prune_dim_select_mode == 'casc':
-                    for prune_dim in self.prune_dim:
-                        prune_channels = self.apply_pruning(h, prune_dim)
-                        prune_channels = self.apply_batch_integ(h_shape[prune_dim], prune_channels)
-                        prune_channels_multi_dims[prune_dim] = prune_channels
-                        
-                        # saving_flops = self.cal_saving_flops(h, prune_dim, prune_channels, layer_type, layer_info)
-                        # saving_flops_multi_dims[prune_dim] = saving_flops
-
-                        pruned_h = self.prune_h(h, prune_dim, prune_channels_multi_dims[prune_dim])
-                        h = pruned_h
-                    pruned_dims = [dim if dim in self.prune_dim else None for dim in range(h.dim())]
-                    return pruned_h, pruned_dims, prune_channels_multi_dims
             else:
                 raise ValueError('Not valid pruning method')
             
             torch.cuda.empty_cache()
 
     def prune_h(self, h, prune_dim, prune_channels):
-        if 'fcst' in cfg['prune_name'] and cfg['prune_metric'] == 'WIFN':
+        # if 'fcst' in cfg['prune_name']:
+        #     return h
+        if 'WOF1N' in cfg['prune_metric'] or 'WOF2N' in cfg['prune_metric']:
             return h
         # Create a boolean mask for all indices
         mask = torch.ones(h.size(prune_dim), dtype=torch.bool)
@@ -766,7 +751,7 @@ class HiddenRepresentationPruning(BasePruning):
             intersected_set = set.union(*sets)
             prune_channels = torch.tensor(list(intersected_set), dtype=torch.long)
         elif self.batch_integ == 'full':
-            prune_channels = torch.tensor(prune_channels[0], dtype=torch.long)
+            prune_channels = torch.tensor(prune_channels[0].clone().detach(), dtype=torch.long)
         else:
             raise ValueError('Not valid batch integration method')
         if prune_channels.numel() == 0:
@@ -779,7 +764,7 @@ class HiddenRepresentationPruning(BasePruning):
             warnings.warn("Attempting to prune all channels. Keeping one channel for calculation.")
         return prune_channels
     
-    def apply_pruning(self, h, key, layer_info, prune_dim=None, fcst=None):
+    def apply_pruning(self, h, key, layer_info, prune_dim, is_prune_out_dim, fcst):
         # print('apply_pruning', prune_dim, h.dim(), h.shape)
         if prune_dim >= h.dim():
             raise ValueError('Not valid pruning dimension')
@@ -794,7 +779,7 @@ class HiddenRepresentationPruning(BasePruning):
         elif 'magstruct' in self.prune_name:
             if self.prune_hyper == 9999:
                 return [torch.empty(0)]
-            prune_channels = self.mag_struct(h, key, layer_info, prune_dim, fcst)
+            prune_channels = self.mag_struct(h, key, layer_info, prune_dim, is_prune_out_dim, fcst)
             return prune_channels
         # elif 'magunstruct' in self.prune_name:
         #     pruned_indices = self.mag_unstruct(h, key)
@@ -1001,63 +986,44 @@ class HiddenRepresentationPruning(BasePruning):
     #     # Select the indices to prune (lowest norms)
     #     pruned_indices = sorted_indices[:, :num_indices_to_prune]
     #     return pruned_indices
-    
-    def execute_fcst(self, h_norm, fcst_list):
-        temp_out = []
-        for i in range(len(fcst_list)-1):
-            cur_fcst = fcst_list[i]
-            if len(cur_fcst) > 1:
-                if len(temp_out) == 0:
-                    for j in range(len(cur_fcst)):
-                        if getattr(cur_fcst[i][j], 'weight') is not None:
-                            device = cur_fcst[i][j].weight.device
-                            h_norm = h_norm.to(device)
-                        temp_out.append(cur_fcst[i][j](h_norm))
-                else:
-                    for j in range(len(cur_fcst)):
-                        if getattr(cur_fcst[i][j], 'weight') is not None:
-                            device = cur_fcst[i][j].weight.device
-                            temp_out[j] = temp_out[j].to(device)
-                        temp_out.append(cur_fcst[i][j](temp_out[j]))
-                        temp_out.pop(0)
-            elif len(cur_fcst) == 1:
-                if cur_fcst == alternate_broadcast:
-                    temp_out.append(cur_fcst[i][0](temp_out[0], fcst_list[i+1]))
-                else:
-                    temp_out.append(cur_fcst[i][0](**temp_out))
-                temp_out.pop(0)
-        return temp_out[0]
-                    
 
-    def mag_struct(self, h, key,layer_info, prune_dim, fcst=None):
+    def mag_struct(self, h, key,layer_info, prune_dim, is_prune_out_dim, fcst):
         info = {}
         dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != self.exclude_dim_to_aggregate)
-        if self.prune_metric == 'IF1N':
-            norm_across_other_dims = torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate)
-        elif self.prune_metric == 'IF2N':
-            norm_across_other_dims = torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate)
-        # if norm_across_other_dims.dim() == 0 or norm_across_other_dims.dim() == 1:
-        #     norm_across_other_dims.unsqueeze_(0)
-        # print('w*magstruct', self.prune_name)     
-        if 'w*magstruct' in self.prune_name:
-            # print('2222w*magstruct', self.prune_name)
-            if self.weight_norm_across_channel_dims is None:
-                self.cal_weight_norm_across_channel_dims(layer_info['weight'])
-                start_time = time.time()
-                info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
-                self.logger_info_time_used += time.time() - start_time
-            
-            norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
-        elif 'fcst' in cfg['prune_name']:
-            batch_size = h.shape[0]
-            # self.scaler_in += torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate)
-            # norm_across_other_dims = (torch.abs(layer_info['weight']) * self.scaler_in.reshape((1,-1))).mean(axis=1)
-            norm_across_other_dims = self.execute_fcst(norm_across_other_dims, fcst)
+
+        if fcst is not None:
+            norm_across_other_dims = fcst
+        else:
+            if self.prune_metric == 'IF1N':
+                norm_across_other_dims = torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate)
+            elif self.prune_metric == 'IF2N':
+                norm_across_other_dims = torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate)
+            elif self.prune_metric == 'WIF1N':
+                norm_across_other_dims = (torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate) * layer_info['weight'].abs()).sum(dim=0)
+            elif self.prune_metric == 'WIF2N':
+                norm_across_other_dims = (torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) * layer_info['weight'].abs()).sum(dim=0)
+            elif self.prune_metric == 'WOF1N':
+                norm_across_other_dims = (torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate) * layer_info['weight'].abs()).sum(dim=1)
+            elif self.prune_metric == 'WOF2N':
+                norm_across_other_dims = (torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) * layer_info['weight'].abs()).sum(dim=1)
+            # if norm_across_other_dims.dim() == 0 or norm_across_other_dims.dim() == 1:
+            #     norm_across_other_dims.unsqueeze_(0)
+            # print('w*magstruct', self.prune_name)     
+            if 'w*magstruct' in self.prune_name:
+                # print('2222w*magstruct', self.prune_name)
+                if self.weight_norm_across_channel_dims is None:
+                    self.cal_weight_norm_across_channel_dims(layer_info['weight'])
+                    start_time = time.time()
+                    info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
+                    self.logger_info_time_used += time.time() - start_time
+                
+                norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
 
         if norm_across_other_dims.dim() == 0 or norm_across_other_dims.dim() == 1:
             norm_across_other_dims.unsqueeze_(0)
 
         prune_channels_count = int(self.prune_hyper * norm_across_other_dims[0].shape[0])
+        # print('prune_channels_count', prune_channels_count, norm_across_other_dims[0].shape[0], self.prune_hyper)
         _, sorted_channels = torch.sort(norm_across_other_dims, dim=1)
 
         if sorted_channels.dim() == 0 or sorted_channels.dim() == 1:
