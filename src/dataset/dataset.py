@@ -677,13 +677,13 @@ def process_dataset(dataset, tokenizer):
                 inputs = []
                 labels = []
                 correct_labels_extended = []
-                input_indicies = []
+                input_indices = []
                 for i in range(batch_size):
                     num_choices = len(examples['endings'][i])
                     inputs.extend([examples['ctx_a'][i] + " " + examples['ctx_b'][i]] * num_choices)
                     labels.extend(targets[i])
                     correct_labels_extended.extend([targets[i]] * num_choices)
-                    input_indicies.extend([i] * num_choices)
+                    input_indices.extend([i] * num_choices)
                 # inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
                 #           range(batch_size)]
                 model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True)
@@ -701,11 +701,11 @@ def process_dataset(dataset, tokenizer):
                     model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
                     model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
                     labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
-                    # input_indicies[i] = torch.tensor(input_indicies[i])
+                    # input_indices[i] = torch.tensor(input_indices[i])
                     # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
 
                 model_inputs["labels"] = labels["input_ids"]
-                model_inputs['input_indicies'] = input_indicies
+                model_inputs['input_indices'] = input_indices
                 model_inputs["correct_labels"] = correct_labels_extended
                 return model_inputs
 
@@ -743,13 +743,13 @@ def process_dataset(dataset, tokenizer):
                 inputs = []
                 labels = []
                 correct_labels_extended = []
-                input_indicies = []
+                input_indices = []
                 for i in range(batch_size):
                     num_choices = len(examples['choices'][i]['text'])
                     inputs.extend([f"{examples['question_stem'][i]}"] * num_choices)
                     labels.extend(examples['choices'][i]['text'])
                     correct_labels_extended.extend([correct_labels[i]] * num_choices)
-                    input_indicies.extend([i] * num_choices)
+                    input_indices.extend([i] * num_choices)
                 # inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
                 #           range(batch_size)]
                 model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True)
@@ -767,11 +767,11 @@ def process_dataset(dataset, tokenizer):
                     model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
                     model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
                     labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
-                    # input_indicies[i] = torch.tensor(input_indicies[i])
+                    # input_indices[i] = torch.tensor(input_indices[i])
                     # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
 
                 model_inputs["labels"] = labels["input_ids"]
-                model_inputs['input_indicies'] = input_indicies
+                model_inputs['input_indices'] = input_indices
                 model_inputs["correct_labels"] = correct_labels_extended
                 return model_inputs
 

@@ -141,26 +141,26 @@ import torchvision.models as models
 import torch
 
 
-def new_forward(self, x):
-    x = self.conv1(x)
-    x = self.bn1(x)
-    x = self.relu(x)
-    x = self.maxpool(x)
+# def new_forward(self, x):
+#     x = self.conv1(x)
+#     x = self.bn1(x)
+#     x = self.relu(x)
+#     x = self.maxpool(x)
 
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x)
-    x = self.layer4(x)
-    return x
+#     x = self.layer1(x)
+#     x = self.layer2(x)
+#     x = self.layer3(x)
+#     x = self.layer4(x)
+#     return x
 
 
-# define a resnet instance
-resnet = models.resnet18()
+# # define a resnet instance
+# resnet = models.resnet18()
 
-# add new_forward function to the resnet instance as a class method
-bound_method = new_forward.__get__(resnet, resnet.__class__)
-setattr(resnet, 'forward', bound_method)
-aa = resnet.forward
+# # add new_forward function to the resnet instance as a class method
+# bound_method = new_forward.__get__(resnet, resnet.__class__)
+# setattr(resnet, 'forward', bound_method)
+# aa = resnet.forward
 a = 5
 # # print(len(x), len(x[0]))
 # for d in range(1, len(x)):
@@ -242,54 +242,57 @@ def memory_usage_in_MB():
 
 
 # Your PyTorch code
-a = torch.randn(40, 1100)
-b = torch.randn(1100, 40)
+# a = torch.randn(40, 1100)
+# b = torch.randn(1100, 40)
 
-temp_a = copy.deepcopy(a)
-temp_b = copy.deepcopy(b)
-memory_before = memory_usage_in_MB()
-c = torch.matmul(a, b)
+# temp_a = copy.deepcopy(a)
+# temp_b = copy.deepcopy(b)
+# memory_before = memory_usage_in_MB()
+# c = torch.matmul(a, b)
 
-# Memory usage after the operation
-memory_after = memory_usage_in_MB()
+# # Memory usage after the operation
+# memory_after = memory_usage_in_MB()
 
-# Calculate the difference
-memory_consumed = memory_after - memory_before
-print(f"Memory consumed: {memory_consumed:.2f} MB")
-
-
-memory_before = memory_usage_in_MB()
-a = a.unsqueeze(-1)
-b = b.unsqueeze(0)
-result = a * b
-print('result', result.shape)
-memory_after = memory_usage_in_MB()
-
-# Calculate the difference
-memory_consumed = memory_after - memory_before
-print(f"Memory consumed broadcast: {memory_consumed:.2f} MB")
+# # Calculate the difference
+# memory_consumed = memory_after - memory_before
+# print(f"Memory consumed: {memory_consumed:.2f} MB")
 
 
-memory_before = memory_usage_in_MB()
-result = (a * b).sum(dim=(0,2))
-print('result', result.shape)
+# memory_before = memory_usage_in_MB()
+# a = a.unsqueeze(-1)
+# b = b.unsqueeze(0)
+# result = a * b
+# print('result', result.shape)
+# memory_after = memory_usage_in_MB()
 
-# result2 = a.sum(dim=0) * b.sum(dim=1)
-# print('result2', result2.shape)
+# # Calculate the difference
+# memory_consumed = memory_after - memory_before
+# print(f"Memory consumed broadcast: {memory_consumed:.2f} MB")
 
-result3 = temp_a.sum(0) * temp_b.sum(1)
-print('result3', result3.shape)
-dd = result == result3
 
-result4 = (temp_a * temp_b.sum(1)).sum(0)
-ddd = result == result4
-memory_after = memory_usage_in_MB()
+# memory_before = memory_usage_in_MB()
+# result = (a * b).sum(dim=(0,2))
+# print('result', result.shape)
 
-# Calculate the difference
-memory_consumed = memory_after - memory_before
-print(f"Memory consumed 2: {memory_consumed:.2f} MB")
+# # result2 = a.sum(dim=0) * b.sum(dim=1)
+# # print('result2', result2.shape)
 
-a = 6
+# result3 = temp_a.sum(0) * temp_b.sum(1)
+# print('result3', result3.shape)
+# dd = result == result3
+
+# result4 = (temp_a * temp_b.sum(1)).sum(0)
+# ddd = result == result4
+# memory_after = memory_usage_in_MB()
+
+# # Calculate the difference
+# memory_consumed = memory_after - memory_before
+# print(f"Memory consumed 2: {memory_consumed:.2f} MB")
+
+a = torch.randn(1, 32, 128, 128)
+b = torch.randn(256, 128)
+c = a * b
+d = 6
 # Settings for the network
 # layer_sizes = [5, 8, 8, 5]  # Example layer sizes
 # n_layers = len(layer_sizes)

@@ -673,13 +673,15 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
 def cal_se(std, sample_nums):
     return std / np.sqrt(sample_nums)
 
+
 def summarize_result(processed_result, key):
     # print(f'processed_result: {processed_result}')
     if 'exp' in processed_result:
         pivot = 'exp'
         processed_result[pivot] = np.stack(processed_result[pivot], axis=0)
         processed_result['mean'] = np.mean(processed_result[pivot], axis=0).item()
-        processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=0).item(), len(processed_result[pivot]))
+        # processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=0).item(), len(processed_result[pivot]))
+        processed_result['std'] = np.std(processed_result[pivot], axis=0).item()
         processed_result['max'] = np.max(processed_result[pivot], axis=0).item()
         processed_result['min'] = np.min(processed_result[pivot], axis=0).item()
         processed_result['argmax'] = np.argmax(processed_result[pivot], axis=0).item()
@@ -718,12 +720,13 @@ def summarize_result(processed_result, key):
         # TODO: for inference
         if 'Perplexity' in key:
             print('mean', processed_result[pivot], cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot])))
-        processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot]))
+        # processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot]))
+        processed_result['std'] = np.std(processed_result[pivot], axis=0)
         processed_result['max'] = np.max(processed_result[pivot], axis=1)
         processed_result['min'] = np.min(processed_result[pivot], axis=1)
         b = np.max(processed_result[pivot], axis=1)
         processed_result['mean_of_max'] = np.mean(np.max(processed_result[pivot], axis=1))
-        processed_result['se_of_max'] = cal_se(np.std(np.max(processed_result[pivot], axis=1)), len(processed_result[pivot]))
+        processed_result['std_of_max'] = np.std(np.max(processed_result[pivot], axis=1))
         processed_result['argmax'] = np.argmax(processed_result[pivot], axis=0)
         processed_result['argmin'] = np.argmin(processed_result[pivot], axis=0)
         processed_result[pivot] = processed_result[pivot].tolist()
@@ -752,10 +755,10 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
             extracted_processed_result[exp_name] = defaultdict()
         
         extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = processed_result['mean']
-        extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = processed_result['se']
+        extracted_processed_result[exp_name]['{}_std'.format(metric_name)] = processed_result['std']
 
         extracted_processed_result[exp_name]['{}_mean_of_max'.format(metric_name)] = processed_result['mean_of_max']
-        extracted_processed_result[exp_name]['{}_se_of_max'.format(metric_name)] = processed_result['se_of_max']
+        extracted_processed_result[exp_name]['{}_std_of_max'.format(metric_name)] = processed_result['std_of_max']
     else:
         for k, v in processed_result.items():
             extract_processed_result(extracted_processed_result, v, control + [k])

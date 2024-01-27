@@ -18,6 +18,11 @@ FLOPS_UNIT = (1000000, 'Million')
 # already in seconds unit
 TIME_UNIT = (1, 's')
 
+def nearest_even_number(value):
+    rounded_value = round(value)
+    # If it's odd, adjust by 1 to make it even
+    return rounded_value if rounded_value % 2 == 0 else rounded_value + 1
+
 def identity_function(x):
     return x
 
@@ -42,7 +47,7 @@ def get_model_profile(tag, model_prof):
     for name, module in model_prof.model.named_modules():
         temp = [name, module.__flops__, module.__duration__, module.__params__, module.__macs__, type(module)]
         # print('temp', temp)
-        if hasattr(module, 'pruning_module') or hasattr(module, 'is_pruned'):
+        if hasattr(module, 'is_pruned'):
             print('module.key', module.key)
             temp.append(module.key)
             temp.append(True)
@@ -67,19 +72,7 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, p
     print('Summary ---------\n')
     vanilla_total_flops = sum([vanilla_info_list[i][1] for i in range(len(vanilla_info_list))])
     pruned_total_flops = sum([pruned_info_list[i][1] for i in range(len(pruned_info_list))])
-    print(f"Vanilla FLOPs ({FLOPS_UNIT[1]}): ", vanilla_total_flops/FLOPS_UNIT[0], flush=True)
-    print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
-    print('Pruning FLOPs reduction percentage (%): ', ((vanilla_total_flops - pruned_total_flops) / (vanilla_total_flops + 1e-6)) * 100, flush=True)
-
-    # vanilla_total_inference_time = sum([vanilla_info_list[i][2] for i in range(len(vanilla_info_list))])
-    # pruned_total_inference_time = sum([pruned_info_list[i][2] for i in range(len(pruned_info_list))])
-    print(f"Vanilla inference time ({TIME_UNIT[1]}): ", vanilla_duration/TIME_UNIT[0], flush=True)
-    print(f"Vanilla inference time ({TIME_UNIT[1]}) per batch: ", vanilla_duration/TIME_UNIT[0]/batch_num, flush=True)
-    print(f"Pruned inference time ({TIME_UNIT[1]}): ", pruned_duration/TIME_UNIT[0], flush=True)
-    print(f"Pruned inference time ({TIME_UNIT[1]}) per batch: ", pruned_duration/TIME_UNIT[0]/batch_num, flush=True)
-    print(f"Pruning inference time cost ({TIME_UNIT[1]}): ", (pruned_duration - vanilla_duration), flush=True)
-    print(f"Pruning inference time cost ({TIME_UNIT[1]}) per batch: ", (pruned_duration - vanilla_duration)/(batch_num), flush=True)
-
+    
     info = {
         'vanilla_total_FLOPs': vanilla_total_flops,
         'Pruned_total_FLOPs': pruned_total_flops,
@@ -90,7 +83,6 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, p
         'pruned_duration_cost_per_batch': (pruned_duration - vanilla_duration)/(batch_num),
         'total_FLOPs_ratio': pruned_total_flops/(vanilla_total_flops+1e-6),
     }
-
     total_target_used_params = 0
     total_target_params = 0
     for i in range(len(vanilla_info_list)):
@@ -112,6 +104,20 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, p
     else:
         info['FLOPs_for_pruned_layers'] = total_target_used_params / (total_target_params + 1e-6)
     
+    
+
+    # vanilla_total_inference_time = sum([vanilla_info_list[i][2] for i in range(len(vanilla_info_list))])
+    # pruned_total_inference_time = sum([pruned_info_list[i][2] for i in range(len(pruned_info_list))])
+    print(f"Vanilla inference time ({TIME_UNIT[1]}): ", vanilla_duration/TIME_UNIT[0], flush=True)
+    print(f"Vanilla inference time ({TIME_UNIT[1]}) per batch: ", vanilla_duration/TIME_UNIT[0]/batch_num, flush=True)
+    print(f"Pruned inference time ({TIME_UNIT[1]}): ", pruned_duration/TIME_UNIT[0], flush=True)
+    print(f"Pruned inference time ({TIME_UNIT[1]}) per batch: ", pruned_duration/TIME_UNIT[0]/batch_num, flush=True)
+    print(f"Pruning inference time cost ({TIME_UNIT[1]}): ", (pruned_duration - vanilla_duration), flush=True)
+    print(f"Pruning inference time cost ({TIME_UNIT[1]}) per batch: ", (pruned_duration - vanilla_duration)/(batch_num), flush=True)
+
+    print(f"Vanilla FLOPs ({FLOPS_UNIT[1]}): ", vanilla_total_flops/FLOPS_UNIT[0], flush=True)
+    print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
+    print('Pruning FLOPs for all modules: ', (pruned_total_flops / (vanilla_total_flops + 1e-6)), flush=True)
     print("info[FLOPs_for_pruned_layers]", info['FLOPs_for_pruned_layers'])
     print('Summary Finished ---------\n')
     logger.append(info, 'test')

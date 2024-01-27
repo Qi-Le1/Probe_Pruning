@@ -42,6 +42,11 @@ def process_control():
     cfg['prune_dim_select_mode'] = prune_name_list[4] if len(prune_name_list) > 4 else 'max'
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
+
+    if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != 'default':
+        cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
+    elif cfg['cust_tgt_modules'] == 'default':
+        cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
     # if cfg['cust_tgt_modules'] == ['None']:
     #     cfg['cust_tgt_modules'] = None
 
@@ -345,7 +350,7 @@ TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
     "deberta-v2": ["query_proj", "value_proj"],
     "deberta": ["in_proj"],
     "layoutlm": ["query", "value"],
-    "llama": ["q_proj", "v_proj", "o_proj", "k_proj", "gate_proj", "up_proj", "down_proj"],
+    "llama-2-7b": ["q_proj", "v_proj", "o_proj", "k_proj", "gate_proj", "up_proj", "down_proj"],
     # "llama": ["proj"],
     "chatglm": ["query_key_value"],
     "gpt_bigcode": ["c_attn"],
@@ -372,7 +377,7 @@ TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
 }
 
 TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING = {
-    "llama": ["gate_proj", "up_proj"],
+    "llama": ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"]
     
 }
 

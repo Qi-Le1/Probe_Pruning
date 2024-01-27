@@ -100,13 +100,13 @@ def test(data_loader, model, model_prof, metric, logger):
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             elif cfg['task_name'] in ['mc']:
                 input_size = input['labels'].size(0)
-                input_indicies = input['input_indicies']
+                input_indices = input['input_indices']
                 correct_labels = input['correct_labels']
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
                 output = model(**input)
-                input_ = {'input_indicies': input_indicies, 'target': input['labels'], 'correct_labels': correct_labels}
+                input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             else:
                 input = collate(input)

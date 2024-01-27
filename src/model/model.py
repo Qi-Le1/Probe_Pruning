@@ -9,6 +9,8 @@ from config import cfg
 from diffusers import DDPMScheduler
 from .huggingface import make_hf_model
 
+from module import TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING
+
 
 def make_model(model_name, sub_model_name=None):
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc', 't2i']:
@@ -20,10 +22,7 @@ def make_model(model_name, sub_model_name=None):
         model_type = model_config["model_type"]
         cfg['model_type'] = model_type
 
-        if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != 'default':
-            cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
-        elif cfg['cust_tgt_modules'] == 'default':
-            cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_type']]
+        
     else:
         model = eval('model.{}()'.format(model_name))
         model = model.to(cfg['device'])
