@@ -394,7 +394,7 @@ class Linear(nn.Linear, EriLayer):
                 input_dim = x.dim()
                 seq_len = x.size(1)
                 input_shape = x.shape
-                print('input_shape: ', input_shape, self.key)
+                # print('input_shape: ', input_shape, self.key)
                 linear_layer_info = {
                     'weight': self.weight.data,
                     # 'weight_norm_across_channel_dims': self.weight_norm_across_channel_dims,

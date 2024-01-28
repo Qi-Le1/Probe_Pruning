@@ -118,9 +118,10 @@ ALL_LAYERNORM_LAYERS.append(LlamaRMSNorm)
 
 
 class LlamaRotaryEmbedding(nn.Module):
-    def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None):
+    def __init__(self, num_heads, dim, max_position_embeddings=2048, base=10000, device=None):
         super().__init__()
 
+        self.num_heads = num_heads
         self.dim = dim
         self.max_position_embeddings = max_position_embeddings
         self.base = base
@@ -140,6 +141,15 @@ class LlamaRotaryEmbedding(nn.Module):
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = torch.cat((freqs, freqs), dim=-1)
+
+        # if 'each' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
+        #     # Expand embeddings for each head if we prune different indices for each head
+        #     cos_emb = emb.cos().to(dtype).unsqueeze(0).repeat(self.num_heads, 1, 1)
+        #     sin_emb = emb.sin().to(dtype).unsqueeze(0).repeat(self.num_heads, 1, 1)
+
+        #     self.register_buffer("cos_cached", cos_emb, persistent=False)
+        #     self.register_buffer("sin_cached", sin_emb, persistent=False)
+        # else:
         self.register_buffer("cos_cached", emb.cos().to(dtype), persistent=False)
         self.register_buffer("sin_cached", emb.sin().to(dtype), persistent=False)
         print('freq, emb, cos_cache', freqs.shape, emb.shape, self.cos_cached.shape, flush=True)
@@ -229,14 +239,72 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, unsqueeze_dim=1):
     """
     cos = cos[position_ids].unsqueeze(unsqueeze_dim)
     sin = sin[position_ids].unsqueeze(unsqueeze_dim)
-    # print('apply_rotary_pos_emb_cos', cos.shape, flush=True)
-    # print('apply_rotary_pos_emb_sin', sin.shape, flush=True)
-    # a = q*cos
-    # b = rotate_half(q) * sin
+    print('apply_rotary_pos_emb_cos', cos.shape, flush=True)
+    print('apply_rotary_pos_emb_sin', sin.shape, flush=True)
+
+    a = q*cos
+    b = rotate_half(q) * sin
+    print('apply_rotary_pos_emb_a', a.shape, flush=True)
+    print('apply_rotary_pos_emb_b', b.shape, flush=True)
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
 
+
+
+def apply_rotary_pos_emb_for_prune_each_head(q, k, cos, sin, position_ids, fcst_out_dim_indices_for_rope, unsqueeze_dim=1):
+    """Applies Rotary Position Embedding to the query and key tensors.
+
+    Args:
+        q (`torch.Tensor`): The query tensor.
+        k (`torch.Tensor`): The key tensor.
+        cos (`torch.Tensor`): The cosine part of the rotary embedding.
+        sin (`torch.Tensor`): The sine part of the rotary embedding.
+        position_ids (`torch.Tensor`):
+            The position indices of the tokens corresponding to the query and key tensors. For example, this can be
+            used to pass offsetted position ids when working with a KV-cache.
+        unsqueeze_dim (`int`, *optional*, defaults to 1):
+            The 'unsqueeze_dim' argument specifies the dimension along which to unsqueeze cos[position_ids] and
+            sin[position_ids] so that they can be properly broadcasted to the dimensions of q and k. For example, note
+            that cos[position_ids] and sin[position_ids] have the shape [batch_size, seq_len, head_dim]. Then, if q and
+            k have the shape [batch_size, heads, seq_len, head_dim], then setting unsqueeze_dim=1 makes
+            cos[position_ids] and sin[position_ids] broadcastable to the shapes of q and k. Similarly, if q and k have
+            the shape [batch_size, seq_len, heads, head_dim], then set unsqueeze_dim=2.
+    Returns:
+        `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
+    """
+
+    bsz = q.shape[0]
+    num_heads = q.shape[1]
+    seq_len = q.shape[2]
+    head_dim = q.shape[3]
+    
+
+    cos = cos[position_ids].unsqueeze(unsqueeze_dim).repeat(1, num_heads, 1, 1)
+    sin = sin[position_ids].unsqueeze(unsqueeze_dim).repeat(1, num_heads, 1, 1)
+    print('apply_rotary_pos_emb_for_prune_each_head_emb_cos', cos.shape, flush=True)
+    print('apply_rotary_pos_emb_for_prune_each_head_emb_sin', sin.shape, flush=True)
+
+    # print('fcst_out_dim_indices_for_rope', fcst_out_dim_indices_for_rope.shape, flush=True)
+    # head_indices = torch.arange(num_heads).view(-1, 1).expand(-1, head_dim).to(cos.device)
+    # # Use advanced indexing to extract the values
+    # cos = cos[:, head_indices, :, fcst_out_dim_indices_for_rope]
+    # sin = sin[:, head_indices, :, fcst_out_dim_indices_for_rope]
+
+    # Create a 4D index tensor for fcst_out_dim_indices_for_rope
+    index_tensor = fcst_out_dim_indices_for_rope.unsqueeze(0).unsqueeze(2).expand(bsz, -1, seq_len, -1)
+
+    # Use torch.gather to extract the elements
+    cos = torch.gather(cos, -1, index_tensor)
+    sin = torch.gather(sin, -1, index_tensor)
+    print('apply_rotary_pos_emb_for_prune_each_head_emb_cos2', cos.shape, flush=True)
+    a = q*cos
+    b = rotate_half(q) * sin
+    print('apply_rotary_pos_emb_for_prune_each_head_emb_a', a.shape, flush=True)
+    print('apply_rotary_pos_emb_for_prune_each_head_b', b.shape, flush=True)
+    q_embed = (q * cos) + (rotate_half(q) * sin)
+    k_embed = (k * cos) + (rotate_half(k) * sin)
+    return q_embed, k_embed
 
 class LlamaMLP(nn.Module):
     def __init__(self, config):
@@ -345,22 +413,24 @@ class LlamaAttention(nn.Module):
     def _init_rope(self):
         if self.config.rope_scaling is None:
             self.rotary_emb = LlamaRotaryEmbedding(
+                self.num_heads,
                 self.head_dim,
-                max_position_embeddings=self.max_position_embeddings,
+                max_position_embeddings=cfg['seq_len'],
                 base=self.rope_theta,
             )
 
-            self.inference_rotary_emb = copy.deepcopy(self.rotary_emb)
-            if 'WO' in cfg['prune_metric'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
-                if 'each' in cfg['prune_name']:
-                    # if number is odd, the RoPE will have problem
-                    head_dim = nearest_even_number((1 - cfg['prune_hyper']) * self.head_dim)
-                    # print('head_dimfor rotary', head_dim, flush=True)
-                    self.inference_rotary_emb = LlamaRotaryEmbedding(
-                        head_dim,
-                        max_position_embeddings=self.max_position_embeddings,
-                        base=self.rope_theta,
-                    )
+            # self.inference_rotary_emb = copy.deepcopy(self.rotary_emb)
+            # if 'WO' in cfg['prune_metric'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
+            #     if 'each' in cfg['prune_name']:
+            #         # if number is odd, the RoPE will have problem
+            #         head_dim = nearest_even_number((1 - cfg['prune_hyper']) * self.head_dim)
+            #         # print('head_dimfor rotary', head_dim, flush=True)
+            #         self.inference_rotary_emb = LlamaRotaryEmbedding(
+            #             self.num_heads,
+            #             head_dim,
+            #             max_position_embeddings=self.max_position_embeddings,
+            #             base=self.rope_theta,
+            #         )
         else:
             scaling_type = self.config.rope_scaling["type"]
             scaling_factor = self.config.rope_scaling["factor"]
@@ -441,6 +511,14 @@ class LlamaAttention(nn.Module):
                 # if past_key_value is not None:
                 #     kv_seq_len += past_key_value[0].shape[-2]
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
+                # print('-----1')
+                # print('shapes', query_states.shape, key_states.shape, cos.shape, sin.shape, position_ids.shape, flush=True)
+                # print('query_shape', query_states.shape, flush=True)
+                # print('key_shape', key_states.shape, flush=True)
+                # print('cos_shape', cos.shape, flush=True)
+                # print('sin_shape', sin.shape, flush=True)
+                # print('position_ids_shape', position_ids.shape, position_ids, flush=True)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
                 # if past_key_value is not None:
@@ -493,7 +571,7 @@ class LlamaAttention(nn.Module):
                     # attn_output = sum([F.linear(attn_output[i], o_proj_slices[i]) for i in range(self.config.pretraining_tp)])
                 else:
                     fcst_out_dim_metric = ((attn_output).sum(axis=(0, 1)) * self.o_proj_first_dim_sum).abs_()
-                    fcst_out_dim_indices, self.num_heads, self.head_dim = self.pruning_module.cal_fcst_attn_metric(fcst_out_dim_metric, self.num_heads, self.head_dim)
+                    fcst_out_dim_indices, fcst_out_dim_indices_for_rope, self.num_heads, self.head_dim = self.pruning_module.cal_fcst_attn_metric(fcst_out_dim_metric, self.num_heads, self.head_dim)
                     # these 2 are equal
                     self.num_key_value_heads = self.num_heads
                 if not output_attentions:
@@ -529,10 +607,12 @@ class LlamaAttention(nn.Module):
                 value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
                 kv_seq_len = key_states.shape[-2]
+                # print('past_key_value', past_key_value, flush=True)
                 if past_key_value is not None:
                     kv_seq_len += past_key_value[0].shape[-2]
-                cos, sin = self.inference_rotary_emb(value_states, seq_len=kv_seq_len)
-
+                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                
+                
                 # class LlamaRotaryEmbedding(nn.Module):
                 #     def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None):
                 #         super().__init__()
@@ -598,8 +678,6 @@ class LlamaAttention(nn.Module):
                 #     """
                 #     cos = cos[position_ids].unsqueeze(unsqueeze_dim)
                 #     sin = sin[position_ids].unsqueeze(unsqueeze_dim)
-                #     a = q*cos
-                #     b = rotate_half(q) * sin
                 #     q_embed = (q * cos) + (rotate_half(q) * sin)
                 #     k_embed = (k * cos) + (rotate_half(k) * sin)
                 #     return q_embed, k_embed
@@ -609,7 +687,7 @@ class LlamaAttention(nn.Module):
                 # print('cos_shape', cos.shape, flush=True)
                 # print('sin_shape', sin.shape, flush=True)
                 # print('position_ids_shape', position_ids.shape, position_ids, flush=True)
-                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+                query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, fcst_out_dim_indices_for_rope)
 
                 if past_key_value is not None:
                     # reuse k, v, self_attention
@@ -702,7 +780,7 @@ class LlamaAttention(nn.Module):
             kv_seq_len = key_states.shape[-2]
             if past_key_value is not None:
                 kv_seq_len += past_key_value[0].shape[-2]
-            cos, sin = self.inference_rotary_emb(value_states, seq_len=kv_seq_len)
+            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
             query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
             if past_key_value is not None:

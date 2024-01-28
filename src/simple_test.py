@@ -36,6 +36,94 @@ import torch
 import torch
 import torch.nn as nn
 
+
+import torch
+
+# Example tensor initialization
+# cos = torch.randn(32, 128, 128)
+# fcst_out_dim_indices_for_rope = torch.randint(0, 128, (32, 122))  # Example indices
+
+# # Create a grid of indices for the batch dimension
+# batch_dim_indices = torch.arange(32).view(-1, 1).expand(-1, 122).to(cos.device)
+
+# # Use advanced indexing to extract the values
+# extracted_values = cos[batch_dim_indices, :, fcst_out_dim_indices_for_rope]
+
+# # Check the shape of the extracted values
+# print(extracted_values.shape)  # Should be [32, 128, 122]
+
+import torch
+
+# Example tensors
+# cos = torch.randn(32, 128, 128)
+
+# # Assuming position_ids contains indices for the second dimension of cos
+# # and we use every index from 0 to 127 (which is the size of the second dimension of cos)
+# position_ids = torch.arange(128).unsqueeze(0)  # Shape [1, 128]
+
+# # Perform the indexing operation
+# result = cos[position_ids]
+
+# # Print the output shape
+# print(result.shape)
+
+
+# cos = torch.randn(128, 128)
+
+# # Assuming position_ids contains indices for the second dimension of cos
+# # and we use every index from 0 to 127 (which is the size of the second dimension of cos)
+# position_ids = torch.arange(128).unsqueeze(0)  # Shape [1, 128]
+
+# # Perform the indexing operation
+# result = cos[position_ids]
+
+# # Print the output shape
+# print(result.shape)
+
+# a = 6
+
+import torch
+import time
+
+# Initialize the tensors
+cos = torch.randn(10, 32, 128, 128)
+fcst_out_dim_indices_for_rope = torch.randint(0, 127, (32, 122))  # Example indices
+
+# Operation 1: Loop-based extraction
+def loop_based_extraction(cos, fcst_out_dim_indices_for_rope):
+    res = cos[:, 0, :, fcst_out_dim_indices_for_rope[0]].unsqueeze(1)
+    for i in range(1, 32):
+        new = cos[:, i, :, fcst_out_dim_indices_for_rope[i]].unsqueeze(1)
+        res = torch.cat((res, new), dim=1)
+    return res
+
+# Operation 2: torch.gather method
+def gather_method(cos, fcst_out_dim_indices_for_rope):
+    # Creating index tensor for gather
+    indices = fcst_out_dim_indices_for_rope.unsqueeze(0).unsqueeze(2).expand(10, -1, 128, -1)
+    # Using torch.gather
+    gathered = torch.gather(cos, 3, indices)
+    return gathered
+
+
+
+# Measure time for loop-based extraction
+start_time = time.time()
+result_loop = loop_based_extraction(cos, fcst_out_dim_indices_for_rope)
+end_time = time.time()
+time_loop = end_time - start_time
+print(f"Time taken by loop-based extraction: {time_loop} seconds")
+
+# Measure time for torch.gather method
+start_time = time.time()
+result_gather = gather_method(cos, fcst_out_dim_indices_for_rope)
+end_time = time.time()
+time_gather = end_time - start_time
+print(f"Time taken by torch.gather method: {time_gather} seconds")
+
+a = 5
+
+
 # class SimpleModel(nn.Module):
 #     def __init__(self):
 #         super(SimpleModel, self).__init__()

@@ -130,7 +130,8 @@ def test(data_loader, model, model_prof, metric, logger):
             print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
-            # return
+            # if i == 50:
+            #     return
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))

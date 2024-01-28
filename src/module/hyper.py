@@ -26,7 +26,7 @@ def process_control():
         if 'pq' in cfg['prune_name']:
             cfg['attn_pq_beta'] = float(prune_name_sub_list[1])
             cfg['global_pq_beta'] = cfg['attn_pq_beta'] 
-            cfg['mlp_pq_beta'] = float(prune_name_sub_list[2]) if len(prune_name_sub_list) > 2 else None
+            cfg['mlp_pq_beta'] = float(prune_name_sub_list[2]) if len(prune_name_sub_list) >= 2 else None
 
     cfg['prune_tgt'] = prune_name_list[1]
     if cfg['prune_tgt'] == 'w':

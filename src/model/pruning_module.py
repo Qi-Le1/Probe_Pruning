@@ -81,7 +81,160 @@ class BasePruning:
         else:
             raise ValueError('Not valid weight dimension')
         return
+
+
+def parallel_cal_varying_length_norm(sorted_norm, norm):
+    # sorted_norm is non-negative
+    processed_channels = sorted_norm.pow(norm)
+    # print('processed_channels', processed_channels.shape, processed_channels[0])
+    varying_vector_norm = torch.pow(processed_channels.cumsum(dim=0), 1/norm)
+    return varying_vector_norm
+            
+def parallel_cal_varying_length_info(sorted_norm, pq_p, pq_q, reversed=False):
+    if reversed:
+        sorted_norm = torch.flip(sorted_norm, [1])
+    nominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, pq_p)
+    denominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, pq_q)
+
+    nominator_varying_vector_norm = nominator_varying_vector_norm.to(cfg['device'])
+    denominator_varying_vector_norm = denominator_varying_vector_norm.to(cfg['device'])
+    # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm[0])
+    # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm[0])
+
+    # num_rows, num_cols = nominator_varying_vector_norm.shape
+
+    # if reversed:
+    #     # Create a tensor where each row starts from 1 and decreases to the length of the row
+    #     dimension = torch.arange(num_cols, 0, -1).unsqueeze(0)
+    # else:
+        # Create a tensor where each row starts from 1 and increases to the length of the row
+    dimension = torch.arange(1, nominator_varying_vector_norm.shape[0] + 1).to(cfg['device'])
+    # dimension = dimension.expand(nominator_varying_vector_norm.shape[0], -1).to(cfg['device'])
+    return nominator_varying_vector_norm, denominator_varying_vector_norm, dimension
+
+def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma):
     
+    # norm_across_other_dims = norm_across_other_dims + (norm_across_other_dims == 0) * 1e-9
+    # Calculate norms only for non-zero channels
+    # non_zero_norms = norm_across_other_dims[non_zero_mask]
+
+    # norm_p = torch.linalg.vector_norm(sorted_tensor, ord=pq_p, dim=0)
+    # norm_q = torch.linalg.vector_norm(sorted_tensor, ord=pq_q, dim=0) + 1e-10
+    
+    # dimension = sorted_tensor.shape[0]
+    # pq_indices = (1 - dimension ** (1/pq_q - 1/pq_p) * (norm_p / norm_q))
+    
+    # # add additional dimension if dimension is 0
+    # # if pq_indices.dim() == 0 or pq_indices.dim() == 1:
+    # #     pq_indices.unsqueeze_(0)
+    # print('pq_indices', pq_indices, dimension)
+    # if torch.isnan(pq_indices).any():
+    #     pq_indices = torch.min(pq_indices, torch.ones_like(pq_indices))
+    #     raise ValueError('pq_indices contains nan values')
+
+    # lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p)))
+    # print('lower_bound', lower_bound, dimension)
+    # beta_tensor = torch.full_like(lower_bound, pq_beta)
+    # prune_channels_count = torch.floor(dimension * torch.min(pq_gamma * (1 - lower_bound / dimension), beta_tensor))
+    # print('prune_channels_count', prune_channels_count)
+
+    # return int(prune_channels_count), pq_indices
+
+    nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_tensor, pq_p, pq_q)
+    pq_indices_varying_length = (1 - dimension ** (1/pq_q - 1/pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
+    lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_indices_varying_length) ** (pq_q * pq_p / (pq_q - pq_p)))
+    
+    # lower_bound = lower_bound.cpu().numpy()
+    # x = list(range(len(lower_bound.tolist())))
+    # dx = np.diff(x)
+    # dy = np.diff(lower_bound)
+
+    # # Compute slope
+    # slopes = dy / dx
+    
+    # if 'low' in cfg['prune_name']:
+    #     # avoid edge case of slope
+    #     window_size = 21  # 10 neighbors on each side + the element itself
+
+    #     # Create a window with equal weights
+    #     window = np.ones(window_size) / window_size
+    #     # Calculate the moving average using convolution
+    #     averages = np.convolve(slopes, window, 'same')
+    #     abs_averages_slopes = np.abs(averages)
+    #     # Find the index of the minimum value in abs_slopes
+    #     first_phase_transition = np.argmin(abs_averages_slopes)
+    #     pq_indices = pq_indices_varying_length[first_phase_transition]
+    #     lower_bound = lower_bound[first_phase_transition]
+    x = torch.arange(len(lower_bound), dtype=torch.float32, device=lower_bound.device)
+
+    # Calculate differences (equivalent to np.diff)
+    dx = x[1:] - x[:-1]
+    dy = lower_bound[1:] - lower_bound[:-1]
+
+    # Compute slope
+    slopes = dy / dx
+
+    if 'low' in cfg['prune_name']:
+        # Avoid edge case of slope, just randomly pick this number
+        window_size = 20  # 10 neighbors on each side + the element itself
+
+        # Create a window with equal weights
+        window = torch.ones(window_size, dtype=torch.float32,  device=lower_bound.device) / window_size
+        window = window.to(lower_bound.device)  # Ensure window is on the same device as lower_bound
+
+        # Calculate the moving average using convolution
+        # PyTorch's conv1d expects a 3D tensor (batch, channel, length), so we need to add extra dimensions
+        slopes = slopes.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+        window = window.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+
+        # Use conv1d for moving average
+        averages = torch.nn.functional.conv1d(slopes, window, padding=window_size//2)
+        averages = averages.squeeze()  # Remove extra dimensions
+
+        negative_values = averages[averages <= 0]
+
+        # Check if there are any negative values
+        if len(negative_values) > 0:
+            # Find the maximum among the negative values (closest to zero)
+            closest_negative = torch.max(negative_values)
+
+            # Get the index of this value in the original 'averages' tensor
+            first_phase_transition = torch.where(averages == closest_negative)[0][0]
+        else:
+            first_phase_transition = None  # or handle the case where there are no negative values
+            raise ValueError('No negative values found in averages')
+
+        print("Index of negative value closest to zero low:", first_phase_transition, sorted_tensor.shape[0], lower_bound)
+        pq_indices = pq_indices_varying_length[first_phase_transition]
+        lower_bound = lower_bound[first_phase_transition]
+        dimension = dimension[first_phase_transition]
+    elif 'high' in cfg['prune_name']:
+        slopes = torch.abs(dy / dx)
+        threshold = 0.05 * slopes.shape[0]
+        indices = torch.where(slopes > threshold)[0]
+        if len(indices) > 0:
+            second_phase_transition = indices[0].item()  # Get the first index as a Python scalar
+        else:
+            print('dont find second phase transition')
+            second_phase_transition = lower_bound.shape[0] - 1  # or handle the case where there are no negative values
+
+        pq_indices = pq_indices_varying_length[second_phase_transition]
+        lower_bound = lower_bound[second_phase_transition]
+        dimension = dimension[second_phase_transition]
+        print("Index of negative value closest to zero high:", second_phase_transition, sorted_tensor.shape[0], lower_bound)
+    else:
+        pq_indices = pq_indices_varying_length[-1]
+        lower_bound = lower_bound[-1]
+        dimension = dimension[-1]
+        print("Index of negative value closest to zero no:", pq_indices, dimension, sorted_tensor.shape[0], lower_bound)
+
+    beta_tensor = torch.full_like(lower_bound, pq_beta)
+    prune_channels_count = torch.floor(dimension * torch.min(pq_gamma * (1 - lower_bound / dimension), beta_tensor))
+
+    prune_channels_count = prune_channels_count.to(cfg['device'])
+    pq_indices = pq_indices_varying_length.to(cfg['device'])
+    return int(prune_channels_count), pq_indices
+
 class HiddenRepresentationPruning(BasePruning):
 
     def __init__(self, cfg, key, device=None, in_dim=None, out_dim=None):
@@ -91,19 +244,27 @@ class HiddenRepresentationPruning(BasePruning):
         if out_dim:
             self.scaler_in = torch.zeros((in_dim), device=self.device)
         self.nsamples = 0
+        self.pq_p = cfg['pq_p']
+        self.pq_q = cfg['pq_q']
+        self.eta = cfg['prune_hyper']
+        self.pq_attn_beta = cfg['attn_pq_beta']
+        self.pq_mlp_beta = cfg['mlp_pq_beta']
+        self.pq_global_beta = cfg['global_pq_beta']
+        self.pq_gamma = cfg['pq_gamma']
 
     def cal_fcst_mlp_metric(self, fcst_out_dim_metric):
         # mask = torch.ones(fcst.shape[-1], dtype=torch.bool, device=fcst.device)
-        preserve_ratio = 1 - self.prune_hyper
-        num_prune_indices = int(preserve_ratio * fcst_out_dim_metric.shape[0])
+        sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=0)
+        if 'mag' in cfg['prune_name']:
+            num_prune = int(self.prune_hyper * fcst_out_dim_metric.shape[0])
+        elif 'pq' in cfg['prune_name']:
+            num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_mlp_beta, self.pq_gamma)[0]
         # print('prune_channels_count', prune_channels_count, norm_across_other_dims[0].shape[0], self.prune_hyper)
-        _, sorted_indices = torch.sort(fcst_out_dim_metric, dim=0, descending=True)
-            
-        return sorted_indices[:num_prune_indices]
+
+        return sorted_indices[num_prune:]
     
     def cal_fcst_attn_metric(self, fcst_out_dim_metric, num_heads, head_dim):
         # mask = torch.ones(fcst.shape[-1], dtype=torch.bool, device=fcst.device)
-        preserve_ratio = 1 - self.prune_hyper
         fcst_out_dim_metric = fcst_out_dim_metric.reshape(num_heads, -1)
         
         # delete whole head
@@ -111,29 +272,32 @@ class HiddenRepresentationPruning(BasePruning):
             # Sum over the last dimension and take absolute values
             summed_metrics = torch.abs(fcst_out_dim_metric.sum(dim=-1))
             # Sort the summed metrics
-            _, sorted_indices = torch.sort(summed_metrics, dim=0, descending=True)
+            sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
             # Determine the number of heads to prune
-            num_preserve_heads = int(num_heads * preserve_ratio)
+            if 'mag' in cfg['prune_name']:
+                num_prune_heads = int(num_heads * cfg['prune_hyper'])
+            elif 'pq' in cfg['prune_name']:
+                num_prune_heads = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_attn_beta, self.pq_gamma)[0]
             # Select the heads to prune
-            heads_to_preserve = sorted_indices[:num_preserve_heads]
+            heads_to_preserve = sorted_indices[num_prune_heads:]
 
             head_indices = (torch.arange(head_dim, device=fcst_out_dim_metric.device) + heads_to_preserve.unsqueeze(1) * head_dim).view(-1)
 
-            num_heads = num_preserve_heads
+            num_heads = num_heads - num_prune_heads
 
-            return head_indices, num_heads, head_dim
+            return head_indices, None, num_heads, head_dim
         elif 'each' in cfg['prune_name']:
             # Take absolute values
             fcst_out_dim_metric.abs_()
 
             # Sort the fcst_out_dim_metric across each head
-            _, sorted_indices = torch.sort(fcst_out_dim_metric, dim=1, descending=True)
+            sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=1)
 
             # Determine the number of elements to prune in each head
-            num_preserve_indices = nearest_even_number(fcst_out_dim_metric.shape[1] * preserve_ratio)
+            num_prune_head_dim = nearest_even_number(fcst_out_dim_metric.shape[1] * cfg['prune_hyper'])
 
             # Select indices to prune for each head
-            indices_to_preserve = sorted_indices[:, :num_preserve_indices]
+            indices_to_preserve = sorted_indices[:, num_prune_head_dim:]
 
             # Generate a range tensor for head indices
             head_range = torch.arange(num_heads, device=fcst_out_dim_metric.device) * head_dim
@@ -141,9 +305,9 @@ class HiddenRepresentationPruning(BasePruning):
             # Create the full indices for pruning using broadcasting
             full_indices_to_preserve = (indices_to_preserve + head_range.unsqueeze(1)).view(-1)
 
-            head_dim = num_preserve_indices
+            head_dim = head_dim - num_prune_head_dim
 
-            return full_indices_to_preserve, num_heads, head_dim
+            return full_indices_to_preserve, indices_to_preserve, num_heads, head_dim
 
 
     def batch_pruning(self, h, layer_type, layer_info, key, is_prune_out_dim):
