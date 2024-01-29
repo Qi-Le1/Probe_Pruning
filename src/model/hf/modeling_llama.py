@@ -338,6 +338,7 @@ class LlamaMLP(nn.Module):
             down_proj = sum(down_proj)
         else:
             if 'fcst' in cfg['prune_name'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
+                print('mlpfcst')
                 if getattr(self, 'down_proj_first_dim_sum', None) is None:
                     self.down_proj_first_dim_sum = self.down_proj.weight.data.sum(axis=0)
                 
@@ -345,13 +346,20 @@ class LlamaMLP(nn.Module):
                     comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=1, dim=(0, 1))
                 elif cfg['prune_metric'] == 'WOF2N':
                     comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0, 1))
+                elif cfg['prune_metric'] == 'SumWOF2N':
+                    comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0, 1))
                 elif cfg['prune_metric'] == 'WOFM':
                     comp_across_bsz_seq = torch.mean(x, dim=(0, 1))
 
                 if 'para' in cfg['prune_name']:
                     # print('temp1', temp1.shape, flush=True)
                     # print('self.down_proj_first_dim_sum', self.down_proj_first_dim_sum.shape, flush=True)
-                    fcst_out_dim_metric = ((self.act_fn(self.gate_proj(comp_across_bsz_seq, cal_mlp_fcst_out_dim_metric=True)) * self.up_proj(comp_across_bsz_seq, cal_mlp_fcst_out_dim_metric=True)).sum(axis=1) * self.down_proj_first_dim_sum).abs_()
+                    fcst_out = self.act_fn(self.gate_proj(comp_across_bsz_seq, cal_mlp_fcst_out_dim_metric=True)) * self.up_proj(comp_across_bsz_seq, cal_mlp_fcst_out_dim_metric=True)
+                    if cfg['prune_metric'] == 'WOF2N':
+                        fcst_out_dim_metric = (torch.linalg.vector_norm(fcst_out, ord=2, dim=(0, 1)).reshape((1, -1)) * torch.abs(self.down_proj.weight.data)).sum(axis=0)
+                    elif cfg['prune_metric'] == 'SumWOF2N':
+                        fcst_out_dim_metric = ((fcst_out).sum(axis=1) * self.down_proj_first_dim_sum).abs_()
+                    
                     fcst_out_dim_indices = self.pruning_module.cal_fcst_mlp_metric(fcst_out_dim_metric)
                     # print('fcst_out_dim_metric', fcst_out_dim_metric.shape, flush=True)
                     kwargs['fcst_out_dim_indices'] = fcst_out_dim_indices
@@ -475,9 +483,12 @@ class LlamaAttention(nn.Module):
             if getattr(self, 'o_proj_first_dim_sum', None) is None:
                 self.o_proj_first_dim_sum = self.o_proj.weight.data.sum(axis=0)
             
+            print('self.config.pretraining_tp', self.config.pretraining_tp)
             if cfg['prune_metric'] == 'WOF1N':
                 comp_across_bsz = torch.linalg.vector_norm(hidden_states, ord=1, dim=0).unsqueeze_(0)
             elif cfg['prune_metric'] == 'WOF2N':
+                comp_across_bsz = torch.linalg.vector_norm(hidden_states, ord=2, dim=0).unsqueeze_(0)
+            elif cfg['prune_metric'] == 'SumWOF2N':
                 comp_across_bsz = torch.linalg.vector_norm(hidden_states, ord=2, dim=0).unsqueeze_(0)
             elif cfg['prune_metric'] == 'WOFM':
                 comp_across_bsz = torch.mean(hidden_states, dim=0).unsqueeze_(0)
@@ -537,7 +548,7 @@ class LlamaAttention(nn.Module):
 
                 # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
                 attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-                print('attn_weights', attn_weights.shape, query_states.shape,flush=True)
+                # print('attn_weights', attn_weights.shape, query_states.shape,flush=True)
                 if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
                     raise ValueError(
                         f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
@@ -545,26 +556,26 @@ class LlamaAttention(nn.Module):
                     )
 
                 fcst_attn_mask = attention_mask[0].unsqueeze_(0)
-                print('attnweights', attn_weights, attn_weights.shape, flush=True)
-                print('fcst_attn_mask', fcst_attn_mask, fcst_attn_mask.shape, flush=True)
+                # print('attnweights', attn_weights, attn_weights.shape, flush=True)
+                # print('fcst_attn_mask', fcst_attn_mask, fcst_attn_mask.shape, flush=True)
                 if fcst_attn_mask is not None:
                     if fcst_attn_mask.size() != (bsz, 1, q_len, kv_seq_len):
                         raise ValueError(
                             f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {fcst_attn_mask.size()}"
                         )
                     attn_weights = attn_weights + fcst_attn_mask
-                    print('attnweightsaftermask', attn_weights, attn_weights.shape, flush=True)
+                    # print('attnweightsaftermask', attn_weights, attn_weights.shape, flush=True)
 
                 # upcast attention to fp32
                 # attn_weights: bsz, self.num_heads, q_len, q_len
                 # attn_weights: 1, self.num_heads, q_len, q_len
                 attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-                print('attn_weightsafter softmax', attn_weights, attn_weights.shape, flush=True)
+                # print('attn_weightsafter softmax', attn_weights, attn_weights.shape, flush=True)
                 # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
                 # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
                 attn_output = torch.matmul(attn_weights, value_states)
-                print('attn_output', attn_output, attn_output.shape, flush=True)
-                print('attn_output00', attn_output[0][0], attn_output[0][0].shape, flush=True)
+                # print('attn_output', attn_output, attn_output.shape, flush=True)
+                # print('attn_output00', attn_output[0][0], attn_output[0][0].shape, flush=True)
                 if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
                     raise ValueError(
                         f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
@@ -573,21 +584,28 @@ class LlamaAttention(nn.Module):
                 # attn_output: bsz, self.num_heads, q_len, self.head_dim -> bsz, q_len, self.num_heads, self.head_dim
                 attn_output = attn_output.transpose(1, 2).contiguous()
 
-                attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+                attn_output = attn_output.reshape(bsz, q_len, self.hidden_size).type(torch.float32)
 
                 if self.config.pretraining_tp > 1:
                     attn_output = attn_output.split(self.hidden_size // self.config.pretraining_tp, dim=2)
                     o_proj_slices = self.o_proj.weight.split(self.hidden_size // self.config.pretraining_tp, dim=1)
                     # attn_output = sum([F.linear(attn_output[i], o_proj_slices[i]) for i in range(self.config.pretraining_tp)])
                 else:
-                    fcst_out_dim_metric = (attn_output.sum(axis=(0, 1)) * self.o_proj_first_dim_sum).abs_()
+                    if cfg['prune_metric'] == 'WOF2N':
+                        # print('attn_output', attn_output.dtype, flush=True)
+                        # print('self.o_proj.weight.data', self.o_proj.weight.data.dtype, flush=True)
+                        fcst_out_dim_metric = (torch.linalg.vector_norm(attn_output, ord=2, dim=(0, 1)).reshape((1, -1)) * torch.abs(self.o_proj.weight.data)).sum(axis=0)
+                        sorted_values, sorted_indices = torch.sort(fcst_out_dim_metric, descending=True)
+                        # print('fcst_out_dim_metric', fcst_out_dim_metric.dtype, flush=True)
+                    elif cfg['prune_metric'] == 'SumWOF2N':
+                        fcst_out_dim_metric = (attn_output.sum(axis=(0, 1)) * self.o_proj_first_dim_sum).abs_()
                     fcst_out_dim_indices, fcst_out_dim_indices_for_rope, self.num_heads, self.head_dim = self.pruning_module.cal_fcst_attn_metric(fcst_out_dim_metric, self.num_heads, self.head_dim)
                     # these 2 are equal
                     self.num_key_value_heads = self.num_heads
                 if not output_attentions:
                     attn_weights = None
 
-                # full inference with adding some info to layer input
+                #full inference with adding some info to layer input
                 bsz, q_len, _ = hidden_states.size()
 
                 if self.config.pretraining_tp > 1:
@@ -657,7 +675,7 @@ class LlamaAttention(nn.Module):
                 #             self.cos_cached[:seq_len].to(dtype=x.dtype),
                 #             self.sin_cached[:seq_len].to(dtype=x.dtype),
                 #         )
-    
+
                 # def rotate_half(x):
                 #     """Rotates half the hidden dims of the input."""
                 #     x1 = x[..., : x.shape[-1] // 2]
@@ -760,6 +778,7 @@ class LlamaAttention(nn.Module):
                 self.num_heads = self.default_num_heads
                 self.head_dim = self.default_head_dim
                 self.num_key_value_heads = self.default_num_key_value_heads
+            
         else:
             # full inference
             bsz, q_len, _ = hidden_states.size()

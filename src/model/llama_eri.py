@@ -120,9 +120,9 @@ class LlamaEriModel(torch.nn.Module):
             #         new_module.is_prune_out_dim = True
 
             new_module = self._create_new_module(prune_name, target, key)
-
+            new_module.is_prune_out_dim = False
             if 'WO' in cfg['prune_metric']:
-                new_module.is_prune_out_dim = False
+                # new_module.is_prune_out_dim = False
                 out_dim_target_modules = TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING[cfg['model_type']]
                 if _check_target_module_exists(out_dim_target_modules, key):
                     print('out_dim_target_modules', key)
@@ -292,6 +292,7 @@ class EriLayer:
                 return self.weight
             else:
                 extract_weight_dim = 1
+                print('extract_inweight')
                 # weight dim 1 should have same size as original h dim 2
                 mask = torch.ones(self.weight.size(extract_weight_dim), dtype=torch.bool)
                 # Mark the indices to be pruned as False
@@ -483,7 +484,7 @@ class Linear(nn.Linear, EriLayer):
 
                                 # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
                                 result = recovered_output
-                                print('result.shape', result.shape)
+                                # print('result.shape', result.shape)
                             else:
                                 pass
                         else:

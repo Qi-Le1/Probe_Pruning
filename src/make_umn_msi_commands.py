@@ -312,10 +312,35 @@ def main():
 
 
 
-            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.05, 0.1, 0.15, 0.2, 0.3]],
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WOF2N'], [f'magstructlocalfcstparawhole+h+{x}+-1+max' for x in [0.05, 0.1, 0.2, 0.3]],
             #         ['q-proj+k-proj+v-proj+o-proj'], ['full']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.05, 0.1, 0.2, 0.3]],
+            #         ['q-proj+k-proj+v-proj+o-proj'], ['full']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIF2N'], [f'magstructlocal+h+{x}+-1+max' for x in [0.05, 0.1, 0.2, 0.3]],
+            #         ['o-proj'], ['full']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIF2N'], [f'magstructlocal+h+{x}+-1+max' for x in [0.4, 0.5, 0.6, 0.7]],
+            #         ['o-proj'], ['full']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIF2N'], [f'magstructlocal+h+{x}+-1+max' for x in [0.1]],
+                    ['o-proj'], ['full']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.1]],
+                    ['o-proj'], ['full']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
 
 
 
@@ -552,10 +577,10 @@ def main():
             #         ['default']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0.1, 0.2, 0.3, 0.4, 0.45, 0.5, 0.6]],
-                    ['o-proj']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0.1, 0.2, 0.3, 0.4, 0.45, 0.5, 0.6]],
+            #         ['o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
             #         ['default']]]
@@ -848,7 +873,7 @@ def main():
             #         ['gate-proj+down-proj']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
-
+            pass
         elif 'missing' in data:
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode)
             controls.extend(CIFAR10_controls_9)

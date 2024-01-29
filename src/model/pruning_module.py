@@ -296,7 +296,7 @@ class HiddenRepresentationPruning(BasePruning):
             summed_metrics = torch.abs(fcst_out_dim_metric.sum(dim=-1))
             # Sort the summed metrics
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
-            print('summed_metricssorted_value', sorted_value)
+            # print('summed_metricssorted_value', sorted_value)
             # Determine the number of heads to prune
             if 'mag' in cfg['prune_name']:
                 num_prune_heads = int(num_heads * cfg['prune_hyper'])
@@ -333,7 +333,9 @@ class HiddenRepresentationPruning(BasePruning):
         elif 'mix' in cfg['prune_name']:
 
             sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=0)
+
             print('sorted_value', sorted_value)
+            # print('sorted_value', sorted_value)
             if 'mag' in cfg['prune_name']:
                 num_prune = int(fcst_out_dim_metric.shape[0] * cfg['prune_hyper'])
             elif 'pq' in cfg['prune_name']:
@@ -741,6 +743,7 @@ class HiddenRepresentationPruning(BasePruning):
             norm_across_other_dims = (torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate) * layer_info['weight'].abs()).sum(dim=0)
         elif self.prune_metric == 'WIF2N':
             norm_across_other_dims = (torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) * layer_info['weight'].abs()).sum(dim=0)
+            # print('WIF2N', norm_across_other_dims)
         elif self.prune_metric == 'WOF1N':
             norm_across_other_dims = (torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate) * layer_info['weight'].abs()).sum(dim=1)
         elif self.prune_metric == 'WOF2N':
@@ -748,31 +751,58 @@ class HiddenRepresentationPruning(BasePruning):
         # if norm_across_other_dims.dim() == 0 or norm_across_other_dims.dim() == 1:
         #     norm_across_other_dims.unsqueeze_(0)
         # print('w*magstruct', self.prune_name)     
-        if 'w*magstruct' in self.prune_name:
-            # print('2222w*magstruct', self.prune_name)
-            if self.weight_norm_across_channel_dims is None:
-                self.cal_weight_norm_across_channel_dims(layer_info['weight'])
-                start_time = time.time()
-                info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
-                self.logger_info_time_used += time.time() - start_time
+        # if 'w*magstruct' in self.prune_name:
+        #     # print('2222w*magstruct', self.prune_name)
+        #     if self.weight_norm_across_channel_dims is None:
+        #         self.cal_weight_norm_across_channel_dims(layer_info['weight'])
+        #         start_time = time.time()
+        #         info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
+        #         self.logger_info_time_used += time.time() - start_time
             
-            norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
+        #     norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
 
         if norm_across_other_dims.dim() == 0 or norm_across_other_dims.dim() == 1:
             norm_across_other_dims.unsqueeze_(0)
 
         prune_channels_count = int(self.prune_hyper * norm_across_other_dims[0].shape[0])
         # print('prune_channels_count', prune_channels_count, norm_across_other_dims[0].shape[0], self.prune_hyper)
-        _, sorted_channels = torch.sort(norm_across_other_dims, dim=1)
+        sorted_values, sorted_channels = torch.sort(norm_across_other_dims, dim=1)
 
         if sorted_channels.dim() == 0 or sorted_channels.dim() == 1:
             sorted_channels.unsqueeze_(0)
         
         prune_channels = [sorted_channels[i, :prune_channels_count] for i in range(sorted_channels.size(0))]
+        print('prune_channels_count', prune_channels_count)
+        print('sorted_values', sorted_values)
+        print('prune_channels', prune_channels)
         self.update_pruning_info(info)
         return prune_channels
 
         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class WeightPruning(BasePruning):
 

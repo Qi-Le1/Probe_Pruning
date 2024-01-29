@@ -23,6 +23,21 @@ import torch.nn.functional as F
 
 import torch
 
+import torch
+
+a = torch.randn(1, 2, 3)
+b = torch.linalg.vector_norm(a, ord=2, dim=1)
+c = torch.linalg.vector_norm(a, ord=2, dim=(0, 1)).reshape(1,-1)
+d = 5
+
+# Create two tensors with different data types
+tensor1 = torch.randn(5, dtype=torch.float32)
+tensor2 = torch.randn(5, dtype=torch.float16)
+
+# Attempt to add them
+result = tensor1 * tensor2
+b = result.dtype
+a = 5
 # 假设 a 和 b 是两个三维张量
 # a = torch.rand(2, 3)
 # b = torch.rand(3, 4)
@@ -377,10 +392,10 @@ def memory_usage_in_MB():
 # memory_consumed = memory_after - memory_before
 # print(f"Memory consumed 2: {memory_consumed:.2f} MB")
 
-a = torch.randn(1, 32, 128, 128)
-b = torch.randn(256, 128)
-c = a * b
-d = 6
+
+# b = torch.randn(256, 128)
+# c = a * b
+# d = 6
 # Settings for the network
 # layer_sizes = [5, 8, 8, 5]  # Example layer sizes
 # n_layers = len(layer_sizes)

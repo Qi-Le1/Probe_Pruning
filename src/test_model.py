@@ -51,8 +51,8 @@ def runExperiment():
     vanilla_name_list[7] = 'vanilla+h+0+-1+max'
     vanilla_name_list[8] = 'None'
     vanilla_name_list[9] = 'full'
-    vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
-    vanilla_info_list, vanilla_duration = vanilla_res['vanilla_info_list'], vanilla_res['vanilla_duration']
+    # vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
+    # vanilla_info_list, vanilla_duration = vanilla_res['vanilla_info_list'], vanilla_res['vanilla_duration']
 
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
@@ -131,8 +131,9 @@ def test(data_loader, model, model_prof, metric, logger):
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
             # if i == 50:
-            if i == 10:
-                break
+            # if i == 10:
+            #     break
+            break
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
