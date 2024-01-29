@@ -14,7 +14,7 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_calibration_prune_model, calibrate_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, MULTIGPUS_MODEL_NAME_LIST
+    record_pruing_info, get_model_profile, summarize_info_list, MULTIGPUS_MODEL_NAME_LIST, load
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 
 
@@ -50,18 +50,13 @@ def runExperiment():
     makedir_exist_ok(result_path)
 
     cfg['epoch'] = 0  
-
-    model, tokenizer = make_model(cfg['model_name'])
-    dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
-    dataset = process_dataset(dataset, tokenizer)
-    if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
-        model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
-    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
-    metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
-    model_prof = FlopsProfiler(model)
-    test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    test(data_loader['test'], model, model_prof, metric, test_logger)
-    vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
+    vanilla_name_list = cfg['model_tag'].split('_')
+    vanilla_name_list[4] = '1'
+    vanilla_name_list[7] = 'vanilla+NA+0+-100+NA'
+    vanilla_name_list[8] = 'None'
+    # vanilla_name_list[9] = 'full'
+    vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
+    vanilla_info_list, vanilla_duration = vanilla_res['vanilla_info_list'], vanilla_res['vanilla_duration']
 
     model, tokenizer = make_model(cfg['model_name'])
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])

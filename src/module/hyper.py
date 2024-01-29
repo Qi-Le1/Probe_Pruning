@@ -43,9 +43,9 @@ def process_control():
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
 
-    if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != 'default':
+    if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
         cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
-    elif cfg['cust_tgt_modules'] == 'default':
+    elif cfg['cust_tgt_modules'] == ['default']:
         cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
     # if cfg['cust_tgt_modules'] == ['None']:
     #     cfg['cust_tgt_modules'] = None

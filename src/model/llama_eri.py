@@ -401,21 +401,40 @@ class Linear(nn.Linear, EriLayer):
                 }
                 # if 'fcst' in cfg['prune_name'] and self.is_prune_out_dim == False:
                 # print('ceshi','fcst' in cfg['prune_name'], 'fcst_out_dim_indices' in kwargs )
+
                 # enter down-proj after delete outputdim of gate-proj and up-proj
+                # enter o-proj after attention
                 if 'WO' in cfg['prune_metric'] and self.is_prune_out_dim == False:
                     # print('here1')
-                    if 'fcst' in cfg['prune_name']:
-                        # if it is forecast and parallel, we consider all the structure and operations
-                        # we already know the weight index to extract
-                        weight = torch.index_select(self.weight, dim=1, index=kwargs['fcst_out_dim_indices'].to(self.weight.device))
+                    if 'attn' in self.key:
+                        if 'fcst' in cfg['prune_name']:
+                            if 'mix' in cfg['prune_name']:
+                                x = x[..., kwargs['fcst_out_dim_indices']]
+                            # if it is forecast and parallel, we consider all the structure and operations
+                            # we already know the weight index to extract
+                            weight = torch.index_select(self.weight, dim=1, index=kwargs['fcst_out_dim_indices'].to(self.weight.device))
+                        else:
+                            # prune out dim situation
+                            # but not forecast (only consider current layer's input and weight)
+                            # or forecast, but do not consider parallel strucutre's effect, only considering gate or up individually.
+                            non_zero_indices = torch.nonzero(torch.sum(x, dim=(0,1)), as_tuple=True)[-1]
+                            weight = torch.index_select(self.weight, dim=1, index=non_zero_indices.to(self.weight.device))
+                            x = x[..., non_zero_indices]
+
                     else:
-                        # prune out dim situation
-                        # but not forecast (only consider current layer's input and weight)
-                        # or forecast, but do not consider parallel strucutre's effect, only considering gate or up individually.
-                        non_zero_indices = torch.nonzero(torch.sum(x, dim=(0,1)), as_tuple=True)[-1]
-                        weight = torch.index_select(self.weight, dim=1, index=non_zero_indices.to(self.weight.device))
-                        x = x[..., non_zero_indices]
+                        if 'fcst' in cfg['prune_name']:
+                            # if it is forecast and parallel, we consider all the structure and operations
+                            # we already know the weight index to extract
+                            weight = torch.index_select(self.weight, dim=1, index=kwargs['fcst_out_dim_indices'].to(self.weight.device))
+                        else:
+                            # prune out dim situation
+                            # but not forecast (only consider current layer's input and weight)
+                            # or forecast, but do not consider parallel strucutre's effect, only considering gate or up individually.
+                            non_zero_indices = torch.nonzero(torch.sum(x, dim=(0,1)), as_tuple=True)[-1]
+                            weight = torch.index_select(self.weight, dim=1, index=non_zero_indices.to(self.weight.device))
+                            x = x[..., non_zero_indices]
                 # for forecast situation, entering up-proj or gate-proj
+                # or entering q/k/v-proj
                 elif 'fcst' in cfg['prune_name'] and 'fcst_out_dim_indices' in kwargs:
                     # # weight dim 1 should have same size as original h dim 2
                     # mask = torch.ones(self.weight.size(0), dtype=torch.bool)
@@ -424,11 +443,20 @@ class Linear(nn.Linear, EriLayer):
                     
                     # Use the mask to index the tensor
                     # print('here2')
-                    weight = torch.index_select(self.weight, dim=0, index=kwargs['fcst_out_dim_indices'].to(self.weight.device))
-                    # print('weight.shape', weight.shape)
-                    # record to fill zero
-                    if 'para' not in cfg['prune_name']:
-                        self.out_selected_dim = kwargs['fcst_out_dim_indices']
+                    if 'attn' in self.key:
+                        weight = torch.index_select(self.weight, dim=0, index=kwargs['fcst_out_dim_indices'].to(self.weight.device))
+                        # print('weight.shape', weight.shape)
+                        # record to fill zero
+                        if 'para' not in cfg['prune_name']:
+                            self.out_selected_dim = kwargs['fcst_out_dim_indices']
+                        elif 'mix' in cfg['prune_name']:
+                            self.out_selected_dim = kwargs['fcst_out_dim_indices']
+                    else:
+                        weight = torch.index_select(self.weight, dim=0, index=kwargs['fcst_out_dim_indices'].to(self.weight.device))
+                        # print('weight.shape', weight.shape)
+                        # record to fill zero
+                        if 'para' not in cfg['prune_name']:
+                            self.out_selected_dim = kwargs['fcst_out_dim_indices']
                 else:
                     # print('here3')
                     x, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.is_prune_out_dim)
@@ -442,19 +470,47 @@ class Linear(nn.Linear, EriLayer):
                 # gate-proj & up-proj
                 if 'WO' in cfg['prune_metric'] and self.is_prune_out_dim == True:
                     # dont need to refill 0 because all indices are determined
-                    if 'fcst' in cfg['prune_name']:
-                        pass
-                    else:
-                        recovered_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
-                        # Insert the output from the pruned layer into the correct positions in the extended tensor
-                        # print('extended_output.shape', extended_output.shape)
-                        # print('key', self.key)
-                        # print('self.out_selected_dim', torch.nonzero(self.out_selected_dim).squeeze())
-                        # print('gate&up', (self.out_selected_dim.shape[0] - torch.sum(self.out_selected_dim))/self.weight.shape[0], self.key)
-                        recovered_output[..., self.out_selected_dim] = result
+                    if 'attn' in self.key:
+                        if 'fcst' in cfg['prune_name']:
+                            if 'mix' in cfg['prune_name']:
+                                recovered_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
+                                # Insert the output from the pruned layer into the correct positions in the extended tensor
+                                # print('extended_output.shape', extended_output.shape)
+                                # print('key', self.key)
+                                # print('self.out_selected_dim', torch.nonzero(self.out_selected_dim).squeeze())
+                                # print('gate&up', (self.out_selected_dim.shape[0] - torch.sum(self.out_selected_dim))/self.weight.shape[0], self.key)
+                                recovered_output[..., self.out_selected_dim] = result
 
-                        # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
-                        result = recovered_output
+                                # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
+                                result = recovered_output
+                                print('result.shape', result.shape)
+                            else:
+                                pass
+                        else:
+                            recovered_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
+                            # Insert the output from the pruned layer into the correct positions in the extended tensor
+                            # print('extended_output.shape', extended_output.shape)
+                            # print('key', self.key)
+                            # print('self.out_selected_dim', torch.nonzero(self.out_selected_dim).squeeze())
+                            # print('gate&up', (self.out_selected_dim.shape[0] - torch.sum(self.out_selected_dim))/self.weight.shape[0], self.key)
+                            recovered_output[..., self.out_selected_dim] = result
+
+                            # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
+                            result = recovered_output
+                    else:
+                        if 'fcst' in cfg['prune_name']:
+                            pass
+                        else:
+                            recovered_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
+                            # Insert the output from the pruned layer into the correct positions in the extended tensor
+                            # print('extended_output.shape', extended_output.shape)
+                            # print('key', self.key)
+                            # print('self.out_selected_dim', torch.nonzero(self.out_selected_dim).squeeze())
+                            # print('gate&up', (self.out_selected_dim.shape[0] - torch.sum(self.out_selected_dim))/self.weight.shape[0], self.key)
+                            recovered_output[..., self.out_selected_dim] = result
+
+                            # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
+                            result = recovered_output
             # elif self.prune_tgt == 'weight':
             #     pruned_h = self.extract_input(x, self.layer_type)
             #     result = F.linear(pruned_h, self.weight, bias=self.bias)

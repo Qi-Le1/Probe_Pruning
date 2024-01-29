@@ -1101,14 +1101,14 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
             W_metric = metric_process(mysetting, W_metric)         
 
             # test ratio
-            if 'gate_proj' in name:
-                temp = subset[name].baseline_inp
-                print('self.baseline_inp', subset[name].baseline_inp.shape, outs.shape, outs.mean(dim=(0,1)).shape, subset[name].baseline_inp)
-                temp_out = outs.mean(dim=(0,1)) - temp
-                print('temp_out', temp_out.shape, temp_out, temp_out.mean())
-                ratio = temp / temp_out
-                print('ratio', outs.mean(dim=0).shape, temp_out.shape, ratio.shape, ratio, ratio.mean())
-                continue
+            # if 'gate_proj' in name:
+            #     temp = subset[name].baseline_inp
+            #     print('self.baseline_inp', subset[name].baseline_inp.shape, outs.shape, outs.mean(dim=(0,1)).shape, subset[name].baseline_inp)
+            #     temp_out = outs.mean(dim=(0,1)) - temp
+            #     print('temp_out', temp_out.shape, temp_out, temp_out.mean())
+            #     ratio = temp / temp_out
+            #     print('ratio', outs.mean(dim=0).shape, temp_out.shape, ratio.shape, ratio, ratio.mean())
+            #     continue
 
             if name == 'self_attn.o_proj':
                 if mysetting.global_prune:

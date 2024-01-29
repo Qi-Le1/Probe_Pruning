@@ -141,6 +141,8 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     # return int(prune_channels_count), pq_indices
 
     nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_tensor, pq_p, pq_q)
+    # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm)
+    # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm)
     pq_indices_varying_length = (1 - dimension ** (1/pq_q - 1/pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_indices_varying_length) ** (pq_q * pq_p / (pq_q - pq_p)))
     
@@ -191,23 +193,38 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
         averages = torch.nn.functional.conv1d(slopes, window, padding=window_size//2)
         averages = averages.squeeze()  # Remove extra dimensions
 
-        negative_values = averages[averages <= 0]
+        # negative_values = averages[averages <= 0]
+        sign_change_mask = ((torch.sign(averages[:-1]) * torch.sign(averages[1:])) < 0) & (torch.sign(averages[:-1]) > 0)
+
+        # Find indices where sign changes from positive to negative
+        # positive_to_negative_mask = (averages[:-1] > 0) & (averages[1:] <= 0)
+        transition_indices = torch.where(sign_change_mask)[0] + 1
+
+        if len(transition_indices) > 0:
+            first_phase_transition = transition_indices[-1].item()  # Get the last transition point
+        else:
+            first_phase_transition = lower_bound.shape[0] - 1
+            print("No transition from positive to negative found in slopes.")
 
         # Check if there are any negative values
-        if len(negative_values) > 0:
-            # Find the maximum among the negative values (closest to zero)
-            closest_negative = torch.max(negative_values)
+        # if len(negative_values) > 0:
+        #     # Find the maximum among the negative values (closest to zero)
+        #     closest_negative = torch.max(negative_values)
 
-            # Get the index of this value in the original 'averages' tensor
-            first_phase_transition = torch.where(averages == closest_negative)[0][0]
-        else:
-            first_phase_transition = None  # or handle the case where there are no negative values
-            raise ValueError('No negative values found in averages')
+        #     # Get the index of this value in the original 'averages' tensor
+        #     first_phase_transition = torch.where(averages == closest_negative)[0][0]
+        # else:
+        #     first_phase_transition = None  # or handle the case where there are no negative values
+        #     raise ValueError('No negative values found in averages')
 
-        print("Index of negative value closest to zero low:", first_phase_transition, sorted_tensor.shape[0], lower_bound)
+        # print('lower_bound', lower_bound)
+        # print('pq_indices_varying_length', pq_indices_varying_length)
+        # print('dimension', dimension)
         pq_indices = pq_indices_varying_length[first_phase_transition]
         lower_bound = lower_bound[first_phase_transition]
         dimension = dimension[first_phase_transition]
+
+        print("Index of negative value closest to zero low:", first_phase_transition, sorted_tensor.shape[0], lower_bound)
     elif 'high' in cfg['prune_name']:
         slopes = torch.abs(dy / dx)
         threshold = 0.05 * slopes.shape[0]
@@ -230,7 +247,7 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
 
     beta_tensor = torch.full_like(lower_bound, pq_beta)
     prune_channels_count = torch.floor(dimension * torch.min(pq_gamma * (1 - lower_bound / dimension), beta_tensor))
-
+    print('prune_channels_count', prune_channels_count, lower_bound, dimension)
     prune_channels_count = prune_channels_count.to(cfg['device'])
     pq_indices = pq_indices_varying_length.to(cfg['device'])
     return int(prune_channels_count), pq_indices
@@ -244,35 +261,42 @@ class HiddenRepresentationPruning(BasePruning):
         if out_dim:
             self.scaler_in = torch.zeros((in_dim), device=self.device)
         self.nsamples = 0
-        self.pq_p = cfg['pq_p']
-        self.pq_q = cfg['pq_q']
-        self.eta = cfg['prune_hyper']
-        self.pq_attn_beta = cfg['attn_pq_beta']
-        self.pq_mlp_beta = cfg['mlp_pq_beta']
-        self.pq_global_beta = cfg['global_pq_beta']
-        self.pq_gamma = cfg['pq_gamma']
+        if 'pq' in cfg['prune_name']:
+            self.pq_p = cfg['pq_p']
+            self.pq_q = cfg['pq_q']
+            self.eta = cfg['prune_hyper']
+            self.pq_attn_beta = cfg['attn_pq_beta']
+            self.pq_mlp_beta = cfg['mlp_pq_beta']
+            self.pq_global_beta = cfg['global_pq_beta']
+            self.pq_gamma = cfg['pq_gamma']
 
     def cal_fcst_mlp_metric(self, fcst_out_dim_metric):
+        fcst_out_dim_metric.abs_()
+        fcst_out_dim_metric = fcst_out_dim_metric.to(torch.float32)
         # mask = torch.ones(fcst.shape[-1], dtype=torch.bool, device=fcst.device)
         sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=0)
         if 'mag' in cfg['prune_name']:
             num_prune = int(self.prune_hyper * fcst_out_dim_metric.shape[0])
         elif 'pq' in cfg['prune_name']:
             num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_mlp_beta, self.pq_gamma)[0]
+            # print('num_prune', num_prune)
         # print('prune_channels_count', prune_channels_count, norm_across_other_dims[0].shape[0], self.prune_hyper)
 
         return sorted_indices[num_prune:]
     
     def cal_fcst_attn_metric(self, fcst_out_dim_metric, num_heads, head_dim):
         # mask = torch.ones(fcst.shape[-1], dtype=torch.bool, device=fcst.device)
-        fcst_out_dim_metric = fcst_out_dim_metric.reshape(num_heads, -1)
+        fcst_out_dim_metric.abs_()
+        fcst_out_dim_metric = fcst_out_dim_metric.to(torch.float32)
         
         # delete whole head
         if 'whole' in cfg['prune_name']:    
+            fcst_out_dim_metric = fcst_out_dim_metric.reshape(num_heads, -1)
             # Sum over the last dimension and take absolute values
             summed_metrics = torch.abs(fcst_out_dim_metric.sum(dim=-1))
             # Sort the summed metrics
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
+            print('summed_metricssorted_value', sorted_value)
             # Determine the number of heads to prune
             if 'mag' in cfg['prune_name']:
                 num_prune_heads = int(num_heads * cfg['prune_hyper'])
@@ -287,9 +311,7 @@ class HiddenRepresentationPruning(BasePruning):
 
             return head_indices, None, num_heads, head_dim
         elif 'each' in cfg['prune_name']:
-            # Take absolute values
-            fcst_out_dim_metric.abs_()
-
+            fcst_out_dim_metric = fcst_out_dim_metric.reshape(num_heads, -1)
             # Sort the fcst_out_dim_metric across each head
             sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=1)
 
@@ -308,6 +330,18 @@ class HiddenRepresentationPruning(BasePruning):
             head_dim = head_dim - num_prune_head_dim
 
             return full_indices_to_preserve, indices_to_preserve, num_heads, head_dim
+        elif 'mix' in cfg['prune_name']:
+
+            sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=0)
+            print('sorted_value', sorted_value)
+            if 'mag' in cfg['prune_name']:
+                num_prune = int(fcst_out_dim_metric.shape[0] * cfg['prune_hyper'])
+            elif 'pq' in cfg['prune_name']:
+                num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_attn_beta, self.pq_gamma)[0]
+            print('delete indices', sorted_indices[:num_prune])
+            return sorted_indices[num_prune:], None, num_heads, head_dim
+
+            
 
 
     def batch_pruning(self, h, layer_type, layer_info, key, is_prune_out_dim):
