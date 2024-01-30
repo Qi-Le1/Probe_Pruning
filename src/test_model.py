@@ -48,9 +48,8 @@ def runExperiment():
     cfg['epoch'] = 0 
     vanilla_name_list = cfg['model_tag'].split('_')
     vanilla_name_list[4] = '1'
-    vanilla_name_list[7] = 'vanilla+h+0+-1+max'
+    vanilla_name_list[7] = 'vanilla+h+0+-1'
     vanilla_name_list[8] = 'None'
-    vanilla_name_list[9] = 'full'
     # vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
     # vanilla_info_list, vanilla_duration = vanilla_res['vanilla_info_list'], vanilla_res['vanilla_duration']
 

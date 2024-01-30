@@ -39,7 +39,10 @@ import torch
 # b = result.dtype
 # a = 5
 
-a = torch.randn(4, 5)
+a = torch.randn(4, 5, 5)
+a_mean = a.mean(axis=0)
+print('a_mean', a_mean.shape)
+print('a', a.shape)
 b = torch.randn(4, 5)
 e = torch.randn(4, 5)
 c = torch.matmul(a, b.T)

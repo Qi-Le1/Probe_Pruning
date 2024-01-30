@@ -7,9 +7,9 @@ control:
   batch_size: 8
   seq_len: 128
   prune_metric: l1+128
-  prune_name: pq-0.7-0.7+w+0.2+2#3#4+max/casc
+  prune_name: pq-0.7-0.7+w+0.2+2#3#4
   cust_tgt_modules: None
-  batch_integ: inter
+  # batch_integ: inter
   # multibatch_integ: somemethods-3
 # experiment
 pin_memory: True

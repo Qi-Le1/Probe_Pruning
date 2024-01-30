@@ -357,13 +357,13 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['WOF2N', 'msWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                    ['gate-proj+up-proj+down-proj'], ['full']]]
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['WOF2N', 'mbmsWOF2N', 'mbnsWOF2N'], [f'magstructlocalfcstpara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                    ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['SumWOF2N','msSumWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-                    ['gate-proj+up-proj+down-proj'], ['full']]]
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['SumWOF2N','mbmsSumWOF2N', 'mbnsSumWOF2N'], [f'magstructlocalfcstpara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                    ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 

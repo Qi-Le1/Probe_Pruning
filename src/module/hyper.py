@@ -39,7 +39,7 @@ def process_control():
         raise ValueError('Not valid prune target')
     cfg['prune_hyper'] = float(prune_name_list[2])
     cfg['prune_dim'] = [int(dim) for dim in prune_name_list[3].split('+')] if len(prune_name_list) > 3 else None
-    cfg['prune_dim_select_mode'] = prune_name_list[4] if len(prune_name_list) > 4 else 'max'
+    # cfg['prune_dim_select_mode'] = prune_name_list[4] if len(prune_name_list) > 4 else 'max'
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
 
@@ -50,7 +50,7 @@ def process_control():
     # if cfg['cust_tgt_modules'] == ['None']:
     #     cfg['cust_tgt_modules'] = None
 
-    cfg['batch_integ'] = cfg['control']['batch_integ'] if 'batch_integ' in cfg['control'] else None
+    # cfg['batch_integ'] = cfg['control']['batch_integ'] if 'batch_integ' in cfg['control'] else None
     # if 'multibatch_integ' in cfg['control']:
     #     multibatch_integ_list = cfg['control']['multibatch_integ'].split('-')
     #     cfg['multibatch_integ'] = multibatch_integ_list[0]
