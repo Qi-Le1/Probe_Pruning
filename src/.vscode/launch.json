@@ -6,6 +6,19 @@
     "configurations": [
 
         {
+            "name": "fcst_process_language_model",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--type",
+                "observe_fcst",
+            ],
+        },
+
+        {
             "name": "process_language_model",
             "type": "python",
             "request": "launch",

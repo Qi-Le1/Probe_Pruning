@@ -232,7 +232,17 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
         
-
+    elif file == 'observe_fcst':
+        # 'WOF2N', 
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10', '50'], ['128'], ['mbmsWOF2N', 'mbWOF2N'], [f'magstructlocalfcstpara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+                ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+        # 'SumWOF2N',
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10','50'], ['128'], ['mbmsSumWOF2N', 'mbSumWOF2N'], [f'magstructlocalfcstpara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+                ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
     elif file == 'observe_cv':
         # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
         #                      ['inter'], ['somemethods-3'], ['default']]]
@@ -560,6 +570,8 @@ def main():
         num_experiments = 1
     elif 'observe_fix_pruned_llm' in args['type']:
         num_experiments = 2
+    elif 'observe_fcst' in args['type']:
+        num_experiments = 1
     else:
         raise ValueError('Not valid type')
     exp = [str(x) for x in list(range(num_experiments))]
@@ -793,16 +805,16 @@ def make_df_history(extracted_processed_result_history):
                 # print(k)  
                 df[df_name].append(
                     pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
-        elif len(control) == 10:
-            data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ  = control
-            df_name = '_'.join(
-                [data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ])
-            for k in extracted_processed_result_history[exp_name]:
-                # print(f'k: {k}')
-                index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ, k])]
-                # print(k)
-                df[df_name].append(
-                    pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
+        # elif len(control) == 10:
+        #     data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ  = control
+        #     df_name = '_'.join(
+        #         [data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ])
+        #     for k in extracted_processed_result_history[exp_name]:
+        #         # print(f'k: {k}')
+        #         index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ, k])]
+        #         # print(k)
+        #         df[df_name].append(
+        #             pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
                 # df[df_name] = df[df_name].append(pd.DataFrame(...))
         else:
             raise ValueError('Not valid control')
@@ -1162,7 +1174,12 @@ def make_vis(df_exp, df_history):
             prune_dim = prune_name_list[3] if len(prune_name_list) > 3 else '0'
             prune_dim_select_mode = prune_name_list[4] if len(prune_name_list) > 4 else 'max'
             
-            nsamples = prune_metric.split('+')[1]
+            # nsamples = prune_metric.split('+')[1]
+            prune_metric_list = prune_metric.split('+')
+            if len(prune_metric_list) > 1:
+                nsamples = prune_metric_list[1]
+            else:
+                nsamples = 'fullds'
             # if isinstance(df_history[df_name], list):
             #     # Handle the case where it's a list
             #     temp = df_history[df_name]
@@ -1210,77 +1227,77 @@ def make_vis(df_exp, df_history):
                     index_list = index.split('/')
                     temp_key = index_list[-1]
 
-                    if 'norm_across_other_dims_mean' in index:
-                        if not is_valid_layer_for_detailed_info(index, model_name):
-                            continue
-                        # temp_key = index_list[-1]
+                    # if 'norm_across_other_dims_mean' in index:
+                    #     if not is_valid_layer_for_detailed_info(index, model_name):
+                    #         continue
+                    #     # temp_key = index_list[-1]
                         
-                        data = torch.tensor(row.tolist())
+                    #     data = torch.tensor(row.tolist())
                        
-                        norm_comb = [(p, 2) for p in np.arange(0.2, 1.01, 0.04)]
-                        lower_bound_list = []
-                        pq_indices_list = []
-                        p_values = []
-                        return_norm_list = []
-                        for comb in norm_comb:
-                            p = comb[0]
-                            q = comb[1]
-                            lower_bound, pq_indices, return_norm = cal_prune_count_base_on_pq(data, p, q, 0, 0.9, 1, 'p')
-                            lower_bound_list.append(lower_bound)
-                            pq_indices_list.append(pq_indices)
-                            p_values.append(p)
-                            return_norm_list.append(return_norm)
+                    #     norm_comb = [(p, 2) for p in np.arange(0.2, 1.01, 0.04)]
+                    #     lower_bound_list = []
+                    #     pq_indices_list = []
+                    #     p_values = []
+                    #     return_norm_list = []
+                    #     for comb in norm_comb:
+                    #         p = comb[0]
+                    #         q = comb[1]
+                    #         lower_bound, pq_indices, return_norm = cal_prune_count_base_on_pq(data, p, q, 0, 0.9, 1, 'p')
+                    #         lower_bound_list.append(lower_bound)
+                    #         pq_indices_list.append(pq_indices)
+                    #         p_values.append(p)
+                    #         return_norm_list.append(return_norm)
 
-                        key_for_dict = prune_name + prune_metric
+                    #     key_for_dict = prune_name + prune_metric
 
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pq',temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        draw_str_x_figure(plt, p_values, pq_indices_list, None, key_for_dict, 'P', 'PQ_index')
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pq',temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     draw_str_x_figure(plt, p_values, pq_indices_list, None, key_for_dict, 'P', 'PQ_index')
 
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-lb',temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        draw_str_x_figure(plt, p_values, lower_bound_list, None, key_for_dict, 'P', 'Lower bound')
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-lb',temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     draw_str_x_figure(plt, p_values, lower_bound_list, None, key_for_dict, 'P', 'Lower bound')
 
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pnorm',temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        draw_str_x_figure(plt, p_values, return_norm_list, None, key_for_dict, 'P', 'P norm')
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pnorm',temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     draw_str_x_figure(plt, p_values, return_norm_list, None, key_for_dict, 'P', 'P norm')
 
-                        norm_comb = [(1, q) for q in np.arange(1.04, 2.01, 0.04)]
-                        lower_bound_list = []
-                        pq_indices_list = []
-                        q_values = []
-                        return_norm_list = []
-                        for comb in norm_comb:
-                            p = comb[0]
-                            q = comb[1]
-                            lower_bound, pq_indices, return_norm = cal_prune_count_base_on_pq(data, p, q, 0, 0.9, 1, 'q')
-                            lower_bound_list.append(lower_bound)
-                            pq_indices_list.append(pq_indices)
-                            q_values.append(q)
-                            return_norm_list.append(return_norm)
+                    #     norm_comb = [(1, q) for q in np.arange(1.04, 2.01, 0.04)]
+                    #     lower_bound_list = []
+                    #     pq_indices_list = []
+                    #     q_values = []
+                    #     return_norm_list = []
+                    #     for comb in norm_comb:
+                    #         p = comb[0]
+                    #         q = comb[1]
+                    #         lower_bound, pq_indices, return_norm = cal_prune_count_base_on_pq(data, p, q, 0, 0.9, 1, 'q')
+                    #         lower_bound_list.append(lower_bound)
+                    #         pq_indices_list.append(pq_indices)
+                    #         q_values.append(q)
+                    #         return_norm_list.append(return_norm)
 
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-pq',temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        draw_str_x_figure(plt, q_values, pq_indices_list, None, key_for_dict, 'Q', 'PQ_index')
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-pq',temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     draw_str_x_figure(plt, q_values, pq_indices_list, None, key_for_dict, 'Q', 'PQ_index')
 
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-lb',temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        draw_str_x_figure(plt, q_values, lower_bound_list, None, key_for_dict, 'Q', 'Lower bound')
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-lb',temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     draw_str_x_figure(plt, q_values, lower_bound_list, None, key_for_dict, 'Q', 'Lower bound')
 
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-qnorm',temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        draw_str_x_figure(plt, q_values, return_norm_list, None, key_for_dict, 'Q', 'Q norm')
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-qnorm',temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     draw_str_x_figure(plt, q_values, return_norm_list, None, key_for_dict, 'Q', 'Q norm')
 
-                        data = data.tolist()
-                        print('data', len(data), data[:10])
-                        data.sort()
-                        norm_across_other_dims = data
-                        temp_norm_across_other_dims_key = temp_key
-                        # key_for_dict = f"{prune_name}_{prune_hyper}"
-                        x = list(range(len(data)))
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        draw_str_x_figure(plt, x, data, None, key_for_dict, 'varying length', 'norm_across_other_dims')
+                    #     data = data.tolist()
+                    #     print('data', len(data), data[:10])
+                    #     data.sort()
+                    #     norm_across_other_dims = data
+                    #     temp_norm_across_other_dims_key = temp_key
+                    #     # key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     x = list(range(len(data)))
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     draw_str_x_figure(plt, x, data, None, key_for_dict, 'varying length', 'norm_across_other_dims')
 
 
                         # draw_histogram(plt, data)
@@ -1315,99 +1332,99 @@ def make_vis(df_exp, df_history):
                     #     print('lower_bound', x)
                     #     plt.text(x, 0.03, f'B', ha='center', va='bottom')
 
-                    if "_pq_indices_varying_lengths_mean" in index:
-                        print('index', index)
-                        print('pqqq', is_valid_layer_for_detailed_info(index, model_name))
-                        if not is_valid_layer_for_detailed_info(index, model_name):
-                            continue
+                    # if "_pq_indices_varying_lengths_mean" in index:
+                    #     print('index', index)
+                    #     print('pqqq', is_valid_layer_for_detailed_info(index, model_name))
+                    #     if not is_valid_layer_for_detailed_info(index, model_name):
+                    #         continue
 
-                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: 3dheatmap', temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        x = list(range(len(row.tolist())))
-                        # y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-                        y = np.array(row.tolist())
-                        key_for_dict = f"{prune_name}_{prune_hyper}"
-                        # draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
-                        draw_3d_heatmap(plt, fig[fig_name], y, 'd dimension', 'm dimension', 'eta', index)
+                    #     # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: 3dheatmap', temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     x = list(range(len(row.tolist())))
+                    #     # y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                    #     y = np.array(row.tolist())
+                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     # draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
+                    #     draw_3d_heatmap(plt, fig[fig_name], y, 'd dimension', 'm dimension', 'eta', index)
 
 
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG:', temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        x = list(range(len(row.tolist())))
-                        y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-                        key_for_dict = f"{prune_name}_{prune_hyper}"
-                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG:', temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     x = list(range(len(row.tolist())))
+                    #     y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
+                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
 
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: lowerbound', temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        x = list(range(len(row.tolist())))
-                        y = np.array(row.tolist())
-                        dimension = np.arange(1, len(y) + 1)
-                        pq_p, pq_q = 1, 2
-                        lower_bound = dimension * (1 + 0) ** (-pq_q / (pq_q - pq_p)) * ((1 - y) ** (pq_q * pq_p / (pq_q - pq_p)))
-                        key_for_dict = f"{prune_name}_{prune_hyper}"
-                        draw_str_x_figure(plt, x, lower_bound, None, key_for_dict, 'vector_length', 'Lower bound')
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: lowerbound', temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     x = list(range(len(row.tolist())))
+                    #     y = np.array(row.tolist())
+                    #     dimension = np.arange(1, len(y) + 1)
+                    #     pq_p, pq_q = 1, 2
+                    #     lower_bound = dimension * (1 + 0) ** (-pq_q / (pq_q - pq_p)) * ((1 - y) ** (pq_q * pq_p / (pq_q - pq_p)))
+                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     draw_str_x_figure(plt, x, lower_bound, None, key_for_dict, 'vector_length', 'Lower bound')
 
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: slope_lowerbound', temp_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        x = list(range(len(row.tolist())))
-                        y = np.array(row.tolist())
-                        dimension = np.arange(1, len(y) + 1)
-                        pq_p, pq_q = 1, 2
-                        lower_bound = dimension * (1 + 0) ** (-pq_q / (pq_q - pq_p)) * ((1 - y) ** (pq_q * pq_p / (pq_q - pq_p)))
-                        dx = np.diff(x)
-                        dy = np.diff(lower_bound)
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: slope_lowerbound', temp_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     x = list(range(len(row.tolist())))
+                    #     y = np.array(row.tolist())
+                    #     dimension = np.arange(1, len(y) + 1)
+                    #     pq_p, pq_q = 1, 2
+                    #     lower_bound = dimension * (1 + 0) ** (-pq_q / (pq_q - pq_p)) * ((1 - y) ** (pq_q * pq_p / (pq_q - pq_p)))
+                    #     dx = np.diff(x)
+                    #     dy = np.diff(lower_bound)
 
-                        # Compute slope
-                        slopes = dy / dx
-                        print('slopes', slopes)
-                        temp_slopes = np.clip(dy / dx, -200, 20)
-                        key_for_dict = f"{prune_name}_{prune_hyper}"
-                        draw_str_x_figure(plt, list(range(len(dx))), temp_slopes, None, key_for_dict, 'vector_length', 'Lower bound slope')
+                    #     # Compute slope
+                    #     slopes = dy / dx
+                    #     print('slopes', slopes)
+                    #     temp_slopes = np.clip(dy / dx, -200, 20)
+                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     draw_str_x_figure(plt, list(range(len(dx))), temp_slopes, None, key_for_dict, 'vector_length', 'Lower bound slope')
           
-                        # norm_across_other_dims.sort()
-                        # slopes = -slopes
-                        # zero_slope_indices = np.where(np.isclose(slopes, 0, atol=1e-4))
+                    #     # norm_across_other_dims.sort()
+                    #     # slopes = -slopes
+                    #     # zero_slope_indices = np.where(np.isclose(slopes, 0, atol=1e-4))
         
 
-                        window_size = 21  # 10 neighbors on each side + the element itself
+                    #     window_size = 21  # 10 neighbors on each side + the element itself
 
-                        # Create a window with equal weights
-                        window = np.ones(window_size) / window_size
+                    #     # Create a window with equal weights
+                    #     window = np.ones(window_size) / window_size
 
-                        # Calculate the moving average using convolution
-                        averages = np.convolve(slopes, window, 'same')
+                    #     # Calculate the moving average using convolution
+                    #     averages = np.convolve(slopes, window, 'same')
 
-                        negative_values = averages[averages < 0]
+                    #     negative_values = averages[averages < 0]
 
-                        # Check if there are any negative values
-                        if len(negative_values) > 0:
-                            # Find the maximum among the negative values (closest to zero)
-                            closest_negative = np.max(negative_values)
+                    #     # Check if there are any negative values
+                    #     if len(negative_values) > 0:
+                    #         # Find the maximum among the negative values (closest to zero)
+                    #         closest_negative = np.max(negative_values)
 
-                            # Get the index of this value in the original 'averages' tensor
-                            first_point = np.where(averages == closest_negative)
-                        else:
-                            first_point = None  # or handle the case where there are no negative values
-                            raise ValueError('No negative values found in averages')
-                            # if slopes[index] < -0.5:
-                            #     # first_point = index
-                            #     break
-                        threshold = 0.05 * len(slopes)
-                        second_point = 0
-                        for index in range(len(slopes)):
-                            if np.abs(slopes[index]) >= threshold:
-                                second_point = index
-                                break
+                    #         # Get the index of this value in the original 'averages' tensor
+                    #         first_point = np.where(averages == closest_negative)
+                    #     else:
+                    #         first_point = None  # or handle the case where there are no negative values
+                    #         raise ValueError('No negative values found in averages')
+                    #         # if slopes[index] < -0.5:
+                    #         #     # first_point = index
+                    #         #     break
+                    #     threshold = 0.05 * len(slopes)
+                    #     second_point = 0
+                    #     for index in range(len(slopes)):
+                    #         if np.abs(slopes[index]) >= threshold:
+                    #             second_point = index
+                    #             break
                         
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_norm_across_other_dims_key])
-                        fig[fig_name] = plt.figure(fig_name)
-                        plt.text(first_point, 0, f'first {first_point}', ha='center', va='bottom')
-                        # plt.show()
-                        plt.text(second_point, 0, f'second {second_point}', ha='center', va='bottom')
-                        # plt.show()
-                        print('first_point', first_point, 'second_point', second_point)
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_norm_across_other_dims_key])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     plt.text(first_point, 0, f'first {first_point}', ha='center', va='bottom')
+                    #     # plt.show()
+                    #     plt.text(second_point, 0, f'second {second_point}', ha='center', va='bottom')
+                    #     # plt.show()
+                    #     print('first_point', first_point, 'second_point', second_point)
 
                         # draw_3d_heatmap(plt, fig[fig_name], y, 'd dimension', 'm dimension', 'eta')
                         # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
@@ -1483,7 +1500,7 @@ def make_vis(df_exp, df_history):
                                 prune_name += '-wanda'
                             elif 'IFN' in prune_metric:
                                 prune_name += prune_metric
-                            key_for_dict = f"{prune_name}"
+                            key_for_dict = f"{prune_name}_{prune_metric}"
                             
                             # if 'pq' in prune_name:
                             #     key_for_dict = f"Our"

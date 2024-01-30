@@ -47,11 +47,16 @@ def runExperiment():
 
     cfg['epoch'] = 0 
     vanilla_name_list = cfg['model_tag'].split('_')
+    # batch size
     vanilla_name_list[4] = '1'
+    # metric
+    vanilla_name_list[6] = 'None'
+    # prune_name
     vanilla_name_list[7] = 'vanilla+h+0+-1'
+    # cust_tgt_modules
     vanilla_name_list[8] = 'None'
-    # vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
-    # vanilla_info_list, vanilla_duration = vanilla_res['vanilla_info_list'], vanilla_res['vanilla_duration']
+    vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
+    vanilla_info_list, vanilla_duration = vanilla_res['vanilla_info_list'], vanilla_res['vanilla_duration']
 
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])

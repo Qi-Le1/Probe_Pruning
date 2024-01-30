@@ -343,22 +343,22 @@ class LlamaMLP(nn.Module):
                 
                 # x_mean_bsz = x.mean(axis=0)
                 if cfg['prune_metric'] == 'WOF1N':
-                    comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=(0,1)).unsqueeze_(0)
+                    comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
                 elif cfg['prune_metric'] == 'WOF2N':
-                    comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=(0,1)).unsqueeze_(0)
+                    comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
                     # comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0, 1)).unsqueeze_(0)
                 elif cfg['prune_metric'] == 'SumWOF2N':
-                    comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=(0,1)).unsqueeze_(0)
+                    comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
                 elif cfg['prune_metric'] == 'mbmsWOF2N':
                     # comp_across_bsz = torch.linalg.vector_norm(hidden_states, ord=2, dim=0).unsqueeze_(0)
                     comp_across_bsz_seq = x.mean(axis=(0, 1)).unsqueeze_(0)
-                elif cfg['prune_metric'] == 'mbnsWOF2N':
+                elif cfg['prune_metric'] == 'mbWOF2N':
                     x_mean_bsz = x.mean(axis=0)
                     comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=0).unsqueeze_(0)
                 elif cfg['prune_metric'] == 'mbmsSumWOF2N':
                     # comp_across_bsz = torch.linalg.vector_norm(hidden_states, ord=2, dim=0).unsqueeze_(0)
                     comp_across_bsz_seq = x.mean(axis=(0, 1)).unsqueeze_(0)
-                elif cfg['prune_metric'] == 'mbnsSumWOF2N':
+                elif cfg['prune_metric'] == 'mbSumWOF2N':
                     x_mean_bsz = x.mean(axis=0)
                     comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=0).unsqueeze_(0)
 
@@ -366,9 +366,9 @@ class LlamaMLP(nn.Module):
                     # print('temp1', temp1.shape, flush=True)
                     # print('self.down_proj_first_dim_sum', self.down_proj_first_dim_sum.shape, flush=True)
                     fcst_out = self.act_fn(self.gate_proj(comp_across_bsz_seq, cal_mlp_fcst_out_dim_metric=True)) * self.up_proj(comp_across_bsz_seq, cal_mlp_fcst_out_dim_metric=True)
-                    if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbmsWOF2N' or cfg['prune_metric'] == 'mbnsWOF2N':
+                    if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbmsWOF2N' or cfg['prune_metric'] == 'mbWOF2N':
                         fcst_out_dim_metric = (torch.linalg.vector_norm(fcst_out, ord=2, dim=1).reshape((1, -1)) * torch.abs(self.down_proj.weight.data)).sum(axis=0)
-                    elif cfg['prune_metric'] == 'SumWOF2N' or cfg['prune_metric'] == 'mbmsSumWOF2N' or cfg['prune_metric'] == 'mbnsSumWOF2N':
+                    elif cfg['prune_metric'] == 'SumWOF2N' or cfg['prune_metric'] == 'mbmsSumWOF2N' or cfg['prune_metric'] == 'mbSumWOF2N':
                         fcst_out_dim_metric = ((fcst_out).sum(axis=1) * self.down_proj_first_dim_sum).abs_()
                     
                     fcst_out_dim_indices = self.pruning_module.cal_fcst_mlp_metric(fcst_out_dim_metric)
@@ -681,7 +681,7 @@ class LlamaAttention(nn.Module):
         
 
         if 'fcst' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
-            print('fcst attn')
+            # print('fcst attn')
             if getattr(self, 'o_proj_first_dim_sum', None) is None:
                 self.o_proj_first_dim_sum = self.o_proj.weight.data.sum(axis=0)
             
