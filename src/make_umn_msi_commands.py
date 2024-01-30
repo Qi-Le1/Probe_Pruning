@@ -332,13 +332,38 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIF2N'], [f'magstructlocal+h+{x}+-1+max' for x in [0.1]],
-                    ['o-proj'], ['full']]]
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIF2N'], [f'magstructlocal+h+{x}+-1+max' for x in [0.1]],
+            #         ['o-proj'], ['full']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['SumWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.1, 0.2, 0.3, 0.4, 0.5]],
+            #         ['q-proj+k-proj+v-proj+o-proj'], ['full']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WIF2N'], [f'magstructlocal+h+{x}+-1+max' for x in [0.1]],
+            #         ['o-proj'], ['full']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['WOF2N', 'mbWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+            #         ['q-proj+k-proj+v-proj+o-proj'], ['full']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], [ 'SumWOF2N','mbSumWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+            #         ['q-proj+k-proj+v-proj+o-proj'], ['full']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['WOF2N', 'msWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                    ['gate-proj+up-proj+down-proj'], ['full']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['WOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.1]],
-                    ['o-proj'], ['full']]]
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['SumWOF2N','msSumWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1+max' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
+                    ['gate-proj+up-proj+down-proj'], ['full']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 

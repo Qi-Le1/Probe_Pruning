@@ -25,19 +25,39 @@ import torch
 
 import torch
 
-a = torch.randn(1, 2, 3)
-b = torch.linalg.vector_norm(a, ord=2, dim=1)
-c = torch.linalg.vector_norm(a, ord=2, dim=(0, 1)).reshape(1,-1)
-d = 5
+# a = torch.randn(1, 2, 3)
+# b = torch.linalg.vector_norm(a, ord=2, dim=1)
+# c = torch.linalg.vector_norm(a, ord=2, dim=(0, 1)).reshape(1,-1)
+# d = 5
 
-# Create two tensors with different data types
-tensor1 = torch.randn(5, dtype=torch.float32)
-tensor2 = torch.randn(5, dtype=torch.float16)
+# # Create two tensors with different data types
+# tensor1 = torch.randn(5, dtype=torch.float32)
+# tensor2 = torch.randn(5, dtype=torch.float16)
 
-# Attempt to add them
-result = tensor1 * tensor2
-b = result.dtype
-a = 5
+# # Attempt to add them
+# result = tensor1 * tensor2
+# b = result.dtype
+# a = 5
+
+a = torch.randn(4, 5)
+b = torch.randn(4, 5)
+e = torch.randn(4, 5)
+c = torch.matmul(a, b.T)
+# print(c)
+c = nn.functional.softmax(c, dim=-1)
+print('original after softmax', c)
+c = torch.matmul(c, e)
+print('new after v', c)
+
+a[:, 0] = 0
+b[:, 0] = 0
+e[:, 0] = 0
+d = torch.matmul(a, b.T)
+# print(d)
+d = nn.functional.softmax(d, dim=-1)
+print('new after softmax', d)
+d = torch.matmul(d, e)
+print('new after v', d)
 # 假设 a 和 b 是两个三维张量
 # a = torch.rand(2, 3)
 # b = torch.rand(3, 4)

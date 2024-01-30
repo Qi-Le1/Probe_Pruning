@@ -133,7 +133,7 @@ def test(data_loader, model, model_prof, metric, logger):
             # if i == 50:
             # if i == 10:
             #     break
-            break
+            # break
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))

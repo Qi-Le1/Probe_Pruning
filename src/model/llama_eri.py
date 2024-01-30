@@ -144,11 +144,12 @@ class LlamaEriModel(torch.nn.Module):
         new_module.weight.requires_grad = False
         new_module.device = old_module.weight.device
         new_module.is_pruned = True
-        if hasattr(old_module, "bias"):
-            # old_module might not have bias, bias=None
-            # need to write into new_module, otherwise
-            # the parent class will assign bias
-            new_module.bias = old_module.bias
+        # if hasattr(old_module, "bias"):
+        #     # old_module might not have bias, bias=None
+        #     # need to write into new_module, otherwise
+        #     # the parent class will assign bias
+        #     print('old_module.bias', old_module.bias)
+        #     new_module.bias = old_module.bias
 
         if 'local' in cfg['prune_name'] and cfg['prune_tgt'] == 'weight':
             new_module.prune_weight(new_module.weight, new_module.layer_type)
@@ -377,17 +378,19 @@ class Linear(nn.Linear, EriLayer):
         # if 'local' in self.prune_name and self.prune_tgt == 'weight':
         #     self.prune_weight(self.weight, self.layer_type)
     
-
+    # no bias in llama-2
     def forward(self, x: torch.Tensor, **kwargs):
         with torch.no_grad():
             previous_dtype = x.dtype
             if self.prune_tgt == 'hidden_repr':
-                if 'fcst' in cfg['prune_name'] and 'cal_mlp_fcst_out_dim_metric' in kwargs:
+                if 'fcst' in cfg['prune_name'] and 'cal_mlp_fcst_out_dim_metric' in kwargs and kwargs['cal_mlp_fcst_out_dim_metric'] == True:
                     # broadcast and return out_dim * in_dim matrix
                     return x * self.weight
-                elif 'fcst' in cfg['prune_name'] and 'cal_attn_fcst_out_dim_metric' in kwargs:
+                elif 'fcst' in cfg['prune_name'] and 'cal_attn_fcst_out_dim_metric' in kwargs and kwargs['cal_attn_fcst_out_dim_metric'] == True:
                     # need to save s dimension for the following fcst
-                    return F.linear(x, self.weight, bias=self.bias)
+                    result = F.linear(x, self.weight)
+                    result = result.to(previous_dtype)
+                    return result
                 # print('-----\n')
                 # print('input_shape: ', x.shape)
                 # print("prev weight.shape", self.weight.shape)
@@ -395,6 +398,8 @@ class Linear(nn.Linear, EriLayer):
                 input_dim = x.dim()
                 seq_len = x.size(1)
                 input_shape = x.shape
+
+                # print('self.bias', self.bias)
                 # print('input_shape: ', input_shape, self.key)
                 linear_layer_info = {
                     'weight': self.weight.data,
@@ -409,11 +414,19 @@ class Linear(nn.Linear, EriLayer):
                     # print('here1')
                     if 'attn' in self.key:
                         if 'fcst' in cfg['prune_name']:
+                            # res_original = F.linear(x, self.weight)
+
                             if 'mix' in cfg['prune_name']:
                                 x = x[..., kwargs['fcst_out_dim_indices']]
                             # if it is forecast and parallel, we consider all the structure and operations
                             # we already know the weight index to extract
                             weight = torch.index_select(self.weight, dim=1, index=kwargs['fcst_out_dim_indices'].to(self.weight.device))
+                            # print('attnfcstmix, fcst_out_dim_indices', kwargs['fcst_out_dim_indices'])
+
+                            # res_after_extract = F.linear(x, weight)
+                            # print('res_original', res_original)
+                            # print('res_after_extract', res_after_extract)
+                            
                         else:
                             # prune out dim situation
                             # but not forecast (only consider current layer's input and weight)
@@ -452,6 +465,8 @@ class Linear(nn.Linear, EriLayer):
                             self.out_selected_dim = kwargs['fcst_out_dim_indices']
                         elif 'mix' in cfg['prune_name']:
                             self.out_selected_dim = kwargs['fcst_out_dim_indices']
+
+                        # print('attn fcst_out_dim_indices')
                     else:
                         weight = torch.index_select(self.weight, dim=0, index=kwargs['fcst_out_dim_indices'].to(self.weight.device))
                         # print('weight.shape', weight.shape)
@@ -461,12 +476,15 @@ class Linear(nn.Linear, EriLayer):
                 else:
                     # print('here3')
                     x, pruned_dims, prune_channels_multi_dims = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.is_prune_out_dim)
+                    print('xafter prune', x)
                     if 'WO' in cfg['prune_metric']:
                         weight = self.extract_out_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
                     else:
                         weight = self.extract_in_weight(input_dim, pruned_dims, prune_channels_multi_dims, self.layer_type)
                 
-                result = F.linear(x, weight, bias=self.bias)
+                result = F.linear(x, weight)
+                # if 'o_proj' in self.key:
+                #     print('result', result, flush=True)
                 # refill the pruned output dim with 0
                 # gate-proj & up-proj
                 if 'WO' in cfg['prune_metric'] and self.is_prune_out_dim == True:

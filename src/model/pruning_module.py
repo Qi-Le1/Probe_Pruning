@@ -334,13 +334,13 @@ class HiddenRepresentationPruning(BasePruning):
 
             sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=0)
 
-            print('sorted_value', sorted_value)
+            # print('sorted_value', sorted_value)
             # print('sorted_value', sorted_value)
             if 'mag' in cfg['prune_name']:
                 num_prune = int(fcst_out_dim_metric.shape[0] * cfg['prune_hyper'])
             elif 'pq' in cfg['prune_name']:
                 num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_attn_beta, self.pq_gamma)[0]
-            print('delete indices', sorted_indices[:num_prune])
+            # print('delete indices', sorted_indices[:num_prune])
             return sorted_indices[num_prune:], None, num_heads, head_dim
 
             
@@ -734,7 +734,7 @@ class HiddenRepresentationPruning(BasePruning):
     def mag_struct(self, h, key,layer_info, prune_dim, is_prune_out_dim):
         info = {}
         dims_to_aggregate = tuple(i for i in range(h.dim()) if i != prune_dim and i != self.exclude_dim_to_aggregate)
-
+        print('mag_struct input', h, flush=True)
         if self.prune_metric == 'IF1N':
             norm_across_other_dims = torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate)
         elif self.prune_metric == 'IF2N':
@@ -748,6 +748,7 @@ class HiddenRepresentationPruning(BasePruning):
             norm_across_other_dims = (torch.linalg.vector_norm(h, ord=1, dim=dims_to_aggregate) * layer_info['weight'].abs()).sum(dim=1)
         elif self.prune_metric == 'WOF2N':
             norm_across_other_dims = (torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) * layer_info['weight'].abs()).sum(dim=1)
+
         # if norm_across_other_dims.dim() == 0 or norm_across_other_dims.dim() == 1:
         #     norm_across_other_dims.unsqueeze_(0)
         # print('w*magstruct', self.prune_name)     
