@@ -234,15 +234,67 @@ def make_control_list(file):
         
     elif file == 'observe_fcst':
         # 'WOF2N', 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10', '50'], ['128'], ['mbmsWOF2N', 'mbWOF2N'], [f'magstructlocalfcstpara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                ['gate-proj+up-proj+down-proj']]]
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10', '50'], ['128'], ['WOF2N', 'mbmsWOF2N', 'mbWOF2N'], [f'magstructlocalfcstpara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+        #         ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10', '50'], ['128'], ['WOF2S', 'mbmsWOF2S', 'mbWOF2S'], [f'magstructlocalfcstpara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+        #         ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+        # # 'SumWOF2N',
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10','50'], ['128'], ['SumWOF2N', 'mbmsSumWOF2N', 'mbSumWOF2N'], [f'magstructlocalfcstpara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+        #         ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2N', 'mbWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+                ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2S', 'mbWOF2S'], [f'magstructlocalfcstparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+                ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['SumWOF2N','mbSumWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+                ['q-proj+k-proj+v-proj+o-proj']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
-        # 'SumWOF2N',
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10','50'], ['128'], ['mbmsSumWOF2N', 'mbSumWOF2N'], [f'magstructlocalfcstpara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                ['gate-proj+up-proj+down-proj']]]
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2N', 'mbWOF2N'], [f'magstructlocalfcstparaeach+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+                    ['q-proj+k-proj+v-proj+o-proj']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2S', 'mbWOF2S'], [f'magstructlocalfcstparaeach+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+                    ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], [ 'mbWOF2S'], [f'magstructlocalfcstparaeachonlyqk+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+                    ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], [ 'mbWOF2S'], [f'magstructlocalfcstparamixonlyqk+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+                ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2N', 'mbWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['SumWOF2N','mbSumWOF2N'], [f'magstructlocalfcstparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
     elif file == 'observe_cv':
         # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
         #                      ['inter'], ['somemethods-3'], ['default']]]
@@ -657,7 +709,7 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
                 
             for k in base_result['logger']['test'].history:
                 if args['detail'].lower() == 'false':
-                    # if 'FLOPs_for_pruned_layers' not in k:
+                    # if 'FLOPs_ratio_for_pruned_layers' not in k:
                     #     continue
                     if 'pq_indices_varying_lengths' in k:
                         continue
@@ -1469,14 +1521,14 @@ def make_vis(df_exp, df_history):
                         # draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_hypers', 'pruned_ratio')
 
                     # several methods for all layers on 1 plot
-                    if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_for_pruned_layers' in index:
+                    if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_ratio_for_pruned_layers' in index or 'FLOPs_for_pruned_layers' in index:
                         if any(metric_name in index for metric_name in metric_name_list):
                             flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
                             flops_metric_name = flops_metric_name.split('/')[1]
                             if performance_vs_prunedflops[0] is None:
                                 performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
                                 performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
-                        elif 'FLOPs_for_pruned_layers' in index:
+                        elif 'FLOPs_ratio_for_pruned_layers' in index or 'FLOPs_for_pruned_layers' in index:
                             if performance_vs_prunedflops[2] is None:
                                 performance_vs_prunedflops[2] = row.tolist()[0]
                         
@@ -1486,7 +1538,7 @@ def make_vis(df_exp, df_history):
                             # prune_tgt, 
                             # prune_dim, 
                             # batch_integ, 
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_pruned_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_prunedflops[2]
                             
@@ -1514,9 +1566,62 @@ def make_vis(df_exp, df_history):
                             # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
                             performance_vs_prunedflops = [None, None, None]
 
+                    if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_ratio_for_all_layers' in index:
+                        if any(metric_name in index for metric_name in metric_name_list):
+                            flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                            flops_metric_name = flops_metric_name.split('/')[1]
+                            if performance_vs_total_FLOPs_ratio[0] is None:
+                                performance_vs_total_FLOPs_ratio[0] = min(performance_metric_max, row.tolist()[0])
+                                performance_vs_total_FLOPs_ratio[1] = min(performance_metric_max, row_se.tolist()[0])
+                        elif 'FLOPs_ratio_for_all_layers' in index:
+                            if performance_vs_total_FLOPs_ratio[2] is None:
+                                performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
+                        
+                        if performance_vs_total_FLOPs_ratio[0] is not None and performance_vs_total_FLOPs_ratio[2] is not None:
+                            print('performancevssparsity', performance_vs_total_FLOPs_ratio, flops_metric_name, prune_hyper)
+                            # print('here1')
+                            # prune_tgt, 
+                            # prune_dim, 
+                            # batch_integ, 
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_all_layers'])
+                            fig[fig_name] = plt.figure(fig_name)
+                            x = performance_vs_total_FLOPs_ratio[2]
+                            
+                            y = performance_vs_total_FLOPs_ratio[0]
+                            yerr = performance_vs_total_FLOPs_ratio[1]
+                            if 'pq' in prune_name and 'WIFV' in prune_metric:
+                                prune_name += '-flap'
+                            elif 'O1WIFN' in prune_metric or 'O2WIFN' in prune_metric:
+                                prune_name += prune_metric
+                            elif 'pq' in prune_name and 'WIFN' in prune_metric:
+                                prune_name += '-wanda'
+                            elif 'IFN' in prune_metric:
+                                prune_name += prune_metric
+                            key_for_dict = f"{prune_name}_{prune_metric}"
+                            
+                            # if 'pq' in prune_name:
+                            #     key_for_dict = f"Our"
+                            # elif 'mag' in prune_name:
+                            #     # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
+                            #     if float(prune_hyper) == 0:
+                            #         key_for_dict = f"Dense"
+                            #     else:
+                            #         key_for_dict = f"Mag"
+                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                            # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                            performance_vs_prunedflops = [None, None, None]
 
 
-
+                    if 'vanilla_duration_per_batch' in index or 'pruned_duration_per_batch' in index:
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size,  prune_name, seq_len, nsamples,  prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:', 'time_cost_per_batch'])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = prune_hyper
+                        y = row.tolist()[0]
+                        if 'vanilla_duration_per_batch' in index:
+                            key_for_dict = "vanilla"
+                        else:
+                            key_for_dict = f"{prune_name}_{prune_metric}"
+                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'Batch size', 'Seconds')
 
 
 
@@ -1882,14 +1987,14 @@ def make_vis(df_exp, df_history):
                     #         draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'Sparsity', cur_metric_name)
                             # performance_vs_prunedflops = [None, None]
 
-                    if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_for_pruned_layers' in index:
+                    if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_ratio_for_pruned_layers' in index:
                         if any(metric_name in index for metric_name in metric_name_list):
                             flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
                             flops_metric_name = flops_metric_name.split('/')[1]
                             if performance_vs_prunedflops[0] is None:
                                 performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
                                 performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
-                        elif 'FLOPs_for_pruned_layers' in index:
+                        elif 'FLOPs_ratio_for_pruned_layers' in index:
                             if performance_vs_prunedflops[2] is None:
                                 performance_vs_prunedflops[2] = row.tolist()[0]
                         
@@ -1899,7 +2004,7 @@ def make_vis(df_exp, df_history):
                             # prune_tgt, 
                             # prune_dim, 
                             # batch_integ, 
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, prune_metric,   prune_dim_select_mode, multibatch_integ, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_for_pruned_layers'])
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, prune_metric,   prune_dim_select_mode, multibatch_integ, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_pruned_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             
                             x = performance_vs_prunedflops[2]
@@ -1928,7 +2033,7 @@ def make_vis(df_exp, df_history):
             x_label = fig_data_across_multi_indices[fig_name][key_for_dict]['x_label'][0]
             y_label = fig_data_across_multi_indices[fig_name][key_for_dict]['y_label'][0]
 
-            if 'all_methods_performance_vs_FLOPs_for_pruned_layers' in fig_name:
+            if 'all_methods_performance_vs_FLOPs_ratio_for_pruned_layers' in fig_name:
                 # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, y_lim=performance_metric_max)
                 draw_str_x_figure(plt, x, y, 0, key_for_dict, x_label, y_label)
             if 'all_layer_pruned_ratio_mean' in fig_name:

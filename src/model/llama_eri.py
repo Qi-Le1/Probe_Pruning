@@ -200,6 +200,8 @@ def _check_target_module_exists(target_modules, key):
 
 class EriLayer:
     def __init__(self, in_features: int, out_features: int, **kwargs):
+        self.cal_total_flops = True
+        
         self.prune_tgt = kwargs['prune_tgt']
         self.prune_metric = kwargs['prune_metric']
         self.pruning_module = kwargs['pruning_module']

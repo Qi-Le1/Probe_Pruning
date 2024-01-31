@@ -47,10 +47,14 @@ def get_model_profile(tag, model_prof):
     for name, module in model_prof.model.named_modules():
         temp = [name, module.__flops__, module.__duration__, module.__params__, module.__macs__, type(module)]
         # print('temp', temp)
-        if hasattr(module, 'is_pruned'):
+        if hasattr(module, 'is_pruned') and module.is_pruned == True:
             print('module.key', module.key)
             temp.append(module.key)
             temp.append(True)
+
+        # only cal attn + linear layer for clean comparison
+        if not hasattr(module, 'cal_total_flops'):
+            temp[1] = 0
         info_list.append(temp)
     
     def get_module_duration(module):
@@ -85,6 +89,9 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, p
     }
     total_target_used_params = 0
     total_target_params = 0
+
+    pruned_layer_vanilla_total_flops = 0
+    pruned_layer_pruned_total_flops = 0
     for i in range(len(vanilla_info_list)):
         sub_vanilla_info = vanilla_info_list[i]
         sub_pruned_info = pruned_info_list[i+1]
@@ -93,17 +100,19 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, p
             # [name, module.__flops__, module.__duration__, module.__params__, module.__macs__, type(module)]
             print('sub_pruned_info', sub_pruned_info)
             print('sub_vanilla_info', sub_vanilla_info, sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6))
-            total_target_used_params += sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6) * sub_vanilla_info[3]
-            total_target_params += sub_vanilla_info[3]
+            # total_target_used_params += sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6) * sub_vanilla_info[3]
+            # total_target_params += sub_vanilla_info[3]
+            pruned_layer_vanilla_total_flops += sub_vanilla_info[1]
+            pruned_layer_pruned_total_flops += sub_pruned_info[1]
         print('----\n')
         print(f"VANILLA: {sub_vanilla_info[0]} - {sub_vanilla_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_vanilla_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_vanilla_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_vanilla_info[4]}", flush=True)
         print(f"PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_pruned_info[4]}", flush=True)
     
-    if 'unstruct' in cfg['prune_name']:
-        info['FLOPs_for_pruned_layers'] = cfg['prune_hyper']
-    else:
-        info['FLOPs_for_pruned_layers'] = total_target_used_params / (total_target_params + 1e-6)
-    
+    # if 'unstruct' in cfg['prune_name']:
+    #     info['FLOPs_for_pruned_layers'] = cfg['prune_hyper']
+    # else:
+    info['FLOPs_ratio_for_pruned_layers'] = pruned_layer_pruned_total_flops / (pruned_layer_vanilla_total_flops + 1e-6)
+    info['FLOPs_ratio_for_all_layers'] = pruned_total_flops / (vanilla_total_flops + 1e-6)
     
 
     # vanilla_total_inference_time = sum([vanilla_info_list[i][2] for i in range(len(vanilla_info_list))])
@@ -117,8 +126,8 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, p
 
     print(f"Vanilla FLOPs ({FLOPS_UNIT[1]}): ", vanilla_total_flops/FLOPS_UNIT[0], flush=True)
     print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
-    print('Pruning FLOPs for all modules: ', (pruned_total_flops / (vanilla_total_flops + 1e-6)), flush=True)
-    print("info[FLOPs_for_pruned_layers]", info['FLOPs_for_pruned_layers'])
+    print('FLOPs_ratio_for_all_layers: ', (pruned_total_flops / (vanilla_total_flops + 1e-6)), flush=True)
+    print("FLOPs_ratio_for_pruned_layers", info['FLOPs_ratio_for_pruned_layers'])
     print('Summary Finished ---------\n')
     logger.append(info, 'test')
     logger.save(False)

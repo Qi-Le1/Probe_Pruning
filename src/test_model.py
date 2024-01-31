@@ -85,15 +85,15 @@ def runExperiment():
     return
 
 def test(data_loader, model, model_prof, metric, logger):
-    print("Debug 12.01: Test logger created", flush=True)
+    # print("Debug 12.01: Test logger created", flush=True)
     start_time = time.time()
     with torch.no_grad():
         model_prof.start_profile()
         
         model.train(False)
-        print("Debug 12.011: Test logger created", flush=True)
+        # print("Debug 12.011: Test logger created", flush=True)
         for i, input in enumerate(data_loader):
-            print("Debug 12.1: Test logger created", flush=True)
+            # print("Debug 12.1: Test logger created", flush=True)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
