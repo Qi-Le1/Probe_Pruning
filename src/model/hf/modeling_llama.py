@@ -19,6 +19,7 @@
 # limitations under the License.
 """ PyTorch LLaMA model."""
 import math
+import time
 import warnings
 from typing import List, Optional, Tuple, Union
 
@@ -251,7 +252,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, unsqueeze_dim=1):
 
 
 
-def apply_rotary_pos_emb_for_prune_each_head(q, k, cos, sin, position_ids, fcst_qk_out_dim_indices_for_rope, unsqueeze_dim=1):
+def apply_rotary_pos_emb_for_prune_each_head(q, k, cos, sin, position_ids, probe_qk_out_dim_indices_for_rope, unsqueeze_dim=1):
     """Applies Rotary Position Embedding to the query and key tensors.
 
     Args:
@@ -281,17 +282,7 @@ def apply_rotary_pos_emb_for_prune_each_head(q, k, cos, sin, position_ids, fcst_
 
     cos = cos[position_ids].unsqueeze(unsqueeze_dim).repeat(bsz, num_heads, 1, 1)
     sin = sin[position_ids].unsqueeze(unsqueeze_dim).repeat(bsz, num_heads, 1, 1)
-    # print('apply_rotary_pos_emb_for_prune_each_head_emb_cos', cos.shape, flush=True)
-    # print('apply_rotary_pos_emb_for_prune_each_head_emb_sin', sin.shape, flush=True)
-
-    # print('fcst_out_dim_indices_for_rope', fcst_out_dim_indices_for_rope.shape, flush=True)
-    # head_indices = torch.arange(num_heads).view(-1, 1).expand(-1, head_dim).to(cos.device)
-    # # Use advanced indexing to extract the values
-    # cos = cos[:, head_indices, :, fcst_out_dim_indices_for_rope]
-    # sin = sin[:, head_indices, :, fcst_out_dim_indices_for_rope]
-
-    # Create a 4D index tensor for fcst_out_dim_indices_for_rope
-    index_tensor = fcst_qk_out_dim_indices_for_rope.unsqueeze(0).unsqueeze(2).expand(bsz, -1, seq_len, -1)
+    index_tensor = probe_qk_out_dim_indices_for_rope.unsqueeze(0).unsqueeze(2).expand(bsz, -1, seq_len, -1)
 
     # Use torch.gather to extract the elements for each head (positions are different for each head)
     cos = torch.gather(cos, -1, index_tensor)
@@ -314,13 +305,13 @@ class LlamaMLP(nn.Module):
         self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
         self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)
-
         self.gate_proj.cal_total_flops = True
         self.up_proj.cal_total_flops = True
         self.down_proj.cal_total_flops = True
 
         self.act_fn = ACT2FN[config.hidden_act]
 
+        self.cal_total_flops = True
         self.pruning_module = HiddenRepresentationPruning(cfg, 'llama_mlp')
 
     def forward(self, x, **kwargs):
@@ -341,36 +332,30 @@ class LlamaMLP(nn.Module):
             ]
             down_proj = sum(down_proj)
         else:
-            if 'fcst' in cfg['prune_name'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
-
-                if cfg['prune_metric'] in ['WOF2N', 'SumWOF2N', 'WOF2S']:
-                    comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
-                elif cfg['prune_metric'] in ['mbWOF2N', 'mbSumWOF2N', 'mbWOF2S']:
+            if 'probe' in cfg['prune_name'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
+                
+                if 'mb' in cfg['prune_metric']:
                     x_mean_bsz = x.mean(axis=0)
                     comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=0).unsqueeze_(0)
-                elif cfg['prune_metric'] in ['mbmsWOF2N','mbmsSumWOF2N', 'mbmsWOF2S']:
+                elif 'mbms' in cfg['prune_metric']:
                     comp_across_bsz_seq = x.mean(axis=(0, 1)).unsqueeze_(0)
+                else:
+                    comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
 
-                if 'para' in cfg['prune_name']:
-                    # print('temp1', temp1.shape, flush=True)
-                    # print('self.down_proj_first_dim_sum', self.down_proj_first_dim_sum.shape, flush=True)
-                    fcst_out = self.act_fn(self.gate_proj(comp_across_bsz_seq, cal_mlp_fcst_out_dim_metric=True)) * self.up_proj(comp_across_bsz_seq, cal_mlp_fcst_out_dim_metric=True)
+                probe_out = self.act_fn(self.gate_proj(comp_across_bsz_seq, cal_mlp_probe_out_dim_metric=True)) * self.up_proj(comp_across_bsz_seq, cal_mlp_probe_out_dim_metric=True)
 
-                    if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbmsWOF2N' or cfg['prune_metric'] == 'mbWOF2N':
-                        fcst_out_dim_metric = (torch.linalg.vector_norm(fcst_out, ord=2, dim=1).reshape((1, -1)) * torch.abs(self.down_proj.weight.data)).sum(axis=0)
-                    elif cfg['prune_metric'] == 'SumWOF2N' or cfg['prune_metric'] == 'mbmsSumWOF2N' or cfg['prune_metric'] == 'mbSumWOF2N':
-                        if getattr(self, 'down_proj_first_dim_sum', None) is None:
-                            self.down_proj_first_dim_sum = self.down_proj.weight.data.sum(axis=0)
-                        fcst_out_dim_metric = ((fcst_out).sum(axis=1) * self.down_proj_first_dim_sum).abs_()
-                    elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S' or cfg['prune_metric'] == 'mbmsWOF2S':
-                        fcst_out_dim_metric = torch.sqrt((torch.sum(torch.pow(fcst_out, 2), dim=1).reshape((1, -1)) * torch.pow(self.down_proj.weight.data, 2)).sum(axis=0))
+                # ablation study for different metrics
+                if 'wanda' in cfg['prune_metric']:
+                    probe_out_dim_metric = (torch.linalg.vector_norm(probe_out, ord=2, dim=1).reshape((1, -1)) * torch.abs(self.down_proj.weight.data)).sum(axis=0)
+                elif 'flap' in cfg['prune_metric']:
+                    pass
+                elif 'probe' in cfg['prune_metric']:
+                    probe_out_dim_metric = torch.sqrt((torch.sum(torch.pow(probe_out, 2), dim=1).reshape((1, -1)) * torch.pow(self.down_proj.weight.data, 2)).sum(axis=0))
 
-                    fcst_out_dim_indices = self.pruning_module.cal_fcst_mlp_metric(fcst_out_dim_metric)
-                    # print('fcst_out_dim_metric', fcst_out_dim_metric.shape, flush=True)
-                    kwargs['fcst_out_dim_indices'] = fcst_out_dim_indices
-                    down_proj = self.down_proj(self.act_fn(self.gate_proj(x, fcst_out_dim_indices=fcst_out_dim_indices)) * self.up_proj(x, fcst_out_dim_indices=fcst_out_dim_indices), **kwargs)
-                    # print('down_proj', down_proj.shape, flush=True)
-                    return down_proj
+                probe_out_dim_indices = self.pruning_module.cal_probe_mlp_metric(probe_out_dim_metric)
+                kwargs['probe_out_dim_indices'] = probe_out_dim_indices
+                down_proj = self.down_proj(self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices), **kwargs)
+                return down_proj
             else:
                 down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
@@ -426,7 +411,7 @@ class LlamaAttention(nn.Module):
         self.v_proj.cal_total_flops = True
         self.o_proj.cal_total_flops = True
         # print("cfg['cust_tgt_modules']", cfg['cust_tgt_modules'])
-        # if 'fcst' in cfg['prune_name'] and 'each' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
+        # if 'probe' in cfg['prune_name'] and 'each' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
         #     self.head_dim = int((1 - cfg['prune_hyper']) * self.head_dim)
         #     print('self.head_dim', self.head_dim, flush=True)
         self._init_rope()
@@ -490,235 +475,278 @@ class LlamaAttention(nn.Module):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
 
-        if 'fcst' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
-            # print('fcst attn')
-            
-            if cfg['prune_metric'] in ['WOF2N', 'SumWOF2N', 'WOF2S']:
-                comp_across_bsz = torch.linalg.vector_norm(hidden_states, ord=2, dim=0).unsqueeze_(0)
-            elif cfg['prune_metric'] in ['mbWOF2N', 'mbSumWOF2N', 'mbWOF2S']:
-                comp_across_bsz = hidden_states.mean(axis=0).unsqueeze_(0)
+        if 'probe' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
+
+            if 'mb' in cfg['prune_metric']:
+                x_mean_bsz = x.mean(axis=0)
+                comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=0).unsqueeze_(0)
+            else:
+                comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
 
             q_num_heads, k_num_heads, v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
             q_head_dim, k_head_dim, v_head_dim = self.head_dim, self.head_dim, self.head_dim
             # print('hidden_states', hidden_states)
             # print('comp_across_bsz', comp_across_bsz, flush=True)
-            if 'para' in cfg['prune_name']:
-                # copy orignal code and modify a little bit for forecast pruning
-                # currently does not implement for group attention, but it should work too
-                bsz, q_len, _ = comp_across_bsz.size()
-                
-                query_states = self.q_proj(comp_across_bsz, cal_attn_fcst_out_dim_metric='q_proj' in cfg['cust_tgt_modules'])
-                key_states = self.k_proj(comp_across_bsz, cal_attn_fcst_out_dim_metric='k_proj' in cfg['cust_tgt_modules'])
-                value_states = self.v_proj(comp_across_bsz, cal_attn_fcst_out_dim_metric='v_proj' in cfg['cust_tgt_modules'])
+            # if 'para' in cfg['prune_name']:
+            # copy orignal code and modify a little bit for forecast pruning
+            # currently does not implement for group attention, but it should work too
+            bsz, q_len, _ = comp_across_bsz.size()
+            
+            query_states = self.q_proj(comp_across_bsz, cal_attn_probe_out_dim_metric='q_proj' in cfg['cust_tgt_modules'])
+            key_states = self.k_proj(comp_across_bsz, cal_attn_probe_out_dim_metric='k_proj' in cfg['cust_tgt_modules'])
+            value_states = self.v_proj(comp_across_bsz, cal_attn_probe_out_dim_metric='v_proj' in cfg['cust_tgt_modules'])
 
-                # only consider qk effect, v and o remain the same
-                # if 'onlyqk' in cfg['prune_name']:
-                if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbWOF2N':
-                    fcst_qk_out_dim_metric = (torch.linalg.vector_norm(query_states, ord=2, dim=(0, 1)).reshape((1, 1, -1)) * torch.abs(key_states)).sum(axis=(0, 1))
-                elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
-                    fcst_qk_out_dim_metric = torch.sqrt((torch.sum(torch.pow(query_states, 2), dim=(0, 1)).reshape((1, 1, -1)) * torch.pow(key_states, 2)).sum(axis=(0, 1)))
+            # only consider qk effect, v and o remain the same
+            # if 'onlyqk' in cfg['prune_name']:
+            if 'wanda' in cfg['prune_metric']:
+                probe_qk_out_dim_metric = (torch.linalg.vector_norm(query_states, ord=2, dim=(0, 1)).reshape((1, 1, -1)) * torch.abs(key_states)).sum(axis=(0, 1))
+            elif 'flap' in cfg['prune_metric']:
+                pass
+            elif 'probe' in cfg['prune_metric']:
+                probe_qk_out_dim_metric = torch.sqrt((torch.sum(torch.pow(query_states, 2), dim=(0, 1)).reshape((1, 1, -1)) * torch.pow(key_states, 2)).sum(axis=(0, 1)))
 
-                fcst_qk_out_dim_indices, fcst_qk_out_dim_indices_for_rope, qk_num_heads, qk_head_dim  = self.pruning_module.cal_fcst_attn_metric(fcst_qk_out_dim_metric, self.num_heads, self.head_dim)
-                q_num_heads, k_num_heads = qk_num_heads, qk_num_heads
-                q_head_dim, k_head_dim = qk_head_dim, qk_head_dim
+            probe_qk_out_dim_indices, probe_qk_out_dim_indices_for_rope, qk_num_heads, qk_head_dim  = self.pruning_module.cal_probe_attn_metric(probe_qk_out_dim_metric, self.num_heads, self.head_dim, cfg['qk_proj_prune'])
+            q_num_heads, k_num_heads = qk_num_heads, qk_num_heads
+            q_head_dim, k_head_dim = qk_head_dim, qk_head_dim
 
-                if 'conditionqk' in cfg['prune_name']:
-                    # query_states = self.q_proj(hidden_states, fcst_out_dim_indices=fcst_qk_out_dim_indices)
-                    # key_states = self.k_proj(hidden_states, fcst_out_dim_indices=fcst_qk_out_dim_indices)
-                    if 'mix' in cfg['prune_name']:
-                        mask = torch.zeros(query_states.shape[-1], dtype=torch.bool, device=query_states.device)
-                        mask[~fcst_qk_out_dim_indices] = True
-                        query_states[..., mask] = 0
-                        key_states[..., mask] = 0
-                    else:
-                        query_states = torch.index_select(query_states, -1, fcst_qk_out_dim_indices)
-                        key_states = torch.index_select(key_states, -1, fcst_qk_out_dim_indices)
-                        
-                    query_states = query_states.view(bsz, q_len, q_num_heads, q_head_dim).transpose(1, 2)
-                    key_states = key_states.view(bsz, q_len, k_num_heads, k_head_dim).transpose(1, 2)
+            if 'conditionqk' in cfg['prune_name']:
+                # query_states = self.q_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+                # key_states = self.k_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+                if 'fill' in cfg['prune_name']:
+                    mask = torch.zeros(query_states.shape[-1], dtype=torch.bool, device=query_states.device)
+                    mask[~probe_qk_out_dim_indices] = True
+                    query_states[..., mask] = 0
+                    key_states[..., mask] = 0
                 else:
-                    query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-                    key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-                
-                value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-
-                kv_seq_len = key_states.shape[-2]
-                # if past_key_value is not None:
-                #     kv_seq_len += past_key_value[0].shape[-2]
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-
-                # print('-----1')
-                # print('shapes', query_states.shape, key_states.shape, cos.shape, sin.shape, position_ids.shape, flush=True)
-                # print('query_shape', query_states.shape, flush=True)
-                # print('key_shape', key_states.shape, flush=True)
-                # print('cos_shape', cos.shape, flush=True)
-                # print('sin_shape', sin.shape, flush=True)
-                # print('position_ids_shape', position_ids.shape, position_ids, flush=True)
-                if 'each' in cfg['prune_name']:
-                    query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, fcst_qk_out_dim_indices_for_rope)
-                else:
-                    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
-
-                key_states = repeat_kv(key_states, self.num_key_value_groups)
-                value_states = repeat_kv(value_states, self.num_key_value_groups)
-
-                # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
-                if 'conditionqk' in cfg['prune_name']:
-                    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(k_head_dim)
-                else:
-                    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-                # print('attn_weights', attn_weights.shape, query_states.shape,flush=True)
-                if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
-                    raise ValueError(
-                        f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
-                        f" {attn_weights.size()}"
-                    )
-
-                fcst_attn_mask = attention_mask[0].unsqueeze_(0)
-                # print('attnweights', attn_weights, attn_weights.shape, flush=True)
-                # print('fcst_attn_mask', fcst_attn_mask, fcst_attn_mask.shape, flush=True)
-                if fcst_attn_mask is not None:
-                    if fcst_attn_mask.size() != (bsz, 1, q_len, kv_seq_len):
-                        raise ValueError(
-                            f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {fcst_attn_mask.size()}"
-                        )
-                    attn_weights = attn_weights + fcst_attn_mask
-                    # print('attnweightsaftermask', attn_weights, attn_weights.shape, flush=True)
-
-                # upcast attention to fp32
-                # attn_weights: bsz, self.num_heads, q_len, q_len
-                # attn_weights: 1, self.num_heads, q_len, q_len
-                attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-                # print('attn_weightsafter softmax', attn_weights, attn_weights.shape, flush=True)
-                # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
-                # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
-                attn_output = torch.matmul(attn_weights, value_states)
-                
-                # print('attn_output00', attn_output[0][0], attn_output[0][0].shape, flush=True)
-                if attn_output.size() != (bsz, v_num_heads, q_len, v_head_dim):
-                    raise ValueError(
-                        f"`attn_output` should be of size {(bsz, v_num_heads, q_len, v_head_dim)}, but is"
-                        f" {attn_output.size()}"
-                    )
-
-                # attn_output: bsz, self.num_heads, q_len, self.head_dim -> bsz, q_len, self.num_heads, self.head_dim
-                attn_output = attn_output.transpose(1, 2).contiguous()
-
-                attn_output = attn_output.reshape(bsz, q_len, v_num_heads * v_head_dim)
-                # .type(torch.float32)
-                
-                if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbWOF2N':
-                    fcst_out_dim_metric = (torch.linalg.vector_norm(attn_output, ord=2, dim=(0, 1)).reshape((1, -1)) * torch.abs(self.o_proj.weight.data)).sum(axis=0)
-                elif cfg['prune_metric'] == 'SumWOF2N' or cfg['prune_metric'] == 'mbSumWOF2N':
-                    if getattr(self, 'o_proj_first_dim_sum', None) is None:
-                        self.o_proj_first_dim_sum = self.o_proj.weight.data.sum(axis=0)
-                    fcst_out_dim_metric = (attn_output.sum(axis=(0, 1)) * self.o_proj_first_dim_sum).abs_()
-                elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
-                    fcst_out_dim_metric = torch.sqrt((torch.sum(torch.pow(attn_output, 2), dim=(0, 1)).reshape((1, -1)) * torch.pow(self.o_proj.weight.data, 2)).sum(axis=0))
-                fcst_out_dim_indices, fcst_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.cal_fcst_attn_metric(fcst_out_dim_metric, self.num_heads, self.head_dim)
-
-                if not output_attentions:
-                    attn_weights = None
-                
-                # --------------------------------------
-                #full inference with adding some info to layer input
-                bsz, q_len, _ = hidden_states.size()
-
-                # print('fcst_out_dim_indices', fcst_out_dim_indices)
-                # temp = torch.arange(4096).dtype(fcst_out_dim_indices.dtype).to(fcst_out_dim_indices.device)
-                temp = torch.arange(4096).to(dtype=fcst_out_dim_indices.dtype, device=fcst_out_dim_indices.device)
-                if 'onlyqk' in cfg['prune_name']:
-                    # temp = fcst_qk_out_dim_indices
-                    # print('temp', temp.shape, flush=True)
-                    fcst_out_dim_indices = torch.arange(4096).to(dtype=fcst_out_dim_indices.dtype, device=fcst_out_dim_indices.device)
-                    v_num_heads, v_head_dim = self.num_heads, self.head_dim
-                if 'onlyv' in cfg['prune_name']:
-                    fcst_qk_out_dim_indices = torch.arange(4096).to(dtype=fcst_out_dim_indices.dtype, device=fcst_out_dim_indices.device)
-                    q_num_heads, k_num_heads = self.num_heads, self.num_key_value_heads
-                    q_head_dim, k_head_dim = self.head_dim, self.head_dim
-                # elif 'conditionqk' in cfg['prune_name']:
-                #     temp = fcst_qk_out_dim_indices
-                    # fcst_out_dim_indices = torch.arange(4096).to(dtype=fcst_out_dim_indices.dtype, device=fcst_out_dim_indices.device)
-                    # v_num_heads, v_head_dim = qk_num_heads, qk_head_dim
-                query_states = self.q_proj(hidden_states, fcst_out_dim_indices=fcst_qk_out_dim_indices)
-                key_states = self.k_proj(hidden_states, fcst_out_dim_indices=fcst_qk_out_dim_indices)
-                value_states = self.v_proj(hidden_states, fcst_out_dim_indices=fcst_out_dim_indices)
-                # print('query_states shape', query_states.shape, flush=True)
-                # print('key_states shape', key_states.shape, flush=True)
-                # print('value_states shape', value_states.shape, flush=True)
-                # query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-                # key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-                # value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-
+                    query_states = torch.index_select(query_states, -1, probe_qk_out_dim_indices)
+                    key_states = torch.index_select(key_states, -1, probe_qk_out_dim_indices)
+                    
                 query_states = query_states.view(bsz, q_len, q_num_heads, q_head_dim).transpose(1, 2)
                 key_states = key_states.view(bsz, q_len, k_num_heads, k_head_dim).transpose(1, 2)
-                value_states = value_states.view(bsz, q_len, v_num_heads, v_head_dim).transpose(1, 2)
-                # print('query_states shape 2', query_states.shape, flush=True)
-                # print('key_states shape 2', key_states.shape, flush=True)
-                # print('value_states shape 2', value_states.shape, flush=True)
-                kv_seq_len = key_states.shape[-2]
-                # print('past_key_value', past_key_value, flush=True)
-                if past_key_value is not None:
-                    kv_seq_len += past_key_value[0].shape[-2]
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+            else:
+                query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+                key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+            
+            value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
-                if 'each' in cfg['prune_name']:
-                    query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, fcst_qk_out_dim_indices_for_rope)
-                else:
-                    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+            kv_seq_len = key_states.shape[-2]
+            # if past_key_value is not None:
+            #     kv_seq_len += past_key_value[0].shape[-2]
+            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
-                # print('query_states key_states after rotary', query_states, key_states, flush=True)
-                if past_key_value is not None:
-                    # reuse k, v, self_attention
-                    key_states = torch.cat([past_key_value[0], key_states], dim=2)
-                    value_states = torch.cat([past_key_value[1], value_states], dim=2)
+            if 'each' in cfg['qk_proj_prune']:
+                query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, probe_qk_out_dim_indices_for_rope)
+            else:
+                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
-                past_key_value = (key_states, value_states) if use_cache else None
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
 
-                key_states = repeat_kv(key_states, self.num_key_value_groups)
-                value_states = repeat_kv(value_states, self.num_key_value_groups)
-
-                # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
-                # attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+            # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
+            if 'conditionqk' in cfg['prune_name']:
                 attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(k_head_dim)
+            else:
+                attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+            # print('attn_weights', attn_weights.shape, query_states.shape,flush=True)
+            if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
+                raise ValueError(
+                    f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+                    f" {attn_weights.size()}"
+                )
 
-                if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
+            probe_attn_mask = attention_mask[0].unsqueeze_(0)
+            # print('probe_attn_mask', probe_attn_mask, flush=True)
+            
+            # if 'beforedeleteseq' in cfg['prune_name']:
+            #     zero_attn_mask = (probe_attn_mask >= 0)
+            #     # print('zero_attn_mask', zero_attn_mask, flush=True)
+            #     attn_weights = attn_weights * zero_attn_mask
+            #     # print('attn_weightsaftermask', attn_weights, attn_weights.shape, flush=True)
+            #     if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbWOF2N':
+            #         # becomes self.num_heads, q_len
+            #         attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.abs(value_states)).sum(axis=(0, -1))
+            #     elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
+            #         # becomes self.num_heads, q_len
+            #         attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, -1)))
+
+                # attn_weights_indices = self.pruning_module.cal_probe_attn_weights_metric(attn_weights_metric)
+            if probe_attn_mask is not None:
+                if probe_attn_mask.size() != (bsz, 1, q_len, kv_seq_len):
                     raise ValueError(
-                        f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
-                        f" {attn_weights.size()}"
+                        f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {probe_attn_mask.size()}"
                     )
+                attn_weights = attn_weights + probe_attn_mask
+                # print('attnweightsaftermask', attn_weights, attn_weights.shape, flush=True)
 
-                if attention_mask is not None:
-                    if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
-                        raise ValueError(
-                            f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
-                        )
-                    attn_weights = attn_weights + attention_mask
+            # upcast attention to fp32
+            # attn_weights: bsz, self.num_heads, q_len, q_len
+            # attn_weights: 1, self.num_heads, q_len, q_len
+            # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
+            
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+            if 'delseq' in cfg['prune_name']:
+                if 'wanda' in cfg['prune_metric']:
+                    # becomes self.num_heads, q_len
+                    attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.abs(value_states)).sum(axis=(0, -1))
+                elif 'flap' in cfg['prune_metric']:
+                    pass
+                elif 'probe' in cfg['prune_metric']:
+                    # becomes self.num_heads, q_len
+                    # reshape to do element-wise multiplication
+                    attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, -1)))
 
-                # upcast attention to fp32
-                # attn_weights: bsz, self.num_heads, q_len, q_len
-                # attn_weights: 1, self.num_heads, q_len, q_len
-                attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-                # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
-                # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
-                attn_output = torch.matmul(attn_weights, value_states)
-                # print('attn_output after value', attn_output, attn_output.shape, flush=True)
-                if attn_output.size() != (bsz, v_num_heads, q_len, v_head_dim):
+                # dont customize the metric for each head
+                # if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbWOF2N':
+                #     # becomes self.num_heads, q_len
+                #     attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 1, 2)).reshape((1, 1, -1, 1)) * torch.abs(value_states)).sum(axis=(0, 1, 3))
+                # elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
+                #     # becomes self.num_heads, q_len
+                #     attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 1, 2)).reshape((1, 1, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, 1, 3)))
+                _, attn_weights_indices, _, _ = self.pruning_module.cal_probe_attn_weights_metric(attn_weights_metric, attn_weights.shape[1], 1, cfg['vo_proj_prune'])
+
+            # print('attn_weightsafter softmax', attn_weights, attn_weights.shape, flush=True)
+            # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
+            # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
+            attn_output = torch.matmul(attn_weights, value_states)
+            
+            # print('attn_output00', attn_output[0][0], attn_output[0][0].shape, flush=True)
+            if attn_output.size() != (bsz, v_num_heads, q_len, v_head_dim):
+                raise ValueError(
+                    f"`attn_output` should be of size {(bsz, v_num_heads, q_len, v_head_dim)}, but is"
+                    f" {attn_output.size()}"
+                )
+
+            # attn_output: bsz, self.num_heads, q_len, self.head_dim -> bsz, q_len, self.num_heads, self.head_dim
+            attn_output = attn_output.transpose(1, 2).contiguous()
+            attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+            
+            if 'wanda' in cfg['prune_metric']:
+                probe_out_dim_metric = (torch.linalg.vector_norm(attn_output, ord=2, dim=(0, 1)).reshape((1, -1)) * torch.abs(self.o_proj.weight.data)).sum(axis=0)
+            elif 'flap' in cfg['prune_metric']:
+                pass
+            elif 'probe' in cfg['prune_metric']:
+                probe_out_dim_metric = torch.sqrt((torch.sum(torch.pow(attn_output, 2), dim=(0, 1)).reshape((1, -1)) * torch.pow(self.o_proj.weight.data, 2)).sum(axis=0))
+            probe_out_dim_indices, _, v_num_heads, v_head_dim = self.pruning_module.cal_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, cfg['vo_proj_prune'])
+
+            if not output_attentions:
+                attn_weights = None
+            
+            # --------------------------------------
+            #full inference with adding some info to layer input
+            bsz, q_len, _ = hidden_states.size()
+
+            # print('probe_out_dim_indices', probe_out_dim_indices)
+            # temp = torch.arange(4096).dtype(probe_out_dim_indices.dtype).to(probe_out_dim_indices.device)
+            # temp = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
+            if 'onlyqk' in cfg['prune_name']:
+                probe_out_dim_indices = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
+                v_num_heads, v_head_dim = self.num_heads, self.head_dim
+            if 'onlyvo' in cfg['prune_name']:
+                probe_qk_out_dim_indices = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
+                q_num_heads, k_num_heads = self.num_heads, self.num_key_value_heads
+                q_head_dim, k_head_dim = self.head_dim, self.head_dim
+            # elif 'conditionqk' in cfg['prune_name']:
+            #     temp = probe_qk_out_dim_indices
+                # probe_out_dim_indices = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
+                # v_num_heads, v_head_dim = qk_num_heads, qk_head_dim
+            query_states = self.q_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+            key_states = self.k_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+            value_states = self.v_proj(hidden_states, probe_out_dim_indices=probe_out_dim_indices)
+            # print('query_states shape', query_states.shape, flush=True)
+            # print('key_states shape', key_states.shape, flush=True)
+            # print('value_states shape', value_states.shape, flush=True)
+            # query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+            # key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+            # value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+            query_states = query_states.view(bsz, q_len, q_num_heads, q_head_dim).transpose(1, 2)
+            key_states = key_states.view(bsz, q_len, k_num_heads, k_head_dim).transpose(1, 2)
+            value_states = value_states.view(bsz, q_len, v_num_heads, v_head_dim).transpose(1, 2)
+            # print('query_states shape 2', query_states.shape, flush=True)
+            # print('key_states shape 2', key_states.shape, flush=True)
+            # print('value_states shape 2', value_states.shape, flush=True)
+            kv_seq_len = key_states.shape[-2]
+            # print('past_key_value', past_key_value, flush=True)
+            if past_key_value is not None:
+                kv_seq_len += past_key_value[0].shape[-2]
+            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
+            if 'each' in cfg['qk_proj_prune']:
+                query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, probe_qk_out_dim_indices_for_rope)
+            else:
+                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+
+            # print('query_states key_states after rotary', query_states, key_states, flush=True)
+            if past_key_value is not None:
+                # reuse k, v, self_attention
+                key_states = torch.cat([past_key_value[0], key_states], dim=2)
+                value_states = torch.cat([past_key_value[1], value_states], dim=2)
+
+            past_key_value = (key_states, value_states) if use_cache else None
+
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+            # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
+            # attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+            attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(k_head_dim)
+
+            if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
+                raise ValueError(
+                    f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+                    f" {attn_weights.size()}"
+                )
+
+            if attention_mask is not None:
+                if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
                     raise ValueError(
-                        f"`attn_output` should be of size {(bsz, v_num_heads, q_len, v_head_dim)}, but is"
-                        f" {attn_output.size()}"
+                        f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                     )
+                attn_weights = attn_weights + attention_mask
 
-                attn_output = attn_output.transpose(1, 2).contiguous()
+            # upcast attention to fp32
+            # attn_weights: bsz, self.num_heads, q_len, q_len
+            # attn_weights: 1, self.num_heads, q_len, q_len
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+            if 'deleteseq' in cfg['prune_name']:
+                # attn_weights = torch.index_select(attn_weights, -1, attn_weights_indices)
+                # value_states = torch.index_select(value_states, -2, attn_weights_indices)
+                # torch.cuda.reset_peak_memory_stats(device="cuda")  # Reset peak memory statistics
+                # before_op_memory_allocated = torch.cuda.memory_allocated("cuda")
+                # start_time = time.time()
 
-                # attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
-                attn_output = attn_output.reshape(bsz, q_len, v_num_heads * v_head_dim)
-                # print('final attn input', attn_output, attn_output.shape, flush=True)
-                attn_output = self.o_proj(attn_output, fcst_out_dim_indices=fcst_out_dim_indices)
+                attn_weights_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(2).expand(bsz, k_num_heads, q_len, -1)
+                attn_weights = torch.gather(attn_weights, -1, attn_weights_indices_expand)
+                value_states_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(3).expand(bsz, v_num_heads, -1, v_head_dim)
+                value_states = torch.gather(value_states, -2, value_states_indices_expand)
 
-                # print('attn_output_final', attn_output, attn_output.shape, flush=True)
-                if not output_attentions:
-                    attn_weights = None
+                # end_time = time.time()
+                # elapsed_time = end_time - start_time
+                # print(f"Elapsed time: {elapsed_time} seconds")  
+                # after_op_memory_allocated = torch.cuda.memory_allocated("cuda")
+                # memory_used = after_op_memory_allocated - before_op_memory_allocated
+                # print(f"Memory used for the operation: {memory_used} bytes")
+
+            # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
+            # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
+            attn_output = torch.matmul(attn_weights, value_states)
+            # print('attn_output after value', attn_output, attn_output.shape, flush=True)
+            if attn_output.size() != (bsz, v_num_heads, q_len, v_head_dim):
+                raise ValueError(
+                    f"`attn_output` should be of size {(bsz, v_num_heads, q_len, v_head_dim)}, but is"
+                    f" {attn_output.size()}"
+                )
+
+            attn_output = attn_output.transpose(1, 2).contiguous()
+
+            # attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+            attn_output = attn_output.reshape(bsz, q_len, v_num_heads * v_head_dim)
+            # print('final attn input', attn_output, attn_output.shape, flush=True)
+            attn_output = self.o_proj(attn_output, probe_out_dim_indices=probe_out_dim_indices)
+
+            # print('attn_output_final', attn_output, attn_output.shape, flush=True)
+            if not output_attentions:
+                attn_weights = None
         else:
             # full inference
             bsz, q_len, _ = hidden_states.size()

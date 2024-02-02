@@ -41,7 +41,6 @@ class EwiModel(torch.nn.Module):
         loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
         
         kwargs = {
-            "prune_tgt": cfg['prune_tgt'],
             "prune_metric": cfg['prune_metric'],
             "key": key,
             "fan_in_fan_out": False,
@@ -185,7 +184,6 @@ def _check_target_module_exists(target_modules, key):
 
 class EwiLayer:
     def __init__(self, in_features: int, out_features: int, **kwargs):
-        self.prune_tgt = kwargs['prune_tgt']
         self.prune_metric = kwargs['prune_metric']
         self.key = kwargs['key']
 
@@ -223,9 +221,9 @@ class Linear(nn.Linear, EwiLayer):
         self.device = kwargs['device']
 
         self.baseline_inp = torch.zeros((self.in_dim), device=self.device)
-        if 'IFN' in self.prune_metric:
+        if 'wanda' in self.prune_metric:
             self.scaler_inp = torch.zeros((self.in_dim), device=self.device)
-        elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
+        elif self.prune_metric == "flap":
             self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
         else:
             raise ValueError(f"Unknown pruning method {self.prune_name}")
@@ -254,12 +252,12 @@ class Linear(nn.Linear, EwiLayer):
             old_baseline_inp = self.baseline_inp
             self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
             self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-            if 'IFN' in self.prune_metric:
+            if 'wanda' in self.prune_metric:
                 inp = inp.type(torch.float32)
                 self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
                 self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
                 # print('self.scaler_inp', self.scaler_inp)
-            elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
+            elif self.prune_metric == "flap":
                 if self.nsamples == 0:
                     self.fluc_inp = 0
                 else:

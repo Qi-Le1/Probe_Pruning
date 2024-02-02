@@ -40,27 +40,31 @@ import torch
 # a = 5
 
 a = torch.randn(4, 5, 5)
-a_mean = a.mean(axis=0)
-print('a_mean', a_mean.shape)
-print('a', a.shape)
-b = torch.randn(4, 5)
-e = torch.randn(4, 5)
-c = torch.matmul(a, b.T)
-# print(c)
-c = nn.functional.softmax(c, dim=-1)
-print('original after softmax', c)
-c = torch.matmul(c, e)
-print('new after v', c)
+b = torch.tensor([[0, 1],[0, 1]])
 
-a[:, 0] = 0
-b[:, 0] = 0
-e[:, 0] = 0
-d = torch.matmul(a, b.T)
-# print(d)
-d = nn.functional.softmax(d, dim=-1)
-print('new after softmax', d)
-d = torch.matmul(d, e)
-print('new after v', d)
+a = a[]
+# a = torch.randn(4, 5, 5)
+# a_mean = a.mean(axis=0)
+# print('a_mean', a_mean.shape)
+# print('a', a.shape)
+# b = torch.randn(4, 5)
+# e = torch.randn(4, 5)
+# c = torch.matmul(a, b.T)
+# # print(c)
+# c = nn.functional.softmax(c, dim=-1)
+# print('original after softmax', c)
+# c = torch.matmul(c, e)
+# print('new after v', c)
+
+# a[:, 0] = 0
+# b[:, 0] = 0
+# e[:, 0] = 0
+# d = torch.matmul(a, b.T)
+# # print(d)
+# d = nn.functional.softmax(d, dim=-1)
+# print('new after softmax', d)
+# d = torch.matmul(d, e)
+# print('new after v', d)
 # 假设 a 和 b 是两个三维张量
 # a = torch.rand(2, 3)
 # b = torch.rand(3, 4)
@@ -79,13 +83,13 @@ import torch
 
 # Example tensor initialization
 # cos = torch.randn(32, 128, 128)
-# fcst_out_dim_indices_for_rope = torch.randint(0, 128, (32, 122))  # Example indices
+# probe_out_dim_indices_for_rope = torch.randint(0, 128, (32, 122))  # Example indices
 
 # # Create a grid of indices for the batch dimension
 # batch_dim_indices = torch.arange(32).view(-1, 1).expand(-1, 122).to(cos.device)
 
 # # Use advanced indexing to extract the values
-# extracted_values = cos[batch_dim_indices, :, fcst_out_dim_indices_for_rope]
+# extracted_values = cos[batch_dim_indices, :, probe_out_dim_indices_for_rope]
 
 # # Check the shape of the extracted values
 # print(extracted_values.shape)  # Should be [32, 128, 122]
@@ -125,20 +129,20 @@ import time
 
 # Initialize the tensors
 cos = torch.randn(10, 32, 128, 128)
-fcst_out_dim_indices_for_rope = torch.randint(0, 127, (32, 122))  # Example indices
+probe_out_dim_indices_for_rope = torch.randint(0, 127, (32, 122))  # Example indices
 
 # Operation 1: Loop-based extraction
-def loop_based_extraction(cos, fcst_out_dim_indices_for_rope):
-    res = cos[:, 0, :, fcst_out_dim_indices_for_rope[0]].unsqueeze(1)
+def loop_based_extraction(cos, probe_out_dim_indices_for_rope):
+    res = cos[:, 0, :, probe_out_dim_indices_for_rope[0]].unsqueeze(1)
     for i in range(1, 32):
-        new = cos[:, i, :, fcst_out_dim_indices_for_rope[i]].unsqueeze(1)
+        new = cos[:, i, :, probe_out_dim_indices_for_rope[i]].unsqueeze(1)
         res = torch.cat((res, new), dim=1)
     return res
 
 # Operation 2: torch.gather method
-def gather_method(cos, fcst_out_dim_indices_for_rope):
+def gather_method(cos, probe_out_dim_indices_for_rope):
     # Creating index tensor for gather
-    indices = fcst_out_dim_indices_for_rope.unsqueeze(0).unsqueeze(2).expand(10, -1, 128, -1)
+    indices = probe_out_dim_indices_for_rope.unsqueeze(0).unsqueeze(2).expand(10, -1, 128, -1)
     # Using torch.gather
     gathered = torch.gather(cos, 3, indices)
     return gathered
@@ -147,14 +151,14 @@ def gather_method(cos, fcst_out_dim_indices_for_rope):
 
 # Measure time for loop-based extraction
 start_time = time.time()
-result_loop = loop_based_extraction(cos, fcst_out_dim_indices_for_rope)
+result_loop = loop_based_extraction(cos, probe_out_dim_indices_for_rope)
 end_time = time.time()
 time_loop = end_time - start_time
 print(f"Time taken by loop-based extraction: {time_loop} seconds")
 
 # Measure time for torch.gather method
 start_time = time.time()
-result_gather = gather_method(cos, fcst_out_dim_indices_for_rope)
+result_gather = gather_method(cos, probe_out_dim_indices_for_rope)
 end_time = time.time()
 time_gather = end_time - start_time
 print(f"Time taken by torch.gather method: {time_gather} seconds")

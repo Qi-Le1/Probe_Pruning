@@ -1,73 +1,48 @@
 from config import cfg
 
-MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70B', 'llama-30b', 'llama-65b']
-
-# cfg['prune_norm']
-# self.prune_norm
+MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70B', 'llama-2-30b', 'llama-2-65b']
 
 def process_control():
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
     cfg['seq_len'] = int(cfg['control']['seq_len'])
+    cfg['prune_hyper'] = int(cfg['control']['prune_hyper'])
 
-    prune_metric_list = cfg['control']['prune_metric'].split('+')
-    cfg['prune_metric'] = prune_metric_list[0]
+    prune_name_list = cfg['control']['prune_name'].split('+')
+    cfg['prune_name'] = prune_metric_list[0]
+    if 'wanda' in cfg['model_name']:
+        cfg['prune_metric'] = 'wanda'
+    elif 'flap' in cfg['model_name']:
+        cfg['prune_metric'] = 'flap'
+    elif 'probe' in cfg['model_name']:
+        prune_name_sub_list = cfg['prune_name'].split('-')
+        cfg['prune_metric'] = prune_name_sub_list[1]
+        # fill or each
+        cfg['vo_proj_prune'] = prune_name_sub_list[2]
+        # fill or each
+        cfg['qk_proj_prune'] = prune_name_sub_list[3]    
+    
+    # for calibration data pruning
     if len(prune_metric_list) == 1:
         cfg['nsamples'] = None
     else:
-        cfg['nsamples'] = int(prune_metric_list[1])
-
-    prune_name_list = cfg['control']['prune_name'].split('+')
-    cfg['prune_name'] = prune_name_list[0]
-    prune_name_sub_list = cfg['prune_name'].split('-')
-    if len(prune_name_sub_list) > 1:
-        # cfg['prune_name'] = prune_name[0]
-        if 'pq' in cfg['prune_name']:
-            cfg['attn_pq_beta'] = float(prune_name_sub_list[1])
-            cfg['global_pq_beta'] = cfg['attn_pq_beta'] 
-            cfg['mlp_pq_beta'] = float(prune_name_sub_list[2]) if len(prune_name_sub_list) >= 2 else None
-
-    cfg['prune_tgt'] = prune_name_list[1]
-    if cfg['prune_tgt'] == 'w':
-        cfg['prune_tgt'] = 'weight'
-    elif cfg['prune_tgt'] == 'h':
-        cfg['prune_tgt'] = 'hidden_repr'
-    elif cfg['prune_tgt'] == 'NA':
-        pass
-    else:
-        raise ValueError('Not valid prune target')
-    cfg['prune_hyper'] = float(prune_name_list[2])
-    cfg['prune_dim'] = [int(dim) for dim in prune_name_list[3].split('+')] if len(prune_name_list) > 3 else None
-    # cfg['prune_dim_select_mode'] = prune_name_list[4] if len(prune_name_list) > 4 else 'max'
+        cfg['nsamples'] = int(prune_name_list[1])   
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
-
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
         cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
     elif cfg['cust_tgt_modules'] == ['default']:
         cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
-    # if cfg['cust_tgt_modules'] == ['None']:
-    #     cfg['cust_tgt_modules'] = None
 
-    # cfg['batch_integ'] = cfg['control']['batch_integ'] if 'batch_integ' in cfg['control'] else None
-    # if 'multibatch_integ' in cfg['control']:
-    #     multibatch_integ_list = cfg['control']['multibatch_integ'].split('-')
-    #     cfg['multibatch_integ'] = multibatch_integ_list[0]
-    #     cfg['multibatch_factor'] = float(multibatch_integ_list[1])
-    
-    cfg['split_metric'] = False
-
+    cfg['prune_dim'] = -1
     cfg['pq_p'] = 1
     cfg['pq_q'] = 2
+    cfg['beta'] = 0.9
     cfg['pq_gamma'] = 1
-
     make_data_name()
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i', 'mc']:
-        cfg['pq_beta'] = 0.9
         cfg['collate_mode'] = 'transformer'
-        cfg['bart-base'] = {'max_length': 128}
-        cfg['roberta-base'] = {'max_length': 128}
         cfg['gpt2'] = {'max_length': 512}
         if 'llama' in cfg['model_name']:
             # reassign in make_hf_model
@@ -77,7 +52,6 @@ def process_control():
             cfg[cfg['model_name']] = {'max_length': None}
         # cfg['opt'] = {'max_length': 128}
     elif cfg['task_name'] in ['ic']:
-        cfg['pq_beta'] = 0.9
         cfg['collate_mode'] = 'dict'
         data_shape = {'MNIST': [1, 28, 28], 'FashionMNIST': [1, 28, 28], 'SVHN': [3, 32, 32], 'CIFAR10': [3, 32, 32],
                       'CIFAR100': [3, 32, 32]}

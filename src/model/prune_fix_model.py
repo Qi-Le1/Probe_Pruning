@@ -18,19 +18,13 @@ from module import to_device, TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING,
 """
 
 metrics = {
-    'IFN': lambda wrapped_layers, subset, name: torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))).squeeze(0),
-    'WIFN': lambda wrapped_layers, subset, name: (torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))) * torch.abs(subset[name].weight.data)).mean(axis=0),
+    # 'IFN': lambda wrapped_layers, subset, name: torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))).squeeze(0),
+    'wanda': lambda wrapped_layers, subset, name: (torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))) * torch.abs(subset[name].weight.data)).mean(axis=0),
     # out product
-    'O1WIFN': lambda wrapped_layers, subset, name: torch.sum((torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1, -1))).reshape(-1, 1) * torch.linalg.vector_norm(subset[name].weight.data, ord=1, dim=1).reshape(1, -1)), dim=1),
-    'O2WIFN': lambda wrapped_layers, subset, name: torch.sum((torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1, -1))).reshape(-1, 1) * torch.linalg.vector_norm(subset[name].weight.data, ord=2, dim=1).reshape(1, -1)), dim=1),
-    'IFV': lambda wrapped_layers, subset, name: wrapped_layers[name].fluc_inp,
-    'WIFV': lambda wrapped_layers, subset, name: wrapped_layers[name].fluc_inp * torch.sum(subset[name].weight.data.pow(2), dim=0),
-}
-
-attn_head_metrics = {
-    'WIFN': lambda wrapped_layers, subset, name: (torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1,-1))) * torch.abs(subset[name].weight.data)).mean(axis=0),
-    'IFV': lambda wrapped_layers, subset, name: wrapped_layers[name].fluc_inp,
-    'WIFV': lambda wrapped_layers, subset, name: wrapped_layers[name].fluc_inp * torch.sum(subset[name].weight.data.pow(2), dim=0),
+    # 'O1WIFN': lambda wrapped_layers, subset, name: torch.sum((torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1, -1))).reshape(-1, 1) * torch.linalg.vector_norm(subset[name].weight.data, ord=1, dim=1).reshape(1, -1)), dim=1),
+    # 'O2WIFN': lambda wrapped_layers, subset, name: torch.sum((torch.sqrt(wrapped_layers[name].scaler_inp.reshape((1, -1))).reshape(-1, 1) * torch.linalg.vector_norm(subset[name].weight.data, ord=2, dim=1).reshape(1, -1)), dim=1),
+    # 'IFV': lambda wrapped_layers, subset, name: wrapped_layers[name].fluc_inp,
+    'flap': lambda wrapped_layers, subset, name: wrapped_layers[name].fluc_inp * torch.sum(subset[name].weight.data.pow(2), dim=0),
 }
 
 
@@ -841,9 +835,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
     pq_p = cfg['pq_p']
     pq_q = cfg['pq_q']
     eta = cfg['prune_hyper']
-    pq_attn_beta = cfg['attn_pq_beta']
-    pq_mlp_beta = cfg['mlp_pq_beta']
-    pq_global_beta = cfg['global_pq_beta']
+    pq_beta = cfg['pq_beta']
     pq_gamma = cfg['pq_gamma']
     # print("loading calibdation data")
     # dataloader, _ = get_loaders("c4",nsamples=128,seed=args.seed,seqlen=cfg[cfg['model_name']]['max_length'],tokenizer=tokenizer)
@@ -911,7 +903,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
                     else:
                         W_metric = W_metric.reshape(-1, 128).sum(dim=1)
                     # print('W_metric2', W_metric.shape, W_metric, type(W_metric))
-                    prune_count, pq_indices = cal_prune_count_base_on_pq(torch.sort(W_metric.cuda())[0], pq_p, pq_q, eta, pq_attn_beta, pq_gamma)
+                    prune_count, pq_indices = cal_prune_count_base_on_pq(torch.sort(W_metric.cuda())[0], pq_p, pq_q, eta, pq_beta, pq_gamma)
                     print('atten', torch.sort(W_metric.cuda())[0], W_metric.tolist(), prune_count)
                     thresh = torch.sort(W_metric.cuda())[0][prune_count].cpu()
                     W_mask = (W_metric>=thresh)
@@ -940,7 +932,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
                     # b = torch.sum(a, dim=1)
                     # print('mlpW_metric3', b.shape, b)
                     sorted_prune = torch.sort(W_metric.cuda())[0]
-                    prune_count, pq_indices = cal_prune_count_base_on_pq(sorted_prune, pq_p, pq_q, eta, pq_mlp_beta, pq_gamma)
+                    prune_count, pq_indices = cal_prune_count_base_on_pq(sorted_prune, pq_p, pq_q, eta, pq_beta, pq_gamma)
                     # print('mlp', sorted_prune, sorted_prune.shape, prune_count)
                     thresh = sorted_prune[prune_count].cpu()
                     W_mask = (W_metric>=thresh)
@@ -1001,7 +993,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
 
         sorted_prune, indices = torch.sort(prune_metric)
         print('sorted_prune', sorted_prune.shape, sorted_prune)
-        prune_count, pq_indices = cal_prune_count_base_on_pq(sorted_prune, pq_p, pq_q, eta, pq_global_beta, pq_gamma)
+        prune_count, pq_indices = cal_prune_count_base_on_pq(sorted_prune, pq_p, pq_q, eta, pq_beta, pq_gamma)
         
         threshold = sorted_prune[prune_count]
         if len(attn_metric_list) > 0:

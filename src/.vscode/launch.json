@@ -6,7 +6,7 @@
     "configurations": [
 
         {
-            "name": "fcst_process_language_model",
+            "name": "probe_process_language_model",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
@@ -14,7 +14,7 @@
             "justMyCode": true,
             "args": [
                 "--type",
-                "observe_fcst",
+                "observe_probe",
             ],
         },
 

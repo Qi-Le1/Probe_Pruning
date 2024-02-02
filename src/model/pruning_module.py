@@ -15,7 +15,6 @@ from module import nearest_even_number
 class BasePruning:
     def __init__(self, cfg):
         self.prune_name = cfg['prune_name']
-        self.prune_tgt = cfg['prune_tgt']
         self.prune_metric = cfg['prune_metric']
         self.prune_hyper = cfg['prune_hyper'] 
         self.prune_dim = cfg['prune_dim'] 
@@ -263,13 +262,13 @@ class HiddenRepresentationPruning(BasePruning):
             self.pq_global_beta = cfg['global_pq_beta']
             self.pq_gamma = cfg['pq_gamma']
 
-    def cal_fcst_mlp_metric(self, fcst_out_dim_metric):
-        fcst_out_dim_metric.abs_()
-        fcst_out_dim_metric = fcst_out_dim_metric.to(torch.float32)
-        # mask = torch.ones(fcst.shape[-1], dtype=torch.bool, device=fcst.device)
-        sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=0)
+    def cal_probe_mlp_metric(self, probe_out_dim_metric):
+        probe_out_dim_metric.abs_()
+        probe_out_dim_metric = probe_out_dim_metric.to(torch.float32)
+        # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
+        sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
         if 'mag' in cfg['prune_name']:
-            num_prune = int(self.prune_hyper * fcst_out_dim_metric.shape[0])
+            num_prune = int(self.prune_hyper * probe_out_dim_metric.shape[0])
         elif 'pq' in cfg['prune_name']:
             num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_mlp_beta, self.pq_gamma)[0]
             # print('num_prune', num_prune)
@@ -277,16 +276,40 @@ class HiddenRepresentationPruning(BasePruning):
 
         return sorted_indices[num_prune:]
     
-    def cal_fcst_attn_metric(self, fcst_out_dim_metric, num_heads, head_dim):
-        # mask = torch.ones(fcst.shape[-1], dtype=torch.bool, device=fcst.device)
-        fcst_out_dim_metric.abs_()
-        fcst_out_dim_metric = fcst_out_dim_metric.to(torch.float32)
+    def cal_probe_attn_weights_metric(self, attn_weights_metric):
+        
+        attn_weights_metric = attn_weights_metric.to(torch.float32)
+        sorted_value, sorted_indices = torch.sort(attn_weights_metric, dim=1)
+        if 'mag' in cfg['prune_name']:
+            num_prune = int(self.prune_hyper * attn_weights_metric.shape[1])
+        # Select indices to prune for each head
+        indices_to_preserve = sorted_indices[:, num_prune:]
+
+        return indices_to_preserve
+
+        # attn_weights_metric.abs_()
+        # attn_weights_metric = attn_weights_metric.to(torch.float32)
+        # # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
+        # sorted_value, sorted_indices = torch.sort(attn_weights_metric, dim=0)
+        # if 'mag' in cfg['prune_name']:
+        #     num_prune = int(self.prune_hyper * attn_weights_metric.shape[0])
+        # elif 'pq' in cfg['prune_name']:
+        #     num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_mlp_beta, self.pq_gamma)[0]
+        #     # print('num_prune', num_prune)
+        # # print('prune_channels_count', prune_channels_count, norm_across_other_dims[0].shape[0], self.prune_hyper)
+
+        # return sorted_indices[num_prune:]
+
+    def cal_probe_attn_metric(self, probe_out_dim_metric, num_heads, head_dim):
+        # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
+        probe_out_dim_metric.abs_()
+        probe_out_dim_metric = probe_out_dim_metric.to(torch.float32)
         
         # delete whole head
         if 'whole' in cfg['prune_name']:    
-            fcst_out_dim_metric = fcst_out_dim_metric.reshape(num_heads, -1)
+            probe_out_dim_metric = probe_out_dim_metric.reshape(num_heads, -1)
             # Sum over the last dimension and take absolute values
-            summed_metrics = torch.abs(fcst_out_dim_metric.sum(dim=-1))
+            summed_metrics = torch.abs(probe_out_dim_metric.sum(dim=-1))
             # Sort the summed metrics
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
             # print('summed_metricssorted_value', sorted_value)
@@ -298,24 +321,25 @@ class HiddenRepresentationPruning(BasePruning):
             # Select the heads to prune
             heads_to_preserve = sorted_indices[num_prune_heads:]
 
-            head_indices = (torch.arange(head_dim, device=fcst_out_dim_metric.device) + heads_to_preserve.unsqueeze(1) * head_dim).view(-1)
+            head_indices = (torch.arange(head_dim, device=probe_out_dim_metric.device) + heads_to_preserve.unsqueeze(1) * head_dim).view(-1)
 
             num_heads = num_heads - num_prune_heads
 
             return head_indices, None, num_heads, head_dim
         elif 'each' in cfg['prune_name']:
-            fcst_out_dim_metric = fcst_out_dim_metric.reshape(num_heads, -1)
-            # Sort the fcst_out_dim_metric across each head
-            sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=1)
+            probe_out_dim_metric = probe_out_dim_metric.reshape(num_heads, -1)
+            # Sort the probe_out_dim_metric across each head
+            sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=1)
 
             # Determine the number of elements to prune in each head
-            num_prune_head_dim = nearest_even_number(fcst_out_dim_metric.shape[1] * cfg['prune_hyper'])
+            # handling the edge case for RoPE if prune each head for qk
+            num_prune_head_dim = nearest_even_number(probe_out_dim_metric.shape[1] * cfg['prune_hyper'])
 
             # Select indices to prune for each head
             indices_to_preserve = sorted_indices[:, num_prune_head_dim:]
 
             # Generate a range tensor for head indices
-            head_range = torch.arange(num_heads, device=fcst_out_dim_metric.device) * head_dim
+            head_range = torch.arange(num_heads, device=probe_out_dim_metric.device) * head_dim
 
             # Create the full indices for pruning using broadcasting
             full_indices_to_preserve = (indices_to_preserve + head_range.unsqueeze(1)).view(-1)
@@ -323,14 +347,14 @@ class HiddenRepresentationPruning(BasePruning):
             head_dim = head_dim - num_prune_head_dim
 
             return full_indices_to_preserve, indices_to_preserve, num_heads, head_dim
-        elif 'mix' in cfg['prune_name']:
+        elif 'fill' in cfg['prune_name']:
 
-            sorted_value, sorted_indices = torch.sort(fcst_out_dim_metric, dim=0)
+            sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
 
             # print('sorted_value', sorted_value)
             # print('sorted_value', sorted_value)
             if 'mag' in cfg['prune_name']:
-                num_prune = int(fcst_out_dim_metric.shape[0] * cfg['prune_hyper'])
+                num_prune = int(probe_out_dim_metric.shape[0] * cfg['prune_hyper'])
             elif 'pq' in cfg['prune_name']:
                 num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_attn_beta, self.pq_gamma)[0]
             # print('delete indices', sorted_indices[:num_prune])
@@ -619,7 +643,7 @@ class HiddenRepresentationPruning(BasePruning):
     #         torch.cuda.empty_cache()
 
     # def prune_h(self, h, prune_dim, prune_channels):
-    #     # if 'fcst' in cfg['prune_name']:
+    #     # if 'probe' in cfg['prune_name']:
     #     #     return h
     #     if 'WOF1N' in cfg['prune_metric'] or 'WOF2N' in cfg['prune_metric']:
     #         return h
@@ -706,7 +730,7 @@ class HiddenRepresentationPruning(BasePruning):
     #             info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
     #             self.logger_info_time_used += time.time() - start_time
     #         norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
-    #     # elif 'fcst' in cfg['prune_name'] and cfg['prune_metric'] == 'WIFN':
+    #     # elif 'probe' in cfg['prune_name'] and cfg['prune_metric'] == 'WIFN':
     #     #     batch_size = h.shape[0]
     #     #     # self.scaler_in *= self.nsamples / (self.nsamples + batch_size)
     #     #     # self.scaler_in += torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) ** 2 / (self.nsamples + batch_size)
@@ -864,7 +888,7 @@ class HiddenRepresentationPruning(BasePruning):
     #         # self.logger_info_time_used += time.time() - start_time
 
     #     # print('sorted_channels', sorted_channels.shape, sorted_channels, prune_channels_count)
-    #     # if 'fcst' in cfg['prune_name']:
+    #     # if 'probe' in cfg['prune_name']:
     #     #     prune_channels = []
     #     # else:
     #     # print('sorted_channels', sorted_channels.shape, sorted_channels, prune_channels_count)
