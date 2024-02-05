@@ -25,6 +25,43 @@ import torch
 
 import torch
 
+
+import torch
+
+
+a = []
+# a.extend(6)
+a.extend([6])
+a.extend([7])
+print(a)
+# Sample input
+bsz = 4  # Example batch size
+h = torch.randn(bsz, 10)  # Example tensor with shape [batch_size, features]
+
+# Simulated layer weights
+layer_info = {'weight': torch.randn(10)}
+
+# First piece
+sum_squared_norms = torch.sum(torch.norm(h, p=2, dim=1) ** 2, dim=0)
+average_squared_norm = sum_squared_norms / torch.tensor(bsz, device=h.device, dtype=torch.float)
+norm_across_other_dims_first = (torch.sqrt(average_squared_norm.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
+
+# Second piece
+scaler_inp = torch.zeros_like(sum_squared_norms)
+nsamples = 0
+for i in range(bsz):
+    scaler_inp *= nsamples / (nsamples + 1)
+    temp = torch.norm(h[i], p=2, dim=0) ** 2
+    scaler_inp +=  temp / (nsamples + 1)
+    nsamples += 1
+norm_across_other_dims_second = (torch.sqrt(scaler_inp.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
+
+# Compare the results
+are_equivalent = torch.isclose(norm_across_other_dims_first, norm_across_other_dims_second, atol=1e-6)
+
+print(f"Are the computations equivalent? {are_equivalent}")
+
+
 # a = torch.randn(1, 2, 3)
 # b = torch.linalg.vector_norm(a, ord=2, dim=1)
 # c = torch.linalg.vector_norm(a, ord=2, dim=(0, 1)).reshape(1,-1)
@@ -42,7 +79,7 @@ import torch
 a = torch.randn(4, 5, 5)
 b = torch.tensor([[0, 1],[0, 1]])
 
-a = a[]
+# a = a[]
 # a = torch.randn(4, 5, 5)
 # a_mean = a.mean(axis=0)
 # print('a_mean', a_mean.shape)

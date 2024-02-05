@@ -334,10 +334,10 @@ class LlamaMLP(nn.Module):
         else:
             if 'probe' in cfg['prune_name'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
                 
-                if 'mb' in cfg['prune_metric']:
+                if 'mbsz' in cfg['prune_metric']:
                     x_mean_bsz = x.mean(axis=0)
                     comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=0).unsqueeze_(0)
-                elif 'mbms' in cfg['prune_metric']:
+                elif 'mbszmseq' in cfg['prune_metric']:
                     comp_across_bsz_seq = x.mean(axis=(0, 1)).unsqueeze_(0)
                 else:
                     comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
@@ -345,7 +345,7 @@ class LlamaMLP(nn.Module):
                 probe_out = self.act_fn(self.gate_proj(comp_across_bsz_seq, cal_mlp_probe_out_dim_metric=True)) * self.up_proj(comp_across_bsz_seq, cal_mlp_probe_out_dim_metric=True)
 
                 # ablation study for different metrics
-                if 'wanda' in cfg['prune_metric']:
+                if 'wandasp' in cfg['prune_metric']:
                     probe_out_dim_metric = (torch.linalg.vector_norm(probe_out, ord=2, dim=1).reshape((1, -1)) * torch.abs(self.down_proj.weight.data)).sum(axis=0)
                 elif 'flap' in cfg['prune_metric']:
                     pass
@@ -477,18 +477,18 @@ class LlamaAttention(nn.Module):
 
         if 'probe' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
 
-            if 'mb' in cfg['prune_metric']:
-                x_mean_bsz = x.mean(axis=0)
-                comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=0).unsqueeze_(0)
+            if 'mbsz' in cfg['prune_metric']:
+                comp_across_bsz = hidden_states.mean(axis=0).unsqueeze_(0)
+                # comp_across_bsz = torch.linalg.vector_norm(hidden_states_mean_bsz, ord=2, dim=0).unsqueeze_(0)
             else:
-                comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
+                comp_across_bsz = torch.linalg.vector_norm(hidden_states, ord=2, dim=0).unsqueeze_(0)
 
             q_num_heads, k_num_heads, v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
             q_head_dim, k_head_dim, v_head_dim = self.head_dim, self.head_dim, self.head_dim
             # print('hidden_states', hidden_states)
             # print('comp_across_bsz', comp_across_bsz, flush=True)
             # if 'para' in cfg['prune_name']:
-            # copy orignal code and modify a little bit for forecast pruning
+            # copy orignal code and modify a little bit for probe pruning
             # currently does not implement for group attention, but it should work too
             bsz, q_len, _ = comp_across_bsz.size()
             
@@ -498,7 +498,7 @@ class LlamaAttention(nn.Module):
 
             # only consider qk effect, v and o remain the same
             # if 'onlyqk' in cfg['prune_name']:
-            if 'wanda' in cfg['prune_metric']:
+            if 'wandasp' in cfg['prune_metric']:
                 probe_qk_out_dim_metric = (torch.linalg.vector_norm(query_states, ord=2, dim=(0, 1)).reshape((1, 1, -1)) * torch.abs(key_states)).sum(axis=(0, 1))
             elif 'flap' in cfg['prune_metric']:
                 pass
@@ -512,7 +512,7 @@ class LlamaAttention(nn.Module):
             if 'conditionqk' in cfg['prune_name']:
                 # query_states = self.q_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
                 # key_states = self.k_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
-                if 'fill' in cfg['prune_name']:
+                if 'fill' in cfg['qk_proj_prune']:
                     mask = torch.zeros(query_states.shape[-1], dtype=torch.bool, device=query_states.device)
                     mask[~probe_qk_out_dim_indices] = True
                     query_states[..., mask] = 0
@@ -585,7 +585,7 @@ class LlamaAttention(nn.Module):
             
             attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
             if 'delseq' in cfg['prune_name']:
-                if 'wanda' in cfg['prune_metric']:
+                if 'wandasp' in cfg['prune_metric']:
                     # becomes self.num_heads, q_len
                     attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.abs(value_states)).sum(axis=(0, -1))
                 elif 'flap' in cfg['prune_metric']:
@@ -602,7 +602,7 @@ class LlamaAttention(nn.Module):
                 # elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
                 #     # becomes self.num_heads, q_len
                 #     attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 1, 2)).reshape((1, 1, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, 1, 3)))
-                _, attn_weights_indices, _, _ = self.pruning_module.cal_probe_attn_weights_metric(attn_weights_metric, attn_weights.shape[1], 1, cfg['vo_proj_prune'])
+                _, attn_weights_indices, _, _ = self.pruning_module.cal_probe_attn_metric(attn_weights_metric, attn_weights.shape[1], 1, cfg['vo_proj_prune'])
 
             # print('attn_weightsafter softmax', attn_weights, attn_weights.shape, flush=True)
             # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
@@ -620,7 +620,7 @@ class LlamaAttention(nn.Module):
             attn_output = attn_output.transpose(1, 2).contiguous()
             attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
             
-            if 'wanda' in cfg['prune_metric']:
+            if 'wandasp' in cfg['prune_metric']:
                 probe_out_dim_metric = (torch.linalg.vector_norm(attn_output, ord=2, dim=(0, 1)).reshape((1, -1)) * torch.abs(self.o_proj.weight.data)).sum(axis=0)
             elif 'flap' in cfg['prune_metric']:
                 pass
@@ -900,12 +900,14 @@ class LlamaDecoderLayer(nn.Module):
             use_cache=use_cache,
             **kwargs,
         )
+
         hidden_states = residual + hidden_states
 
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states, residual=residual)
+
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
@@ -1127,7 +1129,7 @@ class LlamaModel(LlamaPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
-
+            # print('idx decoder_layer', idx, decoder_layer, flush=True)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             if self.gradient_checkpointing and self.training:
@@ -1149,7 +1151,7 @@ class LlamaModel(LlamaPreTrainedModel):
                     output_attentions=output_attentions,
                     use_cache=use_cache,
                 )
-
+            # print('layer_outputs', layer_outputs, flush=True)
             hidden_states = layer_outputs[0]
 
             if use_cache:
@@ -1279,6 +1281,8 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             # Shift so that tokens < n predict n
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
+            # print('shift_logits', shift_logits, shift_logits.shape, flush=True)
+            # print('shift_labels', shift_labels, shift_labels.shape, flush=True)
             # Flatten the tokens
             loss_fct = CrossEntropyLoss()
             shift_logits = shift_logits.view(-1, self.config.vocab_size)

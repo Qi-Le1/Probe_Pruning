@@ -5,18 +5,19 @@ import copy
 import time
 import random
 import torch
-import torch.nn as nn
+import fnmatch
 import traceback
 import datetime
 import torch.backends.cudnn as cudnn
 from config import cfg, process_args
-from dataset import make_dataset, make_data_loader, process_dataset, collate, make_batchnorm_stats, make_calibration_dataloader
+from dataset import make_dataset, make_data_loader, process_dataset, collate, make_batchnorm_stats
 from metric import make_metric, make_logger
-from model import make_model, make_calibration_prune_model, calibrate_model
+from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, MULTIGPUS_MODEL_NAME_LIST, load
+    record_pruing_info, get_model_profile, summarize_info_list, match_prefix
 from deepspeed.profiling.flops_profiler import FlopsProfiler
-
+from lm_eval import tasks
+from lm_eval import evaluator
 
 
 cudnn.benchmark = True
@@ -34,6 +35,7 @@ def main():
     print(f"The current file name is {current_file_name}")
     # You can also use conditions to differentiate behavior
     cfg['python_file'] = current_file_name
+
     process_control()
     seeds = list(range(cfg['init_seed'], cfg['init_seed'] + cfg['num_experiments']))
     for i in range(cfg['num_experiments']):
@@ -41,14 +43,9 @@ def main():
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
         print('Experiment: {}'.format(cfg['model_tag']))
         runExperiment()
-
-    
     return
 
 
-
-# metric, nsamples
-# structure for flap maybe
 def runExperiment():
     cfg['seed'] = int(cfg['model_tag'].split('_')[0])
     torch.manual_seed(cfg['seed'])
@@ -57,89 +54,105 @@ def runExperiment():
     makedir_exist_ok(result_path)
 
     cfg['epoch'] = 0 
-    vanilla_name_list = cfg['model_tag'].split('_')
-    # batch size
-    vanilla_name_list[4] = '1'
-    # metric
-    vanilla_name_list[6] = '0'
-    # prune_name
-    vanilla_name_list[7] = 'vanilla'
-    # cust_tgt_modules
-    vanilla_name_list[8] = 'None'
-    # vanilla_name_list[9] = 'full'
-    vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
-    vanilla_info_list, vanilla_duration = vanilla_res['vanilla_info_list'], vanilla_res['vanilla_duration']
-
-    model, tokenizer = make_model(cfg['model_name'])
-    dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
-    dataset = process_dataset(dataset, tokenizer)
-    metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
-    if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
-        model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
-    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
-    calibration_data_loader = make_calibration_dataloader(tokenizer)
-    # return
-    # print('calibration_data_loaderlen', calibration_data_loader['train'], len(calibration_data_loader['train']))
-    model = make_calibration_prune_model(model)
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
-    if cfg['model_name'] in MULTIGPUS_MODEL_NAME_LIST:
-        device = model.hf_device_map["lm_head"] # for 30b and 65b we use device_map to load onto multiple A6000 GPUs, thus the processing here.
-    # wrap with EWI layer, so pass model.model
-    logger_info = calibrate_model(model.model, tokenizer, calibration_data_loader['train'], device)
-    model_prof = FlopsProfiler(model)
-    test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    test_logger.append(logger_info, 'test', 1)
-    test(data_loader['test'], model, model_prof, metric, test_logger)
-    pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
     
-    # print('vanilla_info_list', vanilla_info_list[0], vanilla_info_list[1])
-    batch_num = len(data_loader['test'])
-    summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, pruned_duration, batch_num, test_logger)
+    
+    model, tokenizer = make_model(cfg['model_name'])
+    if cfg['task_name'] == 'csr':
+        model_prof = FlopsProfiler(model)
+        test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
+        def pattern_match(patterns, source_list):
+            task_names = set()
+            for pattern in patterns:
+                for matching in fnmatch.filter(source_list, pattern):
+                    task_names.add(matching)
+            return list(task_names)
+        # "boolq","rte","hellaswag","winogrande","arc_challenge","arc_easy","openbookqa"
+        task_names = pattern_match(cfg['data_name'], tasks.ALL_TASKS)
+        model_args = cfg['model_name']
+        limit = None 
+        if "70b" in cfg['model_name'] or "65b" in cfg['model_name']:
+            limit = 2000
+        accelerate=False
+        if "30b" in args.model or "65b" in args.model or "70b" in args.model:
+            accelerate=True
+        if accelerate:
+            model_args = f"cfg['model_name'],use_accelerate=True"
+        model_prof.start_profile()
+        results = evaluator.simple_evaluate(
+            model="hf-causal-experimental",
+            model_args=model_args,
+            tasks=task_names,
+            num_fewshot=0,
+            batch_size=None,
+            device=None,
+            no_cache=True,
+            limit=limit,
+            description_dict={},
+            decontamination_ngrams_path=None,
+            check_integrity=False,
+            pretrained_model=model,
+            tokenizer=tokenizer, 
+            add_special_tokens=False
+        )
+        model_prof.stop_profile()
+        accuracy = results[cfg['data_name']]['acc'] * 100
+        print('accuracy', accuracy)
+        test_logger.append({'Accuracy': accuracy}, 'test', 1)
+        vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
+    else:
+        raise ValueError('Not valid task name')
+    # dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
+    # dataset = process_dataset(dataset, tokenizer)
+    # data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+    # metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
+    # if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
+    #     model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
+    # model_prof = FlopsProfiler(model)
+    # test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
+    # test(data_loader['test'], model, model_prof, metric, test_logger)
+    # vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
 
     # thread lock bug
     test_logger.writer = None
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
-              'vanilla_info_list': vanilla_info_list, 'pruned_info_list': pruned_info_list, \
-              'vanilla_duration': vanilla_duration, 'pruned_duration': pruned_duration, 'batch_num': batch_num}
-    # result = {'cfg': cfg, 'epoch': cfg['epoch']}
-    # for k,v in test_logger.history.items():
-    #     print('k', k)
-    #     print('v', v)
+              'vanilla_info_list': vanilla_info_list, 'vanilla_duration': vanilla_duration}
+
     save(result, os.path.join(result_path, cfg['model_tag']))
     return
 
 def test(data_loader, model, model_prof, metric, logger):
+    print("Debug 12.01: Test logger created", flush=True)
     start_time = time.time()
     with torch.no_grad():
         model_prof.start_profile()
+        
         model.train(False)
+        print("Debug 12.011: Test logger created", flush=True)
         for i, input in enumerate(data_loader):
+            print("Debug 12.1: Test logger created", flush=True)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
-                # print('input id', input['input_ids'] )
                 input = to_device(input, cfg['device'])
                 output = model(**input)
-                # for name, param in model.named_parameters():
-                #     print('name', name)
-                #     print('param', param)
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
-                # print('outputloss', output['loss'])
-                # print('outputlogits', output['logits'])
             elif cfg['task_name'] in ['csr']:
                 input_size = input['labels'].size(0)
                 input_indices = input['input_indices']
                 correct_labels = input['correct_labels']
-                # print('input', input)
+                print('input', input)
+                # if 'text' in input:
+                # print('input_text', input['text_seq'])
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
                 output = model(**input)
                 input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
-                # print('outputloss', output['loss'])
+                print('outputloss', output['loss'])
+                print('outputlogits', output['logits'])
             else:
                 input = collate(input)
                 input_size = input['data'].size(0)
@@ -163,14 +176,12 @@ def test(data_loader, model, model_prof, metric, logger):
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
             # return
-            if i % 50 == 0:
-                print("sample i", i)
+            # break
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
-            # break
         evaluation = metric.evaluate('test', 'full')
         print('evaluation_for_full', evaluation)
         logger.append(evaluation, 'test')

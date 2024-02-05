@@ -28,6 +28,11 @@ process_args(args)
 
 
 def main():
+    # Get the name of the current file
+    current_file_name = os.path.basename(__file__)
+    print(f"The current file name is {current_file_name}")
+    # You can also use conditions to differentiate behavior
+    cfg['python_file'] = current_file_name
     process_control()
     seeds = list(range(cfg['init_seed'], cfg['init_seed'] + cfg['num_experiments']))
     for i in range(cfg['num_experiments']):
@@ -35,6 +40,8 @@ def main():
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
         print('Experiment: {}'.format(cfg['model_tag']))
         runExperiment()
+
+    
     return
 
 
@@ -50,9 +57,9 @@ def runExperiment():
     # batch size
     vanilla_name_list[4] = '1'
     # metric
-    vanilla_name_list[6] = 'None'
+    vanilla_name_list[6] = '0'
     # prune_name
-    vanilla_name_list[7] = 'vanilla+h+0+-1'
+    vanilla_name_list[7] = 'vanilla'
     # cust_tgt_modules
     vanilla_name_list[8] = 'None'
     vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
@@ -102,16 +109,18 @@ def test(data_loader, model, model_prof, metric, logger):
                 output = model(**input)
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
-            elif cfg['task_name'] in ['mc']:
+            elif cfg['task_name'] in ['csr']:
                 input_size = input['labels'].size(0)
                 input_indices = input['input_indices']
                 correct_labels = input['correct_labels']
+                # print('input', input)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
                 output = model(**input)
                 input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
+                # print('outputloss', output['loss'])
             else:
                 input = collate(input)
                 input_size = input['data'].size(0)

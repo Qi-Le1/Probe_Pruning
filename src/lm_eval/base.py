@@ -18,6 +18,8 @@ from lm_eval import utils
 from abc import abstractmethod
 
 
+from pdb import set_trace as st 
+
 class LM(abc.ABC):
     def __init__(self):
         self.cache_hook = CacheHook(None)
@@ -181,6 +183,7 @@ class BaseLM(LM):
             )
         else:
             max_length = self.max_length
+        print(f"max_length: {max_length}")
 
         # if OOM, then halves batch_size and tries again
         @find_executable_batch_size(starting_batch_size=self.max_batch_size)
@@ -218,8 +221,11 @@ class BaseLM(LM):
                     continuation
                 )
             else:
+                # print(f"context: {context}, continuation: {continuation}")
                 context_enc, continuation_enc = self._encode_pair(context, continuation)
 
+            #### append bos_token manually to the sequence encoding 
+            # context_enc = [1,] + context_enc 
             new_reqs.append(((context, continuation), context_enc, continuation_enc))
 
         return self._loglikelihood_tokens(new_reqs)
@@ -322,12 +328,15 @@ class BaseLM(LM):
             # tensors, then we pack them together into a batch, call the model, and then pick it all apart
             # again because vectorizing is annoying
 
-            for _, context_enc, continuation_enc in chunk:
+            for (context, continuation), context_enc, continuation_enc in chunk:
+
+                print(f"context: {context}, continuation: {continuation}")
                 # sanity check
                 assert len(context_enc) > 0
                 assert len(continuation_enc) > 0
                 assert len(continuation_enc) <= self.max_length
 
+                print('self.max_length: ', self.max_length)
                 # how this all works:
                 #          CTX      CONT
                 # inp    0 1 2 3|4 5 6 7 8 9   <- last token is deleted by inp[:, :-1]
@@ -343,6 +352,7 @@ class BaseLM(LM):
                 (inplen,) = inp.shape
 
                 cont = continuation_enc
+                print(f"inp: {inp}, cont: {cont}")
 
                 # since in _collate we make sure length is descending, the longest is always the first one.
                 padding_length = (
@@ -368,7 +378,7 @@ class BaseLM(LM):
             multi_logits = F.log_softmax(
                 self._model_call(batched_inps), dim=-1
             ).cpu()  # [batch, padding_length, vocab]
-
+            print(f"multi_logits: {multi_logits}")
             for (cache_key, _, _), logits, inp, inplen, cont_toks in zip(
                 chunk, multi_logits, inps, inplens, cont_toks_list
             ):
@@ -379,7 +389,7 @@ class BaseLM(LM):
                 logits = logits[inplen - contlen : inplen].unsqueeze(
                     0
                 )  # [1, seq, vocab]
-
+                print(f'cut logit: {logits}')
                 # Check if per-token argmax is exactly equal to continuation
                 greedy_tokens = logits.argmax(dim=-1)
                 cont_toks = torch.tensor(cont_toks, dtype=torch.long).unsqueeze(
@@ -392,10 +402,10 @@ class BaseLM(LM):
                 logits = torch.gather(logits, 2, cont_toks.unsqueeze(-1)).squeeze(
                     -1
                 )  # [1, seq]
-
+                print(f'logit after log softmax: {logits}')
                 # Answer: (log prob, is-exact-match)
                 answer = (float(logits.sum()), bool(max_equal))
-
+                print(f"answer: {answer}")
                 # partial caching
                 if cache_key is not None:
                     self.cache_hook.add_partial("loglikelihood", cache_key, answer)
@@ -908,8 +918,7 @@ class CachingLM:
             # figure out which ones are cached and which ones are new
             for req in requests:
                 hsh = hash_args(attr, req)
-                # if hsh in self.dbdict:
-                if False:
+                if hsh in self.dbdict:
                     ob = self.dbdict[hsh]
 
                     assert ob is not None

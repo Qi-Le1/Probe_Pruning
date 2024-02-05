@@ -123,14 +123,15 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         # Randomly sample 128 examples
         # dataset_['train'] = dataset_['train'].train_test_split(test_size=cfg['nsamples'], seed=cfg['seed'])["test"]
     # piqa: piqa
-    # storycloze: storycloze , 
+    # siqa: siqa , 
     # arc-e: arc-easy 
     # arc-c: arc-challenge (Clark et al., 2018), 
     # hellaswag: hellaswag (Zellers et al., 2019) 
+    # winogrande: winogrande 
     # obqa: OpenBookQA (Mihaylov et al., 2018)
-    elif data_name in ['wikitext', 'storycloze', 'arc', 'obqa']:
-        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test')
-    elif data_name in ['piqa', 'hellaswag']:
+    elif data_name in ['wikitext', 'arc', 'obqa']:
+        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test[:10%]')
+    elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
     elif data_name in ['c4']:
         dataset_['train'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='train[:10%]')
@@ -164,6 +165,14 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         raise ValueError('Not valid dataset name')
     if verbose:
         print('data ready')
+    if "70b" in model_name or "65b" in model_name:
+        limit = 2000
+    if 'train' in dataset_:
+        dataset_['train'] = dataset_['train'].select(range(limit))
+    if 'validation' in dataset_:
+        dataset_['validation'] = dataset_['validation'].select(range(limit))
+    if 'test' in dataset_:
+        dataset_['test'] = dataset_['test'].select(range(limit))
     return dataset_
 
 
@@ -262,9 +271,9 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
 
 def make_calibration_dataloader(tokenizer):
     dataset = make_dataset('c4')
-    print('c4len', len(dataset['train']))
+    # print('c4len', len(dataset['train']))
     dataset = process_calibration_dataset(dataset, tokenizer, 'c4')
-    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'], batch_size={'train': 1})
     return data_loader
 
 def collate(input):
@@ -274,7 +283,7 @@ def collate(input):
 
 processed_calibrate_sample_num = 0
 def process_calibration_dataset(dataset, tokenizer, dataset_name):
-    if cfg['task_name'] in ['clm', 'mc']:
+    if cfg['task_name'] in ['clm', 'csr']:
         if dataset_name == 'c4':
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
@@ -334,149 +343,16 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
             #     desc="Running tokenizer on sampled dataset",
             #     keep_in_memory=True,
             # )
+    else:
+        raise ValueError('Not valid task name')
     return processed_dataset
 
 processed_wikitext_sample_num = 0
 def process_dataset(dataset, tokenizer):
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'csr']:
         text_column = cfg['text_column']
         label_column = cfg['label_column']
-        if cfg['data_name'] == 'fpb':
-            max_length = cfg[cfg['model_name']]['max_length']
-
-            def preprocess_function(examples):
-                inputs = examples[text_column]
-                targets = examples[label_column]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                labels = tokenizer(targets, max_length=3, padding="max_length", truncation=True, return_tensors="pt")
-                labels = labels["input_ids"]
-                labels[labels == tokenizer.pad_token_id] = -100
-                model_inputs["labels"] = labels
-                return model_inputs
-
-            processed_dataset = dataset.map(
-                preprocess_function,
-                batched=True,
-                num_proc=1,
-                remove_columns=dataset["train"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-            )
-            cfg['max_new_tokens'] = 10
-        elif cfg['data_name'] == 'ptb':
-            max_length = cfg[cfg['model_name']]['max_length']
-
-            def preprocess_function(examples):
-                inputs = examples[text_column]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                model_inputs['labels'] = copy.deepcopy(model_inputs['input_ids'])
-                model_inputs["labels"][model_inputs["labels"] == tokenizer.pad_token_id] = -100
-                return model_inputs
-
-            processed_dataset = dataset.map(
-                preprocess_function,
-                batched=True,
-                num_proc=1,
-                remove_columns=dataset["train"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-            )
-        elif cfg['data_name'] == 'glue':
-            max_length = cfg[cfg['model_name']]['max_length']
-
-            def tokenize_function(examples):
-                batch_size = len(examples[label_column])
-
-                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}") for i in
-                          range(batch_size)]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                model_inputs["labels"] = examples["label"]
-                return model_inputs
-
-            processed_dataset = dataset.map(
-                tokenize_function,
-                batched=True,
-                remove_columns=dataset["train"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-            )
-        elif cfg['data_name'] == 'dolly':
-            max_length = cfg[cfg['model_name']]['max_length']
-
-            def preprocess_function_train(examples):
-                batch_size = len(examples[text_column[0]])
-                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])} "
-                           f"response: ") for i in range(batch_size)]
-                targets = [str(x) for x in examples[label_column]]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding='max_length', truncation=True)
-                labels = tokenizer(targets, max_length=max_length, padding='do_not_pad', truncation=True)
-
-                model_inputs["split"] = []
-                for i in range(batch_size):
-                    sample_input_ids = model_inputs["input_ids"][i]
-                    sample_attention_mask = model_inputs["attention_mask"][i]
-                    label_input_ids = labels["input_ids"][i]
-                    label_attention_mask = labels["attention_mask"][i]
-                    model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
-                    model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
-                    labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
-                    model_inputs["split"].append(cfg['task_label'][examples['category'][i]])
-                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
-                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
-                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
-                model_inputs["labels"] = labels["input_ids"]
-                return model_inputs
-
-            def preprocess_function_test(examples):
-                batch_size = len(examples[text_column[0]])
-                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])} "
-                           f"response: ") for i in range(batch_size)]
-                targets = [str(x) for x in examples[label_column]]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding='max_length', truncation=True)
-                labels = tokenizer(targets, max_length=max_length, padding='do_not_pad', truncation=True)
-
-                model_inputs["split"] = []
-                for i in range(batch_size):
-                    sample_input_ids = model_inputs["input_ids"][i]
-                    sample_attention_mask = model_inputs["attention_mask"][i]
-                    label_input_ids = labels["input_ids"][i]
-                    model_inputs["input_ids"][i] = sample_input_ids
-                    model_inputs["attention_mask"][i] = sample_attention_mask
-                    labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
-                    model_inputs["split"].append(cfg['task_label'][examples['category'][i]])
-                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
-                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
-                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
-                model_inputs["labels"] = labels["input_ids"]
-                return model_inputs
-
-            cfg['task_value'] = ['classification', 'information_extraction', 'summarization', 'brainstorming',
-                                 'creative_writing', 'open_qa', 'closed_qa', 'general_qa']
-            cfg['task_label'] = {category: idx for idx, category in enumerate(cfg['task_value'])}
-            cfg['num_split'] = len(cfg['task_label'])
-
-            processed_dataset = {}
-            processed_dataset['train'] = dataset['train'].map(
-                preprocess_function_train,
-                batched=True,
-                num_proc=1,
-                remove_columns=dataset["train"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-            )
-            processed_dataset['test'] = dataset['test'].map(
-                preprocess_function_test,
-                batched=True,
-                num_proc=1,
-                remove_columns=dataset["test"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-            )
-            cfg['max_new_tokens'] = 40
-        elif cfg['data_name'] == 'wikitext':
+        if cfg['data_name'] == 'wikitext':
 
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
@@ -516,38 +392,73 @@ def process_dataset(dataset, tokenizer):
                 desc="Running tokenizer on dataset",
                 keep_in_memory=True,
             )
+        # boolq
         # piqa: piqa
-        # storycloze: storycloze , 
+        # siqa: siqa , 
         # arc-e: arc-easy 
         # arc-c: arc-challenge (Clark et al., 2018), 
         # hellaswag: hellaswag (Zellers et al., 2019) 
         # obqa: OpenBookQA (Mihaylov et al., 2018)
-        elif cfg['data_name'] == 'piqa':
+        elif cfg['data_name'] == 'boolq':
             '''
             {
-                "goal": "How do I ready a guinea pig cage for it's new occupants?",
-                "sol1": "Provide the guinea pig with a cage full of a few inches of bedding made of ripped paper strips, you will also need to supply it with a water bottle and a food dish.",
-                "sol2": "Provide the guinea pig with a cage full of a few inches of bedding made of ripped jeans material, you will also need to supply it with a water bottle and a food dish.",
-                "label": 0,
+                "answer": false,
+                "passage": "\"All biomass goes through at least some of these steps: it needs to be grown, collected, dried, fermented, distilled, and burned...",
+                "question": "does ethanol take more energy make that produces"
             }
             '''
+
+            def yesno(x):
+                if x:
+                    return "yes"
+                else:
+                    return "no"
+    
+
             max_length = cfg[cfg['model_name']]['max_length']
             def tokenize_function(examples):
-                batch_size = len(examples[label_column])
-                targets = examples[label_column]
+                batch_size = len(examples['answer'])
+                targets = examples['answer']
 
-                # inputs = [
-                #     f"goal: {examples['goal'][i]} choices: [{examples['sol1'][i]}, {examples['sol2'][i]}] {label_column}: "
-                #     for i in range(batch_size)
-                # ]
-                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
-                          range(batch_size)]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                labels = tokenizer(targets, max_length=3, padding="max_length", truncation=True, return_tensors="pt")
-                labels = labels["input_ids"]
-                labels[labels == tokenizer.pad_token_id] = -100
-                model_inputs["labels"] = labels
+                inputs = []
+                labels = []
+                correct_labels_extended = []
+                input_indices = []
+                for i in range(batch_size):
+                    
+                    inputs.extend([f"{examples['passage'][i]}\nQuestion: {examples['question'][i]}\nAnswer:"])
+                    labels.extend([' yes'])
+                    correct_labels_extended.extend([f' {yesno(targets[i])}'])
+                    input_indices.extend([i])
+
+                    inputs.extend([f"{examples['passage'][i]}\nQuestion: {examples['question'][i]}\nAnswer:"])
+                    labels.extend([' no'])
+                    correct_labels_extended.extend([f' {yesno(targets[i])}'])
+                    input_indices.extend([i])
+                # inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
+                #           range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length")
+                labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
+
+                for i in range(len(correct_labels_extended)):
+                    sample_input_ids = model_inputs["input_ids"][i]
+                    sample_attention_mask = model_inputs["attention_mask"][i]
+                    label_input_ids = labels["input_ids"][i][1:]
+                    label_attention_mask = labels["attention_mask"][i][1:]
+                    model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
+                    model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
+                    labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
+                    # labels["input_ids"][i] = [-100] * (len(sample_input_ids)+1)
+                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
+                    # input_indices[i] = torch.tensor(input_indices[i])
+                    # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
+
+                model_inputs["labels"] = labels["input_ids"]
+                model_inputs['input_indices'] = input_indices
+                model_inputs["correct_labels"] = correct_labels_extended
+                # print('model_inputscorrect_labels', model_inputs['correct_labels'])
                 return model_inputs
 
             processed_dataset = {}
@@ -561,32 +472,114 @@ def process_dataset(dataset, tokenizer):
                 desc="Running tokenizer on dataset",
                 keep_in_memory=True,
             )
-        elif cfg['data_name'] == 'storycloze':
+        elif cfg['data_name'] == 'piqa':
             '''
             {
-                'answer_right_ending': 1,
-                'input_sentence_1': 'Rick grew up in a troubled household.',
-                'input_sentence_2': 'He never found good support in family, and turned to gangs.',
-                'input_sentence_3': "It wasn't long before Rick got shot in a robbery.",
-                'input_sentence_4': 'The incident caused him to turn a new leaf.',
-                'sentence_quiz1': 'He is happy now.',
-                'sentence_quiz2': 'He joined a gang.',
-                'story_id': '138d5bfb-05cc-41e3-bf2c-fa85ebad14e2'
+                "goal": "How do I ready a guinea pig cage for it's new occupants?",
+                "sol1": "Provide the guinea pig with a cage full of a few inches of bedding made of ripped paper strips, you will also need to supply it with a water bottle and a food dish.",
+                "sol2": "Provide the guinea pig with a cage full of a few inches of bedding made of ripped jeans material, you will also need to supply it with a water bottle and a food dish.",
+                "label": 0,
             }
             '''
             max_length = cfg[cfg['model_name']]['max_length']
             def tokenize_function(examples):
-                batch_size = len(examples[label_column])
-                targets = examples[label_column]
+                batch_size = len(examples['label'])
+                targets = examples['label']
 
-                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
-                          range(batch_size)]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                labels = tokenizer(targets, max_length=3, padding="max_length", truncation=True, return_tensors="pt")
-                labels = labels["input_ids"]
-                labels[labels == tokenizer.pad_token_id] = -100
-                model_inputs["labels"] = labels
+                inputs = []
+                labels = []
+                correct_labels_extended = []
+                input_indices = []
+                for i in range(batch_size):
+                    for j in range(2):
+                        goal = examples['goal'][i]
+                        sol = examples[f"sol{j+1}"][i]
+                        inputs.extend([goal])
+                        labels.extend([sol])
+                        correct_labels_extended.extend([targets[i]])
+                        input_indices.extend([i])
+                # inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
+                #           range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length")
+                labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
+
+                for i in range(len(correct_labels_extended)):
+                    sample_input_ids = model_inputs["input_ids"][i]
+                    sample_attention_mask = model_inputs["attention_mask"][i]
+                    label_input_ids = labels["input_ids"][i][1:]
+                    label_attention_mask = labels["attention_mask"][i][1:]
+                    model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
+                    model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
+                    labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
+                    # labels["input_ids"][i] = [-100] * (len(sample_input_ids)+1)
+                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
+                    # input_indices[i] = torch.tensor(input_indices[i])
+                    # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
+
+                model_inputs["labels"] = labels["input_ids"]
+                model_inputs['input_indices'] = input_indices
+                model_inputs["correct_labels"] = correct_labels_extended
+                return model_inputs
+
+            processed_dataset = {}
+            processed_dataset['test'] = dataset['test'].map(
+                tokenize_function,
+                batched=True,
+                # batch_size=50,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset",
+                keep_in_memory=True,
+            )
+        elif cfg['data_name'] == 'siqa':
+            '''
+            {
+                "answerA": "sympathetic",
+                "answerB": "like a person who was unable to help",
+                "answerC": "incredulous",
+                "context": "Sydney walked past a homeless woman asking for change but did not have any money they could give to her. Sydney felt bad afterwards.",
+                "label": "1",
+                "question": "How would you describe Sydney?"
+            }
+            '''
+            max_length = cfg[cfg['model_name']]['max_length']
+            def tokenize_function(examples):
+                batch_size = len(examples['label'])
+                targets = examples['label']
+                targets = [int(targets[i])-1 for i in range(batch_size)]
+
+                inputs = []
+                labels = []
+                correct_labels_extended = []
+                input_indices = []
+                for i in range(batch_size):
+                    for char in ['A', 'B', 'C']:  # Loop through characters A, B, C
+                        inputs.extend([examples['question'][i] + ' ' + examples['context'][i]])
+                        labels.extend([examples[f'answer{char}'][i]])  # Use the char variable to dynamically refer to answer keys
+                        correct_labels_extended.extend([targets[i]])
+                        input_indices.extend([i])
+
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length")
+                labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
+
+                for i in range(len(correct_labels_extended)):
+                    sample_input_ids = model_inputs["input_ids"][i]
+                    sample_attention_mask = model_inputs["attention_mask"][i]
+                    label_input_ids = labels["input_ids"][i][1:]
+                    label_attention_mask = labels["attention_mask"][i][1:]
+                    model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
+                    model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
+                    labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
+                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
+
+                model_inputs["labels"] = labels["input_ids"]
+                model_inputs['input_indices'] = input_indices
+                model_inputs["correct_labels"] = correct_labels_extended
                 return model_inputs
 
             processed_dataset = {}
@@ -602,6 +595,7 @@ def process_dataset(dataset, tokenizer):
             )
         elif cfg['data_name'] == 'arc':
             '''
+            https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/arc.py
             {
                 "answerKey": "B",
                 "choices": {
@@ -615,22 +609,56 @@ def process_dataset(dataset, tokenizer):
             
             max_length = cfg[cfg['model_name']]['max_length']
             def tokenize_function(examples):
-                batch_size = len(examples[label_column])
-                targets = examples[label_column]
+                batch_size = len(examples['answerKey'])
+                targets = examples['answerKey']
 
                 num_to_letter = {"1": "A", "2": "B", "3": "C", "4": "D", "5": "E"}
                 targets = [num_to_letter.get(target, target) for target in targets]
                 # Convert each target to its numerical index
                 targets = [["A", "B", "C", "D", "E"].index(target) for target in targets]
 
-                inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
-                          range(batch_size)]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                labels = tokenizer(targets, max_length=3, padding="max_length", truncation=True, return_tensors="pt")
-                labels = labels["input_ids"]
-                labels[labels == tokenizer.pad_token_id] = -100
-                model_inputs["labels"] = labels
+                inputs = []
+                labels = []
+                correct_labels_extended = []
+                input_indices = []
+                input_text = []
+                for i in range(batch_size):
+                    cur_label = examples['choices'][i]['text']
+                    num_choices = len(cur_label)
+                    inputs.extend(["Question: " + examples['question'][i] + "\nAnswer:"] * num_choices)
+                    print('cur input', ["Question: " + examples['question'][i] + "\nAnswer:"])
+                    print('index', i)
+                    # input_text.extend(["Question: " + examples['question'][i] + "\nAnswer:"] * num_choices)
+                    labels.extend(cur_label)
+                    correct_labels_extended.extend([targets[i]] * num_choices)
+                    input_indices.extend([i] * num_choices)
+                # inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
+                #           range(batch_size)]
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length")
+                labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
+
+                for i in range(len(correct_labels_extended)):
+                    sample_input_ids = model_inputs["input_ids"][i]
+                    # print('sample_input_ids', sample_input_ids)
+                    # print('text', inputs[i])
+                    sample_attention_mask = model_inputs["attention_mask"][i]
+                    label_input_ids = labels["input_ids"][i][1:]
+                    label_attention_mask = labels["attention_mask"][i][1:]
+                    model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
+                    model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
+                    labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
+                    # labels["input_ids"][i] = copy.deepcopy(model_inputs["input_ids"][i])
+                    # labels["input_ids"][i] = [-100] * (len(sample_input_ids)+1)
+                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
+                    # input_indices[i] = torch.tensor(input_indices[i])
+                    # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
+
+                model_inputs["labels"] = labels["input_ids"]
+                model_inputs['input_indices'] = input_indices
+                model_inputs["correct_labels"] = correct_labels_extended
+                # model_inputs["text_seq"] = input_text
                 return model_inputs
 
             processed_dataset = {}
@@ -646,6 +674,7 @@ def process_dataset(dataset, tokenizer):
             )
         elif cfg['data_name'] == 'hellaswag':
             '''
+            Reference: https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/hellaswag.py
             This example was too long and was cropped:
             {
                 "activity_label": "Removing ice from car",
@@ -660,6 +689,7 @@ def process_dataset(dataset, tokenizer):
                 "split_type": "indomain"
             }
             '''
+            max_length = cfg[cfg['model_name']]['max_length']
             def preprocess(text):
                 text = text.strip()
                 # NOTE: Brackets are artifacts of the WikiHow dataset portion of HellaSwag.
@@ -669,8 +699,8 @@ def process_dataset(dataset, tokenizer):
                 return text
                 
             def tokenize_function(examples):
-                batch_size = len(examples[label_column])
-                targets = examples[label_column]
+                batch_size = len(examples['label'])
+                targets = examples['label']
                 examples['ctx_b'] = [examples['ctx_b'][i].capitalize() for i in range(batch_size)]
                 targets = [int(targets[i]) for i in range(batch_size)]
 
@@ -680,20 +710,101 @@ def process_dataset(dataset, tokenizer):
                 input_indices = []
                 for i in range(batch_size):
                     num_choices = len(examples['endings'][i])
-                    inputs.extend([examples['ctx_a'][i] + " " + examples['ctx_b'][i]] * num_choices)
-                    labels.extend(targets[i])
+                    inputs.extend([preprocess(examples['activity_label'][i] + ': ' + examples['ctx_a'][i] + " " + examples['ctx_b'][i])] * num_choices)
+                    for j in range(num_choices):
+                        labels.extend([preprocess(examples['endings'][i][j])])
+                    # labels.extend(preprocess(examples['endings'][i]))
                     correct_labels_extended.extend([targets[i]] * num_choices)
                     input_indices.extend([i] * num_choices)
                 # inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
                 #           range(batch_size)]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True)
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length")
                 labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
 
                 for i in range(len(correct_labels_extended)):
                     sample_input_ids = model_inputs["input_ids"][i]
                     sample_attention_mask = model_inputs["attention_mask"][i]
-                    label_input_ids = labels["input_ids"][i]
-                    label_attention_mask = labels["attention_mask"][i]
+                    label_input_ids = labels["input_ids"][i][1:]
+                    label_attention_mask = labels["attention_mask"][i][1:]
+                    model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
+                    model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
+                    labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
+                    # labels["input_ids"][i] = [-100] * (len(sample_input_ids)+1)
+                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
+                    # input_indices[i] = torch.tensor(input_indices[i])
+                    # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
+
+                model_inputs["labels"] = labels["input_ids"]
+                model_inputs['input_indices'] = input_indices
+                model_inputs["correct_labels"] = correct_labels_extended
+                return model_inputs
+
+            processed_dataset = {}
+            processed_dataset['test'] = dataset['test'].map(
+                tokenize_function,
+                batched=True,
+                # batch_size=50,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset",
+                keep_in_memory=True,
+            )
+        elif cfg['data_name'] == 'winogrande':
+            '''
+            Reference: https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/winogrande.py
+            This example was too long and was cropped:
+            {
+                "sentence": "John moved the couch from the garage to the backyard to create space. The _ is small.",
+                "option1": "garage",
+                "option2": "backyard",
+                "answer": "1"
+            }
+            '''
+            max_length = cfg[cfg['model_name']]['max_length']
+            def partial_context(sentence, option):
+                # Substitute the pronoun in the sentence with the specified option
+                # and ignore everything after.
+                pronoun_loc = sentence.index("_")
+                return sentence[:pronoun_loc] + option
+
+            def partial_target(sentence):
+                # The target is everything after the document specified pronoun.
+                pronoun_loc = sentence.index("_") + 1
+                return " " + sentence[pronoun_loc:].strip()
+    
+            answer_to_num = {"1": 0, "2": 1}
+            def tokenize_function(examples):
+                batch_size = len(examples['answer'])
+                targets = examples['answer']
+                # examples['ctx_b'] = [examples['ctx_b'][i].capitalize() for i in range(batch_size)]
+                targets = [answer_to_num[targets[i]] for i in range(batch_size)]
+
+                inputs = []
+                labels = []
+                correct_labels_extended = []
+                input_indices = []
+                for i in range(batch_size):
+                    for j in range(2):
+                        option = examples[f"option{j+1}"][i]
+                        sentence = examples['sentence'][i]
+                        # print('sentence', sentence, '||||||', partial_context(sentence, option))
+                        inputs.extend([partial_context(sentence, option)])
+                        # print('labels',partial_target(sentence) )
+                        labels.extend([partial_target(sentence)])
+                        correct_labels_extended.extend([targets[i]])
+                        input_indices.extend([i])
+
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length")
+                labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
+
+                for i in range(len(correct_labels_extended)):
+                    sample_input_ids = model_inputs["input_ids"][i]
+                    sample_attention_mask = model_inputs["attention_mask"][i]
+                    label_input_ids = labels["input_ids"][i][1:]
+                    label_attention_mask = labels["attention_mask"][i][1:]
                     model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
                     model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
                     labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
@@ -735,8 +846,8 @@ def process_dataset(dataset, tokenizer):
             '''
             max_length = cfg[cfg['model_name']]['max_length']
             def tokenize_function(examples):
-                batch_size = len(examples[label_column])
-                correct_labels = examples[label_column]
+                batch_size = len(examples['answerKey'])
+                correct_labels = examples['answerKey']
                 # Convert each target to its numerical index
                 correct_labels = [["A", "B", "C", "D"].index(choice) for choice in correct_labels]
 
@@ -752,18 +863,19 @@ def process_dataset(dataset, tokenizer):
                     input_indices.extend([i] * num_choices)
                 # inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}" f'{label_column}: ') for i in
                 #           range(batch_size)]
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True)
+                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length")
                 labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
 
                 for i in range(len(correct_labels_extended)):
                     sample_input_ids = model_inputs["input_ids"][i]
                     sample_attention_mask = model_inputs["attention_mask"][i]
-                    label_input_ids = labels["input_ids"][i]
-                    label_attention_mask = labels["attention_mask"][i]
+                    label_input_ids = labels["input_ids"][i][1:]
+                    # print('label_input_ids', label_input_ids)
+                    label_attention_mask = labels["attention_mask"][i][1:]
                     model_inputs["input_ids"][i] = sample_input_ids + label_input_ids
                     model_inputs["attention_mask"][i] = sample_attention_mask + label_attention_mask
                     labels["input_ids"][i] = [-100] * len(sample_input_ids) + label_input_ids
-                    # labels["input_ids"][i] = [-100] * (len(sample_input_ids)+1)
+                    # labels["input_ids"][i] = copy.deepcopy(model_inputs["input_ids"][i])
                     model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
                     model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
                     labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])

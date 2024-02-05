@@ -1,7 +1,7 @@
 import collections
 import itertools
 import random
-import copy
+
 import lm_eval.metrics
 import lm_eval.models
 import lm_eval.tasks
@@ -12,6 +12,7 @@ from lm_eval.models.gpt2 import HFLM
 import numpy as np
 import transformers
 
+from pdb import set_trace as st 
 
 @positional_deprecated
 def simple_evaluate(
@@ -30,6 +31,9 @@ def simple_evaluate(
     decontamination_ngrams_path=None,
     write_out=False,
     output_base_path=None,
+    pretrained_model=None,
+    tokenizer=None,
+    add_special_tokens=False, 
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -74,8 +78,12 @@ def simple_evaluate(
         if model_args is None:
             model_args = ""
         lm = lm_eval.models.get_model(model).create_from_arg_string(
-            model_args, {"batch_size": batch_size, "max_batch_size": max_batch_size, "device": device}
+            model_args, {"batch_size": batch_size, "device": device, 
+                "set_model": False, "set_tokenizer": False, "add_special_tokens": add_special_tokens}
         )
+        # lm = lm_eval.models.get_model(model).create_from_arg_string(
+        #     model_args, {"batch_size": batch_size, "max_batch_size": max_batch_size, "device": device}
+        # )
     elif isinstance(model, transformers.PreTrainedModel):
         lm = lm_eval.models.get_model("hf-causal")(
                 pretrained=model,
@@ -86,6 +94,12 @@ def simple_evaluate(
     else:
         assert isinstance(model, lm_eval.base.LM)
         lm = model
+
+    if pretrained_model is not None:
+        lm.set_model(pretrained_model)
+
+    if tokenizer is not None:
+        lm.set_tokenizer(tokenizer)
 
     if not no_cache:
         lm = lm_eval.base.CachingLM(
@@ -121,7 +135,7 @@ def simple_evaluate(
     elif isinstance(model, transformers.PreTrainedModel):
         model_name = "pretrained=" + model.config._name_or_path
     results["config"] = {
-        "model": model_name,
+        "model": model,
         "model_args": model_args,
         "num_fewshot": num_fewshot,
         "batch_size": batch_size,
@@ -278,7 +292,9 @@ def evaluate(
                     prompt_details[-1][f"prompt_{i}"] = "".join(
                         (map(lambda x: "".join(x), req.args))
                     )
-            break
+            
+            
+
         if write_out:
             write_out_info[task_name] = prompt_details
 
@@ -302,12 +318,8 @@ def evaluate(
         #       they should end up next to each other.
 
         print("Running", reqtype, "requests")
-        a = getattr(lm, reqtype)
-        b = [req.args for req in reqs]
         resps = getattr(lm, reqtype)([req.args for req in reqs])
-        zz = copy.deepcopy(resps)
-        for x, req in zip(resps, reqs):
-            print('x', x, 'req', req)
+        print('Resps', resps)
         resps = [
             x if req.index is None else x[req.index] for x, req in zip(resps, reqs)
         ]
@@ -326,7 +338,6 @@ def evaluate(
                     ]
                 else:
                     write_out_info[task_name][doc_id]["truth"] = task.doc_to_target(doc)
-            
 
     vals = collections.defaultdict(list)
 

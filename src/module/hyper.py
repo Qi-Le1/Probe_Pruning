@@ -1,30 +1,34 @@
 from config import cfg
 
-MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70B', 'llama-2-30b', 'llama-2-65b']
+MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70b']
 
 def process_control():
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
     cfg['seq_len'] = int(cfg['control']['seq_len'])
-    cfg['prune_hyper'] = int(cfg['control']['prune_hyper'])
+    cfg['prune_hyper'] = float(cfg['control']['prune_hyper'])
 
     prune_name_list = cfg['control']['prune_name'].split('+')
-    cfg['prune_name'] = prune_metric_list[0]
-    if 'wanda' in cfg['model_name']:
-        cfg['prune_metric'] = 'wanda'
-    elif 'flap' in cfg['model_name']:
+    cfg['prune_name'] = prune_name_list[0]
+
+    cfg['prune_metric'] = None
+    if 'wandasp' in cfg['prune_name']:
+        cfg['prune_metric'] = 'wandasp'
+    elif 'flap' in cfg['prune_name']:
         cfg['prune_metric'] = 'flap'
-    elif 'probe' in cfg['model_name']:
+    elif 'probe' in cfg['prune_name']:
         prune_name_sub_list = cfg['prune_name'].split('-')
         cfg['prune_metric'] = prune_name_sub_list[1]
+         # fill or each
+        cfg['qk_proj_prune'] = prune_name_sub_list[2]  
         # fill or each
-        cfg['vo_proj_prune'] = prune_name_sub_list[2]
-        # fill or each
-        cfg['qk_proj_prune'] = prune_name_sub_list[3]    
+        cfg['vo_proj_prune'] = prune_name_sub_list[3]
+    elif 'testourmetric' in cfg['prune_name']:
+        cfg['prune_metric'] = 'testourmetric'
     
     # for calibration data pruning
-    if len(prune_metric_list) == 1:
+    if len(prune_name_list) == 1:
         cfg['nsamples'] = None
     else:
         cfg['nsamples'] = int(prune_name_list[1])   
@@ -33,15 +37,18 @@ def process_control():
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
         cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
     elif cfg['cust_tgt_modules'] == ['default']:
-        cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
+        if cfg['fix_pruned_model'] == True:
+            cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING[cfg['model_name']]
+        elif cfg['fix_pruned_model'] == False:
+            cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
 
     cfg['prune_dim'] = -1
     cfg['pq_p'] = 1
     cfg['pq_q'] = 2
-    cfg['beta'] = 0.9
+    cfg['pq_beta'] = 0.9
     cfg['pq_gamma'] = 1
     make_data_name()
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i', 'mc']:
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i', 'csr']:
         cfg['collate_mode'] = 'transformer'
         cfg['gpt2'] = {'max_length': 512}
         if 'llama' in cfg['model_name']:
@@ -70,7 +77,7 @@ def process_control():
     if model_name not in cfg:
         cfg[model_name] = {}
     cfg[model_name]['shuffle'] = {'train': False, 'test': False}
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc']:
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'csr']:
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
     elif cfg['task_name'] in ['ic']:
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
@@ -94,7 +101,13 @@ def make_data_name():
     else:
         cfg['data_name'] = data_name_list[0]
         cfg['subset_name'] = 'none'
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc', 't2i']:
+    if cfg['data_name'] == 'arcchallenge':
+        cfg['data_name'] = 'arc_challenge'
+    elif cfg['data_name'] == 'arceasy':
+        cfg['data_name'] = 'arc_easy'
+    if cfg['python_file'] == 'test_vanilla_harness_model.py':
+        return
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'csr', 't2i']:
         data_name_dict = {
             # https://huggingface.co/datasets/financial_phrasebank
             'fpb': {'data_name': 'financial_phrasebank',
@@ -181,53 +194,68 @@ def make_data_name():
                          },
             
             # piqa: piqa
-            # storycloze: storycloze , 
+            # siqa: siqa , 
             # arc-e: arc-easy 
             # arc-c: arc-challenge (Clark et al., 2018), 
             # hellaswag: hellaswag (Zellers et al., 2019) 
+            # winogrande: winogrande 
             # obqa: OpenBookQA (Mihaylov et al., 2018)
             # preprocessing according to: https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/arc.py
             # https://huggingface.co/datasets/piqa
+            'boolq': {'data_name': 'google/boolq',
+                    'subset_name_dict': {
+                        'none': {'subset_name': None,
+                              'text_column': ['hardcode'],
+                              'label_column': 'hardcode'}
+                        },
+            },  
             'piqa': {'data_name': 'piqa',
                     'subset_name_dict': {
                         'none': {'subset_name': None,
-                              'text_column': ['goal', 'sol1', 'sol2'],
-                              'label_column': 'label'}
+                              'text_column': ['hardcode'],
+                              'label_column': 'hardcode'}
                         },
-            },       
-            # https://huggingface.co/datasets/story_cloze
-            'storycloze': {'data_name': 'story_cloze',
+            },          
+            # https://huggingface.co/datasets/social_i_qa/viewer/default/validation
+            'siqa': {'data_name': 'social_i_qa',
                     'subset_name_dict': {
-                        '2016': {'subset_name': '2016',
-                              'text_column': ['input_sentence_1', 'input_sentence_2', 'input_sentence_3', 'input_sentence_4', 'sentence_quiz1', 'sentence_quiz2'],
-                              'label_column': 'answer_right_ending'}
+                        'none': {'subset_name': None,
+                              'text_column': ['hardcode'],
+                              'label_column': 'hardcode'}
                         },
-            },        
+            },         
             # https://huggingface.co/datasets/ai2_arc          
            'arc': {'data_name': 'ai2_arc',
                     'subset_name_dict': {
                         'e': {'subset_name': 'ARC-Easy',
-                              'text_column': ['id', 'question', 'choices'],
-                             'label_column': 'answerKey'},   
+                              'text_column': ['hardcode'],
+                             'label_column': 'hardcode'},   
                         'c': {'subset_name': 'ARC-Challenge',
-                              'text_column': ['id', 'question', 'choices'],
-                              'label_column': 'answerKey'}
+                              'text_column': ['hardcode'],
+                              'label_column': 'hardcode'}
                         },                        
             },
             # https://huggingface.co/datasets/Rowan/hellaswag
             'hellaswag': {'data_name': 'Rowan/hellaswag',
                     'subset_name_dict': {
                         'none': {'subset_name': None,
-                              'text_column': 'hardcode, complex structure',
-                              'label_column': 'hardcode, complex structure'}, 
+                              'text_column': 'hardcode',
+                              'label_column': 'hardcode'}, 
+                        },                        
+            },
+            'winogrande': {'data_name': 'winogrande',
+                    'subset_name_dict': {
+                        'none': {'subset_name': 'winogrande_debiased',
+                              'text_column': 'hardcode',
+                              'label_column': 'hardcode'}, 
                         },                        
             },
             # https://huggingface.co/datasets/openbookqa
             'obqa': {'data_name': 'openbookqa',
                     'subset_name_dict': {
                         'main': {'subset_name': 'main',
-                              'text_column': ['id', 'question_stem', 'choices'],
-                              'label_column': 'answerKey'},    
+                              'text_column': ['hardcode'],
+                              'label_column': 'hardcode'},    
                         },                        
             },
             # Dataset: https://github.com/google/dreambooth
@@ -375,7 +403,10 @@ key:  transformer.h.3.mlp.dropout <class 'torch.nn.modules.dropout.Dropout'>
 
 
 # opt 1.3b layer
+
 '''
+125M、350M、1.3B、2.7B、6.7B、13B、30B、66B、175B
+selected: 6.7B、13B、30B、66B
 key:  model.decoder.layers.0 <class 'transformers.models.opt.modeling_opt.OPTDecoderLayer'>
 key:  model.decoder.layers.0.self_attn <class 'transformers.models.opt.modeling_opt.OPTAttention'>
 key:  model.decoder.layers.0.self_attn.k_proj <class 'torch.nn.modules.linear.Linear'>
@@ -391,6 +422,7 @@ key:  model.decoder.layers.0.final_layer_norm <class 'torch.nn.modules.normaliza
 
 # llama-2-7b layer
 '''
+7b, 13b, 65b
 key:  model.layers.0 <class 'transformers.models.llama.modeling_llama.LlamaDecoderLayer'>
 key:  model.layers.0.self_attn <class 'transformers.models.llama.modeling_llama.LlamaAttention'>
 key:  model.layers.0.self_attn.q_proj <class 'torch.nn.modules.linear.Linear'>

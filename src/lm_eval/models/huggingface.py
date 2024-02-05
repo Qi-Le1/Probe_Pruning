@@ -13,6 +13,8 @@ from transformers import BatchEncoding
 from lm_eval import utils
 from lm_eval.base import BaseLM
 
+from pdb import set_trace as st 
+
 TokenSequence = Union[List[int], torch.LongTensor, torch.Tensor, BatchEncoding]
 
 _DeviceMapping = NewType("DeviceMapping", Mapping[str, Union[int, str, torch.device]])
@@ -93,6 +95,9 @@ class HuggingFaceAutoLM(BaseLM):
         gptq_use_triton: Optional[bool] = False,
         bnb_4bit_quant_type: Optional[str] = None,
         bnb_4bit_compute_dtype: Optional[Union[str, torch.dtype]] = None,
+        cache_dir=None,
+        set_model=True,
+        set_tokenizer=True,
     ):
         """Initializes a HuggingFace `AutoModel` and `AutoTokenizer` for evaluation.
         Args:
@@ -198,60 +203,81 @@ class HuggingFaceAutoLM(BaseLM):
         )
 
         self._add_special_tokens = add_special_tokens
-        self.tokenizer = self._create_auto_tokenizer(
-            pretrained=pretrained,
-            revision=revision,
-            subfolder=subfolder,
-            tokenizer=tokenizer,
-            trust_remote_code=trust_remote_code,
-        )
-        self.tokenizer.model_max_length = self.max_length
+        # self.tokenizer = self._create_auto_tokenizer(
+        #     pretrained=pretrained,
+        #     revision=revision,
+        #     subfolder=subfolder,
+        #     tokenizer=tokenizer,
+        #     trust_remote_code=trust_remote_code,
+        # )
+        # self.tokenizer.model_max_length = self.max_length
 
-        model_kwargs = {}
-        if use_accelerate:
-            model_kwargs = _get_accelerate_args(
-                device_map_option,
-                max_memory_per_gpu,
-                max_cpu_memory,
-                offload_folder,
-            )
-        self.model = self._create_auto_model(
-            pretrained=pretrained,
-            quantized=quantized,
-            trust_remote_code=trust_remote_code,
-            revision=revision,
-            subfolder=subfolder,
-            torch_dtype=_get_dtype(dtype, self._config),
-            gptq_use_triton=gptq_use_triton,
-            load_in_8bit=load_in_8bit,
-            load_in_4bit=load_in_4bit,
-            bnb_4bit_quant_type=bnb_4bit_quant_type,
-            bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
-            **model_kwargs,
-        )
+        # model_kwargs = {}
+        self.use_accelerate=use_accelerate
+        # if use_accelerate:
+        #     model_kwargs = _get_accelerate_args(
+        #         device_map_option,
+        #         max_memory_per_gpu,
+        #         max_cpu_memory,
+        #         offload_folder,
+        #     )
+        # self.model = self._create_auto_model(
+        #     pretrained=pretrained,
+        #     quantized=quantized,
+        #     trust_remote_code=trust_remote_code,
+        #     revision=revision,
+        #     subfolder=subfolder,
+        #     torch_dtype=_get_dtype(dtype, self._config),
+        #     gptq_use_triton=gptq_use_triton,
+        #     load_in_8bit=load_in_8bit,
+        #     load_in_4bit=load_in_4bit,
+        #     bnb_4bit_quant_type=bnb_4bit_quant_type,
+        #     bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
+        #     **model_kwargs,
+        # )
         # note: peft_path can be different than pretrained model path
-        if peft is not None:
-            self.model = self._create_auto_model_peft(
-                model=self.model,
-                peft=peft,
-                revision=revision,
-                subfolder=subfolder,
-                load_in_4bit=load_in_4bit,
-            )
+        # if peft is not None:
+        #     self.model = self._create_auto_model_peft(
+        #         model=self.model,
+        #         peft=peft,
+        #         revision=revision,
+        #         subfolder=subfolder,
+        #         load_in_4bit=load_in_4bit,
+        #     )
+        # # self.model.eval()
+        # torch.set_grad_enabled(False)
+
+        self._device = device
+        # if use_accelerate and "lm_head" in self.model.hf_device_map:
+        #     # `accelerate` can place `lm_head` weights on a different device than
+        #     # the user specified one so we force `self._device` to be the same as
+        #     # `lm_head`'s.
+        #     self._device = self.model.hf_device_map["lm_head"]
+        # if not use_accelerate and not (load_in_4bit or load_in_8bit):
+        #     try:
+        #         self.model.to(self._device)
+        #     except:
+        #         print("Failed to place model onto specified device. This may be because the model is quantized via `bitsandbytes`. If the desired GPU is being used, this message is safe to ignore.")
+
+    def set_model(self, model):
+        print("calling set_model function")
+        self.model = model
         self.model.eval()
         torch.set_grad_enabled(False)
 
-        self._device = device
-        if use_accelerate and "lm_head" in self.model.hf_device_map:
+        if self.use_accelerate and "lm_head" in self.model.hf_device_map:
             # `accelerate` can place `lm_head` weights on a different device than
             # the user specified one so we force `self._device` to be the same as
             # `lm_head`'s.
             self._device = self.model.hf_device_map["lm_head"]
-        if not use_accelerate and not (load_in_4bit or load_in_8bit):
-            try:
-                self.model.to(self._device)
-            except:
-                print("Failed to place model onto specified device. This may be because the model is quantized via `bitsandbytes`. If the desired GPU is being used, this message is safe to ignore.")
+        if not self.use_accelerate:
+            self.model.to(self._device)
+
+    def set_tokenizer(self, tokenizer):
+        print("calling set_tokenizer function")
+        self.tokenizer = tokenizer
+        self.tokenizer.model_max_length = self.max_length
+
 
     def _create_auto_model(
         self,

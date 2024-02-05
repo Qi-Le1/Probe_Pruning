@@ -1,4 +1,5 @@
 import os
+import re
 import torch
 import torch.nn as nn
 from config import cfg
@@ -9,18 +10,27 @@ from diffusers import (
 )
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification, \
     AutoTokenizer, LlamaTokenizer, AutoModelForMultipleChoice, AutoModel
+# from transformers import LlamaForCausalLM
 from .hf.modeling_llama import LlamaForCausalLM
 from module import MULTIGPUS_MODEL_NAME_LIST, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING, alternate_broadcast
 
 
 def make_hf_model(model_name, sub_model_name=None):
+
     if model_name in MULTIGPUS_MODEL_NAME_LIST:
         device_map = "auto"
         # low_cpu_mem_usage = True
     else:
         device_map = cfg['device']
+        if 'llama' in model_name:
+            match = re.search(r'(\d+)b', model_name)
+            number_before_b = match.group(1)
+            approximate_gpu_memory_gb = int(number_before_b) * 2 + cfg['batch_size'] * cfg['seq_len'] * 11000 * 4 / 1024 / 1024 / 1024
+            if approximate_gpu_memory_gb > 48:
+                device_map = "auto"
+                
         # low_cpu_mem_usage = False
-
+    print('device_map', device_map)
     if 'bart' in model_name:
         cfg['model_name_or_path'] = 'facebook/{}'.format(model_name)
         cfg['tokenizer_name_or_path'] = 'facebook/{}'.format(model_name)
@@ -56,12 +66,13 @@ def make_hf_model(model_name, sub_model_name=None):
         if '1.3b' in model_name:
             cfg['model_name_or_path'] = 'facebook/opt-1.3b'
             cfg['tokenizer_name_or_path'] = 'facebook/opt-1.3b'
-    elif 'llama-2-7b' in model_name:
+    elif 'llama-2' in model_name:
         # https://huggingface.co/docs/transformers/main/model_doc/llama2
         # FOLLOW the instruction to run the script: python convert_llama_weights_to_hf.py --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir output/llama-2-7b
         # support ["llama-2-7b"]
-        cfg['model_name_or_path'] = 'output/llama-2-7b'
-        cfg['tokenizer_name_or_path'] = 'output/llama-2-7b'
+        # need tokenizer.model, tokenizer_config.json from https://huggingface.co/meta-llama/Llama-2-13b-hf/tree/main   (corresponding model type)
+        cfg['model_name_or_path'] = f'output/{model_name}'
+        cfg['tokenizer_name_or_path'] = f'output/{model_name}'
     else:
         raise ValueError('Not valid model name')
     cfg['cache_model_path'] = os.path.join('output', 'model', model_name)
@@ -69,8 +80,7 @@ def make_hf_model(model_name, sub_model_name=None):
 
     if cfg['task_name'] == 'clm':
         if 'llama' in model_name:
-            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.float16,
-                                                    device_map=device_map)
+            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], device_map=device_map)
             # model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.float16,
             #                                         device_map=device_map, low_cpu_mem_usage=low_cpu_mem_usage)
         else:
@@ -78,43 +88,17 @@ def make_hf_model(model_name, sub_model_name=None):
                                                          device_map=device_map)
     elif cfg['task_name'] == 's2s':
         model = AutoModelForSeq2SeqLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], device_map=device_map)
-    elif cfg['task_name'] == 'sc':
-        if cfg['subset_name'] in ['mnli']:
-            model = AutoModelForSequenceClassification.from_pretrained(cfg['model_name_or_path'],
-                                                                       cache_dir=cfg['cache_model_path'],
-                                                                       num_labels=3, device_map=device_map)  # "num_labels" is set up in model.config
-        elif cfg['subset_name'] in ['stsb']:
-            model = AutoModelForSequenceClassification.from_pretrained(cfg['model_name_or_path'],
-                                                                       cache_dir=cfg['cache_model_path'], num_labels=1, device_map=device_map)
-        else:
-            model = AutoModelForSequenceClassification.from_pretrained(cfg['model_name_or_path'],
-                                                                       cache_dir=cfg['cache_model_path'], device_map=device_map)
-    elif cfg['task_name'] == 'mc':  # Assuming 'mc' stands for commonsense reasoning
+    elif cfg['task_name'] == 'csr':  # Assuming 'csr' stands for common sense reasoning
         if 'llama' in model_name:
             # "Training Llama in float16 is not recommended and known to produce nan, as such the model should be trained in bfloat16.""
-            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.float16,
-                                                     device_map=device_map)
+            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], device_map=device_map)
             # cache_dir=cfg['cache_model_path']
         else:
             model = AutoModelForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'],
                                                     device_map=device_map)
-    elif cfg['task_name'] == 't2i':
-        if sub_model_name is None:
-            model = DiffusionPipeline.from_pretrained(cfg['model_name_or_path'], safety_checker=None,
-                                                      cache_dir=cfg['cache_model_path'], device_map=device_map)
-        elif sub_model_name == 'vae':
-            model = AutoencoderKL.from_pretrained(cfg['model_name_or_path'], subfolder="vae", device_map=device_map)
-        elif sub_model_name == 'unet':
-            model = UNet2DConditionModel.from_pretrained(cfg['model_name_or_path'], subfolder="unet", device_map=device_map)
-        elif sub_model_name == 'text_encoder':
-            text_encoder_cls = import_model_class_from_model_name_or_path(cfg['model_name_or_path'])
-            model = text_encoder_cls.from_pretrained(
-                cfg['model_name_or_path'], subfolder="text_encoder", device_map=device_map
-            )
     else:
         raise ValueError('Not valid task name')
     if any(k in cfg['model_name_or_path'] for k in ("gpt", "opt", "bloom", "llama")):
-        
         padding_side = "left"
     else:
         padding_side = "right"
@@ -139,7 +123,7 @@ def make_hf_model(model_name, sub_model_name=None):
                                                   padding_side=padding_side)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
-    if any(k in model_name for k in ("gpt", "llama")):
+    if any(k in model_name for k in ("gpt", "llama-2")):
         model.config.pad_token_id = tokenizer.pad_token_id
     if 'opt' in model_name:
         model.config.end_token_id = tokenizer.eos_token_id
@@ -156,7 +140,7 @@ def make_hf_model(model_name, sub_model_name=None):
     
     # print('model.model.layers', model.model.layers)
     print('model.config', model.config)
-       
+    print('padding_side', padding_side)
     return model, tokenizer
 
 

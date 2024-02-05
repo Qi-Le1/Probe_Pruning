@@ -13,7 +13,7 @@ from module import TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING
 
 
 def make_model(model_name, sub_model_name=None):
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'mc', 't2i']:
+    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'csr', 't2i']:
         model, tokenizer = make_hf_model(model_name, sub_model_name)
         # base_model_name_or_path = model.__dict__.get("name_or_path", None)
         model_config = getattr(model, "config", {"model_type": "custom"})
@@ -31,17 +31,19 @@ def make_model(model_name, sub_model_name=None):
     return model, tokenizer
 
 def make_prune_model(model):
-    from .eri import EriModel
     from .llama_eri import LlamaEriModel
     if 'llama' in cfg['model_name']:
         model = LlamaEriModel(model)
     else:
-        model = EriModel(model)
+        raise ValueError('Not valid model name')
     return model
 
 def make_calibration_prune_model(model):
-    from .ewi import EwiModel
-    model = EwiModel(model)
+    from .llama_ewi import LlamaEwiModel
+    if 'llama' in cfg['model_name']:
+        model = LlamaEwiModel(model)
+    else:
+        raise ValueError('Not valid model name')
     return model
 
 def make_loss(output, input):

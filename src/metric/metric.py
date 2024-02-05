@@ -54,13 +54,13 @@ def make_metric(metric_name, tokenizer):
             pivot_name = 'Loss'
         else:
             raise ValueError('Not valid data name')
-    elif cfg['task_name'] == 'mc':
-        if cfg['data_name'] in ['piqa', 'storycloze', 'arc', 'hellaswag', 'obqa']:
+    elif cfg['task_name'] == 'csr':
+        if cfg['data_name'] in ['boolq', 'piqa', 'siqa', 'arc', 'aec','hellaswag', 'winogrande', 'obqa']:
             pivot = -float('inf')
             pivot_direction = 'up'
             pivot_name = 'Accuracy'
             for k in metric_name:
-                metric_name[k].extend(['McAccuracy'])
+                metric_name[k].extend(['CsrAccuracy'])
         else:
             raise ValueError('Not valid data name')
     else:
@@ -116,7 +116,7 @@ class Perplexity:
         # return torch.exp(torch.mean(torch.tensor(self.loss_list))).item()
 
 
-class McAccuracy:
+class CsrAccuracy:
     def __init__(self):
         self.output_for_one_question = defaultdict(list)
         self.correct_labels_for_one_question = defaultdict(list)
@@ -142,30 +142,45 @@ class McAccuracy:
         # non_pad_mask = target != cfg['pad_token_id']
         lm_logits = output['target']
         labels = input['target']
+        bsz = lm_logits.size(0)
         shift_logits = lm_logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
+        print('shift_logits', shift_logits)
+        print('shift_labels', shift_labels)
         # shift_logits = F.log_softmax(shift_logits, dim=-1)
+        # inplen = shift_logits.size(1)
+        # contlen = shift_labels.size(1)
+        # logits = logits[inplen - contlen : inplen].unsqueeze(
+        #     0
+        # ) 
+
         loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-        # Reshape loss back to the batch size and sequence length
-        loss = loss.view(shift_labels.size())
-
-        # Sum loss over the sequence length for each sample in the batch
+        print('loss', loss)
+        loss = loss.view(bsz, -1)
+        print('loss after view', loss)
         loss_per_sample = loss.sum(dim=1)
-        print('McAccuracy', loss_per_sample)
+        print('loss_per_sample', loss_per_sample)
 
-        for i in range(input['input_indicies'].shape[0]):
-            self.output_for_one_question[input['input_indicies'][i].item()].append(loss_per_sample[i].item())
-            self.correct_labels_for_one_question[input['input_indicies'][i].item()].append(input['correct_labels'][i].item())
-        a = 5
+
+        # print('loss persample', loss_per_sample)
+        # print('CsrAccuracy', loss_per_sample)
+
+        for i in range(input['input_indices'].shape[0]):
+            self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item())
+            self.correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
+
+        # a = 5
     def __call__(self, *args, **kwargs):
+        # print('self.output_for_one_question', self.output_for_one_question)
+        # print('self.correct_labels_for_one_question', self.correct_labels_for_one_question)
         total_acc = 0
         for key in self.output_for_one_question:
             # argmin for positive loss
             acc = 1 if np.argmin(self.output_for_one_question[key]) == self.correct_labels_for_one_question[key][0] else 0
             total_acc += acc
 
-        return total_acc / len(self.output_for_one_question) * 100
+        return (total_acc / len(self.output_for_one_question)) * 100
 
 class ROUGE:
     def __init__(self, tokenizer, split_metric):
@@ -239,8 +254,8 @@ class Metric:
                     metric[split][m] = {'mode': 'full', 'metric': ROUGE(tokenizer, cfg['split_metric'])}
                 elif m == 'GLUE':
                     metric[split][m] = {'mode': 'full', 'metric': GLUE(cfg['hf_subset_name'])}
-                elif m == 'McAccuracy':
-                    metric[split][m] = {'mode': 'full', 'metric': McAccuracy()}
+                elif m == 'CsrAccuracy':
+                    metric[split][m] = {'mode': 'full', 'metric': CsrAccuracy()}
                 else:
                     raise ValueError('Not valid metric name')
         return metric

@@ -121,8 +121,8 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, p
     print(f"Vanilla inference time ({TIME_UNIT[1]}) per batch: ", vanilla_duration/TIME_UNIT[0]/batch_num, flush=True)
     print(f"Pruned inference time ({TIME_UNIT[1]}): ", pruned_duration/TIME_UNIT[0], flush=True)
     print(f"Pruned inference time ({TIME_UNIT[1]}) per batch: ", pruned_duration/TIME_UNIT[0]/batch_num, flush=True)
-    print(f"Pruning inference time cost ({TIME_UNIT[1]}): ", (pruned_duration - vanilla_duration), flush=True)
-    print(f"Pruning inference time cost ({TIME_UNIT[1]}) per batch: ", (pruned_duration - vanilla_duration)/(batch_num), flush=True)
+    print(f"Inference time diff ({TIME_UNIT[1]}): ", (pruned_duration - vanilla_duration), flush=True)
+    print(f"Inference time diff ({TIME_UNIT[1]}) per batch: ", (pruned_duration - vanilla_duration)/(batch_num), flush=True)
 
     print(f"Vanilla FLOPs ({FLOPS_UNIT[1]}): ", vanilla_total_flops/FLOPS_UNIT[0], flush=True)
     print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)

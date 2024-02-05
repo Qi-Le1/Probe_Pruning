@@ -111,7 +111,7 @@ class LlamaEriModel(torch.nn.Module):
 
             new_module = self._create_new_module(prune_name, target, key)
             new_module.is_prune_out_dim = False
-            if 'WO' in cfg['prune_metric']:
+            if 'probe' in cfg['prune_metric']:
                 # new_module.is_prune_out_dim = False
                 out_dim_target_modules = TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING[cfg['model_type']]
                 if _check_target_module_exists(out_dim_target_modules, key):
@@ -200,11 +200,11 @@ class EriLayer:
         
     def extract_in_weight(self, input_dim, pruned_dim, preserve_channels, layer_type):
         # unstruct pruning
-        if pruned_dims is None:
+        if pruned_dim is None:
             return self.weight
         
         if layer_type == 'linear':
-            # [batch_size, in_features] / [batch_size, seq_lens, token_lens]
+            #  [batch_size, seq_lens, token_lens]
             if input_dim != 3:
                 raise ValueError('Not valid input dimension')
             
@@ -218,12 +218,10 @@ class EriLayer:
     def extract_out_weight(self, input_dim, pruned_dim, preserve_channels, layer_type):
         
         if layer_type == 'linear':
-            # [batch_size, in_features] / [batch_size, seq_lens, token_lens]
+            #  [batch_size, seq_lens, token_lens]
             if input_dim != 3:
                 raise ValueError('Not valid input dimension')
-    
-                return weight
-            
+                
             weight = torch.index_select(self.weight, dim=0, index=preserve_channels.to(self.weight.device))
             return weight
         
@@ -246,11 +244,15 @@ class Linear(nn.Linear, EriLayer):
         self.fan_in_fan_out = fan_in_fan_out
         self.is_target_conv_1d_layer = is_target_conv_1d_layer
         self.layer_type = 'linear'
-        
         self.prune_metric = cfg['prune_metric']
     
     def check_fill_case(self):
-        if cfg['']
+        if cfg['qk_proj_prune'] == 'fill' and ('q_proj' in self.key or 'k_proj' in self.key):
+            return True
+        elif cfg['vo_proj_prune'] == 'fill' and ('v_proj' in self.key or 'o_proj' in self.key):
+            return True
+        return False
+
     # no bias in llama-2
     def forward(self, x: torch.Tensor, **kwargs):
         with torch.no_grad():
@@ -283,9 +285,9 @@ class Linear(nn.Linear, EriLayer):
                     # if 'probe' in cfg['prune_name']:
                         # res_original = F.linear(x, self.weight)
 
-                    if 'fill' in cfg['prune_name']:
+                    if self.check_fill_case():
                         x = x[..., kwargs['probe_out_dim_indices']]
-                    # if it is forecast and parallel, we consider all the structure and operations
+                    # if it is probe and parallel, we consider all the structure and operations
                     # we already know the weight index to extract
                     weight = torch.index_select(self.weight, dim=1, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
                         # print('attnprobemix, probe_out_dim_indices', kwargs['probe_out_dim_indices'])
@@ -296,25 +298,25 @@ class Linear(nn.Linear, EriLayer):
                         
                     # else:
                         # prune out dim situation
-                        # but not forecast (only consider current layer's input and weight)
-                        # or forecast, but do not consider parallel strucutre's effect, only considering gate or up individually.
+                        # but not probe (only consider current layer's input and weight)
+                        # or probe, but do not consider parallel strucutre's effect, only considering gate or up individually.
                         # non_zero_indices = torch.nonzero(torch.sum(x, dim=(0,1)), as_tuple=True)[-1]
                         # weight = torch.index_select(self.weight, dim=1, index=non_zero_indices.to(self.weight.device))
                         # x = x[..., non_zero_indices]
 
                 else:
                     # if 'probe' in cfg['prune_name']:
-                        # if it is forecast and parallel, we consider all the structure and operations
+                        # if it is probe and parallel, we consider all the structure and operations
                         # we already know the weight index to extract
                     weight = torch.index_select(self.weight, dim=1, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
                     # else:
                     #     # prune out dim situation
-                    #     # but not forecast (only consider current layer's input and weight)
-                    #     # or forecast, but do not consider parallel strucutre's effect, only considering gate or up individually.
+                    #     # but not probe (only consider current layer's input and weight)
+                    #     # or probe, but do not consider parallel strucutre's effect, only considering gate or up individually.
                     #     non_zero_indices = torch.nonzero(torch.sum(x, dim=(0,1)), as_tuple=True)[-1]
                     #     weight = torch.index_select(self.weight, dim=1, index=non_zero_indices.to(self.weight.device))
                     #     x = x[..., non_zero_indices]
-            # for forecast situation, entering up-proj or gate-proj
+            # for probe situation, entering up-proj or gate-proj
             # or entering q/k/v-proj
             elif 'probe' in cfg['prune_name'] and 'probe_out_dim_indices' in kwargs:
                 # # weight dim 1 should have same size as original h dim 2
@@ -330,7 +332,7 @@ class Linear(nn.Linear, EriLayer):
                     # record to fill zero
                     # if 'para' not in cfg['prune_name']:
                     #     self.out_selected_dim = kwargs['probe_out_dim_indices']
-                    if 'fill' in cfg['prune_name']:
+                    if self.check_fill_case():
                         self.out_selected_dim = kwargs['probe_out_dim_indices']
 
                     # print('attn probe_out_dim_indices')
@@ -349,7 +351,14 @@ class Linear(nn.Linear, EriLayer):
                 # else:
                 weight = self.extract_in_weight(input_dim, pruned_dim, preserve_channels, self.layer_type)
             
-            result = F.linear(x, weight)
+            if 'flap' in cfg['prune_metric']:
+                all_channels = torch.arange(self.in_features, dtype=preserve_channels.dtype, device=preserve_channels.device)
+                mask = all_channels[preserve_channels]
+                mean_inp = 5
+                output_bias = ((mean_inp * ~mask.to(self.weight.data.device)) @ self.weight.data.T)
+                result = F.linear(x, weight, bias=output_bias)
+            else:
+                result = F.linear(x, weight)
             # if 'o_proj' in self.key:
             #     print('result', result, flush=True)
             # refill the pruned output dim with 0
@@ -359,45 +368,45 @@ class Linear(nn.Linear, EriLayer):
                 # dont need to refill 0 because all indices are determined
                 if 'attn' in self.key:
                     
-                    if 'fill' in cfg['prune_name']:
-                        recovered_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
+                    if self.check_fill_case():
+                        refilling_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
                         # Insert the output from the pruned layer into the correct positions in the extended tensor
                         # print('extended_output.shape', extended_output.shape)
                         # print('key', self.key)
                         # print('self.out_selected_dim', torch.nonzero(self.out_selected_dim).squeeze())
                         # print('gate&up', (self.out_selected_dim.shape[0] - torch.sum(self.out_selected_dim))/self.weight.shape[0], self.key)
-                        recovered_output[..., self.out_selected_dim] = result
+                        refilling_output[..., self.out_selected_dim] = result
 
                         # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
-                        result = recovered_output
+                        result = refilling_output
                             # print('result.shape', result.shape)
                         # else:
                         #     pass
                     # else:
-                    #     recovered_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
+                    #     refilling_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
                     #     # Insert the output from the pruned layer into the correct positions in the extended tensor
                     #     # print('extended_output.shape', extended_output.shape)
                     #     # print('key', self.key)
                     #     # print('self.out_selected_dim', torch.nonzero(self.out_selected_dim).squeeze())
                     #     # print('gate&up', (self.out_selected_dim.shape[0] - torch.sum(self.out_selected_dim))/self.weight.shape[0], self.key)
-                    #     recovered_output[..., self.out_selected_dim] = result
+                    #     refilling_output[..., self.out_selected_dim] = result
 
                     #     # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
-                    #     result = recovered_output
+                    #     result = refilling_output
                 # else:
                 #     if 'probe' in cfg['prune_name']:
                 #         pass
                 #     else:
-                #         recovered_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
+                #         refilling_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
                 #         # Insert the output from the pruned layer into the correct positions in the extended tensor
                 #         # print('extended_output.shape', extended_output.shape)
                 #         # print('key', self.key)
                 #         # print('self.out_selected_dim', torch.nonzero(self.out_selected_dim).squeeze())
                 #         # print('gate&up', (self.out_selected_dim.shape[0] - torch.sum(self.out_selected_dim))/self.weight.shape[0], self.key)
-                #         recovered_output[..., self.out_selected_dim] = result
+                #         refilling_output[..., self.out_selected_dim] = result
 
                 #         # 'extended_output' now has the pruned outputs filled in and zeros elsewhere
-                #         result = recovered_output
+                #         result = refilling_output
             # elif self.prune_tgt == 'weight':
             #     pruned_h = self.extract_input(x, self.layer_type)
             #     result = F.linear(pruned_h, self.weight, bias=self.bias)
