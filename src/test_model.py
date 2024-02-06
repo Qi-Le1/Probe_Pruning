@@ -55,7 +55,7 @@ def runExperiment():
     cfg['epoch'] = 0 
     vanilla_name_list = cfg['model_tag'].split('_')
     # batch size
-    vanilla_name_list[4] = '1'
+    vanilla_name_list[4] = '10'
     # metric
     vanilla_name_list[6] = '0'
     # prune_name

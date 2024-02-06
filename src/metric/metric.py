@@ -143,10 +143,12 @@ class CsrAccuracy:
         lm_logits = output['target']
         labels = input['target']
         bsz = lm_logits.size(0)
+        
         shift_logits = lm_logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
-        print('shift_logits', shift_logits)
-        print('shift_labels', shift_labels)
+        seq_len = shift_logits.size(1)
+        # print('shift_logits', shift_logits)
+        # print('shift_labels', shift_labels)
         # shift_logits = F.log_softmax(shift_logits, dim=-1)
         # inplen = shift_logits.size(1)
         # contlen = shift_labels.size(1)
@@ -156,11 +158,11 @@ class CsrAccuracy:
 
         loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-        print('loss', loss)
+        # print('loss', loss, loss.shape)
         loss = loss.view(bsz, -1)
-        print('loss after view', loss)
+        # print('loss after view', loss, loss.shape)
         loss_per_sample = loss.sum(dim=1)
-        print('loss_per_sample', loss_per_sample)
+        # print('loss_per_sample', loss_per_sample)
 
 
         # print('loss persample', loss_per_sample)

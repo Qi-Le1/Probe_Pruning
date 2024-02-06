@@ -141,7 +141,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 input_size = input['labels'].size(0)
                 input_indices = input['input_indices']
                 correct_labels = input['correct_labels']
-                print('input', input)
+                # print('input', input)
                 # if 'text' in input:
                 # print('input_text', input['text_seq'])
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -150,8 +150,8 @@ def test(data_loader, model, model_prof, metric, logger):
                 output = model(**input)
                 input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
-                print('outputloss', output['loss'])
-                print('outputlogits', output['logits'])
+                # print('outputloss', output['loss'])
+                # print('outputlogits', output['logits'])
             else:
                 input = collate(input)
                 input_size = input['data'].size(0)

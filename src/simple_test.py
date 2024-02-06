@@ -28,6 +28,40 @@ import torch
 
 import torch
 
+import torch
+import torch.nn as nn
+from transformers import AutoTokenizer
+
+# Load a pre-trained tokenizer
+tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+
+# List of strings
+texts = ["Hello, world!", "Transformers are great for NLP tasks."]
+
+# Tokenize the list of strings
+tokenized_outputs = tokenizer(texts, padding=True, return_tensors="pt")
+
+print(tokenized_outputs)
+a = np.array([-5, -4])
+c = np.argmax(a)
+# Define CrossEntropyLoss with no reduction
+loss_fn = nn.CrossEntropyLoss(reduction='none')
+
+# Example input logits (batch size of 3, 4 classes)
+logits = torch.tensor([[2.0, 0.5, 1.0, 0.2],
+                       [0.5, 2.0, 1.0, 0.2],
+                       [0.2, 0.5, 2.0, 1.0]])
+
+# Corresponding labels (batch size of 3)
+labels = torch.tensor([0, 1, 2])
+
+# Calculate loss
+loss = loss_fn(logits, labels)
+
+print(loss)
+
+modified_logs = F.log_softmax(logits, dim=-1)
+print(modified_logs)
 
 a = []
 # a.extend(6)

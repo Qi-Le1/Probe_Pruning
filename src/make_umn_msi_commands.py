@@ -647,12 +647,12 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-70b'], ['clm'], ['1'], ['128'], ['0'], [f'vanilla'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'llama-2-70b'], ['clm'], ['10'], ['128'], ['0'], [f'vanilla'],
                     ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
         elif 'csr' in data:
-            control_name = [[['boolq', 'rte', 'hellaswag', 'winogrande', 'arcchallenge', 'arceasy', 'openbookqa'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0'], ['vanilla'],
+            control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b', 'llama-2-13b', 'llama-2-70b'], ['csr'], ['10'], ['128'], ['0'], ['vanilla'],
                     ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -1027,14 +1027,14 @@ def main():
             # controls.extend(CIFAR10_controls_9)
 
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3'], ['mag-wandasp+128'],
-                    ['o-proj+down-proj']]]
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
+                    ['down-proj', 'o-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
             pass
         elif 'csr' in data:
-            control_name = [[['boolq', 'piqa', 'siqa', 'arc-e', 'arc-c', 'hellaswag', 'winogrande', 'obqa-main'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1'], ['mag-wandasp+128'],
-                    ['o-proj+down-proj']]]
+            control_name = [[['boolq', 'piqa', 'arc-e', 'arc-c', 'hellaswag', 'winogrande', 'obqa-main'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
+                    ['down-proj', 'o-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
         elif 'missing' in data:
@@ -1078,6 +1078,7 @@ def main():
     while i < len(controls):
     # for i in range(len(controls)):
         controls[i] = list(controls[i])
+        print('controls[i]', controls[i])
         temp = controls[i][3:] 
         filename = ''.join(str(_) for _ in temp)
         filename = pbs_prefix + filename
@@ -1098,8 +1099,16 @@ def main():
                 is_opt = True
             if 'gpt' in controls[i][4]:
                 is_gpt = True
+
+            if 'llama-2-7b' in controls[i][4]:
+                run_time = '00:45:00'
+            elif 'llama-2-13b' in controls[i][4]:
+                run_time = '01:45:00'
+            elif 'llama-2-70b' in controls[i][4]:
+                run_time = '10:45:00'
             j += 1
             i += 1
+            
         
         # print('isgpt', is_gpt)
         temp_mem = mem
@@ -1110,7 +1119,7 @@ def main():
         if is_gpt:
             temp_mem = int(1.5 * temp_mem)
         s = '#!/bin/bash -l\n'
-        s += '#SBATCH --time=00:30:00\n'
+        s += f'#SBATCH --time={run_time}\n'
         s += f'#SBATCH --nodes={task_parallel_num}\n'
         s += f'#SBATCH --ntasks={task_parallel_num}\n'
         # s += '#SBATCH --cpus-per-task=2'

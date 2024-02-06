@@ -244,7 +244,7 @@ def evaluate(
         task_docs = list(task_doc_func())
         rnd = random.Random()
         rnd.seed(42)
-        rnd.shuffle(task_docs)
+        # rnd.shuffle(task_docs)
         print(f"Task: {task_name}; number of docs: {len(task_docs)}")
 
         if write_out:
@@ -318,6 +318,8 @@ def evaluate(
         #       they should end up next to each other.
 
         print("Running", reqtype, "requests")
+        print('reqtype', reqtype)
+        print('getattr(lm, reqtype)', getattr(lm, reqtype))
         resps = getattr(lm, reqtype)([req.args for req in reqs])
         print('Resps', resps)
         resps = [

@@ -69,6 +69,7 @@ def make_hf_model(model_name, sub_model_name=None):
     elif 'llama-2' in model_name:
         # https://huggingface.co/docs/transformers/main/model_doc/llama2
         # FOLLOW the instruction to run the script: python convert_llama_weights_to_hf.py --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir output/llama-2-7b
+        # in the above py file, change line 270 to model = LlamaForCausalLM.from_pretrained(tmp_model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True), need float16 not bfloat16
         # support ["llama-2-7b"]
         # need tokenizer.model, tokenizer_config.json from https://huggingface.co/meta-llama/Llama-2-13b-hf/tree/main   (corresponding model type)
         cfg['model_name_or_path'] = f'output/{model_name}'
@@ -80,7 +81,7 @@ def make_hf_model(model_name, sub_model_name=None):
 
     if cfg['task_name'] == 'clm':
         if 'llama' in model_name:
-            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], device_map=device_map)
+            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'],  torch_dtype=torch.float16, device_map=device_map)
             # model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.float16,
             #                                         device_map=device_map, low_cpu_mem_usage=low_cpu_mem_usage)
         else:
@@ -91,7 +92,7 @@ def make_hf_model(model_name, sub_model_name=None):
     elif cfg['task_name'] == 'csr':  # Assuming 'csr' stands for common sense reasoning
         if 'llama' in model_name:
             # "Training Llama in float16 is not recommended and known to produce nan, as such the model should be trained in bfloat16.""
-            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], device_map=device_map)
+            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'],  torch_dtype=torch.float16, device_map=device_map)
             # cache_dir=cfg['cache_model_path']
         else:
             model = AutoModelForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'],
@@ -100,6 +101,9 @@ def make_hf_model(model_name, sub_model_name=None):
         raise ValueError('Not valid task name')
     if any(k in cfg['model_name_or_path'] for k in ("gpt", "opt", "bloom", "llama")):
         padding_side = "left"
+        # produce nan if we pad input text to the left
+        # if cfg['task_name'] == 'csr':
+        #     padding_side = "right"
     else:
         padding_side = "right"
 
@@ -115,9 +119,6 @@ def make_hf_model(model_name, sub_model_name=None):
     if 'llama' in model_name:
         tokenizer = LlamaTokenizer.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_tokenizer_path'],
                                                    padding_side=padding_side)
-    elif 'sdiffusion' in model_name:
-        tokenizer = AutoTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], subfolder="tokenizer",
-                                                  cache_dir=cfg['cache_tokenizer_path'])
     else:
         tokenizer = AutoTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], cache_dir=cfg['cache_tokenizer_path'],
                                                   padding_side=padding_side)

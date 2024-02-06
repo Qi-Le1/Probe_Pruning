@@ -67,16 +67,20 @@ def runExperiment():
                     task_names.add(matching)
             return list(task_names)
         # "boolq","rte","hellaswag","winogrande","arc_challenge","arc_easy","openbookqa"
-        task_names = pattern_match(cfg['data_name'], tasks.ALL_TASKS)
-        model_args = cfg['model_name']
+        print('cfg[data_name]', cfg['data_name'])
+        print('tasks.ALL_TASKS', tasks.ALL_TASKS)
+        task_names = pattern_match([cfg['data_name']], tasks.ALL_TASKS)
+        print('task_names', task_names)
+        model_args = f"pretrained=output/{cfg['model_name']},cache_dir=output/{cfg['model_name']}"
         limit = None 
         if "70b" in cfg['model_name'] or "65b" in cfg['model_name']:
             limit = 2000
         accelerate=False
-        if "30b" in args.model or "65b" in args.model or "70b" in args.model:
+        if "30b" in cfg['model_name'] or "65b" in cfg['model_name'] or "70b" in cfg['model_name']:
             accelerate=True
         if accelerate:
-            model_args = f"cfg['model_name'],use_accelerate=True"
+            model_args = f"pretrained=output/{cfg['model_name']},cache_dir=output/{cfg['model_name']},use_accelerate=True"
+
         model_prof.start_profile()
         results = evaluator.simple_evaluate(
             model="hf-causal-experimental",
@@ -95,7 +99,8 @@ def runExperiment():
             add_special_tokens=False
         )
         model_prof.stop_profile()
-        accuracy = results[cfg['data_name']]['acc'] * 100
+        print('llm harness results', results)
+        accuracy = results['results'][cfg['data_name']]['acc'] * 100
         print('accuracy', accuracy)
         test_logger.append({'Accuracy': accuracy}, 'test', 1)
         vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)

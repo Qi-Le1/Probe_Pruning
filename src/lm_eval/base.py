@@ -329,8 +329,8 @@ class BaseLM(LM):
             # again because vectorizing is annoying
 
             for (context, continuation), context_enc, continuation_enc in chunk:
-
-                print(f"context: {context}, continuation: {continuation}")
+                # print()
+                print(f"context: {context}, continuation: {continuation}", flush=True)
                 # sanity check
                 assert len(context_enc) > 0
                 assert len(continuation_enc) > 0
@@ -352,7 +352,7 @@ class BaseLM(LM):
                 (inplen,) = inp.shape
 
                 cont = continuation_enc
-                print(f"inp: {inp}, cont: {cont}")
+                # print(f"inp: {inp}, cont: {cont}")
 
                 # since in _collate we make sure length is descending, the longest is always the first one.
                 padding_length = (
@@ -375,10 +375,13 @@ class BaseLM(LM):
                 inplens.append(inplen)
 
             batched_inps = torch.cat(inps, dim=0)  # [batch, padding_length]
+            # print('original_logits: ', self._model_call(batched_inps))
+            original_logis = self._model_call(batched_inps)
+            print('original_logits: ', original_logis, flush=True)
             multi_logits = F.log_softmax(
-                self._model_call(batched_inps), dim=-1
+                original_logis, dim=-1
             ).cpu()  # [batch, padding_length, vocab]
-            print(f"multi_logits: {multi_logits}")
+            print(f"multi_logits after softmax: {multi_logits}", flush=True)
             for (cache_key, _, _), logits, inp, inplen, cont_toks in zip(
                 chunk, multi_logits, inps, inplens, cont_toks_list
             ):
@@ -389,7 +392,7 @@ class BaseLM(LM):
                 logits = logits[inplen - contlen : inplen].unsqueeze(
                     0
                 )  # [1, seq, vocab]
-                print(f'cut logit: {logits}')
+                print(f'cut logit: {logits}', flush=True)
                 # Check if per-token argmax is exactly equal to continuation
                 greedy_tokens = logits.argmax(dim=-1)
                 cont_toks = torch.tensor(cont_toks, dtype=torch.long).unsqueeze(
@@ -402,10 +405,10 @@ class BaseLM(LM):
                 logits = torch.gather(logits, 2, cont_toks.unsqueeze(-1)).squeeze(
                     -1
                 )  # [1, seq]
-                print(f'logit after log softmax: {logits}')
+                print(f'logit after pick corresponding position: {logits}', flush=True)
                 # Answer: (log prob, is-exact-match)
                 answer = (float(logits.sum()), bool(max_equal))
-                print(f"answer: {answer}")
+                print(f"answer: {answer}", flush=True)
                 # partial caching
                 if cache_key is not None:
                     self.cache_hook.add_partial("loglikelihood", cache_key, answer)
