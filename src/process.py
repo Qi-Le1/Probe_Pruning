@@ -24,6 +24,7 @@ args = vars(parser.parse_args())
 
 save_format = 'png'
 result_path = './output/result'
+final_result_path = './output/result'
 vis_path = './output/vis/{}'.format(save_format)
 
 num_experiments = 1
@@ -42,43 +43,44 @@ def make_controls(control_name):
 
 
 def make_control_list(file):
+    controls = []
     if file == 'wikitext-probe':
         pass
-    elif file == 'wikitext-baseline'
+    elif file == 'wikitext-baseline':
         control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
                     ['down-proj', 'o-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
         # control_name = [[['wikitext-2v1'], [ 'llama-2-70b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
         #         ['o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
     elif file == 'zeroshot-probe':
         pass
     elif file == 'zeroshot-baseline':
         control_name = [[['boolq', 'piqa', 'arc-e', 'arc-c', 'hellaswag', 'winogrande', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], [ 'mag-wandasp+128','mag-flap+128'],
                     ['o-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     return controls
 
-def make_dense_controls():
+def make_dense_controls(file):
     controls = []
     if file == 'dense':
         control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'llama-2-70b'], ['clm'], ['10'], ['128'], ['0'], [f'dense'],
                         ['None']]]
-        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
         control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b', 'llama-2-13b', 'llama-2-70b'], ['csr'], ['10'], ['128'], ['0'], ['dense'],
                         ['None']]]
-        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     return controls
 
 def main():
-    global result_path, vis_path, num_experiments, exp
+    global result_path, final_result_path, vis_path, num_experiments, exp
     vis_path = './output/vis/{}'.format(args['type'])
 
     print(f"type: {args['type']}")    
@@ -101,10 +103,14 @@ def main():
         process_result(controls, processed_result_exp, processed_result_history)
 
     # get dense model result
-    exp = [str(x) for x in list(range(2))]
-    controls = make_dense_controls()
+    num_experiments = 2
+    exp = [str(x) for x in list(range(num_experiments))]
+    controls = make_dense_controls('dense')
+    result_path = './output/result/{}'.format('dense')
     process_result(controls, processed_result_exp, processed_result_history)
 
+    final_result_path = './output/result/{}'.format(args['type'])
+    makedir_exist_ok(final_result_path)
     # with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
     #     json.dump(processed_result_exp, fp, indent=2)
     extracted_processed_result_history = {}
@@ -119,7 +125,7 @@ def process_result(controls, processed_result_exp, processed_result_history):
     for control in controls:
         model_tag = '_'.join(control)
         check_missing_files(list(control), model_tag, processed_result_exp, processed_result_history)
-    print('----- check missing files done\n')
+    print(f'\n----- check missing {result_path} files done\n')
     for control in controls:
         model_tag = '_'.join(control)
         extract_result(list(control), model_tag, processed_result_exp, processed_result_history)
@@ -190,6 +196,12 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
 def cal_se(std, sample_nums):
     return std / np.sqrt(sample_nums)
 
+def change_decimal_to_percentage(decimal):
+    return '{:.2%}'.format(float(decimal))
+
+def cut_decimal(decimal):
+    decimal = float(decimal)
+    return format(decimal, '.2f')
 
 def summarize_result(processed_result, key):
     # print(f'processed_result: {processed_result}')
@@ -235,8 +247,8 @@ def summarize_result(processed_result, key):
         processed_result[pivot] = np.stack(processed_result[pivot], axis=0)
         processed_result['mean'] = np.mean(processed_result[pivot], axis=0)
         # TODO: for inference
-        if 'Perplexity' in key:
-            print('mean', processed_result[pivot], cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot])))
+        # if 'Perplexity' in key:
+        #     print('mean', processed_result[pivot], cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot])))
         # processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot]))
         processed_result['std'] = np.std(processed_result[pivot], axis=0)
         processed_result['max'] = np.max(processed_result[pivot], axis=1)
@@ -271,11 +283,11 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
         if exp_name not in extracted_processed_result:
             extracted_processed_result[exp_name] = defaultdict()
         
-        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = processed_result['mean']
-        extracted_processed_result[exp_name]['{}_std'.format(metric_name)] = processed_result['std']
+        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = np.round(processed_result['mean'], 2)
+        extracted_processed_result[exp_name]['{}_std'.format(metric_name)] = np.round(processed_result['std'], 2)
 
-        extracted_processed_result[exp_name]['{}_mean_of_max'.format(metric_name)] = processed_result['mean_of_max']
-        extracted_processed_result[exp_name]['{}_std_of_max'.format(metric_name)] = processed_result['std_of_max']
+        extracted_processed_result[exp_name]['{}_mean_of_max'.format(metric_name)] = np.round(processed_result['mean_of_max'], 2)
+        extracted_processed_result[exp_name]['{}_std_of_max'.format(metric_name)] = np.round(processed_result['std_of_max'], 2)
     else:
         for k, v in processed_result.items():
             extract_processed_result(extracted_processed_result, v, control + [k])
@@ -292,6 +304,9 @@ def write_xlsx(path, df, startrow=0):
     writer.save()
     return
 
+
+
+
 def make_df_history(extracted_processed_result_history):
     df = defaultdict(list)
     for exp_name in extracted_processed_result_history:
@@ -306,17 +321,31 @@ def make_df_history(extracted_processed_result_history):
                     pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
         else:
             raise ValueError('Not valid control')
-    # TODO, dont write into xlsx right now
-    # write_xlsx('{}/result_history.xlsx'.format(result_path), df)
+
+    df_for_xlsx = defaultdict(list)
+    metric_name_list = ['test/Rouge', 'test/ROUGE', 'test/GLUE', 'test/Accuracy', 'test/Perplexity', 'test/CsrAccuracy']
+    for exp_name in extracted_processed_result_history:
+        control = exp_name.split('_')
+        if len(control) == 8:
+            data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules = control
+            df_name = '_'.join(
+                [data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules])
+            for k in extracted_processed_result_history[exp_name]:
+                if 'of_max' in k:
+                    continue
+                # print('k', k)
+                if 'duration_per_batch' in k or 'FLOPs_ratio_for_all_layers' in k or 'FLOPs_ratio_for_pruned_layers' in k or \
+                    any(metric_name in k for metric_name in metric_name_list):
+                    index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules, k])]
+                    # a = extracted_processed_result_history[exp_name][k].reshape(1, -1)
+                    df_for_xlsx[df_name].append(
+                        pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
+        else:
+            raise ValueError('Not valid control')
+    write_xlsx(f"{final_result_path}/result_history.xlsx", df_for_xlsx)
     return df
 
 
-def change_decimal_to_percentage(decimal):
-    return '{:.2%}'.format(float(decimal))
-
-def cut_decimal(decimal):
-    decimal = float(decimal)
-    return format(decimal, '.4f')
 
 def label_exists(plt, label):
     legend = plt.gca().legend_
@@ -325,11 +354,13 @@ def label_exists(plt, label):
         return label in existing_labels
     return False
 
-performance_metric_max_dict = {
-    'wikitext-2v1': 100,
-    'CIFAR10': 100,
-    'CIFAR100': 90,
-}
+# performance_metric_max_dict = {
+#     'wikitext-2v1': 100,
+#     'boolq': 100,
+
+#     'CIFAR10': 100,
+#     'CIFAR100': 90,
+# }
 
 def make_vis(df_exp, df_history):
     color = {
@@ -403,9 +434,9 @@ def make_vis(df_exp, df_history):
     marker['Full model'] = '*'
     # linestyle['pqnobias-0.5-0.5'] = '-.'
     # linestyle['pqnobiasglobal-0.5-0.5'] = '-.'
-    loc_dict = {'test/Rouge': 'lower left', 'test/ROUGE': 'lower left', 'test/GLUE': 'lower left', 'test/Accuracy': 'lower left', 'test/Perplexity': 'lower left', 'label': 'center left'}
+    loc_dict = {'test/Rouge': 'lower left', 'test/ROUGE': 'lower left', 'test/GLUE': 'lower left', 'test/Accuracy': 'lower left', 'test/Perplexity': 'lower left', 'label': 'center left', 'test/CsrAccuracy': 'lower left'}
     fontsize = {'legend': 17, 'label': 17, 'ticks': 14, 'group_x_ticks': 8}
-    metric_name_list = ['test/Rouge', 'test/ROUGE', 'test/GLUE', 'test/Accuracy', 'test/Perplexity']
+    metric_name_list = ['test/Rouge', 'test/ROUGE', 'test/GLUE', 'test/Accuracy', 'test/Perplexity', 'test/CsrAccuracy']
     
     plot_layer_detail = True
     if 'detail' in args:
@@ -646,7 +677,7 @@ def make_vis(df_exp, df_history):
         performance_vs_prunedflops = [None, None, None]
         if len(df_name_list) == 8:
             data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules = df_name_list
-            performance_metric_max = performance_metric_max_dict[data_name]
+            performance_metric_max = 100
 
             prune_name_list = prune_name.split('+')
             prune_name = prune_name_list[0]
@@ -688,9 +719,9 @@ def make_vis(df_exp, df_history):
                 cur_item = temp[i]
                 cur_se_item = temp[i+1]
                 # temp = df_history[df_name].iterrows()
-                for ((index, row), (index_se, row_se)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
+                for ((index, row), (index_std, row_std)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
                 # for index, row in cur_item.iterrows():
-            # for ((index, row), (index_se, row_se)) in zip(temp, temp):
+            # for ((index, row), (index_std, row_std)) in zip(temp, temp):
                     # print(f'index: {index}')
                     if 'of_max' in index:
                         continue
@@ -944,33 +975,33 @@ def make_vis(df_exp, df_history):
                         # draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_hypers', 'pruned_ratio')
 
                     # several methods for all layers on 1 plot
-                    if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_ratio_for_pruned_layers' in index or 'FLOPs_for_pruned_layers' in index:
+                    if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_ratio_for_pruned_layers' in index:
                         if any(metric_name in index for metric_name in metric_name_list):
                             flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
                             flops_metric_name = flops_metric_name.split('/')[1]
                             if performance_vs_prunedflops[0] is None:
                                 performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
-                                performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
+                                performance_vs_prunedflops[1] = min(performance_metric_max, row_std.tolist()[0])
                         elif 'FLOPs_ratio_for_pruned_layers' in index or 'FLOPs_for_pruned_layers' in index:
                             if performance_vs_prunedflops[2] is None:
                                 performance_vs_prunedflops[2] = row.tolist()[0]
                         
                         if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
                             print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, nsamples, prune_name, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_pruned_layers'])
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, nsamples, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_pruned_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_prunedflops[2]
                             y = performance_vs_prunedflops[0]
                             yerr = performance_vs_prunedflops[1]
-                            if 'pq' in prune_name and 'WIFV' in prune_metric:
-                                prune_name += '-flap'
-                            elif 'O1WIFN' in prune_metric or 'O2WIFN' in prune_metric:
-                                prune_name += prune_metric
-                            elif 'pq' in prune_name and 'WIFN' in prune_metric:
-                                prune_name += '-wanda'
-                            elif 'IFN' in prune_metric:
-                                prune_name += prune_metric
-                            key_for_dict = f"{prune_name}_{prune_metric}"
+                            # if 'pq' in prune_name and 'WIFV' in prune_metric:
+                            #     prune_name += '-flap'
+                            # elif 'O1WIFN' in prune_metric or 'O2WIFN' in prune_metric:
+                            #     prune_name += prune_metric
+                            # elif 'pq' in prune_name and 'WIFN' in prune_metric:
+                            #     prune_name += '-wanda'
+                            # elif 'IFN' in prune_metric:
+                            #     prune_name += prune_metric
+                            key_for_dict = f"{prune_name}"
                             # if 'pq' in prune_name:
                             #     key_for_dict = f"Our"
                             # elif 'mag' in prune_name:
@@ -989,28 +1020,28 @@ def make_vis(df_exp, df_history):
                             flops_metric_name = flops_metric_name.split('/')[1]
                             if performance_vs_total_FLOPs_ratio[0] is None:
                                 performance_vs_total_FLOPs_ratio[0] = min(performance_metric_max, row.tolist()[0])
-                                performance_vs_total_FLOPs_ratio[1] = min(performance_metric_max, row_se.tolist()[0])
+                                performance_vs_total_FLOPs_ratio[1] = min(performance_metric_max, row_std.tolist()[0])
                         elif 'FLOPs_ratio_for_all_layers' in index:
                             if performance_vs_total_FLOPs_ratio[2] is None:
                                 performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
                         
                         if performance_vs_total_FLOPs_ratio[0] is not None and performance_vs_total_FLOPs_ratio[2] is not None:
                             print('performancevssparsity', performance_vs_total_FLOPs_ratio, flops_metric_name, prune_hyper)
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_name, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_all_layers'])
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_all_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_total_FLOPs_ratio[2]
                             
                             y = performance_vs_total_FLOPs_ratio[0]
                             yerr = performance_vs_total_FLOPs_ratio[1]
-                            if 'pq' in prune_name and 'WIFV' in prune_metric:
-                                prune_name += '-flap'
-                            elif 'O1WIFN' in prune_metric or 'O2WIFN' in prune_metric:
-                                prune_name += prune_metric
-                            elif 'pq' in prune_name and 'WIFN' in prune_metric:
-                                prune_name += '-wanda'
-                            elif 'IFN' in prune_metric:
-                                prune_name += prune_metric
-                            key_for_dict = f"{prune_name}_{prune_metric}"
+                            # if 'pq' in prune_name and 'WIFV' in prune_metric:
+                            #     prune_name += '-flap'
+                            # elif 'O1WIFN' in prune_metric or 'O2WIFN' in prune_metric:
+                            #     prune_name += prune_metric
+                            # elif 'pq' in prune_name and 'WIFN' in prune_metric:
+                            #     prune_name += '-wanda'
+                            # elif 'IFN' in prune_metric:
+                            #     prune_name += prune_metric
+                            key_for_dict = f"{prune_name}"
                             
                             # if 'pq' in prune_name:
                             #     key_for_dict = f"Our"
@@ -1026,14 +1057,14 @@ def make_vis(df_exp, df_history):
 
 
                     if 'dense_duration_per_batch' in index or 'pruned_duration_per_batch' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_name, cust_tgt_modules, 'FIG:', 'time_cost_per_batch'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules, 'FIG:', 'time_cost_per_batch'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = prune_hyper
                         y = row.tolist()[0]
                         if 'dense_duration_per_batch' in index:
                             key_for_dict = "dense"
                         else:
-                            key_for_dict = f"{prune_name}_{prune_metric}"
+                            key_for_dict = f"{prune_name}"
                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Batch size', 'Seconds')
 
 
@@ -1089,8 +1120,8 @@ def make_vis(df_exp, df_history):
                 cur_item = temp[i]
                 cur_se_item = temp[i+1]
                 # temp = df_history[df_name].iterrows()
-                for ((index, row), (index_se, row_se)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
-            # for ((index, row), (index_se, row_se)) in zip(temp, temp):
+                for ((index, row), (index_std, row_std)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
+            # for ((index, row), (index_std, row_std)) in zip(temp, temp):
                     # print(f'index: {index}')
                     if 'of_max' in index:
                         continue
@@ -1406,7 +1437,7 @@ def make_vis(df_exp, df_history):
                             flops_metric_name = flops_metric_name.split('/')[1]
                             if performance_vs_prunedflops[0] is None:
                                 performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
-                                performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
+                                performance_vs_prunedflops[1] = min(performance_metric_max, row_std.tolist()[0])
                         elif 'FLOPs_ratio_for_pruned_layers' in index:
                             if performance_vs_prunedflops[2] is None:
                                 performance_vs_prunedflops[2] = row.tolist()[0]
@@ -1448,9 +1479,9 @@ def make_vis(df_exp, df_history):
 
             if 'all_methods_performance_vs_FLOPs_ratio_for_pruned_layers' in fig_name:
                 # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, y_lim=performance_metric_max)
-                draw_str_x_figure(plt, x, y, 0, key_for_dict, x_label, y_label)
-            if 'all_layer_pruned_ratio_mean' in fig_name:
-                draw_str_x_figure(plt, x, y, 0, key_for_dict, x_label, y_label)
+                draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
+            if 'all_methods_performance_vs_FLOPs_ratio_for_all_layers' in fig_name:
+                draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
                 # point = (x[40],y[40])
                 # ax = plt.gca()
                 # circle_rad = 50
@@ -1463,15 +1494,15 @@ def make_vis(df_exp, df_history):
                 #                 arrowstyle='simple,tail_width=0.3,head_width=0.8,head_length=0.5',
                 #                 facecolor='b', shrinkB=circle_rad * 1.2)
                 # )
-    def write_xlsx(path, df, startrow=0):
-        writer = pd.ExcelWriter(path, engine='xlsxwriter')
-        for df_name in df:
-            df[df_name] = pd.concat(df[df_name])
-            df[df_name].to_excel(writer, sheet_name='Sheet1', startrow=startrow + 1)
-            writer.sheets['Sheet1'].write_string(startrow, 0, df_name)
-            startrow = startrow + len(df[df_name].index) + 3
-        writer.save()
-        return
+    # def write_xlsx(path, df, startrow=0):
+    #     writer = pd.ExcelWriter(path, engine='xlsxwriter')
+    #     for df_name in df:
+    #         df[df_name] = pd.concat(df[df_name])
+    #         df[df_name].to_excel(writer, sheet_name='Sheet1', startrow=startrow + 1)
+    #         writer.sheets['Sheet1'].write_string(startrow, 0, df_name)
+    #         startrow = startrow + len(df[df_name].index) + 3
+    #     writer.save()
+    #     return
 
 #     save_format = 'png'
 # result_path = './output/result'

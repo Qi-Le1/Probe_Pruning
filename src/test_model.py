@@ -79,8 +79,7 @@ def runExperiment():
     pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
     
     # print('dense_info_list', dense_info_list[0], dense_info_list[1])
-    batch_num = len(data_loader['test'])
-    summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, batch_num, test_logger)
+    summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, test_logger)
 
     # thread lock bug
     test_logger.writer = None

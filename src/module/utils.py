@@ -71,20 +71,24 @@ def get_model_profile(tag, model_prof):
     return copy.deepcopy(info_list), duration
 
 
-def summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, batch_num, logger):
+def summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, logger):
 
     print('Summary ---------\n')
     dense_total_flops = sum([dense_info_list[i][1] for i in range(len(dense_info_list))])
     pruned_total_flops = sum([pruned_info_list[i][1] for i in range(len(pruned_info_list))])
     
+    dataset_size = cfg['dataset_size']['test']
+    print('dataset_size', dataset_size)
     info = {
         'dense_total_FLOPs': dense_total_flops,
         'Pruned_total_FLOPs': pruned_total_flops,
         'dense_duration': dense_duration,
-        'dense_duration_per_batch': dense_duration/batch_num,
+        'dense_duration_per_sample': dense_duration/dataset_size,
+        'dense_duration_token_per_second': dataset_size*cfg['seq_len']/dense_duration,
         'pruned_duration': pruned_duration,
-        'pruned_duration_per_batch': pruned_duration/batch_num,
-        'pruned_duration_cost_per_batch': (pruned_duration - dense_duration)/(batch_num),
+        'pruned_duration_per_sample': pruned_duration/dataset_size,
+        'pruned_duration_token_per_second': dataset_size*cfg['seq_len']/pruned_duration,
+        'pruned_duration_cost_per_sample': (pruned_duration - dense_duration)/(dataset_size),
         'total_FLOPs_ratio': pruned_total_flops/(dense_total_flops+1e-6),
     }
     total_target_used_params = 0
@@ -114,15 +118,14 @@ def summarize_info_list(dense_info_list, pruned_info_list, dense_duration, prune
     info['FLOPs_ratio_for_pruned_layers'] = pruned_layer_pruned_total_flops / (pruned_layer_dense_total_flops + 1e-6)
     info['FLOPs_ratio_for_all_layers'] = pruned_total_flops / (dense_total_flops + 1e-6)
     
-
     # dense_total_inference_time = sum([dense_info_list[i][2] for i in range(len(dense_info_list))])
     # pruned_total_inference_time = sum([pruned_info_list[i][2] for i in range(len(pruned_info_list))])
     print(f"dense inference time ({TIME_UNIT[1]}): ", dense_duration/TIME_UNIT[0], flush=True)
-    print(f"dense inference time ({TIME_UNIT[1]}) per batch: ", dense_duration/TIME_UNIT[0]/batch_num, flush=True)
+    print(f"dense inference time ({TIME_UNIT[1]}) per sample: ", dense_duration/TIME_UNIT[0]/(dataset_size), flush=True)
     print(f"Pruned inference time ({TIME_UNIT[1]}): ", pruned_duration/TIME_UNIT[0], flush=True)
-    print(f"Pruned inference time ({TIME_UNIT[1]}) per batch: ", pruned_duration/TIME_UNIT[0]/batch_num, flush=True)
+    print(f"Pruned inference time ({TIME_UNIT[1]}) per sample: ", pruned_duration/TIME_UNIT[0]/(dataset_size), flush=True)
     print(f"Inference time diff ({TIME_UNIT[1]}): ", (pruned_duration - dense_duration), flush=True)
-    print(f"Inference time diff ({TIME_UNIT[1]}) per batch: ", (pruned_duration - dense_duration)/(batch_num), flush=True)
+    print(f"Inference time diff ({TIME_UNIT[1]}) per sample: ", (pruned_duration - dense_duration)/(dataset_size), flush=True)
 
     print(f"dense FLOPs ({FLOPS_UNIT[1]}): ", dense_total_flops/FLOPS_UNIT[0], flush=True)
     print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)

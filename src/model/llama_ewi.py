@@ -241,6 +241,7 @@ class Linear(nn.Linear, EwiLayer):
         
     def get_pre_hook(self):
         def add_batch(inp, out):
+            print('add_batch')
             if len(inp.shape) == 2:
                 inp = inp.unsqueeze(0)
             batch_size = inp.shape[0]
@@ -299,7 +300,21 @@ class Linear(nn.Linear, EwiLayer):
         result = F.linear(x, self.weight, bias=self.bias)
         
         # self.pruning_module.cal_repr_distribution(pruned_h, f'{self.key}_pruned_hist')
+        # result = result.to(previous_dtype)
+
+        # Start the timer
+        start_time = time.time()
+
+        # The line of code you want to measure
         result = result.to(previous_dtype)
+
+        # Stop the timer
+        end_time = time.time()
+
+        # Calculate the elapsed time
+        elapsed_time = end_time - start_time
+
+        print(f"Time spent on the line: {elapsed_time} seconds")
         return result
     
 

@@ -233,13 +233,6 @@ def torch_default_data_collator(features):
             else:
                 batch[k] = torch.tensor([f[k] for f in features])
         
-        if k not in ("label", "label_ids") and v is not None and not isinstance(v, str):
-            if isinstance(v, torch.Tensor):
-                batch[k] = torch.stack([f[k] for f in features])
-            elif isinstance(v, np.ndarray):
-                batch[k] = torch.tensor(np.stack([f[k] for f in features]))
-            else:
-                batch[k] = torch.tensor([f[k] for f in features])
 
     return batch
 
@@ -249,8 +242,8 @@ def make_data_collate(collate_mode, tokenizer=None):
     elif collate_mode == 'default':
         return default_collate
     elif collate_mode == 'transformer':
-        # return default_data_collator
-        return torch_default_data_collator
+        return default_data_collator
+        # return torch_default_data_collator
     elif collate_mode == 'dreambooth':
         return dreambooth_input_collate
     elif collate_mode == 'pad':
@@ -276,6 +269,7 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
                                         collate_fn=make_data_collate(cfg['collate_mode'], tokenizer),
                                         worker_init_fn=np.random.seed(cfg['seed']))
         cfg['num_steps'][k] = len(data_loader[k])
+        cfg['dataset_size'][k] = len(dataset[k])
     return data_loader
 
 def make_calibration_dataloader(tokenizer):
