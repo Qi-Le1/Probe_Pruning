@@ -1240,6 +1240,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
         for h in handles:
             h.remove()
 
+        torch.cuda.empty_cache()
         for name in subset:
             print(f"pruning layer {i} name {name}")
             W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)

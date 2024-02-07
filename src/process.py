@@ -42,617 +42,71 @@ def make_controls(control_name):
 
 
 def make_control_list(file):
-    controls = []
-    if file == 'observe_llm':
-        # ------- llama-2-7b
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3'], [f'magunstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0]],
-        #         ['full'], ['somemethods-3'], ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3'], [f'magstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0]],
-        #         ['full'], ['somemethods-3'], ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0]],
-        #         ['full'], ['somemethods-3'], ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5]],
-        #         ['inter'], ['somemethods-3'], ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['inter'], ['somemethods-3'], ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['inter'], ['somemethods-3'], ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
-        #         ['inter'], ['somemethods-3'], ['default', 'gate-proj+up-proj+down-proj', 'down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
-        #         ['inter'], ['somemethods-3'], ['default', 'gate-proj+up-proj+down-proj', 'down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
-        #             ['inter'], ['somemethods-3'], ['gate-proj', 'up-proj', 'down-proj', 'gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'w*magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
-        #             ['inter'], ['somemethods-3'], ['gate-proj', 'up-proj', 'down-proj', 'gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
-        #             ['inter'], ['somemethods-3'], ['gate-proj', 'up-proj', 'down-proj', 'gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
-        #             ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.13, 0.17, 0.25, 0.35, 0.45]],
-        #             ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.13, 0.17, 0.25, 0.35, 0.45]],
-        #             ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-        #             ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        # ----- opt 1.3b
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magunstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['full'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['3'], [f'magstructglobal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['full'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+w+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['full'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5]],
-        #         ['inter'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['inter'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #         ['inter'], ['somemethods-3'], ['fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
-        #         ['inter'], ['somemethods-3'], ['default', 'fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w*pqstructlocal+h+2+{x}+-1+max' for x in [9999]],
-        #         ['inter'], ['somemethods-3'], ['default', 'fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
-        #             ['inter'], ['somemethods-3'], ['fc1', 'fc2', 'fc1+fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'w*magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
-        #             ['inter'], ['somemethods-3'], ['fc1', 'fc2', 'fc1+fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
-        #             ['inter'], ['somemethods-3'], ['fc1', 'fc2', 'fc1+fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0]],
-        #             ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['l2'], [f'pqstructlocal+h+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-                    ['o-proj+down-proj'], ['inter'], ['somemethods-3'],]]
-        CIFAR10_controls_9 = make_controls(control_name)
+    if file == 'wikitext-probe':
+        pass
+    elif file == 'wikitext-baseline'
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
+                    ['down-proj', 'o-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['l2'], [f'magstructlocal+w+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-                ['o-proj+down-proj'], ['full'], ['somemethods-3'],]]
-        CIFAR10_controls_9 = make_controls(control_name)
+        # control_name = [[['wikitext-2v1'], [ 'llama-2-70b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
+        #         ['o-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        # controls.extend(CIFAR10_controls_9)
+    elif file == 'zeroshot-probe':
+        pass
+    elif file == 'zeroshot-baseline':
+        control_name = [[['boolq', 'piqa', 'arc-e', 'arc-c', 'hellaswag', 'winogrande', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], [ 'mag-wandasp+128','mag-flap+128'],
+                    ['o-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
         controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-        #             ['inter'], ['somemethods-3'], ['out-proj+fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-        #         ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-        #         ['inter'], ['somemethods-3'], ['out-proj+fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-1.3b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-        #         ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-        #             ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'pqstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-        #         ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-        #         ['inter'], ['somemethods-3'], ['o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [f'magstructlocal+h+2+{x}+-1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-        #         ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        
-    elif file == 'observe_probe':
-        # 'WOF2N', 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10', '50'], ['128'], ['WOF2N', 'mbmsWOF2N', 'mbWOF2N'], [f'magstructlocalprobepara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-        #         ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10', '50'], ['128'], ['WOF2S', 'mbmsWOF2S', 'mbWOF2S'], [f'magstructlocalprobepara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-        #         ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        # # 'SumWOF2N',
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10','50'], ['128'], ['SumWOF2N', 'mbmsSumWOF2N', 'mbSumWOF2N'], [f'magstructlocalprobepara+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-        #         ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2N', 'mbWOF2N'], [f'magstructlocalprobeparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2S', 'mbWOF2S'], [f'magstructlocalprobeparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['SumWOF2N','mbSumWOF2N'], [f'magstructlocalprobeparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-        #         ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2N', 'mbWOF2N'], [f'magstructlocalprobeparaeach+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                    ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2S', 'mbWOF2S'], [f'magstructlocalprobeparaeach+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                    ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], [ 'mbWOF2S'], [f'magstructlocalprobeparaeachonlyqk+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                    ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], [ 'mbWOF2S'], [f'magstructlocalprobeparamixonlyqk+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], [ 'mbWOF2S'], [f'magstructlocalprobeparamixvconditionqk+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], [ 'mbWOF2S'], [f'magstructlocalprobeparamixqkv+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-                ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], [ 'mbWOF2S'], [f'magstructlocalprobeparamixqkvbeforedeleteseq+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-        #             ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], [ 'mbWOF2S'], [f'magstructlocalprobeparamixqkvafterdeleteseq+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-        #         ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['WOF2N', 'mbWOF2N'], [f'magstructlocalprobeparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['SumWOF2N','mbSumWOF2N'], [f'magstructlocalprobeparamix+h+{x}+-1' for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-    elif file == 'observe_cv':
-        # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #                      ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'w*pqstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #                     ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'magstructlocal:h:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #                     ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'magstructlocal:w:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #                     ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'magstructglobal:w:2:{x}:1:max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 9999]],
-        #                     ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal:h:2:{x}:1:max' for x in [9999]],
-        #                      ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['CIFAR10', 'CIFAR100'], ['resnet18'], ['ic'], ['1'], [f'w*pqstructlocal:h:2:{x}:1:max' for x in [9999]],
-        #                     ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal+h+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 9999]],
-                             ['inter'], ['somemethods-3'], ['default']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'magstructlocal+h+2+{x}+1+max' for x in [0, 0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]],
-                            ['inter'], ['somemethods-3'], ['default']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['CIFAR10', 'CIFAR100'], [ 'resnet18'], ['ic'], ['1'], [f'pqstructlocal+h+2+{x}+1+max' for x in [0]],
-        #                      ['inter'], ['somemethods-3'], ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-    elif file == 'observe_fix_pruned_llm':
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], [ '2048'], ['WIFV+128'], [f'flapnosquare+NA+{x}+-100+NA' for x in [0.5]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-
-
-
-
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap-global-bias-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #                 ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap-square-global-bias-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20','WIFV+128'], [f'flap-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'flap-square-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20','WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20','WIFN+128'], [f'wandasp-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'wandasp-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFN+20', 'WIFN+128'], [f'pq-std-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+20', 'WIFV+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], [ 'WIFN+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], [ 'WIFN+128'], [f'wandasp-global-bias-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-
-
-
-
-
-
-
-
-
-        # only mlp
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], ['WIFV+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #             ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '512', '1024', '2048'], [ 'WIFN+128'], [f'pq-0.9-0.9-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128', 'WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global-std+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #             ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-        
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFV+128'], [f'flap-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #             ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['WIFN+128'], [f'wandasp-global+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #             ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-        
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128', '1024', '2048'], ['IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-        
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #             ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #             ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #             ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], [ 'WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                    ['down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128',  'O2WIFN+128'], [f'pq-0.9-0.9-low+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128',  'O2WIFN+128'], [f'pq-0.9-0.9-global-nml-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                    ['down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128','O2WIFN+128'], [f'pq-0.9-0.9-high+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128',  'O2WIFN+128'], [f'wandasp-global-nml+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                    ['down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFN+128','O2WIFN+128'], [f'wandasp+NA+{x}+-100+NA' for x in [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]],
-                ['down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        # for 3d heatmap
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['WIFV+128', 'WIFN+128', 'IFN+128', 'O1WIFN+128', 'O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['O2WIFN+128'], [f'pq-0.9-0.9-global-nml+NA+{x}+-100+NA' for x in [0]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['O1WIFN+128', 'WIFV+128', 'WIFN+128', 'IFN+128',  'O2WIFN+128'], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-# 'IFN+128',  'O2WIFN+128''WIFV+128', 
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['2048'], ['O1WIFN+128', 'WIFN+128', ], [f'pq-0.9-0.9+NA+{x}+-100+NA' for x in [0.1, 0.2, 0.3]],
-        #         ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
     return controls
 
+def make_dense_controls():
+    controls = []
+    if file == 'dense':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'llama-2-70b'], ['clm'], ['10'], ['128'], ['0'], [f'dense'],
+                        ['None']]]
+        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b', 'llama-2-13b', 'llama-2-70b'], ['csr'], ['10'], ['128'], ['0'], ['dense'],
+                        ['None']]]
+        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        controls.extend(CIFAR10_controls_9)
+    return controls
 
 def main():
     global result_path, vis_path, num_experiments, exp
+    vis_path = './output/vis/{}'.format(args['type'])
 
     print(f"type: {args['type']}")    
-    result_path = './output/result/{}'.format(args['type'])
-    vis_path = './output/vis/{}'.format(args['type'])
-    files = [args['type']]
-
-    if 'observe_llm' in args['type']:
-        num_experiments = 1
-    elif 'observe_fix_pruned_llm' in args['type']:
-        num_experiments = 2
-    elif 'observe_probe' in args['type']:
-        num_experiments = 1
-    else:
-        raise ValueError('Not valid type')
-    exp = [str(x) for x in list(range(num_experiments))]
-    # exp = ['3']
-    controls = []
+    files = args['type'].split('_')
+    processed_result_exp, processed_result_history = {}, {}
     for file in files:
-        controls += make_control_list(file)
-    processed_result_exp, processed_result_history = process_result(controls)
-    with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
-        json.dump(processed_result_exp, fp, indent=2)
+        if file == 'wikitext-probe':
+            num_experiments = 1
+        elif file == 'wikitext-baseline':
+            num_experiments = 2
+        elif file == 'zeroshot-probe':
+            num_experiments = 1
+        elif file == 'zeroshot-baseline':
+            num_experiments = 2
+        else:
+            raise ValueError('Not valid type')
+        exp = [str(x) for x in list(range(num_experiments))]
+        controls = make_control_list(file)
+        result_path = './output/result/{}'.format(file)
+        process_result(controls, processed_result_exp, processed_result_history)
+
+    # get dense model result
+    exp = [str(x) for x in list(range(2))]
+    controls = make_dense_controls()
+    process_result(controls, processed_result_exp, processed_result_history)
+
+    # with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
+    #     json.dump(processed_result_exp, fp, indent=2)
     extracted_processed_result_history = {}
     extract_processed_result(extracted_processed_result_history, processed_result_history, [])
     df_history = make_df_history(extracted_processed_result_history)
@@ -661,8 +115,7 @@ def main():
     return
 
 
-def process_result(controls):
-    processed_result_exp, processed_result_history = {}, {}
+def process_result(controls, processed_result_exp, processed_result_history):
     for control in controls:
         model_tag = '_'.join(control)
         check_missing_files(list(control), model_tag, processed_result_exp, processed_result_history)
@@ -674,7 +127,7 @@ def process_result(controls):
     #     summarize_result(processed_result_exp)
     if processed_result_history:
         summarize_result(processed_result_history, None)
-    return processed_result_exp, processed_result_history
+    return 
 
 
 def check_missing_files(control, model_tag, processed_result_exp, processed_result_history):
@@ -706,26 +159,7 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
         #     print('entry', entry)
         # print('here', os.path.exists(base_result_path_i))
         if os.path.exists(base_result_path_i):
-            base_result = load(base_result_path_i)
-            
-            # if 'test' not in base_result['logger']:
-            # if 'train' in base_result['logger']:
-            #     for k in base_result['logger']['train'].history:
-            #         # metric_name = k.split('/')[1]
-            #         metric_name = k
-            #         if metric_name not in processed_result_history:
-            #             processed_result_history[metric_name] = {'history': [None for _ in range(num_experiments)]}
-            #         # processed_result_exp[metric_name]['exp'][exp_idx] = base_result['logger']['test'].mean[k]
-            #         processed_result_history[metric_name]['history'][exp_idx] = base_result['logger']['train'].history[k]
-            # else:
-                # for k in base_result['logger']['test'].mean:
-                #     metric_name = k.split('/')[1]
-                #     if metric_name not in processed_result_exp:
-                #         processed_result_exp[metric_name] = {'exp': [None for _ in range(num_experiments)]}
-                #         processed_result_history[metric_name] = {'history': [None for _ in range(num_experiments)]}
-                #     processed_result_exp[metric_name]['exp'][exp_idx] = base_result['logger']['test'].mean[k]
-                #     processed_result_history[metric_name]['history'][exp_idx] = base_result['logger']['train'].history[k]
-                
+            base_result = load(base_result_path_i)                
             for k in base_result['logger']['test'].history:
                 if args['detail'].lower() == 'false':
                     # if 'FLOPs_ratio_for_pruned_layers' not in k:
@@ -860,33 +294,16 @@ def write_xlsx(path, df, startrow=0):
 
 def make_df_history(extracted_processed_result_history):
     df = defaultdict(list)
-
     for exp_name in extracted_processed_result_history:
-        # print(f'exp_name: {exp_name}')
         control = exp_name.split('_')
-        # print(f'len_control: {len(control)}')
-        # dp
         if len(control) == 8:
-            data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules = control
+            data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules = control
             df_name = '_'.join(
-                [data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules])
+                [data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules])
             for k in extracted_processed_result_history[exp_name]:
-                # print(f'k: {k}')
-                index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, k])]
-                # print(k)  
+                index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules, k])]
                 df[df_name].append(
                     pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
-        # elif len(control) == 10:
-        #     data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ  = control
-        #     df_name = '_'.join(
-        #         [data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ])
-        #     for k in extracted_processed_result_history[exp_name]:
-        #         # print(f'k: {k}')
-        #         index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules, batch_integ, multibatch_integ, k])]
-        #         # print(k)
-        #         df[df_name].append(
-        #             pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
-                # df[df_name] = df[df_name].append(pd.DataFrame(...))
         else:
             raise ValueError('Not valid control')
     # TODO, dont write into xlsx right now
@@ -920,7 +337,7 @@ def make_vis(df_exp, df_history):
              'PQ': 'orange',
              'inter': 'purple',
              'union': 'red',
-             'vanilla': 'green',
+             'dense': 'green',
             'pruned': 'black'
              }
     linestyle = {'5_0.5': '-', '1_0.5': '--', '5_0': ':', '5_0.5_nomixup': '-.', '5_0_nomixup': '-.',
@@ -929,7 +346,7 @@ def make_vis(df_exp, df_history):
                 'full': (5, (10, 3)),
                 'inter': (0, (3, 1, 1, 1)),
                 'union': (10, (2, 5)),
-                'vanilla': '--',
+                'dense': '--',
                 'pruned': '-.'
                 }
     marker = {}
@@ -1228,29 +645,16 @@ def make_vis(df_exp, df_history):
         performance_vs_total_FLOPs_ratio = [None, None, None]
         performance_vs_prunedflops = [None, None, None]
         if len(df_name_list) == 8:
-            # data_name, model_name, task_name, batch_size, prune_name, batch_integ, multibatch_integ, cust_tgt_modules = df_name_list
-            data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, cust_tgt_modules = df_name_list
+            data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules = df_name_list
             performance_metric_max = performance_metric_max_dict[data_name]
 
             prune_name_list = prune_name.split('+')
             prune_name = prune_name_list[0]
-            prune_tgt = prune_name_list[1]
-            if prune_tgt == 'w':
-                prune_tgt = 'weight'
-            elif prune_tgt == 'h':
-                prune_tgt = 'hidden_repr'
+
+            if len(prune_name_list) == 1:
+                nsamples = 'fulldata'
             else:
-                pass
-            prune_hyper = prune_name_list[2] if len(prune_name_list) > 2 else '0'
-            prune_dim = prune_name_list[3] if len(prune_name_list) > 3 else '0'
-            prune_dim_select_mode = prune_name_list[4] if len(prune_name_list) > 4 else 'max'
-            
-            # nsamples = prune_metric.split('+')[1]
-            prune_metric_list = prune_metric.split('+')
-            if len(prune_metric_list) > 1:
-                nsamples = prune_metric_list[1]
-            else:
-                nsamples = 'fullds'
+                nsamples = prune_name_list[1]
             # if isinstance(df_history[df_name], list):
             #     # Handle the case where it's a list
             #     temp = df_history[df_name]
@@ -1267,7 +671,7 @@ def make_vis(df_exp, df_history):
             temp = copy.deepcopy(df_history[df_name]) 
             '''
                 1. norm_across_other_dims distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
-                2. vanilla_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
+                2. dense_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
                 3. pruned_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
                 2. pq_indices for each prune layer (y is pq_indices, x is all the layers, 1 for each prune_hyper)
                 3. pruned_ratio for each prune layer (y is pruned_ratio, x is all the layers, 1 for each prune_hyper)
@@ -1553,14 +957,9 @@ def make_vis(df_exp, df_history):
                         
                         if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
                             print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
-                            # print('here1')
-                            # prune_tgt, 
-                            # prune_dim, 
-                            # batch_integ, 
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_pruned_layers'])
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, nsamples, prune_name, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_pruned_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_prunedflops[2]
-                            
                             y = performance_vs_prunedflops[0]
                             yerr = performance_vs_prunedflops[1]
                             if 'pq' in prune_name and 'WIFV' in prune_metric:
@@ -1572,7 +971,6 @@ def make_vis(df_exp, df_history):
                             elif 'IFN' in prune_metric:
                                 prune_name += prune_metric
                             key_for_dict = f"{prune_name}_{prune_metric}"
-                            
                             # if 'pq' in prune_name:
                             #     key_for_dict = f"Our"
                             # elif 'mag' in prune_name:
@@ -1598,11 +996,7 @@ def make_vis(df_exp, df_history):
                         
                         if performance_vs_total_FLOPs_ratio[0] is not None and performance_vs_total_FLOPs_ratio[2] is not None:
                             print('performancevssparsity', performance_vs_total_FLOPs_ratio, flops_metric_name, prune_hyper)
-                            # print('here1')
-                            # prune_tgt, 
-                            # prune_dim, 
-                            # batch_integ, 
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size,  seq_len, nsamples, prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_all_layers'])
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_name, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_all_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_total_FLOPs_ratio[2]
                             
@@ -1631,13 +1025,13 @@ def make_vis(df_exp, df_history):
                             performance_vs_prunedflops = [None, None, None]
 
 
-                    if 'vanilla_duration_per_batch' in index or 'pruned_duration_per_batch' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size,  prune_name, seq_len, nsamples,  prune_tgt, prune_dim_select_mode, cust_tgt_modules, 'FIG:', 'time_cost_per_batch'])
+                    if 'dense_duration_per_batch' in index or 'pruned_duration_per_batch' in index:
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_name, cust_tgt_modules, 'FIG:', 'time_cost_per_batch'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = prune_hyper
                         y = row.tolist()[0]
-                        if 'vanilla_duration_per_batch' in index:
-                            key_for_dict = "vanilla"
+                        if 'dense_duration_per_batch' in index:
+                            key_for_dict = "dense"
                         else:
                             key_for_dict = f"{prune_name}_{prune_metric}"
                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Batch size', 'Seconds')
@@ -1680,7 +1074,7 @@ def make_vis(df_exp, df_history):
             temp = copy.deepcopy(df_history[df_name]) 
             '''
                 1. norm_across_other_dims distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
-                2. vanilla_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
+                2. dense_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
                 3. pruned_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
                 2. pq_indices for each prune layer (y is pq_indices, x is all the layers, 1 for each prune_hyper)
                 3. pruned_ratio for each prune layer (y is pruned_ratio, x is all the layers, 1 for each prune_hyper)
@@ -1706,7 +1100,7 @@ def make_vis(df_exp, df_history):
 
                     index_list = index.split('/')
                     temp_key = index_list[-1]
-                    if 'vanilla_hist_mean' in index:
+                    if 'dense_hist_mean' in index:
                         if not is_valid_layer_for_detailed_info(index, model_name):
                             continue
                         # temp_key = index_list[-1]
@@ -1762,13 +1156,13 @@ def make_vis(df_exp, df_history):
                         plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
                 
 
-                    if 'vanilla_duration_per_batch' in index or 'pruned_duration_per_batch' in index:
+                    if 'dense_duration_per_batch' in index or 'pruned_duration_per_batch' in index:
                         fig_name = '_'.join([data_name, model_name, task_name, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', 'time_cost_per_batch'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = batch_size
                         y = row.tolist()[0]
-                        if 'vanilla_duration_per_batch' in index:
-                            key_for_dict = "vanilla"
+                        if 'dense_duration_per_batch' in index:
+                            key_for_dict = "dense"
                         else:
                             key_for_dict = "pruned"
                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Batch size', 'Seconds')

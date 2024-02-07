@@ -66,7 +66,7 @@ def runExperiment():
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     test(data_loader['test'], model, model_prof, copy.deepcopy(metric), test_logger)
-    vanilla_info_list, vanilla_duration = get_model_profile('vanilla', model_prof)
+    dense_info_list, dense_duration = get_model_profile('dense', model_prof)
 
 
     model, tokenizer = make_model(cfg['model_name'])
@@ -82,9 +82,9 @@ def runExperiment():
     test(data_loader['test'], model, model_prof, copy.deepcopy(metric), test_logger)
     pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
     
-    # print('vanilla_info_list', vanilla_info_list[0], vanilla_info_list[1])
+    # print('dense_info_list', dense_info_list[0], dense_info_list[1])
     batch_num = len(data_loader['test'])
-    summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, pruned_duration, batch_num, test_logger)
+    summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, batch_num, test_logger)
     # result = resume(os.path.join(checkpoint_path, 'model'))
 
     # thread lock bug

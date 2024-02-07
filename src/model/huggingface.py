@@ -93,12 +93,14 @@ def make_hf_model(model_name, sub_model_name=None):
         if 'llama' in model_name:
             # "Training Llama in float16 is not recommended and known to produce nan, as such the model should be trained in bfloat16.""
             model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'],  torch_dtype=torch.float16, device_map=device_map)
-            # cache_dir=cfg['cache_model_path']
+            # to fit flap and simplify for flops comparision
+
         else:
             model = AutoModelForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'],
                                                     device_map=device_map)
     else:
         raise ValueError('Not valid task name')
+    
     if any(k in cfg['model_name_or_path'] for k in ("gpt", "opt", "bloom", "llama")):
         padding_side = "left"
         # produce nan if we pad input text to the left
@@ -131,6 +133,35 @@ def make_hf_model(model_name, sub_model_name=None):
         model.config.pad_token_id = model.config.eos_token_id
     cfg['pad_token_id'] = tokenizer.pad_token_id    
 
+    # to fit flap and simplify for flops comparision
+    if 'llama-2-70b' in cfg['model_name']:
+        with torch.no_grad():
+            model.train(False)
+            hidden_size = model.config.hidden_size
+            num_heads = model.config.num_attention_heads
+            num_key_value_heads = model.config.num_key_value_heads
+            head_dim = model.config.hidden_size // num_heads
+            num_key_value_groups = num_heads // num_key_value_heads
+
+            layers = model.model.layers
+            for layer in layers:                        
+                if layer.self_attn.k_proj.weight.data.size(0) == num_key_value_heads * head_dim:
+                    temp_weight_data = layer.self_attn.k_proj.weight.data.repeat_interleave(num_key_value_groups, dim=0, output_size=num_heads * head_dim)
+                    temp_weight_data = temp_weight_data.type(layer.self_attn.k_proj.weight.data.dtype)
+                    layer.self_attn.k_proj = nn.Linear(hidden_size, num_heads * head_dim, bias=model.config.attention_bias)
+                    layer.self_attn.k_proj.weight = nn.Parameter(temp_weight_data)
+                    layer.self_attn.k_proj.cal_total_flops = True
+                if layer.self_attn.v_proj.weight.data.size(0) == num_key_value_heads * head_dim:
+                    temp_weight_data = layer.self_attn.v_proj.weight.data.repeat_interleave(num_key_value_groups, dim=0, output_size=num_heads * head_dim)
+                    temp_weight_data = temp_weight_data.type(layer.self_attn.v_proj.weight.data.dtype)
+                    layer.self_attn.v_proj = nn.Linear(hidden_size, num_heads * head_dim, bias=model.config.attention_bias)
+                    layer.self_attn.v_proj.weight = nn.Parameter(temp_weight_data)
+                    layer.self_attn.v_proj.cal_total_flops = True
+                    
+                del temp_weight_data
+                torch.cuda.empty_cache()
+                layer.self_attn.num_key_value_heads = num_heads
+                layer.self_attn.num_key_value_groups = 1
     # for attr in dir(model):
     #     if not attr.startswith('__'):
     #         print(f"{attr} = {getattr(model, attr)}")

@@ -249,18 +249,26 @@ class Linear(nn.Linear, EwiLayer):
                 inp = inp.reshape((-1, inp.shape[-1]))
             inp = inp.t()   # (dim, seqlen * batch_size)
 
+            cur_device = inp.device
             old_baseline_inp = self.baseline_inp
             self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
             self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
+
+            self.baseline_inp = self.baseline_inp.to(cur_device)
+            old_baseline_inp = old_baseline_inp.to(cur_device)
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
                 inp = inp.type(torch.float32)
+                self.scaler_inp = self.scaler_inp.to(cur_device)
                 self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
                 self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
                 # print('self.scaler_inp', self.scaler_inp)
             elif self.prune_metric == "flap":
                 if self.nsamples == 0:
-                    self.fluc_inp = 0
+                    # self.fluc_inp = torch.tensor(0, dtype=torch.float32, device=cur_device)
+                    # self.fluc_inp = torch.zeros((1), device=cur_device)
+                    pass
                 else:
+                    self.fluc_inp = self.fluc_inp.to(cur_device)
                     self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
                     self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
                     # print('inp', inp)

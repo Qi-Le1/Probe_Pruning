@@ -402,14 +402,20 @@ class LlamaAttention(nn.Module):
                 f" and `num_heads`: {self.num_heads})."
             )
         self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.head_dim, bias=config.attention_bias)
+        
+        
         self.k_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias)
         self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias)
+        
+        
         self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.hidden_size, bias=config.attention_bias)
 
         self.q_proj.cal_total_flops = True
         self.k_proj.cal_total_flops = True
         self.v_proj.cal_total_flops = True
         self.o_proj.cal_total_flops = True
+
+        self.modify_kv_for_llama_2_70b = True
         # print("cfg['cust_tgt_modules']", cfg['cust_tgt_modules'])
         # if 'probe' in cfg['prune_name'] and 'each' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
         #     self.head_dim = int((1 - cfg['prune_hyper']) * self.head_dim)
@@ -474,6 +480,27 @@ class LlamaAttention(nn.Module):
             warnings.warn(
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
+        # if 'llama-2-70b' in cfg['model_name'] and self.modify_kv_for_llama_2_70b == True:             
+        #     if self.k_proj.weight.data.size(0) == self.num_key_value_heads * self.head_dim:
+        #         temp_weight_data = self.k_proj.weight.data.repeat_interleave(self.num_key_value_groups, dim=0, output_size=self.num_heads * self.head_dim)
+        #         temp_weight_data = temp_weight_data.type(self.k_proj.weight.data.dtype)
+        #         self.k_proj = nn.Linear(self.hidden_size, self.num_heads * self.head_dim, bias=False)
+        #         self.k_proj.weight = nn.Parameter(temp_weight_data)
+        #         self.k_proj.cal_total_flops = True
+        #         del temp_weight_data
+        #         torch.cuda.empty_cache()
+        #     if self.v_proj.weight.data.size(0) == self.num_key_value_heads * self.head_dim:
+        #         temp_weight_data = self.v_proj.weight.data.repeat_interleave(self.num_key_value_groups, dim=0, output_size=self.num_heads * self.head_dim)
+        #         temp_weight_data = temp_weight_data.type(self.v_proj.weight.data.dtype)
+        #         self.v_proj = nn.Linear(self.hidden_size, self.num_heads * self.head_dim, bias=False)
+        #         self.v_proj.weight = nn.Parameter(temp_weight_data)
+        #         self.v_proj.cal_total_flops = True
+        #         del temp_weight_data
+        #         torch.cuda.empty_cache()
+
+        #     self.num_key_value_heads = self.num_heads
+        #     self.num_key_value_groups = 1
+        #     self.modify_kv_for_llama_2_70b = False
 
         if 'probe' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
 
@@ -496,6 +523,9 @@ class LlamaAttention(nn.Module):
             key_states = self.k_proj(comp_across_bsz, cal_attn_probe_out_dim_metric='k_proj' in cfg['cust_tgt_modules'])
             value_states = self.v_proj(comp_across_bsz, cal_attn_probe_out_dim_metric='v_proj' in cfg['cust_tgt_modules'])
 
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
+
             # only consider qk effect, v and o remain the same
             # if 'onlyqk' in cfg['prune_name']:
             if 'wandasp' in cfg['prune_metric']:
@@ -505,7 +535,7 @@ class LlamaAttention(nn.Module):
             elif 'probe' in cfg['prune_metric']:
                 probe_qk_out_dim_metric = torch.sqrt((torch.sum(torch.pow(query_states, 2), dim=(0, 1)).reshape((1, 1, -1)) * torch.pow(key_states, 2)).sum(axis=(0, 1)))
 
-            probe_qk_out_dim_indices, probe_qk_out_dim_indices_for_rope, qk_num_heads, qk_head_dim  = self.pruning_module.cal_probe_attn_metric(probe_qk_out_dim_metric, self.num_heads, self.head_dim, cfg['qk_proj_prune'])
+            probe_qk_out_dim_indices, probe_qk_out_dim_indices_for_rope, qk_num_heads, qk_head_dim = self.pruning_module.cal_probe_attn_metric(probe_qk_out_dim_metric, self.num_heads, self.head_dim, cfg['qk_proj_prune'])
             q_num_heads, k_num_heads = qk_num_heads, qk_num_heads
             q_head_dim, k_head_dim = qk_head_dim, qk_head_dim
 
@@ -525,9 +555,9 @@ class LlamaAttention(nn.Module):
                 key_states = key_states.view(bsz, q_len, k_num_heads, k_head_dim).transpose(1, 2)
             else:
                 query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-                key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+                key_states = key_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
             
-            value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+            value_states = value_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
 
             kv_seq_len = key_states.shape[-2]
             # if past_key_value is not None:
@@ -539,8 +569,8 @@ class LlamaAttention(nn.Module):
             else:
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
-            key_states = repeat_kv(key_states, self.num_key_value_groups)
-            value_states = repeat_kv(value_states, self.num_key_value_groups)
+            # key_states = repeat_kv(key_states, self.num_key_value_groups)
+            # value_states = repeat_kv(value_states, self.num_key_value_groups)
 
             # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
             if 'conditionqk' in cfg['prune_name']:
@@ -576,6 +606,7 @@ class LlamaAttention(nn.Module):
                         f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {probe_attn_mask.size()}"
                     )
                 attn_weights = attn_weights + probe_attn_mask
+                attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
                 # print('attnweightsaftermask', attn_weights, attn_weights.shape, flush=True)
 
             # upcast attention to fp32
@@ -703,7 +734,7 @@ class LlamaAttention(nn.Module):
                         f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                     )
                 attn_weights = attn_weights + attention_mask
-
+                attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
             # upcast attention to fp32
             # attn_weights: bsz, self.num_heads, q_len, q_len
             # attn_weights: 1, self.num_heads, q_len, q_len
@@ -808,7 +839,7 @@ class LlamaAttention(nn.Module):
                         f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                     )
                 attn_weights = attn_weights + attention_mask
-
+                attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
             # upcast attention to fp32
             # attn_weights: bsz, self.num_heads, q_len, q_len
             # attn_weights: 1, self.num_heads, q_len, q_len

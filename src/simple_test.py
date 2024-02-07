@@ -32,6 +32,10 @@ import torch
 import torch.nn as nn
 from transformers import AutoTokenizer
 
+
+a = np.std([5], axis=0).item()
+
+
 # Load a pre-trained tokenizer
 tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
 
@@ -293,16 +297,16 @@ a = 5
 # b = a.split('-')
 
 # print(b)
-# sub_vanilla_info = ['', 0, 3.74174427986145, 124647170, 0,'zzzz']
+# sub_dense_info = ['', 0, 3.74174427986145, 124647170, 0,'zzzz']
 # NUM_PARAMETER_UNIT = (1000000, 'Million')
 # FLOPS_UNIT = (1000000, 'Million')
 # # already in seconds unit
 # TIME_UNIT = (1, 's')
 # print(FLOPS_UNIT[0])
-# print(f"VANILLA: {sub_vanilla_info[0]} - {sub_vanilla_info[1]/FLOPS_UNIT[0]:.2f}" , flush=True)
+# print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/FLOPS_UNIT[0]:.2f}" , flush=True)
 
-# print(f"VANILLA: {sub_vanilla_info[0]} - {sub_vanilla_info[1]/{FLOPS_UNIT[0]}:.2f} {FLOPS_UNIT[1]}Flops - {sub_vanilla_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} \
-#               - {sub_vanilla_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_vanilla_info[4]}", flush=True)
+# print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/{FLOPS_UNIT[0]}:.2f} {FLOPS_UNIT[1]}Flops - {sub_dense_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} \
+#               - {sub_dense_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_dense_info[4]}", flush=True)
 
 # a = torch.tensor([1,2,3,4])
 

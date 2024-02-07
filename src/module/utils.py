@@ -71,62 +71,62 @@ def get_model_profile(tag, model_prof):
     return copy.deepcopy(info_list), duration
 
 
-def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, pruned_duration, batch_num, logger):
+def summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, batch_num, logger):
 
     print('Summary ---------\n')
-    vanilla_total_flops = sum([vanilla_info_list[i][1] for i in range(len(vanilla_info_list))])
+    dense_total_flops = sum([dense_info_list[i][1] for i in range(len(dense_info_list))])
     pruned_total_flops = sum([pruned_info_list[i][1] for i in range(len(pruned_info_list))])
     
     info = {
-        'vanilla_total_FLOPs': vanilla_total_flops,
+        'dense_total_FLOPs': dense_total_flops,
         'Pruned_total_FLOPs': pruned_total_flops,
-        'vanilla_duration': vanilla_duration,
-        'vanilla_duration_per_batch': vanilla_duration/batch_num,
+        'dense_duration': dense_duration,
+        'dense_duration_per_batch': dense_duration/batch_num,
         'pruned_duration': pruned_duration,
         'pruned_duration_per_batch': pruned_duration/batch_num,
-        'pruned_duration_cost_per_batch': (pruned_duration - vanilla_duration)/(batch_num),
-        'total_FLOPs_ratio': pruned_total_flops/(vanilla_total_flops+1e-6),
+        'pruned_duration_cost_per_batch': (pruned_duration - dense_duration)/(batch_num),
+        'total_FLOPs_ratio': pruned_total_flops/(dense_total_flops+1e-6),
     }
     total_target_used_params = 0
     total_target_params = 0
 
-    pruned_layer_vanilla_total_flops = 0
+    pruned_layer_dense_total_flops = 0
     pruned_layer_pruned_total_flops = 0
-    for i in range(len(vanilla_info_list)):
-        sub_vanilla_info = vanilla_info_list[i]
+    for i in range(len(dense_info_list)):
+        sub_dense_info = dense_info_list[i]
         sub_pruned_info = pruned_info_list[i+1]
         if sub_pruned_info[-1] == True:
-            info[f"{sub_pruned_info[-2]}_pruned_FLOPs_ratio"] = sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6)
+            info[f"{sub_pruned_info[-2]}_pruned_FLOPs_ratio"] = sub_pruned_info[1]/(sub_dense_info[1] + 1e-6)
             # [name, module.__flops__, module.__duration__, module.__params__, module.__macs__, type(module)]
             print('sub_pruned_info', sub_pruned_info)
-            print('sub_vanilla_info', sub_vanilla_info, sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6))
-            # total_target_used_params += sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6) * sub_vanilla_info[3]
-            # total_target_params += sub_vanilla_info[3]
-            pruned_layer_vanilla_total_flops += sub_vanilla_info[1]
+            print('sub_dense_info', sub_dense_info, sub_pruned_info[1]/(sub_dense_info[1] + 1e-6))
+            # total_target_used_params += sub_pruned_info[1]/(sub_dense_info[1] + 1e-6) * sub_dense_info[3]
+            # total_target_params += sub_dense_info[3]
+            pruned_layer_dense_total_flops += sub_dense_info[1]
             pruned_layer_pruned_total_flops += sub_pruned_info[1]
         print('----\n')
-        print(f"VANILLA: {sub_vanilla_info[0]} - {sub_vanilla_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_vanilla_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_vanilla_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_vanilla_info[4]}", flush=True)
+        print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_dense_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_dense_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_dense_info[4]}", flush=True)
         print(f"PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_pruned_info[4]}", flush=True)
     
     # if 'unstruct' in cfg['prune_name']:
     #     info['FLOPs_for_pruned_layers'] = cfg['prune_hyper']
     # else:
-    info['FLOPs_ratio_for_pruned_layers'] = pruned_layer_pruned_total_flops / (pruned_layer_vanilla_total_flops + 1e-6)
-    info['FLOPs_ratio_for_all_layers'] = pruned_total_flops / (vanilla_total_flops + 1e-6)
+    info['FLOPs_ratio_for_pruned_layers'] = pruned_layer_pruned_total_flops / (pruned_layer_dense_total_flops + 1e-6)
+    info['FLOPs_ratio_for_all_layers'] = pruned_total_flops / (dense_total_flops + 1e-6)
     
 
-    # vanilla_total_inference_time = sum([vanilla_info_list[i][2] for i in range(len(vanilla_info_list))])
+    # dense_total_inference_time = sum([dense_info_list[i][2] for i in range(len(dense_info_list))])
     # pruned_total_inference_time = sum([pruned_info_list[i][2] for i in range(len(pruned_info_list))])
-    print(f"Vanilla inference time ({TIME_UNIT[1]}): ", vanilla_duration/TIME_UNIT[0], flush=True)
-    print(f"Vanilla inference time ({TIME_UNIT[1]}) per batch: ", vanilla_duration/TIME_UNIT[0]/batch_num, flush=True)
+    print(f"dense inference time ({TIME_UNIT[1]}): ", dense_duration/TIME_UNIT[0], flush=True)
+    print(f"dense inference time ({TIME_UNIT[1]}) per batch: ", dense_duration/TIME_UNIT[0]/batch_num, flush=True)
     print(f"Pruned inference time ({TIME_UNIT[1]}): ", pruned_duration/TIME_UNIT[0], flush=True)
     print(f"Pruned inference time ({TIME_UNIT[1]}) per batch: ", pruned_duration/TIME_UNIT[0]/batch_num, flush=True)
-    print(f"Inference time diff ({TIME_UNIT[1]}): ", (pruned_duration - vanilla_duration), flush=True)
-    print(f"Inference time diff ({TIME_UNIT[1]}) per batch: ", (pruned_duration - vanilla_duration)/(batch_num), flush=True)
+    print(f"Inference time diff ({TIME_UNIT[1]}): ", (pruned_duration - dense_duration), flush=True)
+    print(f"Inference time diff ({TIME_UNIT[1]}) per batch: ", (pruned_duration - dense_duration)/(batch_num), flush=True)
 
-    print(f"Vanilla FLOPs ({FLOPS_UNIT[1]}): ", vanilla_total_flops/FLOPS_UNIT[0], flush=True)
+    print(f"dense FLOPs ({FLOPS_UNIT[1]}): ", dense_total_flops/FLOPS_UNIT[0], flush=True)
     print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
-    print('FLOPs_ratio_for_all_layers: ', (pruned_total_flops / (vanilla_total_flops + 1e-6)), flush=True)
+    print('FLOPs_ratio_for_all_layers: ', (pruned_total_flops / (dense_total_flops + 1e-6)), flush=True)
     print("FLOPs_ratio_for_pruned_layers", info['FLOPs_ratio_for_pruned_layers'])
     print('Summary Finished ---------\n')
     logger.append(info, 'test')
@@ -159,46 +159,46 @@ def summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, p
 #     return copy.deepcopy(info_list), duration
 
 
-# def summarize_fix_prune_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, pruned_duration, batch_num, logger):
+# def summarize_fix_prune_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, batch_num, logger):
 
 #     print('Summary ---------\n')
-#     vanilla_total_flops = sum([vanilla_info_list[i][1] for i in range(len(vanilla_info_list))])
+#     dense_total_flops = sum([dense_info_list[i][1] for i in range(len(dense_info_list))])
 #     pruned_total_flops = sum([pruned_info_list[i][1] for i in range(len(pruned_info_list))])
-#     print(f"Vanilla FLOPs ({FLOPS_UNIT[1]}): ", vanilla_total_flops/FLOPS_UNIT[0], flush=True)
+#     print(f"dense FLOPs ({FLOPS_UNIT[1]}): ", dense_total_flops/FLOPS_UNIT[0], flush=True)
 #     print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
-#     print('Pruning FLOPs reduction percentage (%): ', ((vanilla_total_flops - pruned_total_flops) / (vanilla_total_flops + 1e-6)) * 100, flush=True)
+#     print('Pruning FLOPs reduction percentage (%): ', ((dense_total_flops - pruned_total_flops) / (dense_total_flops + 1e-6)) * 100, flush=True)
 
-#     # vanilla_total_inference_time = sum([vanilla_info_list[i][2] for i in range(len(vanilla_info_list))])
+#     # dense_total_inference_time = sum([dense_info_list[i][2] for i in range(len(dense_info_list))])
 #     # pruned_total_inference_time = sum([pruned_info_list[i][2] for i in range(len(pruned_info_list))])
-#     print(f"Vanilla inference time ({TIME_UNIT[1]}): ", vanilla_duration/TIME_UNIT[0], flush=True)
-#     print(f"Vanilla inference time ({TIME_UNIT[1]}) per batch: ", vanilla_duration/TIME_UNIT[0]/batch_num, flush=True)
+#     print(f"dense inference time ({TIME_UNIT[1]}): ", dense_duration/TIME_UNIT[0], flush=True)
+#     print(f"dense inference time ({TIME_UNIT[1]}) per batch: ", dense_duration/TIME_UNIT[0]/batch_num, flush=True)
 #     print(f"Pruned inference time ({TIME_UNIT[1]}): ", pruned_duration/TIME_UNIT[0], flush=True)
 #     print(f"Pruned inference time ({TIME_UNIT[1]}) per batch: ", pruned_duration/TIME_UNIT[0]/batch_num, flush=True)
-#     print(f"Pruning inference time cost ({TIME_UNIT[1]}): ", (pruned_duration - vanilla_duration), flush=True)
-#     print(f"Pruning inference time cost ({TIME_UNIT[1]}) per batch: ", (pruned_duration - vanilla_duration)/(batch_num), flush=True)
+#     print(f"Pruning inference time cost ({TIME_UNIT[1]}): ", (pruned_duration - dense_duration), flush=True)
+#     print(f"Pruning inference time cost ({TIME_UNIT[1]}) per batch: ", (pruned_duration - dense_duration)/(batch_num), flush=True)
 
 #     info = {
-#         'vanilla_total_FLOPs': vanilla_total_flops,
+#         'dense_total_FLOPs': dense_total_flops,
 #         'Pruned_total_FLOPs': pruned_total_flops,
-#         'vanilla_duration': vanilla_duration,
-#         'vanilla_duration_per_batch': vanilla_duration/batch_num,
+#         'dense_duration': dense_duration,
+#         'dense_duration_per_batch': dense_duration/batch_num,
 #         'pruned_duration': pruned_duration,
 #         'pruned_duration_per_batch': pruned_duration/batch_num,
-#         'pruned_duration_cost_per_batch': (pruned_duration - vanilla_duration)/(batch_num),
-#         'total_FLOPs_ratio': pruned_total_flops/(vanilla_total_flops+1e-6),
+#         'pruned_duration_cost_per_batch': (pruned_duration - dense_duration)/(batch_num),
+#         'total_FLOPs_ratio': pruned_total_flops/(dense_total_flops+1e-6),
 #     }
 
 #     total_target_used_params = 0
 #     total_target_params = 0
-#     for i in range(len(vanilla_info_list)):
-#         sub_vanilla_info = vanilla_info_list[i]
+#     for i in range(len(dense_info_list)):
+#         sub_dense_info = dense_info_list[i]
 #         sub_pruned_info = pruned_info_list[i+1]
 #         if sub_pruned_info[-1] == True:
-#             info[f"{sub_pruned_info[-2]}_pruned_FLOPs_ratio"] = sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6)
-#             total_target_used_params += sub_pruned_info[1]/(sub_vanilla_info[1] + 1e-6) * sub_pruned_info[3]
+#             info[f"{sub_pruned_info[-2]}_pruned_FLOPs_ratio"] = sub_pruned_info[1]/(sub_dense_info[1] + 1e-6)
+#             total_target_used_params += sub_pruned_info[1]/(sub_dense_info[1] + 1e-6) * sub_pruned_info[3]
 #             total_target_params += sub_pruned_info[3]
 #         print('----\n')
-#         print(f"VANILLA: {sub_vanilla_info[0]} - {sub_vanilla_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_vanilla_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_vanilla_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_vanilla_info[4]}", flush=True)
+#         print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_dense_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_dense_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_dense_info[4]}", flush=True)
 #         print(f"PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_pruned_info[4]}", flush=True)
     
 #     if 'unstruct' in cfg['prune_name']:

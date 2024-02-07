@@ -53,17 +53,17 @@ def runExperiment():
     makedir_exist_ok(result_path)
 
     cfg['epoch'] = 0 
-    vanilla_name_list = cfg['model_tag'].split('_')
+    dense_name_list = cfg['model_tag'].split('_')
     # batch size
-    vanilla_name_list[4] = '10'
+    dense_name_list[4] = '10'
     # metric
-    vanilla_name_list[6] = '0'
+    dense_name_list[6] = '0'
     # prune_name
-    vanilla_name_list[7] = 'vanilla'
+    dense_name_list[7] = 'dense'
     # cust_tgt_modules
-    vanilla_name_list[8] = 'None'
-    vanilla_res = load(os.path.join(result_path, '_'.join(vanilla_name_list)))
-    vanilla_info_list, vanilla_duration = vanilla_res['vanilla_info_list'], vanilla_res['vanilla_duration']
+    dense_name_list[8] = 'None'
+    dense_res = load(os.path.join(result_path, '_'.join(dense_name_list)))
+    dense_info_list, dense_duration = dense_res['dense_info_list'], dense_res['dense_duration']
 
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
@@ -78,19 +78,19 @@ def runExperiment():
     test(data_loader['test'], model, model_prof, metric, test_logger)
     pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
     
-    # print('vanilla_info_list', vanilla_info_list[0], vanilla_info_list[1])
+    # print('dense_info_list', dense_info_list[0], dense_info_list[1])
     batch_num = len(data_loader['test'])
-    summarize_info_list(vanilla_info_list, pruned_info_list, vanilla_duration, pruned_duration, batch_num, test_logger)
+    summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, batch_num, test_logger)
 
     # thread lock bug
     test_logger.writer = None
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
-              'vanilla_info_list': vanilla_info_list, 'pruned_info_list': pruned_info_list, \
-              'vanilla_duration': vanilla_duration, 'pruned_duration': pruned_duration, 'batch_num': batch_num}
+              'dense_info_list': dense_info_list, 'pruned_info_list': pruned_info_list, \
+              'dense_duration': dense_duration, 'pruned_duration': pruned_duration, 'batch_num': batch_num}
 
     save(result, os.path.join(result_path, cfg['model_tag']))
     return
-
+        
 def test(data_loader, model, model_prof, metric, logger):
     # print("Debug 12.01: Test logger created", flush=True)
     start_time = time.time()

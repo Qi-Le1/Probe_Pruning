@@ -105,7 +105,7 @@ def make_data_name():
         cfg['data_name'] = 'arc_challenge'
     elif cfg['data_name'] == 'arceasy':
         cfg['data_name'] = 'arc_easy'
-    if cfg['python_file'] == 'test_vanilla_harness_model.py':
+    if cfg['python_file'] == 'test_dense_harness_model.py':
         return
     if cfg['task_name'] in ['s2s', 'sc', 'clm', 'csr', 't2i']:
         data_name_dict = {

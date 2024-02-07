@@ -372,7 +372,7 @@ class HiddenRepresentationPruning(BasePruning):
         with torch.no_grad():
             h_shape = h.shape
             h_type = h.dtype
-            self.cal_repr_distribution(h, f'{self.key}_vanilla_hist')
+            self.cal_repr_distribution(h, f'{self.key}_dense_hist')
             prune_dim = (h.dim() + self.prune_dim) % h.dim()
             if layer_type == 'linear' and prune_dim != h.dim() - 1:
                 raise ValueError('Not valid prune dim')
@@ -560,7 +560,7 @@ class HiddenRepresentationPruning(BasePruning):
     #         h_shape = h.shape
     #         h_type = h.dtype
             
-    #         self.cal_repr_distribution(h, f'{self.key}_vanilla_hist')
+    #         self.cal_repr_distribution(h, f'{self.key}_dense_hist')
     #         if 'unstruct' in self.prune_name:
     #             if self.batch_integ in ['inter', 'union']:
     #                 raise ValueError('Not valid batch integration method')
