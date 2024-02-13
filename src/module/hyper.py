@@ -1,8 +1,16 @@
+import torch
 from config import cfg
 
 MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70b']
 
 def process_control():
+    print('torch version: ', torch.__version__)
+    print('cuda version: ', torch.version.cuda)
+    print('cudnn version: ', torch.backends.cudnn.version())
+
+    cfg['cudatoolkit_version'] = float(torch.version.cuda)
+    cfg['cudnn_version'] = float(torch.backends.cudnn.version())
+    cfg['gpu_type'] = 'A100'
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
@@ -13,17 +21,17 @@ def process_control():
     cfg['prune_name'] = prune_name_list[0]
 
     cfg['prune_metric'] = None
-    if 'wandasp' in cfg['prune_name']:
-        cfg['prune_metric'] = 'wandasp'
-    elif 'flap' in cfg['prune_name']:
-        cfg['prune_metric'] = 'flap'
-    elif 'probe' in cfg['prune_name']:
+    if 'probe' in cfg['prune_name']:
         prune_name_sub_list = cfg['prune_name'].split('-')
         cfg['prune_metric'] = prune_name_sub_list[1]
          # fill or each
         cfg['qk_proj_prune'] = prune_name_sub_list[2]  
         # fill or each
         cfg['vo_proj_prune'] = prune_name_sub_list[3]
+    elif 'wandasp' in cfg['prune_name']:
+        cfg['prune_metric'] = 'wandasp'
+    elif 'flap' in cfg['prune_name']:
+        cfg['prune_metric'] = 'flap'
     elif 'testourmetric' in cfg['prune_name']:
         cfg['prune_metric'] = 'testourmetric'
     
@@ -37,9 +45,9 @@ def process_control():
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
         cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
     elif cfg['cust_tgt_modules'] == ['default']:
-        if cfg['fix_pruned_model'] == True:
+        if cfg['python_file'] == 'test_fix_pruned_model.py':
             cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING[cfg['model_name']]
-        elif cfg['fix_pruned_model'] == False:
+        elif cfg['python_file'] == 'test_model.py':
             cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
 
     cfg['prune_dim'] = -1

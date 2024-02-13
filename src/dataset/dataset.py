@@ -254,7 +254,10 @@ def make_data_collate(collate_mode, tokenizer=None):
 
 def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sampler=None):
     data_loader = {}
-    cfg['num_steps'] = {}
+    if 'num_steps' not in cfg:
+        cfg['num_steps'] = {}
+    if 'dataset_size' not in cfg:
+        cfg['dataset_size'] = {}
     for k in dataset:
         batch_size_ = cfg[tag]['batch_size'][k] if batch_size is None else batch_size[k]
         shuffle_ = cfg[tag]['shuffle'][k] if shuffle is None else shuffle[k]

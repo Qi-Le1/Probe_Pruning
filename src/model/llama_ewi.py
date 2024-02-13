@@ -241,7 +241,6 @@ class Linear(nn.Linear, EwiLayer):
         
     def get_pre_hook(self):
         def add_batch(inp, out):
-            print('add_batch')
             if len(inp.shape) == 2:
                 inp = inp.unsqueeze(0)
             batch_size = inp.shape[0]
@@ -251,19 +250,21 @@ class Linear(nn.Linear, EwiLayer):
             inp = inp.t()   # (dim, seqlen * batch_size)
 
             cur_device = inp.device
-            old_baseline_inp = self.baseline_inp
-            self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
-            self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-
-            self.baseline_inp = self.baseline_inp.to(cur_device)
-            old_baseline_inp = old_baseline_inp.to(cur_device)
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+                # print('self.key', self.key, self.scaler_inp)
                 inp = inp.type(torch.float32)
-                self.scaler_inp = self.scaler_inp.to(cur_device)
-                self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
-                self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
+                if self.scaler_inp is not None:
+                    self.scaler_inp = self.scaler_inp.to(cur_device)
+                    self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
+                    self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
                 # print('self.scaler_inp', self.scaler_inp)
             elif self.prune_metric == "flap":
+                old_baseline_inp = self.baseline_inp
+                self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
+                self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
+
+                self.baseline_inp = self.baseline_inp.to(cur_device)
+                old_baseline_inp = old_baseline_inp.to(cur_device)
                 if self.nsamples == 0:
                     # self.fluc_inp = torch.tensor(0, dtype=torch.float32, device=cur_device)
                     # self.fluc_inp = torch.zeros((1), device=cur_device)
@@ -281,7 +282,6 @@ class Linear(nn.Linear, EwiLayer):
                     # print('coeff', (self.nsamples - 1) / (self.nsamples + batch_size - 1))
 
             self.nsamples += batch_size
-
         return add_batch
 
     def free(self):
@@ -300,21 +300,7 @@ class Linear(nn.Linear, EwiLayer):
         result = F.linear(x, self.weight, bias=self.bias)
         
         # self.pruning_module.cal_repr_distribution(pruned_h, f'{self.key}_pruned_hist')
-        # result = result.to(previous_dtype)
-
-        # Start the timer
-        start_time = time.time()
-
-        # The line of code you want to measure
         result = result.to(previous_dtype)
-
-        # Stop the timer
-        end_time = time.time()
-
-        # Calculate the elapsed time
-        elapsed_time = end_time - start_time
-
-        print(f"Time spent on the line: {elapsed_time} seconds")
         return result
     
 

@@ -108,7 +108,8 @@ def runExperiment():
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     test(data_loader['test'], model, model_prof, metric, test_logger)
     dense_info_list, dense_duration = get_model_profile('dense', model_prof)
-
+    print('dense_info_list', dense_info_list)
+    print('dense_duration', dense_duration)
     # thread lock bug
     test_logger.writer = None
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
@@ -123,7 +124,6 @@ def test(data_loader, model, model_prof, metric, logger):
     start_time = time.time()
     with torch.no_grad():
         model_prof.start_profile()
-        
         model.train(False)
         print("Debug 12.011: Test logger created", flush=True)
         for i, input in enumerate(data_loader):

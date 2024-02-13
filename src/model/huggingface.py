@@ -17,6 +17,7 @@ from module import MULTIGPUS_MODEL_NAME_LIST, TRANSFORMERS_MODELS_OUT_TARGET_MOD
 
 def make_hf_model(model_name, sub_model_name=None):
 
+
     if model_name in MULTIGPUS_MODEL_NAME_LIST:
         device_map = "auto"
         # low_cpu_mem_usage = True
@@ -25,8 +26,9 @@ def make_hf_model(model_name, sub_model_name=None):
         if 'llama' in model_name:
             match = re.search(r'(\d+)b', model_name)
             number_before_b = match.group(1)
-            approximate_gpu_memory_gb = int(number_before_b) * 2 + cfg['batch_size'] * cfg['seq_len'] * 11000 * 4 / 1024 / 1024 / 1024
-            if approximate_gpu_memory_gb > 48:
+            approximate_gpu_memory_gb = int(number_before_b) * 2 + cfg['batch_size'] * cfg['seq_len'] * 11000 * 8 / 1024 / 1024 / 1024 + 5
+            print('approximate_gpu_memory_gb', approximate_gpu_memory_gb)
+            if approximate_gpu_memory_gb > 40:
                 device_map = "auto"
                 
         # low_cpu_mem_usage = False
@@ -171,6 +173,7 @@ def make_hf_model(model_name, sub_model_name=None):
     #             print(f"model.{attr} = {getattr(model.model, attr)}")
     
     # print('model.model.layers', model.model.layers)
+    model.config.use_cache = False
     print('model.config', model.config)
     print('padding_side', padding_side)
     return model, tokenizer

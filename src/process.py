@@ -45,22 +45,120 @@ def make_controls(control_name):
 def make_control_list(file):
     controls = []
     if file == 'wikitext-probe':
-        pass
-    elif file == 'wikitext-baseline':
-        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
-                    ['down-proj', 'o-proj+down-proj']]]
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-fill-each', 'mag-probe-fill-each-delseq'],
+                ['q-proj+k-proj+v-proj+o-proj']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['wikitext-2v1'], [ 'llama-2-70b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
-        #         ['o-proj+down-proj']]]
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probembsz-fill-each-delseq'],
+                    ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probe-fill-each', 'mag-probembsz-fill-each-delseq'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None', 'mag-probembsz-None-None', 'mag-probembszmseq-None-None'],
+                    ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each-onlyvo', 'mag-probembsz-fill-each-delseq-onlyvo'],
+                ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembszwandasp-fill-each', 'mag-probembszwandasp-fill-each-delseq'],
+                ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0', '0.1', '0.2', '0.3', '0.4', '0.5'], ['pq-probe-None-None-low', 'pq-probembsz-None-None-low', 'pq-probembszmseq-None-None-low'],
+                    ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0','0.1', '0.2', '0.3', '0.4', '0.5'], ['pq-probembsz-fill-fill-low'],
+                ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probeoptim-fill-each'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.6', '0.7', '0.8', '0.9', '0.95'], ['mag-probeoptim-fill-each-onlyvo'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.6', '0.7', '0.8', '0.9', '0.95'], ['mag-probeoptim-None-None'],
+                ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0','0.1', '0.2', '0.3', '0.4', '0.5'], ['pq-probembszwandasp-fill-fill-low'],
+        #         ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probekeepseq-None-None', 'mag-probekeepseqmbsz-None-None'],
+        #             ['gate-proj+up-proj+down-proj']]]
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
+
+    elif file == 'wikitext-baseline':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
+                    ['o-proj','down-proj', 'o-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
+                    ['o-proj','down-proj', 'o-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp-maintain+128', 'mag-flap-maintain+128'],
+                    ['o-proj', 'down-proj', 'o-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp-cascadeattn+128', 'mag-flap-cascadeattn+128'],
+                ['o-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+
     elif file == 'zeroshot-probe':
-        pass
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None'],
+                    ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-fill-each', 'mag-probe-fill-each-delseq'],
+                ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probembsz-fill-each-delseq'],
+                    ['q-proj+k-proj+v-proj+o-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probe-fill-each', 'mag-probembsz-fill-each-delseq'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
     elif file == 'zeroshot-baseline':
         control_name = [[['boolq', 'piqa', 'arc-e', 'arc-c', 'hellaswag', 'winogrande', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], [ 'mag-wandasp+128','mag-flap+128'],
                     ['o-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], [ 'mag-wandasp+128','mag-flap+128'],
+                    ['o-proj+down-proj', 'o-proj', 'down-proj']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     return controls
@@ -68,12 +166,12 @@ def make_control_list(file):
 def make_dense_controls(file):
     controls = []
     if file == 'dense':
-        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'llama-2-70b'], ['clm'], ['10'], ['128'], ['0'], [f'dense'],
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0'], [f'dense'],
                         ['None']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b', 'llama-2-13b', 'llama-2-70b'], ['csr'], ['10'], ['128'], ['0'], ['dense'],
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b', 'llama-2-13b'], ['csr'], ['10'], ['128'], ['0'], ['dense'],
                         ['None']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
@@ -283,11 +381,11 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
         if exp_name not in extracted_processed_result:
             extracted_processed_result[exp_name] = defaultdict()
         
-        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = np.round(processed_result['mean'], 2)
-        extracted_processed_result[exp_name]['{}_std'.format(metric_name)] = np.round(processed_result['std'], 2)
+        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = np.round(processed_result['mean'], 3)
+        extracted_processed_result[exp_name]['{}_std'.format(metric_name)] = np.round(processed_result['std'], 3)
 
-        extracted_processed_result[exp_name]['{}_mean_of_max'.format(metric_name)] = np.round(processed_result['mean_of_max'], 2)
-        extracted_processed_result[exp_name]['{}_std_of_max'.format(metric_name)] = np.round(processed_result['std_of_max'], 2)
+        extracted_processed_result[exp_name]['{}_mean_of_max'.format(metric_name)] = np.round(processed_result['mean_of_max'], 3)
+        extracted_processed_result[exp_name]['{}_std_of_max'.format(metric_name)] = np.round(processed_result['std_of_max'], 3)
     else:
         for k, v in processed_result.items():
             extract_processed_result(extracted_processed_result, v, control + [k])
@@ -411,11 +509,11 @@ def make_vis(df_exp, df_history):
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
             color[f"{name}_{hyper}"] = color_patterns.get(hyper, 'orange')
 
-    backup_color_set = {'orange', 'green', 'red', 'purple', 'black', 'brown', 'blue', 'pink', 'teal','grey', 'cyan', 'magenta', 'yellow', 'indigo', 'silver', 'gold', 'maroon', 'lime', 'navy', 'olive', 'coral', 'steelblue'}
+    backup_color_set = {'orange', 'green', 'red', 'purple', 'black', 'brown', 'blue', 'pink', 'teal','grey', 'cyan', 'magenta', 'yellow', 'indigo', 'silver', 'gold', 'seagreen', 'maroon', 'olive', 'lime', 'crimson', 'navy', 'olive', 'coral', 'steelblue'}
     backup_linestyle_set = {(0, (3, 10, 1, 10)), (0, (3, 1, 2, 1)), '-.', (1, (5, 5)), (0, (1, 10)), (0, (5, 5, 4)), (6, (1, 1, 1, 1)), (0, (1, 1, 10)), (0, (2, 2, 2)), (5, (5, 1)), (10, (5, 1)), (10, (5, 3)),
-                             (0, (1, 1)), '-.', '--', (2, (3, 5, 1, 5)), (1, (4, 10)), (3, (1, 1)), (3, (5, 10, 1)), (2, (5, 2, 1, 2)), (4, (5, 5, 1, 5)), (3, (1, 1, 1, 1)),(0, (1, 1, 15)), (0, (1, 2, 10)) }
+                             (0, (1, 1)), '-.', '--', (2, (3, 5, 1, 5)), (1, (4, 10)), (3, (1, 1)), (3, (5, 10, 1)), (2, (5, 2, 1, 2)),(3, (5, 2, 1, 2)), (4, (5, 5, 1, 5)), (3, (1, 1, 1, 1)),(0, (1, 1, 15)), (0, (1, 2, 10)) }
     # backup_marker_set = {'o', 'v', 's', 'p', '*', 'h', 'H', 'D', 'd', 'P', 'X', '^', '<', '>', '1', '2', '3', '4', '8', 'B', 'C', 'E', 'F'}
-    backup_marker_set = {'o', 'v', 's', 'p', '*', 'h', 'H', 'D', 'd', 'P', 'X', '^', '<', '>', '1', '2', '3', '4', '+', '_', '|', 'x'}
+    backup_marker_set = {'o', 'v', 's', 'p', '*', 'h', 'H', 'D', 'd', 'P', 'X', '^', '<', '>', '1', '2', '3', '4', '+', '_', '|', 'x', '1', '2', '3', '4', '.', ','}
 
     color['Proposed'] = 'orange'
     color['State-of-the-art'] = 'green'
@@ -496,8 +594,10 @@ def make_vis(df_exp, df_history):
             backup_color_set.remove(fig_color)
             backup_linestyle_set.remove(fig_linestyle)
             backup_marker_set.remove(fig_marker)
-        # if label_exists(plt, key_for_dict):
-        #     plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
+        if label_exists(plt, key_for_dict):
+            print('label exists', key_for_dict)
+            return
+            # plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
         # else:
         #     plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle, label=key_for_dict)
             # plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
@@ -675,6 +775,8 @@ def make_vis(df_exp, df_history):
         df_name_list = df_name.split('_')
         performance_vs_total_FLOPs_ratio = [None, None, None]
         performance_vs_prunedflops = [None, None, None]
+        dense_time_vs_total_FLOPs_ratio = [None, None, None]
+        prune_time_vs_total_FLOPs_ratio = [None, None, None]
         if len(df_name_list) == 8:
             data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules = df_name_list
             performance_metric_max = 100
@@ -686,6 +788,15 @@ def make_vis(df_exp, df_history):
                 nsamples = 'fulldata'
             else:
                 nsamples = prune_name_list[1]
+                prune_name = prune_name + '+' + nsamples
+                # align with probing method
+                if 'llama' in model_name:
+                    if 'o-proj+down-proj' in cust_tgt_modules:
+                        cust_tgt_modules = 'default'
+                    elif 'o-proj' in cust_tgt_modules:
+                        cust_tgt_modules = 'q-proj+k-proj+v-proj+o-proj'
+                    elif 'down-proj' in cust_tgt_modules:
+                        cust_tgt_modules = 'gate-proj+up-proj+down-proj'
             # if isinstance(df_history[df_name], list):
             #     # Handle the case where it's a list
             #     temp = df_history[df_name]
@@ -988,7 +1099,7 @@ def make_vis(df_exp, df_history):
                         
                         if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
                             print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, nsamples, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_pruned_layers'])
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_pruned_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_prunedflops[2]
                             y = performance_vs_prunedflops[0]
@@ -1056,16 +1167,42 @@ def make_vis(df_exp, df_history):
                             performance_vs_prunedflops = [None, None, None]
 
 
-                    if 'dense_duration_per_batch' in index or 'pruned_duration_per_batch' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules, 'FIG:', 'time_cost_per_batch'])
-                        fig[fig_name] = plt.figure(fig_name)
-                        x = prune_hyper
-                        y = row.tolist()[0]
-                        if 'dense_duration_per_batch' in index:
+                    if 'dense_duration_per_sample' or 'FLOPs_ratio_for_all_layers' in index:
+                        if 'dense_duration_per_sample' in index:
+                            dense_time_vs_total_FLOPs_ratio[0] = row.tolist()[0]
+                            dense_time_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                        elif 'FLOPs_ratio_for_all_layers' in index:
+                            dense_time_vs_total_FLOPs_ratio[2] = row.tolist()[0]
+                        
+                        if dense_time_vs_total_FLOPs_ratio[0] is not None and dense_time_vs_total_FLOPs_ratio[2] is not None:
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules,'FIG:', 'time_cost_per_sample'])
+                            fig[fig_name] = plt.figure(fig_name)
+                            x = dense_time_vs_total_FLOPs_ratio[2]
+                            y = dense_time_vs_total_FLOPs_ratio[0]
+                            yerr = dense_time_vs_total_FLOPs_ratio[1]
+                            
                             key_for_dict = "dense"
-                        else:
+                            x = 1
+                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label='Time (s)')
+                            dense_time_vs_total_FLOPs_ratio = [None, None, None]
+                    
+                    if 'pruned_duration_per_sample' in index or 'FLOPs_ratio_for_all_layers' in index:
+                        if 'pruned_duration_per_sample' in index:
+                            prune_time_vs_total_FLOPs_ratio[0] = row.tolist()[0]
+                            prune_time_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                        elif 'FLOPs_ratio_for_all_layers' in index:
+                            prune_time_vs_total_FLOPs_ratio[2] = row.tolist()[0]
+                        
+                        if prune_time_vs_total_FLOPs_ratio[0] is not None and prune_time_vs_total_FLOPs_ratio[2] is not None:
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules,'FIG:', 'time_cost_per_sample'])
+                            fig[fig_name] = plt.figure(fig_name)
+                            x = prune_time_vs_total_FLOPs_ratio[2]
+                            y = prune_time_vs_total_FLOPs_ratio[0]
+                            yerr = prune_time_vs_total_FLOPs_ratio[1]
+                            
                             key_for_dict = f"{prune_name}"
-                        draw_str_x_figure(plt, x, y, None, key_for_dict, 'Batch size', 'Seconds')
+                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label='Time (s)')
+                            prune_time_vs_total_FLOPs_ratio = [None, None, None]
 
 
 
@@ -1481,6 +1618,8 @@ def make_vis(df_exp, df_history):
                 # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, y_lim=performance_metric_max)
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
             if 'all_methods_performance_vs_FLOPs_ratio_for_all_layers' in fig_name:
+                draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
+            if 'time_cost_per_sample' in fig_name:
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
                 # point = (x[40],y[40])
                 # ax = plt.gca()

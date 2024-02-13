@@ -33,6 +33,13 @@ import torch.nn as nn
 from transformers import AutoTokenizer
 
 
+
+for i in range(173):
+    cur_number = i * 64
+    ratio = cur_number / 11008
+    print(ratio)
+
+
 a = np.std([5], axis=0).item()
 
 

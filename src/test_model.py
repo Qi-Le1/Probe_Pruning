@@ -62,7 +62,10 @@ def runExperiment():
     dense_name_list[7] = 'dense'
     # cust_tgt_modules
     dense_name_list[8] = 'None'
-    dense_res = load(os.path.join(result_path, '_'.join(dense_name_list)))
+    dense_model_path = os.path.join(result_path, '_'.join(dense_name_list))
+    if not os.path.exists(dense_model_path):
+        dense_model_path = os.path.join(result_path, 'dense', '_'.join(dense_name_list))
+    dense_res = load(dense_model_path)
     dense_info_list, dense_duration = dense_res['dense_info_list'], dense_res['dense_duration']
 
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
@@ -85,7 +88,7 @@ def runExperiment():
     test_logger.writer = None
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
               'dense_info_list': dense_info_list, 'pruned_info_list': pruned_info_list, \
-              'dense_duration': dense_duration, 'pruned_duration': pruned_duration, 'batch_num': batch_num}
+              'dense_duration': dense_duration, 'pruned_duration': pruned_duration, 'dataset_size': cfg['dataset_size']['test']}
 
     save(result, os.path.join(result_path, cfg['model_tag']))
     return
@@ -95,7 +98,6 @@ def test(data_loader, model, model_prof, metric, logger):
     start_time = time.time()
     with torch.no_grad():
         model_prof.start_profile()
-        
         model.train(False)
         # print("Debug 12.011: Test logger created", flush=True)
         for i, input in enumerate(data_loader):

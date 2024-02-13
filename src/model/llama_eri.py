@@ -259,6 +259,8 @@ class Linear(nn.Linear, EriLayer):
             previous_dtype = x.dtype
             if 'probe' in cfg['prune_name'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
                 # broadcast and return out_dim * in_dim matrix
+                if 'keepseq' in cfg['prune_metric']:
+                    return F.linear(x, self.weight)
                 return x * self.weight
             elif 'probe' in cfg['prune_name'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:
                 # need to save s dimension for the following probe
@@ -352,11 +354,13 @@ class Linear(nn.Linear, EriLayer):
                 weight = self.extract_in_weight(input_dim, pruned_dim, preserve_channels, self.layer_type)
             
             if 'flap' in cfg['prune_metric']:
-                all_channels = torch.arange(self.in_features, dtype=preserve_channels.dtype, device=preserve_channels.device)
-                mask = all_channels[preserve_channels]
-                mean_inp = 5
-                output_bias = ((mean_inp * ~mask.to(self.weight.data.device)) @ self.weight.data.T)
-                result = F.linear(x, weight, bias=output_bias)
+                # all_channels = torch.arange(self.in_features, dtype=preserve_channels.dtype, device=preserve_channels.device)
+                # mask = all_channels[preserve_channels]
+                # mean_x = torch.mean(x, dim=1)
+                # flap = (x - mean_x) * 
+                # output_bias = ((mean_inp * ~mask.to(self.weight.data.device)) @ self.weight.data.T)
+                # result = F.linear(x, weight, bias=output_bias)
+                pass
             else:
                 result = F.linear(x, weight)
             # if 'o_proj' in self.key:

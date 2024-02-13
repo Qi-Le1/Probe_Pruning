@@ -19,6 +19,32 @@
         },
 
         {
+            "name": "paper_wikitext_res",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--type",
+                "wikitext-probe_wikitext-baseline",
+            ],
+        },
+
+        {
+            "name": "paper_zeroshot_res",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--type",
+                "zeroshot-probe_zeroshot-baseline",
+            ],
+        },
+
+        {
             "name": "probe_process_language_model",
             "type": "python",
             "request": "launch",

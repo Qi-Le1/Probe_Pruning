@@ -44,6 +44,7 @@ def record_pruing_info(model, logger):
 
 def get_model_profile(tag, model_prof):
     info_list = []
+    total_flops = 0
     for name, module in model_prof.model.named_modules():
         temp = [name, module.__flops__, module.__duration__, module.__params__, module.__macs__, type(module)]
         # print('temp', temp)
@@ -53,17 +54,20 @@ def get_model_profile(tag, model_prof):
             temp.append(True)
 
         # only cal attn + linear layer for clean comparison
+        total_flops += temp[1]
         if not hasattr(module, 'cal_total_flops'):
             temp[1] = 0
         info_list.append(temp)
-    
+        
     def get_module_duration(module):
+        # just return the duration of the whole model
         duration = module.__duration__
-        if hasattr(module, 'pruning_module'):
-            duration -= module.pruning_module.logger_info_time_used
+        # if hasattr(module, 'pruning_module'):
+        #     duration -= module.pruning_module.logger_info_time_used
         if duration == 0:  # e.g. ModuleList
-            for m in module.children():
-                duration += get_module_duration(m)
+            for name, child in module.named_children():
+                cur_duration = get_module_duration(child)
+                duration += cur_duration
         return duration
 
     duration = get_module_duration(model_prof.model)
@@ -126,6 +130,8 @@ def summarize_info_list(dense_info_list, pruned_info_list, dense_duration, prune
     print(f"Pruned inference time ({TIME_UNIT[1]}) per sample: ", pruned_duration/TIME_UNIT[0]/(dataset_size), flush=True)
     print(f"Inference time diff ({TIME_UNIT[1]}): ", (pruned_duration - dense_duration), flush=True)
     print(f"Inference time diff ({TIME_UNIT[1]}) per sample: ", (pruned_duration - dense_duration)/(dataset_size), flush=True)
+    print(f'dense_duration_token_per_second', dataset_size*cfg['seq_len']/dense_duration, flush=True)
+    print(f'pruned_duration_token_per_second', dataset_size*cfg['seq_len']/pruned_duration, flush=True)
 
     print(f"dense FLOPs ({FLOPS_UNIT[1]}): ", dense_total_flops/FLOPS_UNIT[0], flush=True)
     print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
