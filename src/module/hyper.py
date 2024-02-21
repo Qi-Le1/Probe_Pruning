@@ -1,4 +1,5 @@
 import torch
+import re
 from config import cfg
 
 MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70b']
@@ -19,22 +20,34 @@ def process_control():
 
     prune_name_list = cfg['control']['prune_name'].split('+')
     cfg['prune_name'] = prune_name_list[0]
-
-    cfg['prune_metric'] = None
-    if 'probe' in cfg['prune_name']:
-        prune_name_sub_list = cfg['prune_name'].split('-')
-        cfg['prune_metric'] = prune_name_sub_list[1]
-         # fill or each
-        cfg['qk_proj_prune'] = prune_name_sub_list[2]  
-        # fill or each
-        cfg['vo_proj_prune'] = prune_name_sub_list[3]
-    elif 'wandasp' in cfg['prune_name']:
-        cfg['prune_metric'] = 'wandasp'
-    elif 'flap' in cfg['prune_name']:
-        cfg['prune_metric'] = 'flap'
-    elif 'testourmetric' in cfg['prune_name']:
-        cfg['prune_metric'] = 'testourmetric'
     
+    cfg['prune_metric'] = None
+    prune_name_sub_list = cfg['prune_name'].split('-')
+    cfg['prune_method'] = prune_name_sub_list[1]
+    cfg['prune_metric'] = prune_name_sub_list[2]
+    if 'probe' in cfg['prune_method']:
+        # if 'wandasp' in cfg['prune_method']:
+        #     cfg['prune_metric'] = 'wandasp'
+        # elif 'flap' in cfg['prune_method']:
+        #     cfg['prune_metric'] = 'flap'
+        # elif 'testourmetric' in cfg['prune_method']:
+        #     cfg['prune_metric'] = 'testourmetric'
+         # fill or each
+        cfg['qk_proj_prune'] = prune_name_sub_list[3]  
+        # fill or each
+        cfg['vo_proj_prune'] = prune_name_sub_list[4]
+    
+    
+    if 'svd' in cfg['prune_method']:
+        match = re.search(r'svd(\d+\.\d+)', cfg['prune_metric'])
+        if match:
+            # Convert the matched string to a float
+            float_value = float(match.group(1))
+        else:
+            float_value = None  # Or some default value or error handling
+        cfg['svd_ratio'] = float_value
+
+
     # for calibration data pruning
     if len(prune_name_list) == 1:
         cfg['nsamples'] = None
@@ -310,8 +323,8 @@ TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
 }
 
 TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING = {
-    "llama": ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"]
-    
+    "llama": ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"],
+    'opt': ["k_proj", "v_proj", "q_proj", "fc1"]
 }
 
 

@@ -33,6 +33,13 @@ import torch.nn as nn
 from transformers import AutoTokenizer
 
 
+input = torch.randn(2, 3, 4)
+weight = torch.randn(4, 5)
+
+norm_bsz_seq_input =  torch.linalg.vector_norm(input, ord=2, dim=(0,1)).un
+
+
+
 
 for i in range(173):
     cur_number = i * 64

@@ -253,10 +253,105 @@ def main():
             # controls.extend(CIFAR10_controls_9)
 
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '0.95'], ['mag-probeoptim-fill-each-onlyvo', 'mag-probembsz-fill-each-onlyvo'],
-                    ['q-proj+k-proj+v-proj+o-proj']]]
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6'], ['mag-probembsz-fill-each-onlyvo', 'mag-probenmlmbsz-fill-each-onlyvo'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6'], ['mag-probembsz-fill-each-onlyqk', 'mag-probenmlmbsz-fill-each-onlyqk'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6'], ['mag-probembsz-fill-each', 'mag-probenmlmbsz-fill-each'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.3', '0.4', '0.5', '0.6'], ['mag-probembszkeepseq-None-None'],
+            #         ['gate-proj+up-proj+down-proj', 'gate-proj+down-proj', 'up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], ['mag-probe-None-None'],
+            #         [ 'gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['200'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], ['mag-probe-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024', '2048'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd0.01-None-None', 'mag-probesvd0.05-None-None', 'mag-probesvd0.07-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '60'], ['1024'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd0.01-None-None', 'mag-probesvd0.05-None-None', 'mag-probesvd0.07-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['2048'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd0.01-None-None', 'mag-probesvd0.05-None-None', 'mag-probesvd0.07-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['10'], ['128'], ['0.1'], ['mag-probesvd0.01-probe-None-None'],
+            #         ['fc1+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '1024'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7'], ['mag-runningmean-probe-None-None'],
+                    ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd0.01-None-None', 'mag-probesvd0.05-None-None', 'mag-probesvd0.07-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '100'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd1-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], ['mag-probeoptim-fill-each'],
+            #         ['fc1+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probe-None-None', 'mag-probembszkeepseq-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512', '1024'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None', 'mag-probenmlmbszkeepseq-None-None', 'mag-probestdmbszkeepseq-None-None', 'mag-probelogmbszkeepseq-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['1', '2', '4', '6', '8', '10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probe-None-None', 'mag-probembszkeepseq-None-None'],
+            #         ['fc1+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['10'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probewandasp-None-None'],
+            #         ['fc1+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probembsz-fill-each-onlyqk', 'mag-probembszcompressseq-fill-each-onlyqk', 'mag-probembsz-each-each-onlyqk', 'mag-probembszcompressseq-each-each-onlyqk'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['1024'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probewandasp-None-None', 'mag-probewandaspmbszkeepseq-None-None', 'mag-probewandaspkeepseq-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             pass
         elif 'csr' in data:
             # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None'],
@@ -298,7 +393,22 @@ def main():
         controls = []
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
-            control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10', '50', '100', '300'], ['128'], ['0'], ['dense'],
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10', '50', '100', '300'], ['128'], ['0'], ['dense'],
+            #         ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['512', '1024'], ['0'], ['dense'],
+            #         ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['2048'], ['0'], ['dense'],
+            #         ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], [ 'opt-13b'], ['clm'], ['10'], ['128', '512', '1024'], ['0'], ['dense'],
                     ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -427,9 +537,9 @@ def main():
             if 'gpt' in controls[i][4]:
                 is_gpt = True
 
-            if 'llama-2-7b' in controls[i][4]:
+            if 'llama-2-7b' in controls[i][4] or 'opt-6.7b' in controls[i][4] or 'opt-1.3b' in controls[i][4]:
                 run_time = '00:45:00'
-            elif 'llama-2-13b' in controls[i][4]:
+            elif 'llama-2-13b' in controls[i][4] or 'opt-13b' in controls[i][4]:
                 run_time = '01:45:00'
             elif 'llama-2-70b' in controls[i][4]:
                 run_time = '03:45:00'
@@ -440,7 +550,7 @@ def main():
         # print('isgpt', is_gpt)
         temp_mem = mem
         if is_llama:
-            if '7b' in controls[i-1][4]:
+            if '7b' in controls[i-1][4] or '6.7b' in controls[i-1][4] or '1.3b' in controls[i-1][4]:
                 temp_mem = int(2.5 * mem)
             elif '13b' in controls[i-1][4]:
                 temp_mem = int(4.3 * mem)
@@ -457,7 +567,7 @@ def main():
         s += f'#SBATCH --ntasks={task_parallel_num}\n'
         # s += '#SBATCH --cpus-per-task=2'
         s += '#SBATCH --gres=gpu:a100:1\n'
-        s += '#SBATCH --partition=a100-8\n'
+        s += '#SBATCH --partition=a100-4\n'
         s += f'#SBATCH --mem={temp_mem}gb\n'
         # s += '#SBATCH --mail-type=ALL \n'
         # s += '#SBATCH --mail-user=le000288@umn.edu\n'

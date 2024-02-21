@@ -440,6 +440,18 @@
                 "cpu"
             ],
         },
+
+        {
+            "name": "test_ps_speed",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/test_sp_speed.py",
+            "justMyCode": true,
+            "args": [
+
+            ],
+        },
     ]
 }
 

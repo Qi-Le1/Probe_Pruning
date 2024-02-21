@@ -32,8 +32,11 @@ def make_model(model_name, sub_model_name=None):
 
 def make_prune_model(model):
     from .llama_eri import LlamaEriModel
+    from .opt_eri import OPTEriModel
     if 'llama' in cfg['model_name']:
         model = LlamaEriModel(model)
+    elif 'opt' in cfg['model_name']:
+        model = OPTEriModel(model)
     else:
         raise ValueError('Not valid model name')
     return model

@@ -21,7 +21,7 @@ from functools import reduce
 
 from .pruning_module import HiddenRepresentationPruning, WeightPruning
 
-class LlamaEriModel(torch.nn.Module):
+class OPTEriModel(torch.nn.Module):
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -211,8 +211,7 @@ class EriLayer:
             if pruned_dim != input_dim - 1:
                 raise ValueError('Not valid input dimension')
 
-            # weight = torch.index_select(self.weight, dim=1, index=preserve_channels.to(self.weight.device))
-            weight = self.weight[:, preserve_channels.to(self.weight.device)]
+            weight = torch.index_select(self.weight, dim=1, index=preserve_channels.to(self.weight.device))
             return weight
            
         
@@ -223,8 +222,7 @@ class EriLayer:
             if input_dim != 3:
                 raise ValueError('Not valid input dimension')
                 
-            # weight = torch.index_select(self.weight, dim=0, index=preserve_channels.to(self.weight.device))
-            weight = self.weight[preserve_channels.to(self.weight.device), :]
+            weight = torch.index_select(self.weight, dim=0, index=preserve_channels.to(self.weight.device))
             return weight
         
 class Linear(nn.Linear, EriLayer):
@@ -259,27 +257,18 @@ class Linear(nn.Linear, EriLayer):
     def forward(self, x: torch.Tensor, **kwargs):
         with torch.no_grad():
             previous_dtype = x.dtype
-            if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
+            if 'probe' in cfg['prune_name'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
                 # broadcast and return out_dim * in_dim matrix
-                if 'keepseq' in cfg['prune_method']:
-                    # if 'weightabs' in cfg['prune_metric']:
-                    #     return F.linear(x, self.weight.abs())
-                    # elif 'weightsq' in cfg['prune_metric']:
-                    #     prev_type = self.weight.dtype
-                    #     self.weight = self.weight.to(torch.float32)
-                    #     res = F.linear(x, torch.pow(self.weight, 2))
-                    #     self.weight = self.weight.to(prev_type)
-                    #     return res
+                if 'keepseq' in cfg['prune_metric']:
                     return F.linear(x, self.weight)
-
-                return (x * self.weight).t()
-            elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:
+                return x * self.weight
+            elif 'probe' in cfg['prune_name'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:
                 # need to save s dimension for the following probe                    
                 result = F.linear(x, self.weight)
                 result = result.to(previous_dtype)
                 return result
-            elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric_compressseq' in kwargs and kwargs['cal_probe_out_dim_metric_compressseq'] == True:
-                return (x * self.weight).t()
+            elif 'probe' in cfg['prune_name'] and 'cal_attn_probe_out_dim_metric_compressseq' in kwargs and kwargs['cal_probe_out_dim_metric_compressseq'] == True:
+                return x * self.weight
             # print('-----\n')
             # print('input_shape: ', x.shape)
             # print("prev weight.shape", self.weight.shape)
@@ -294,7 +283,7 @@ class Linear(nn.Linear, EriLayer):
 
             # enter down-proj after delete outputdim of gate-proj and up-proj
             # enter o-proj after attention
-            if ('probe' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and self.is_prune_out_dim == False:
+            if 'probe' in cfg['prune_name'] and self.is_prune_out_dim == False:
                 # print('here1')
                 if 'attn' in self.key:
                     # if 'probe' in cfg['prune_name']:
@@ -304,8 +293,7 @@ class Linear(nn.Linear, EriLayer):
                         x = x[..., kwargs['probe_out_dim_indices']]
                     # if it is probe and parallel, we consider all the structure and operations
                     # we already know the weight index to extract
-                    # weight = torch.index_select(self.weight, dim=1, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
-                    weight = self.weight[:, kwargs['probe_out_dim_indices'].to(self.weight.device)]
+                    weight = torch.index_select(self.weight, dim=1, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
                         # print('attnprobemix, probe_out_dim_indices', kwargs['probe_out_dim_indices'])
 
                         # res_after_extract = F.linear(x, weight)
@@ -324,8 +312,7 @@ class Linear(nn.Linear, EriLayer):
                     # if 'probe' in cfg['prune_name']:
                         # if it is probe and parallel, we consider all the structure and operations
                         # we already know the weight index to extract
-                    # weight = torch.index_select(self.weight, dim=1, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
-                    weight = self.weight[:, kwargs['probe_out_dim_indices'].to(self.weight.device)]
+                    weight = torch.index_select(self.weight, dim=1, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
                     # else:
                     #     # prune out dim situation
                     #     # but not probe (only consider current layer's input and weight)
@@ -335,7 +322,7 @@ class Linear(nn.Linear, EriLayer):
                     #     x = x[..., non_zero_indices]
             # for probe situation, entering up-proj or gate-proj
             # or entering q/k/v-proj
-            elif ('probe' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and 'probe_out_dim_indices' in kwargs:
+            elif 'probe' in cfg['prune_name'] and 'probe_out_dim_indices' in kwargs:
                 # # weight dim 1 should have same size as original h dim 2
                 # mask = torch.ones(self.weight.size(0), dtype=torch.bool)
                 # # Mark the indices to be pruned as False
@@ -344,8 +331,7 @@ class Linear(nn.Linear, EriLayer):
                 # Use the mask to index the tensor
                 # print('here2')
                 if 'attn' in self.key:
-                    # weight = torch.index_select(self.weight, dim=0, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
-                    weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
+                    weight = torch.index_select(self.weight, dim=0, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
                     # print('weight.shape', weight.shape)
                     # record to fill zero
                     # if 'para' not in cfg['prune_name']:
@@ -355,8 +341,7 @@ class Linear(nn.Linear, EriLayer):
 
                     # print('attn probe_out_dim_indices')
                 else:
-                    # weight = torch.index_select(self.weight, dim=0, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
-                    weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
+                    weight = torch.index_select(self.weight, dim=0, index=kwargs['probe_out_dim_indices'].to(self.weight.device))
                     # print('weight.shape', weight.shape)
                     # record to fill zero
                     # if 'para' not in cfg['prune_name']:
@@ -385,7 +370,7 @@ class Linear(nn.Linear, EriLayer):
             # refill the pruned output dim with 0
             # gate-proj & up-proj
             # q/k/v-proj
-            if 'probe' in cfg['prune_method'] and self.is_prune_out_dim == True:
+            if 'probe' in cfg['prune_name'] and self.is_prune_out_dim == True:
                 # dont need to refill 0 because all indices are determined
                 if 'attn' in self.key:
                     

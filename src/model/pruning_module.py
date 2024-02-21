@@ -249,6 +249,36 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     pq_indices = pq_indices_varying_length.to(cfg['device'])
     return int(prune_channels_count), pq_indices
 
+def cal_prune_metric(probe_out, weight, metric_type):
+    if 'wandasp' in metric_type:
+        if probe_out.dim() == 2:
+            probe_out.unsqueeze_(0)
+        size = probe_out.shape[0]
+        weight_factor = 1.0 / size
+        sum_squared_norms = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0)
+        average_squared_norm = sum_squared_norms / torch.tensor(size, device=probe_out.device, dtype=torch.float)
+        probe_out_dim_metric = (torch.sqrt(average_squared_norm.unsqueeze_(0).reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
+    elif 'flap' in metric_type:
+        pass
+    elif 'probe' in metric_type:
+        if probe_out.dim() == 2:
+            probe_out.unsqueeze_(0)
+        size = probe_out.shape[0]
+        weight_factor = 1.0 / size
+        average_squared_norm = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0).clamp(min=None, max=65504)
+        probe_out_dim_metric = torch.sqrt(((average_squared_norm.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+
+    return probe_out_dim_metric
+
+def cal_running_mean_prune_metric(running_mean, weight, metric_type):
+    if 'wandasp' in metric_type:
+        probe_out_dim_metric = (torch.sqrt(running_mean.reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
+    elif 'flap' in metric_type:
+        pass
+    elif 'probe' in metric_type:
+        probe_out_dim_metric = torch.sqrt(((running_mean.reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+    return probe_out_dim_metric
+
 class HiddenRepresentationPruning(BasePruning):
 
     def __init__(self, cfg, key, device=None, in_dim=None, out_dim=None):
@@ -271,18 +301,18 @@ class HiddenRepresentationPruning(BasePruning):
         # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
         sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
         print(f'{self.key} sorted_value', sorted_value)
-        normalized_sorted_value = sorted_value / sorted_value.sum()
-        print(f'{self.key} normalized_sorted_value', normalized_sorted_value)
-        mean = torch.mean(sorted_value)
-        std = torch.std(sorted_value)
+        # normalized_sorted_value = sorted_value / sorted_value.sum()
+        # print(f'{self.key} normalized_sorted_value', normalized_sorted_value)
+        # mean = torch.mean(sorted_value)
+        # std = torch.std(sorted_value)
 
-        # Then, normalize the tensor: (sorted_value - mean) / std
-        standardlized_value = (sorted_value - mean) / std
-        print(f'{self.key} standardlized_value', standardlized_value)
+        # # Then, normalize the tensor: (sorted_value - mean) / std
+        # standardlized_value = (sorted_value - mean) / std
+        # print(f'{self.key} standardlized_value', standardlized_value)
         if 'mag' in cfg['prune_name']:
             num_prune = int(self.prune_hyper * probe_out_dim_metric.shape[0])
         elif 'pq' in cfg['prune_name']:
-            num_prune = cal_prune_count_base_on_pq(standardlized_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
+            num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
         
         # let the remaining element be the multiple of multiple to fit tensor cores
         num_prune = num_prune + ((probe_out_dim_metric.shape[0] - num_prune) % multiple)
@@ -366,19 +396,19 @@ class HiddenRepresentationPruning(BasePruning):
             sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
 
             print(f'{self.key}_{prune_module} sorted_value', sorted_value)
-            normalized_sorted_value = sorted_value / sorted_value.sum()
-            print(f'{self.key}_{prune_module} normalized_sorted_value', normalized_sorted_value)
-            mean = torch.mean(sorted_value)
-            std = torch.std(sorted_value)
+            # normalized_sorted_value = sorted_value / sorted_value.sum()
+            # print(f'{self.key}_{prune_module} normalized_sorted_value', normalized_sorted_value)
+            # mean = torch.mean(sorted_value)
+            # std = torch.std(sorted_value)
 
-            # Then, normalize the tensor: (sorted_value - mean) / std
-            standardlized_value = (sorted_value - mean) / std
-            print(f'{self.key}_{prune_module} standardlized_value', standardlized_value)
+            # # Then, normalize the tensor: (sorted_value - mean) / std
+            # standardlized_value = (sorted_value - mean) / std
+            # print(f'{self.key}_{prune_module} standardlized_value', standardlized_value)
             # print('sorted_value', sorted_value)
             if 'mag' in cfg['prune_name']:
                 num_prune = int(probe_out_dim_metric.shape[0] * cfg['prune_hyper'])
             elif 'pq' in cfg['prune_name']:
-                num_prune = cal_prune_count_base_on_pq(standardlized_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, f'{self.key}_{prune_module}')[0]
+                num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, f'{self.key}_{prune_module}')[0]
             # print('delete indices', sorted_indices[:num_prune])
             return sorted_indices[num_prune:], None, num_heads, head_dim
 
