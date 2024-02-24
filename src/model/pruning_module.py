@@ -270,6 +270,24 @@ def cal_prune_metric(probe_out, weight, metric_type):
 
     return probe_out_dim_metric
 
+def cal_prune_metric_only_input(probe_out, metric_type):
+    if 'wandasp' in metric_type:
+        if probe_out.dim() == 2:
+            probe_out.unsqueeze_(0)
+        size = probe_out.shape[0]
+        weight_factor = 1.0 / size
+        sum_squared_norms = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0)
+        average_squared_norm = sum_squared_norms / torch.tensor(size, device=probe_out.device, dtype=torch.float)
+    elif 'flap' in metric_type:
+        pass
+    elif 'probe' in metric_type:
+        if probe_out.dim() == 2:
+            probe_out.unsqueeze_(0)
+        size = probe_out.shape[0]
+        weight_factor = 1.0 / size
+        average_squared_norm = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0).clamp(min=None, max=65504)
+    return average_squared_norm
+
 def cal_running_mean_prune_metric(running_mean, weight, metric_type):
     if 'wandasp' in metric_type:
         probe_out_dim_metric = (torch.sqrt(running_mean.reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
@@ -295,9 +313,9 @@ class HiddenRepresentationPruning(BasePruning):
             self.pq_beta = cfg['pq_beta']
             self.pq_gamma = cfg['pq_gamma']
 
-    def cal_probe_mlp_metric(self, probe_out_dim_metric, multiple):
+    def sort_probe_mlp_metric(self, probe_out_dim_metric, multiple):
         probe_out_dim_metric.abs_()
-        probe_out_dim_metric = probe_out_dim_metric.to(torch.float32)
+        # probe_out_dim_metric = probe_out_dim_metric.to(torch.float32)
         # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
         sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
         print(f'{self.key} sorted_value', sorted_value)

@@ -347,179 +347,86 @@ class LlamaMLP(nn.Module):
             down_proj = sum(down_proj)
         else:
             multiple = check_multiple_for_tensor_cores(self.gate_proj.weight.dtype)
-
-            
+            bsz, _, _ = x.shape
             if 'probe' in cfg['prune_method'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
                 time_start = time.time()
-                
-                if 'svd' in cfg['prune_method']:
-                    comp_across_bsz_seq = x
-                    time_start_1 = time.time()
-                    if 'gate_proj' in cfg['cust_tgt_modules']:
-                        # print('comp_across_bsz_seq', comp_across_bsz_seq)
-                        # print('gate_proj', self.gate_proj.weight)
-                        gate_out = self.act_fn(x @ self.gate_proj_svd_V.T @ self.gate_proj_svd_S.T @ self.gate_proj_svd_U.T)
-                    else:
-                        gate_out = self.act_fn(self.gate_proj(x))
-                    
-                    if 'up_proj' in cfg['cust_tgt_modules']:
-                        up_out = x @ self.up_proj_svd_V.T @ self.up_proj_svd_S.T @ self.up_proj_svd_U.T
-                    else:
-                        up_out = self.up_proj(x)
-
-                    probe_out = gate_out * up_out
-                    end_time_1 = time.time() - time_start_1
-                    print('svd_duration', end_time_1, flush=True)
-                    # prev_probe_out_type = probe_out.dtype
-                    # prev_weight_type = self.down_proj.weight.data.dtype
-                    # probe_out = probe_out.to(torch.float32)
-                    # self.down_proj.weight.data = self.down_proj.weight.data.to(torch.float32)
-                    # ablation study for different metrics
-                    # if 'full' in cfg['prune_metric']:
-                    probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
-                    probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.cal_probe_mlp_metric(probe_out_dim_metric, multiple)
-
-                    # if self.probe_out_dim_indices is None:
-                    #     self.probe_out_dim_indices = probe_out_dim_indices
-                    # else:
-                    #     # Convert lists to sets
-                    #     set_self = set(self.probe_out_dim_indices.tolist())
-                    #     set_probe = set(probe_out_dim_indices.tolist())
-
-                    #     # Find the intersection
-                    #     intersection = set_self & set_probe
-
-                    #     # Count the number of elements in the intersection
-                    #     intersection_count = len(intersection)
-                    #     intersection_ratio = intersection_count / len(set_self)
-                    #     print('intersection_ratio', intersection_ratio, flush=True)
-                    #     self.probe_out_dim_indices = probe_out_dim_indices
-                    #     # intersection = (self.probe_out_dim_indices == probe_out_dim_indices)
-                    #     # intersection_count = intersection.sum().item()
-                    # # print('probe_out_dim_indices', probe_out_dim_indices.shape, flush=True)
-                    kwargs['probe_out_dim_indices'] = probe_out_dim_indices
-                    custom_duration = time.time() - time_start
-                    print('probe_duration', custom_duration, flush=True)
-                    time_start = time.time()
-                    # if 'restore' in cfg['prune_name']:
-                    #     shape2 = torch.sum(probe_out, dim=1)[prune_out_dim_indices].unsqueeze_(0)
-                    #     print('shape2', shape2, flush=True)
-                    #     restore = F.linear(torch.sum(probe_out, dim=1)[prune_out_dim_indices].unsqueeze_(0), torch.index_select(self.down_proj.weight, 1, prune_out_dim_indices))
-                    # gate_out = None
-                    # up_out = None
-                    # print('gate_out', gate_out.shape, flush=True)
-                    # print('up_out', up_out.shape, flush=True)
-                    if 'gate_proj' in cfg['cust_tgt_modules']:
-                        print('gate_proj in custtgt', gate_out.shape, flush=True)
-                        gate_out = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices))
-                    else:
-                        # gate_out = self.act_fn(self.gate_proj(x))
-                        gate_out = gate_out[..., probe_out_dim_indices]
-
-                    if 'up_proj' in cfg['cust_tgt_modules']:
-                        up_out = self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
-                    else:
-                        # up_out = self.up_proj(x)
-                        up_out = up_out[..., probe_out_dim_indices]
-
-                    print('gate_out1', gate_out.shape, flush=True)
-                    print('up_out1', up_out.shape, flush=True)
-                    down_proj = self.down_proj(gate_out * up_out, **kwargs)
-                    # if 'restore' in cfg['prune_name']:
-                    #     down_proj = down_proj + restore
-                    custom_duration = time.time() - time_start
-                    print('fll_batch_duration', custom_duration, flush=True)
-                    return down_proj
+                if 'nmlmbsz' in cfg['prune_method']:
+                    abs_x = torch.abs(x)
+                    porportion = abs_x / abs_x.sum(dim=0, keepdim=True)
+                    comp_across_bsz = (x * porportion).sum(dim=0)
+                elif 'stdmbsz' in cfg['prune_method']:
+                    abs_x = torch.abs(x)
+                    # Calculate mean and std deviation across the batch dimension
+                    mean_x = abs_x.mean(dim=0, keepdim=True)
+                    std_x = abs_x.std(dim=0, keepdim=True)
+                    # Normalize using mean and standard deviation
+                    normalized_x = (abs_x - mean_x) / (std_x + 1e-6)
+                    proportion = normalized_x / normalized_x.sum(dim=0, keepdim=True)
+                    comp_across_bsz = (x * proportion).sum(dim=0)
+                elif 'logmbsz' in cfg['prune_method']:
+                    abs_x = torch.abs(x)
+                    log_abs_x = torch.log1p(abs_x)  # log1p for log(x+1) to handle zeros
+                    sum_log_abs_x = log_abs_x.sum(dim=0, keepdim=True)
+                    proportion = log_abs_x / (sum_log_abs_x + 1e-6)
+                    comp_across_bsz = (x * proportion).sum(dim=0)
+                elif 'mbsz' in cfg['prune_method']:
+                    comp_across_bsz = x.mean(axis=0)
                 else:
-                    if 'keepseq' in cfg['prune_method']:
-                        if 'nmlmbsz' in cfg['prune_method']:
-                            abs_x = torch.abs(x)
-                            porportion = abs_x / abs_x.sum(dim=0, keepdim=True)
-                            comp_across_bsz_seq = (x * porportion).sum(dim=0)
-                        elif 'stdmbsz' in cfg['prune_method']:
-                            abs_x = torch.abs(x)
-
-                            # Calculate mean and std deviation across the batch dimension
-                            mean_x = abs_x.mean(dim=0, keepdim=True)
-                            std_x = abs_x.std(dim=0, keepdim=True)
-
-                            # Normalize using mean and standard deviation
-                            normalized_x = (abs_x - mean_x) / (std_x + 1e-6)
-                            proportion = normalized_x / normalized_x.sum(dim=0, keepdim=True)
-                            comp_across_bsz_seq = (x * proportion).sum(dim=0)
-                        elif 'logmbsz' in cfg['prune_method']:
-                            abs_x = torch.abs(x)
-                            log_abs_x = torch.log1p(abs_x)  # log1p for log(x+1) to handle zeros
-                            sum_log_abs_x = log_abs_x.sum(dim=0, keepdim=True)
-
-                            proportion = log_abs_x / (sum_log_abs_x + 1e-6)
-                            comp_across_bsz_seq = (x * proportion).sum(dim=0)
-                        elif 'mbsz' in cfg['prune_method']:
-                            comp_across_bsz_seq = x.mean(axis=0)
-                        else:
-                            comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=0)
-                    else:
-                        if 'mbsz' in cfg['prune_method']:
-                            x_mean_bsz = x.mean(axis=0)
-                            comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=0).unsqueeze_(0)
-                        elif 'mbszmseq' in cfg['prune_method']:
-                            comp_across_bsz_seq = x.mean(axis=(0, 1)).unsqueeze_(0)
-                        elif 'optim' in cfg['prune_method']:
-                            comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
-                        else:
-                            comp_across_bsz_seq = torch.linalg.vector_norm(x, ord=2, dim=(0,1)).unsqueeze_(0)
-
+                    comp_across_bsz = torch.linalg.vector_norm(x, ord=2, dim=0)
+                    
                 gate_out = None
                 up_out = None
                 if 'gate_proj' in cfg['cust_tgt_modules']:
-                    print('comp_across_bsz_seq', comp_across_bsz_seq)
-                    print('gate_proj', self.gate_proj.weight)
-                    gate_out = self.act_fn(self.gate_proj(comp_across_bsz_seq, cal_mlp_probe_out_dim_metric=True))
+                    if 'svd' in cfg['prune_method']:
+                        gate_out = self.act_fn(x @ self.gate_proj_svd_V.T @ self.gate_proj_svd_S.T @ self.gate_proj_svd_U.T)
+                    else:
+                        gate_out = self.act_fn(self.gate_proj(comp_across_bsz, cal_mlp_probe_out_dim_metric=True))
                 else:
                     gate_out = self.act_fn(self.gate_proj(x))
                 
                 if 'up_proj' in cfg['cust_tgt_modules']:
-                    up_out = self.up_proj(comp_across_bsz_seq, cal_mlp_probe_out_dim_metric=True)
+                    if 'svd' in cfg['prune_method']:
+                        up_out = x @ self.up_proj_svd_V.T @ self.up_proj_svd_S.T @ self.up_proj_svd_U.T
+                    else:
+                        up_out = self.up_proj(comp_across_bsz, cal_mlp_probe_out_dim_metric=True)
                 else:
                     up_out = self.up_proj(x)
 
                 probe_out = gate_out * up_out
+
+                # incorporate the global distribution
+                if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
+                    probe_out = (1 - cfg['ema_momentum']) * probe_out + cfg['ema_momentum'] * self.down_proj.get_global_distribution()
+
+                if 'intersect' in cfg['prune_method']:
+                    full_gate_out = self.act_fn(self.gate_proj(x))
+                    full_up_out = self.up_proj(x)
+                    pass
                 
                 probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
-                probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.cal_probe_mlp_metric(probe_out_dim_metric, multiple)
+                probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
 
-                if self.probe_out_dim_indices is None:
-                    self.probe_out_dim_indices = probe_out_dim_indices
-                else:
-                    # Convert lists to sets
-                    set_self = set(self.probe_out_dim_indices.tolist())
-                    set_probe = set(probe_out_dim_indices.tolist())
+                # if self.probe_out_dim_indices is None:
+                #     self.probe_out_dim_indices = probe_out_dim_indices
+                # else:
+                #     # Convert lists to sets
+                #     set_self = set(self.probe_out_dim_indices.tolist())
+                #     set_probe = set(probe_out_dim_indices.tolist())
 
-                    # Find the intersection
-                    intersection = set_self & set_probe
+                #     # Find the intersection
+                #     intersection = set_self & set_probe
 
-                    # Count the number of elements in the intersection
-                    intersection_count = len(intersection)
-                    intersection_ratio = intersection_count / len(set_self)
-                    print('intersection_ratio', intersection_ratio, flush=True)
-                    self.probe_out_dim_indices = probe_out_dim_indices
-                    # intersection = (self.probe_out_dim_indices == probe_out_dim_indices)
-                    # intersection_count = intersection.sum().item()
-                # print('probe_out_dim_indices', probe_out_dim_indices.shape, flush=True)
-                kwargs['probe_out_dim_indices'] = probe_out_dim_indices
+                #     # Count the number of elements in the intersection
+                #     intersection_count = len(intersection)
+                #     intersection_ratio = intersection_count / len(set_self)
+                #     print('intersection_ratio', intersection_ratio, flush=True)
+                #     self.probe_out_dim_indices = probe_out_dim_indices
+
+                
                 custom_duration = time.time() - time_start
                 print('probe_duration', custom_duration, flush=True)
                 time_start = time.time()
-                # if 'restore' in cfg['prune_name']:
-                #     shape2 = torch.sum(probe_out, dim=1)[prune_out_dim_indices].unsqueeze_(0)
-                #     print('shape2', shape2, flush=True)
-                #     restore = F.linear(torch.sum(probe_out, dim=1)[prune_out_dim_indices].unsqueeze_(0), torch.index_select(self.down_proj.weight, 1, prune_out_dim_indices))
-                # gate_out = None
-                # up_out = None
-                # print('gate_out', gate_out.shape, flush=True)
-                # print('up_out', up_out.shape, flush=True)
                 if 'gate_proj' in cfg['cust_tgt_modules']:
-                    print('gate_proj in custtgt', gate_out.shape, flush=True)
                     gate_out = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices))
                 else:
                     # gate_out = self.act_fn(self.gate_proj(x))
@@ -531,45 +438,43 @@ class LlamaMLP(nn.Module):
                     # up_out = self.up_proj(x)
                     up_out = up_out[..., probe_out_dim_indices]
 
-                print('gate_out1', gate_out.shape, flush=True)
-                print('up_out1', up_out.shape, flush=True)
+                if 'runningmean' in cfg['prune_method'] and 'fillpbmetric' in cfg['prune_method']:
+                    self.down_proj.update_global_distribution(probe_out[prune_out_dim_indices], prune_out_dim_indices, size=bsz)
+
+                kwargs['probe_in_dim_indices'] = probe_out_dim_indices
                 down_proj = self.down_proj(gate_out * up_out, **kwargs)
-                # if 'restore' in cfg['prune_name']:
-                #     down_proj = down_proj + restore
                 custom_duration = time.time() - time_start
                 print('fll_batch_duration', custom_duration, flush=True)
                 return down_proj
             elif 'runningmean' in cfg['prune_method'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
                 bsz, _, _ = x.shape
                 time_start = time.time()
-                if self.running_mean is None:
+                if torch.all(self.down_proj.get_global_distribution() == 0):
                     probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
-                    self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
-                    self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
+                    # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
+                    # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
                 else:
-                    probe_out_dim_metric = cal_running_mean_prune_metric(self.running_mean, self.down_proj.weight.data, cfg['prune_metric'])
-                    probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.cal_probe_mlp_metric(probe_out_dim_metric, multiple)
+                    probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                    probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
 
                 temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
                 if 'runningmean' in cfg['prune_method']:
+                    self.down_proj.update_global_distribution(temp[probe_out_dim_indices], probe_out_dim_indices)
                     # Update the running_mean and running_mean_counter here
-                    self.running_mean[probe_out_dim_indices] *= self.running_mean_counter[probe_out_dim_indices] / (self.running_mean_counter[probe_out_dim_indices] + bsz)
-                    # Ensure the denominator is broadcastable; might need to unsqueeze to add a dimension for correct broadcasting
-                    norm_squared = torch.clamp(torch.norm(temp, p=2, dim=1) ** 2, min=None, max=65504)
-                    denominator = (self.running_mean_counter[probe_out_dim_indices].unsqueeze(0) + bsz)
-                    # Update running mean
-                    self.running_mean[probe_out_dim_indices] += torch.sum(norm_squared / denominator, dim=0)
-                    self.running_mean_counter[probe_out_dim_indices] += bsz
+                    # self.running_mean[probe_out_dim_indices] *= self.running_mean_counter[probe_out_dim_indices] / (self.running_mean_counter[probe_out_dim_indices] + bsz)
+                    # # Ensure the denominator is broadcastable; might need to unsqueeze to add a dimension for correct broadcasting
+                    # norm_squared = torch.clamp(torch.norm(temp, p=2, dim=1) ** 2, min=None, max=65504)
+                    # denominator = (self.running_mean_counter[probe_out_dim_indices].unsqueeze(0) + bsz)
+                    # # Update running mean
+                    # self.running_mean[probe_out_dim_indices] += torch.sum(norm_squared / denominator, dim=0)
+                    # self.running_mean_counter[probe_out_dim_indices] += bsz
                 kwargs['probe_out_dim_indices'] = probe_out_dim_indices
                 down_proj = self.down_proj(temp, **kwargs)
                 custom_duration = time.time() - time_start
                 print('fll_batch_duration', custom_duration, flush=True)
                 return down_proj
             else:
-                # print(torch.cuda.memory_summary())
                 mlp_duration_start = time.time()
-                print('input dtype', x.dtype, flush=True)
-                print('weight dtype', self.gate_proj.weight.dtype, flush=True)
                 time_start = time.time()
                 temp_gate = self.act_fn(self.gate_proj(x))
                 custom_duration = time.time() - time_start
@@ -579,14 +484,10 @@ class LlamaMLP(nn.Module):
                 temp_up = self.up_proj(x)
                 custom_duration = time.time() - time_start
                 print('custom_duration up', custom_duration, flush=True)
-                # print(torch.cuda.memory_summary())
                 time_start = time.time()
                 down_proj = self.down_proj(temp_gate * temp_up)
                 custom_duration = time.time() - time_start
                 print('custom_duration down', custom_duration, flush=True)
-                print('gate_proj.weight.shape', self.gate_proj.weight.shape, flush=True)
-                print('up_proj.weight.shape', self.up_proj.weight.shape, flush=True)
-                print('down_proj.weight.shape', self.down_proj.weight.shape, flush=True)
                 mlp_duration = time.time() - mlp_duration_start
                 print('mlp_duration', mlp_duration, flush=True)
                 del temp_gate, temp_up

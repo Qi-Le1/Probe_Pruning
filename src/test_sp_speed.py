@@ -6,6 +6,68 @@ import time
 import torch
 import time
 import numpy as np
+
+
+# Let's perform the requested operation using PyTorch, as it supports CUDA for GPU acceleration.
+# This involves creating a matrix, retrieving elements using sorted and unsorted indices,
+# and comparing the time it takes for both methods.
+
+# import torch
+# import time
+
+# import torch
+# import time
+
+# # Ensure CUDA is available
+# if torch.cuda.is_available():
+#     device = torch.device("cuda")
+#     print("CUDA is available. Using GPU.")
+# else:
+#     device = torch.device("cpu")
+#     print("CUDA is not available. Falling back to CPU.")
+
+# # Create a (4096, 11008) matrix with random floats on the specified device
+# matrix = torch.randn(4096, 11008, device=device)
+
+# # Generate indices for retrieval
+# indices = torch.arange(0, 11008, device=device, dtype=torch.int64)  # Ensure dtype is compatible for indexing
+# # Sorted indices are already in ascending order; however, to simulate retrieval, we'll use them directly
+
+# # Define retrieval sizes
+# sizes = list(range(1000, 10001, 1000))
+
+# # Function to retrieve elements and measure time
+# def retrieve_elements(matrix, indices, sizes):
+#     times = []
+#     for size in sizes:
+#         start_time = time.time()
+#         # Retrieve `size` elements using the provided indices
+#         _ = matrix[:, indices[:size]]
+#         end_time = time.time()
+#         times.append(end_time - start_time)
+#     return times
+
+# # Shuffle indices for the "unsorted" scenario to demonstrate both sorted and unsorted access
+# unsorted_indices = indices[torch.randperm(indices.size(0))]
+
+# # Measure retrieval time using sorted indices
+# print("Retrieving with sorted indices:")
+# sorted_times = retrieve_elements(matrix, indices, sizes)
+
+# # Measure retrieval time using unsorted indices
+# print("Retrieving with unsorted indices:")
+# unsorted_times = retrieve_elements(matrix, unsorted_indices, sizes)
+
+# # Output the times for comparison (not executed here due to the environment's constraints)
+# print("Sorted times:", sorted_times)
+# print("Unsorted times:", unsorted_times)
+
+
+# (sorted_times, unsorted_times)
+
+
+
+
 # Ensure PyTorch is using CUDA
 # if torch.cuda.is_available():
 #     device = torch.device('cuda')
@@ -124,12 +186,12 @@ import numpy as np
 # print(res, low_rank_res[0].shape[0], low_rank_res[0].shape[1] )
 # print(res/product_of_shape)
 
-d = 4096
-m = 11008
-k_list = [64, 128, 320, 640]
-for k in k_list:
-    a = (d * k + k * k + k * m) / (d * m)
-    print(a)
+# d = 4096
+# m = 11008
+# k_list = [64, 128, 320, 640]
+# for k in k_list:
+#     a = (d * k + k * k + k * m) / (d * m)
+#     print(a)
 
 
 # a = (15404*300) / (4096*11008)

@@ -9,7 +9,7 @@ import traceback
 import datetime
 import torch.backends.cudnn as cudnn
 from config import cfg, process_args
-from dataset import make_dataset, make_data_loader, process_dataset, collate, make_batchnorm_stats
+from dataset import make_dataset, make_data_loader, process_dataset, collate, make_batchnorm_stats, make_calibration_dataloader
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
@@ -40,8 +40,6 @@ def main():
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
         print('Experiment: {}'.format(cfg['model_tag']))
         runExperiment()
-
-    
     return
 
 
@@ -70,6 +68,13 @@ def runExperiment():
 
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
+    if 'calib' in cfg['prune_method']:
+        calibration_data_loader = make_calibration_dataloader(tokenizer)
+        cfg['calibration_stage'] = True
+        run_calibration(model, calibration_data_loader)
+        cfg['calibration_stage'] = False
+
+
     dataset = process_dataset(dataset, tokenizer)
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
@@ -89,10 +94,55 @@ def runExperiment():
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
               'dense_info_list': dense_info_list, 'pruned_info_list': pruned_info_list, \
               'dense_duration': dense_duration, 'pruned_duration': pruned_duration, 'dataset_size': cfg['dataset_size']['test']}
-
     save(result, os.path.join(result_path, cfg['model_tag']))
     return
-        
+
+
+def run_calibration(model, data_loader):
+    with torch.no_grad():
+        model.train(False)
+        for i, input in enumerate(data_loader):
+            if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+                input_size = input['labels'].size(0)
+                input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                        'labels': input['labels']}
+                input = to_device(input, cfg['device'])
+                output = model(**input)
+                input_ = {'target': input['labels']}
+                output_ = {'target': output['logits'], 'loss': output['loss']}
+            elif cfg['task_name'] in ['csr']:
+                input_size = input['labels'].size(0)
+                input_indices = input['input_indices']
+                correct_labels = input['correct_labels']
+                # print('input', input)
+                input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                        'labels': input['labels']}
+                input = to_device(input, cfg['device'])
+                output = model(**input)
+                input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
+                output_ = {'target': output['logits'], 'loss': output['loss']}
+                # print('outputloss', output['loss'])
+            else:
+                input = collate(input)
+                input_size = input['data'].size(0)
+                input = to_device(input, cfg['device'])
+                output = model(**input)
+                input_ = {'target': input['target']}
+                output_ = {'target': output['target'], 'loss': output['loss']}
+            if cfg['task_name'] == 's2s':
+                output_['generate'] = model.generate(input_ids=input["input_ids"],
+                                                    max_new_tokens=cfg['max_new_tokens'])
+            elif cfg['task_name'] == 'clm':
+                if cfg['data_name'] in ['dolly']:
+                    output_['generate'] = model.generate(input_ids=input["input_ids"],
+                                                        attention_mask=input["attention_mask"],
+                                                        max_new_tokens=cfg['max_new_tokens'],
+                                                        eos_token_id=cfg['pad_token_id'],
+                                                        no_repeat_ngram_size=2)
+    return
+
+
+
 def test(data_loader, model, model_prof, metric, logger):
     # print("Debug 12.01: Test logger created", flush=True)
     start_time = time.time()

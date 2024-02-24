@@ -121,7 +121,7 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         dataset_['train'] = load_dataset('json', data_files={'train': 'data/c4/c4-train.00000-of-01024.json.gz'}, split='train')
         dataset_['test'] = load_dataset('json', data_files={'validation': 'data/c4/c4-validation.00000-of-00008.json.gz'}, split='validation')
         # Randomly sample 128 examples
-        # dataset_['train'] = dataset_['train'].train_test_split(test_size=cfg['nsamples'], seed=cfg['seed'])["test"]
+        # dataset_['train'] = dataset_['train'].train_test_split(test_size=cfg['calibration_nsamples'], seed=cfg['seed'])["test"]
     # piqa: piqa
     # siqa: siqa , 
     # arc-e: arc-easy 
@@ -132,6 +132,10 @@ def make_dataset(data_name, subset_name=None, verbose=True):
     elif data_name in ['wikitext', 'arc', 'obqa']:
         # dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test[:10%]')
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test')
+    elif data_name in ['wikivalid']:
+        dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='validation')
+    elif data_name in ['wikitest']:
+        dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
     elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
     elif data_name in ['c4']:
@@ -276,9 +280,16 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
     return data_loader
 
 def make_calibration_dataloader(tokenizer):
-    dataset = make_dataset('c4')
-    # print('c4len', len(dataset['train']))
-    dataset = process_calibration_dataset(dataset, tokenizer, 'c4')
+    if cfg['calibration_dataset'] == 'wikivalid':
+        dataset = make_dataset('wikivalid')
+        dataset = process_calibration_dataset(dataset, tokenizer, 'wiki')
+    elif cfg['calibration_dataset'] == 'wikitest':
+        dataset = make_dataset('wikitest')
+        dataset = process_calibration_dataset(dataset, tokenizer, 'wiki')
+    elif cfg['calibration_dataset'] == 'c4':
+        dataset = make_dataset('c4')
+        dataset = process_calibration_dataset(dataset, tokenizer, 'c4')
+
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'], batch_size={'train': 1})
     return data_loader
 
@@ -302,12 +313,14 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     'labels': []
                 }
                 inputs = examples['text']
+                num_samples = len(input_ids) // max_length
+                if cfg['calibration_nsamples'] == 'all':
+                    raise ValueError('Too many calibration samples for c4')
                 print('input', len(inputs))
-                if processed_calibrate_sample_num >= cfg['nsamples']:
+                if processed_calibrate_sample_num >= cfg['calibration_nsamples']:
                     return model_inputs
-                for _ in range(cfg['nsamples']):
+                for _ in range(cfg['calibration_nsamples']):
                     while True:
-
                         i = random.randint(0, len(inputs) - 1)
                         # i = 1
                         trainenc = tokenizer(inputs[i], return_tensors='pt')
@@ -315,7 +328,7 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                         if trainenc.input_ids.shape[1] > max_length:
                             break
                     processed_calibrate_sample_num += 1
-                    if processed_calibrate_sample_num > cfg['nsamples']:
+                    if processed_calibrate_sample_num > cfg['calibration_nsamples']:
                         return model_inputs
                     # i = 1
                     i = random.randint(0, trainenc.input_ids.shape[1] - max_length - 1)
@@ -339,7 +352,59 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                 desc="Running tokenizer on sampled dataset",
                 keep_in_memory=True,
             )
+        elif 'wiki' in dataset:
+            max_length = cfg[cfg['model_name']]['max_length']
+            print('max_length', max_length)
+            def preprocess_function_test(examples):   
+                global processed_calibrate_sample_num
+                all_text = "\n\n".join(examples[text_column[0]])
 
+                model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
+                input_ids = model_inputs['input_ids'][0]
+                attention_mask = model_inputs['attention_mask'][0]
+
+                num_samples = len(input_ids) // max_length
+                if cfg['calibration_nsamples'] == 'all':
+                    cfg['calibration_nsamples'] = num_samples
+                input_chunks = []
+                mask_chunks = []
+                for i in range(cfg['calibration_nsamples']):
+                    i = random.randint(0, len(input_ids) - max_length - 1)
+                    j = i + max_length
+                    input_chunks.append(input_ids[i: j])
+                    mask_chunks.append(attention_mask[i: j])
+                    processed_calibrate_sample_num += 1
+                    if processed_calibrate_sample_num >= cfg['calibration_nsamples']:
+                        break
+
+                final_inputs = {
+                    'input_ids': [],
+                    'attention_mask': [],
+                    'labels': []
+                }
+                if processed_calibrate_sample_num >= cfg['calibration_nsamples']:
+                    return final_inputs
+                for i in range(len(input_chunks)):
+                    # print('len(input_chunks[i])', len(input_chunks[i]))
+                    if len(input_chunks[i]) == max_length:
+                        final_inputs['input_ids'].append(input_chunks[i])
+                        final_inputs['attention_mask'].append(mask_chunks[i])
+                        labels = copy.deepcopy(input_chunks[i])
+                        final_inputs['labels'].append(labels)
+                
+                return final_inputs
+
+            processed_dataset = {}
+            processed_dataset['train'] = dataset['train'].map(
+                preprocess_function_test,
+                batched=True,
+                batch_size=100000,
+                num_proc=1,
+                remove_columns=dataset["train"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on dataset",
+                keep_in_memory=True,
+            )
             # processed_dataset['test'] = dataset['test'].map(
             #     preprocess_function,
             #     batched=True,

@@ -19,24 +19,16 @@ def process_control():
     cfg['prune_hyper'] = float(cfg['control']['prune_hyper'])
 
     prune_name_list = cfg['control']['prune_name'].split('+')
+
     cfg['prune_name'] = prune_name_list[0]
-    
     cfg['prune_metric'] = None
     prune_name_sub_list = cfg['prune_name'].split('-')
     cfg['prune_method'] = prune_name_sub_list[1]
     cfg['prune_metric'] = prune_name_sub_list[2]
     if 'probe' in cfg['prune_method']:
-        # if 'wandasp' in cfg['prune_method']:
-        #     cfg['prune_metric'] = 'wandasp'
-        # elif 'flap' in cfg['prune_method']:
-        #     cfg['prune_metric'] = 'flap'
-        # elif 'testourmetric' in cfg['prune_method']:
-        #     cfg['prune_metric'] = 'testourmetric'
-         # fill or each
         cfg['qk_proj_prune'] = prune_name_sub_list[3]  
         # fill or each
         cfg['vo_proj_prune'] = prune_name_sub_list[4]
-    
     
     if 'svd' in cfg['prune_method']:
         match = re.search(r'svd(\d+\.\d+)', cfg['prune_metric'])
@@ -47,20 +39,29 @@ def process_control():
             float_value = None  # Or some default value or error handling
         cfg['svd_ratio'] = float_value
 
-
-    # for calibration data pruning
-    if len(prune_name_list) == 1:
-        cfg['nsamples'] = None
-    else:
-        cfg['nsamples'] = int(prune_name_list[1])   
+    if 'calib' in cfg['prune_method']:
+        calib_info_list = prune_name_list[1].split('-')
+        cfg['calibration_dataset'] == calib_info_list[0]
+        cfg['calibration_nsamples'] == calib_info_list[1]
+        # set all to all samples in the calibration dataset
+        if not isinstance(cfg['calibration_nsamples'], str):
+            cfg['calibration_nsamples'] = int(cfg['calibration_nsamples'])  
+        
+        match = re.search(r'calib(\d+\.\d+)', cfg['prune_metric'])
+        if match:
+            # Convert the matched string to a float
+            float_value = float(match.group(1))
+        else:
+            float_value = None  # Or some default value or error handling
+        cfg['ema_momentum'] = float_value
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
         cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
     elif cfg['cust_tgt_modules'] == ['default']:
-        if cfg['python_file'] == 'test_fix_pruned_model.py':
+        if 'fixprune' in cfg['prune_method']:
             cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING[cfg['model_name']]
-        elif cfg['python_file'] == 'test_model.py':
+        else:
             cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
 
     cfg['prune_dim'] = -1

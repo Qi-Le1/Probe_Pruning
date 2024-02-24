@@ -84,6 +84,8 @@ class MySettings:
         self.normalize = if_normalize()
         self.maintain = if_maintain()
         self.cascadeattn = if_cascadeattn()
+
+
 def metric_process(mysetting, x):
     if mysetting.standardize:
         print('metric process standardize')
@@ -286,7 +288,7 @@ def prepare_calibration_input(model, dataloader, device):
         device = model.hf_device_map["model.embed_tokens"]
 
     dtype = next(iter(model.parameters())).dtype
-    inps = torch.zeros((cfg['nsamples'], cfg[cfg['model_name']]['max_length'], model.config.hidden_size), dtype=dtype, device=device)
+    inps = torch.zeros((cfg['calibration_nsamples'], cfg[cfg['model_name']]['max_length'], model.config.hidden_size), dtype=dtype, device=device)
     inps.requires_grad = False
     cache = {'i': 0, 'attention_mask': None, "position_ids": None}
 
@@ -299,6 +301,7 @@ def prepare_calibration_input(model, dataloader, device):
             # print('catcherinp', inp, cache['i'])
             # print("cache['i']", cache['i'])
             # print('kwargs', kwargs)
+            # bsz = inp.shape[0]
             inps[cache['i']] = inp
             cache['i'] += 1
             cache['attention_mask'] = kwargs['attention_mask']

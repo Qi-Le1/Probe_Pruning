@@ -227,18 +227,7 @@ class Linear(nn.Linear, EwiLayer):
             self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
         else:
             raise ValueError(f"Unknown pruning method {self.prune_name}")
-        # if self.prune_name == "wanda-sp":
-        #     self.scaler_row = torch.zeros((self.columns), device=self.device)
-        # elif self.prune_name == "flap":
-            
-        # elif self.prune_name == "pq-nobias" or self.prune_name == "pq-bias":
-        #     self.baseline_inp = torch.zeros((self.in_dim), device=self.device)
-        #     if self.prune_metric == "WIFN":
-        #         self.scaler_inp = torch.zeros((self.in_dim), device=self.device)
-        #     elif self.prune_metric == "IFV" or self.prune_metric == "WIFV":
-        #         self.fluc_inp = torch.zeros((self.in_dim), device=self.device)
-        
-        
+
     def get_pre_hook(self):
         def add_batch(inp, out):
             if len(inp.shape) == 2:
@@ -273,13 +262,6 @@ class Linear(nn.Linear, EwiLayer):
                     self.fluc_inp = self.fluc_inp.to(cur_device)
                     self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
                     self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
-                    # print('inp', inp)
-                    # print('old_baseline_inp', old_baseline_inp)
-                    # print('self.baseline_inp: ', self.baseline_inp)
-                    # print('self.fluc_inp: ', self.fluc_inp)
-                    # print('self.baseline_inp: ', self.baseline_inp)
-                    # print('self.nsamples', self.nsamples)
-                    # print('coeff', (self.nsamples - 1) / (self.nsamples + batch_size - 1))
 
             self.nsamples += batch_size
         return add_batch
