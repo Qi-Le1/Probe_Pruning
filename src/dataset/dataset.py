@@ -290,7 +290,10 @@ def make_calibration_dataloader(tokenizer):
         dataset = make_dataset('c4')
         dataset = process_calibration_dataset(dataset, tokenizer, 'c4')
 
-    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'], batch_size={'train': 1})
+    if 'fixprune' in cfg['prune_method']:
+        data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'], batch_size={'train': 1})
+    else:
+        data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     return data_loader
 
 def collate(input):
@@ -313,7 +316,6 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     'labels': []
                 }
                 inputs = examples['text']
-                num_samples = len(input_ids) // max_length
                 if cfg['calibration_nsamples'] == 'all':
                     raise ValueError('Too many calibration samples for c4')
                 print('input', len(inputs))
@@ -352,12 +354,12 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                 desc="Running tokenizer on sampled dataset",
                 keep_in_memory=True,
             )
-        elif 'wiki' in dataset:
+        elif 'wiki' in dataset_name:
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
             def preprocess_function_test(examples):   
                 global processed_calibrate_sample_num
-                all_text = "\n\n".join(examples[text_column[0]])
+                all_text = "\n\n".join(examples['text'])
 
                 model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
                 input_ids = model_inputs['input_ids'][0]

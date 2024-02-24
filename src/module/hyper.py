@@ -39,15 +39,17 @@ def process_control():
             float_value = None  # Or some default value or error handling
         cfg['svd_ratio'] = float_value
 
+    cfg['calibration_stage'] = False
     if 'calib' in cfg['prune_method']:
         calib_info_list = prune_name_list[1].split('-')
-        cfg['calibration_dataset'] == calib_info_list[0]
-        cfg['calibration_nsamples'] == calib_info_list[1]
+        cfg['calibration_dataset'] = calib_info_list[0]
+        cfg['calibration_nsamples'] = calib_info_list[1]
         # set all to all samples in the calibration dataset
         if not isinstance(cfg['calibration_nsamples'], str):
             cfg['calibration_nsamples'] = int(cfg['calibration_nsamples'])  
-        
-        match = re.search(r'calib(\d+\.\d+)', cfg['prune_metric'])
+    
+    if 'probe' in cfg['prune_method'] and ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']):
+        match = re.search(r'probe(\d+\.\d+)', cfg['prune_method'])
         if match:
             # Convert the matched string to a float
             float_value = float(match.group(1))

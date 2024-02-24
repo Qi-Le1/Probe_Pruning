@@ -369,10 +369,8 @@ class LlamaMLP(nn.Module):
                     sum_log_abs_x = log_abs_x.sum(dim=0, keepdim=True)
                     proportion = log_abs_x / (sum_log_abs_x + 1e-6)
                     comp_across_bsz = (x * proportion).sum(dim=0)
-                elif 'mbsz' in cfg['prune_method']:
-                    comp_across_bsz = x.mean(axis=0)
                 else:
-                    comp_across_bsz = torch.linalg.vector_norm(x, ord=2, dim=0)
+                    comp_across_bsz = x.mean(axis=0)
                     
                 gate_out = None
                 up_out = None
@@ -395,15 +393,15 @@ class LlamaMLP(nn.Module):
                 probe_out = gate_out * up_out
 
                 # incorporate the global distribution
-                if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
-                    probe_out = (1 - cfg['ema_momentum']) * probe_out + cfg['ema_momentum'] * self.down_proj.get_global_distribution()
-
                 if 'intersect' in cfg['prune_method']:
                     full_gate_out = self.act_fn(self.gate_proj(x))
                     full_up_out = self.up_proj(x)
                     pass
                 
-                probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
+                if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
+                    probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_distribution=self.down_proj.get_global_distribution())
+                else:
+                    probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
                 probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
 
                 # if self.probe_out_dim_indices is None:
@@ -438,8 +436,12 @@ class LlamaMLP(nn.Module):
                     # up_out = self.up_proj(x)
                     up_out = up_out[..., probe_out_dim_indices]
 
-                if 'runningmean' in cfg['prune_method'] and 'fillpbmetric' in cfg['prune_method']:
-                    self.down_proj.update_global_distribution(probe_out[prune_out_dim_indices], prune_out_dim_indices, size=bsz)
+                # intermediate_output = 
+                if 'runningmean' in cfg['prune_method']:
+                    # self.down_proj.update_global_distribution(intermediate_output[..., probe_out_dim_indices], probe_out_dim_indices)
+                    # fill the probe predict for prune_out_dim_indices
+                    if 'fillpbmetric' in cfg['prune_method']:
+                        self.down_proj.update_global_distribution(probe_out[..., prune_out_dim_indices], prune_out_dim_indices, batch_size=bsz, is_probe=True)
 
                 kwargs['probe_in_dim_indices'] = probe_out_dim_indices
                 down_proj = self.down_proj(gate_out * up_out, **kwargs)
@@ -458,8 +460,11 @@ class LlamaMLP(nn.Module):
                     probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
 
                 temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
-                if 'runningmean' in cfg['prune_method']:
-                    self.down_proj.update_global_distribution(temp[probe_out_dim_indices], probe_out_dim_indices)
+                # if 'runningmean' in cfg['prune_method']:
+                    # print('runningmean', flush=True)
+                    # print('probe_out_dim_indices', probe_out_dim_indices, flush=True)
+                    # print('temp', temp, flush=True)
+                    # self.down_proj.update_global_distribution(temp, probe_out_dim_indices)
                     # Update the running_mean and running_mean_counter here
                     # self.running_mean[probe_out_dim_indices] *= self.running_mean_counter[probe_out_dim_indices] / (self.running_mean_counter[probe_out_dim_indices] + bsz)
                     # # Ensure the denominator is broadcastable; might need to unsqueeze to add a dimension for correct broadcasting
@@ -468,7 +473,7 @@ class LlamaMLP(nn.Module):
                     # # Update running mean
                     # self.running_mean[probe_out_dim_indices] += torch.sum(norm_squared / denominator, dim=0)
                     # self.running_mean_counter[probe_out_dim_indices] += bsz
-                kwargs['probe_out_dim_indices'] = probe_out_dim_indices
+                kwargs['probe_in_dim_indices'] = probe_out_dim_indices
                 down_proj = self.down_proj(temp, **kwargs)
                 custom_duration = time.time() - time_start
                 print('fll_batch_duration', custom_duration, flush=True)

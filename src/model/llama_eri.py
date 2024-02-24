@@ -244,17 +244,23 @@ class Linear(nn.Linear, EriLayer):
             raise ValueError(f"Unknown pruning method {self.prune_name}")
         self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
 
-    def update_global_distribution(self, inp, update_indices, probe_size=None):
+    def update_global_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
-        batch_size = inp.shape[0] if probe_size is None else probe_size
+        batch_size = inp.shape[0] if batch_size is None else batch_size
         cur_device = inp.device
 
         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
             self.scaler_inp = self.scaler_inp.to(cur_device)
-            self.scaler_inp *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+            self.nsamples = self.nsamples.to(cur_device)
+            update_indices = update_indices.to(cur_device)
+            self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
             norm_squared = torch.clamp(torch.norm(inp, p=2, dim=1) ** 2, min=None, max=65504)
-            denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
+            # the probe for batch size, modify the denominator
+            if is_probe:
+                denominator = (self.nsamples[update_indices].unsqueeze(0) + inp.shape[0])
+            else:
+                denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
             self.scaler_inp[update_indices] += torch.sum(norm_squared / denominator, dim=0)
         elif self.prune_metric == "flap":
             # TODO: update later
@@ -303,7 +309,7 @@ class Linear(nn.Linear, EriLayer):
                 self.update_global_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
             elif 'runningmean' in cfg['prune_method']:
                 if 'probe_in_dim_indices' in kwargs:
-                    self.update_global_distribution(x[kwargs['probe_in_dim_indices']], kwargs['probe_in_dim_indices'])
+                    self.update_global_distribution(x, kwargs['probe_in_dim_indices'])
                 else:
                     self.update_global_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
 

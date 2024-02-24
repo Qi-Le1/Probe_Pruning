@@ -71,7 +71,7 @@ def runExperiment():
     if 'calib' in cfg['prune_method']:
         calibration_data_loader = make_calibration_dataloader(tokenizer)
         cfg['calibration_stage'] = True
-        run_calibration(model, calibration_data_loader)
+        run_calibration(model, calibration_data_loader['train'])
         cfg['calibration_stage'] = False
 
 
@@ -88,7 +88,6 @@ def runExperiment():
     
     # print('dense_info_list', dense_info_list[0], dense_info_list[1])
     summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, test_logger)
-
     # thread lock bug
     test_logger.writer = None
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
