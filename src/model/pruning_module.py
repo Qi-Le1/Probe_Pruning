@@ -255,10 +255,10 @@ def cal_prune_metric(probe_out, weight, metric_type, global_distribution=None):
             probe_out.unsqueeze_(0)
         size = probe_out.shape[0]
         weight_factor = 1.0 / size
-        sum_squared_norms = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0)
-        average_squared_norm = sum_squared_norms / torch.tensor(size, device=probe_out.device, dtype=torch.float)
+        # sum_squared_norms = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0)
+        average_squared_norm = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0).clamp(min=None, max=65504)
         if global_distribution is not None:
-            average_squared_norm = (1 - cfg['ema_momentum']) * average_squared_norm + cfg['ema_momentum'] * global_distribution.to(probe_out.device)
+            average_squared_norm = cfg['ema_momentum'] * global_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * average_squared_norm
         probe_out_dim_metric = (torch.sqrt(average_squared_norm.unsqueeze_(0).reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
     elif 'flap' in metric_type:
         pass
@@ -269,28 +269,12 @@ def cal_prune_metric(probe_out, weight, metric_type, global_distribution=None):
         weight_factor = 1.0 / size
         average_squared_norm = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0).clamp(min=None, max=65504)
         if global_distribution is not None:
-            average_squared_norm = (1 - cfg['ema_momentum']) * average_squared_norm + cfg['ema_momentum'] * global_distribution.to(probe_out.device)
+            average_squared_norm = cfg['ema_momentum'] * global_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * average_squared_norm
         probe_out_dim_metric = torch.sqrt(((average_squared_norm.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
 
     return probe_out_dim_metric
 
-# def cal_prune_metric_only_input(probe_out, metric_type):
-#     if 'wandasp' in metric_type:
-#         if probe_out.dim() == 2:
-#             probe_out.unsqueeze_(0)
-#         size = probe_out.shape[0]
-#         weight_factor = 1.0 / size
-#         sum_squared_norms = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0)
-#         average_squared_norm = sum_squared_norms / torch.tensor(size, device=probe_out.device, dtype=torch.float)
-#     elif 'flap' in metric_type:
-#         pass
-#     elif 'probe' in metric_type:
-#         if probe_out.dim() == 2:
-#             probe_out.unsqueeze_(0)
-#         size = probe_out.shape[0]
-#         weight_factor = 1.0 / size
-#         average_squared_norm = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0).clamp(min=None, max=65504)
-#     return average_squared_norm
+
 
 def cal_running_mean_prune_metric(running_mean, weight, metric_type):
     if 'wandasp' in metric_type:

@@ -68,19 +68,20 @@ def runExperiment():
 
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
-    if 'calib' in cfg['prune_method']:
-        calibration_data_loader = make_calibration_dataloader(tokenizer)
-        cfg['calibration_stage'] = True
-        run_calibration(model, calibration_data_loader['train'])
-        cfg['calibration_stage'] = False
-
-
     dataset = process_dataset(dataset, tokenizer)
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     model = make_prune_model(model)
+    if 'calib' in cfg['prune_method']:
+        print('Running Calibration ...')
+        calibration_data_loader = make_calibration_dataloader(tokenizer)
+        cfg['calibration_stage'] = True
+        print('len(calibration_data_loader)', len(calibration_data_loader['train']))
+        run_calibration(model, calibration_data_loader['train'])
+        cfg['calibration_stage'] = False
+        print('Calibration Done...')
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     test(data_loader['test'], model, model_prof, metric, test_logger)
@@ -101,6 +102,7 @@ def run_calibration(model, data_loader):
     with torch.no_grad():
         model.train(False)
         for i, input in enumerate(data_loader):
+            print('calibration', i)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],

@@ -368,6 +368,7 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                 num_samples = len(input_ids) // max_length
                 if cfg['calibration_nsamples'] == 'all':
                     cfg['calibration_nsamples'] = num_samples
+                    print('cfg[calibration_nsamples]', cfg['calibration_nsamples'])
                 input_chunks = []
                 mask_chunks = []
                 for i in range(cfg['calibration_nsamples']):

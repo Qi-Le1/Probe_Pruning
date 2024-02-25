@@ -244,10 +244,15 @@ class Linear(nn.Linear, EriLayer):
             raise ValueError(f"Unknown pruning method {self.prune_name}")
         self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
 
-    def update_global_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
+    # def update_global_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
+    def update_global_distribution(self, inp, update_indices):
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
-        batch_size = inp.shape[0] if batch_size is None else batch_size
+        # batch_size = inp.shape[0] if batch_size is None else batch_size
+        batch_size = inp.shape[0]
+        default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
+        if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
+            raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
         cur_device = inp.device
 
         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
@@ -257,10 +262,10 @@ class Linear(nn.Linear, EriLayer):
             self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
             norm_squared = torch.clamp(torch.norm(inp, p=2, dim=1) ** 2, min=None, max=65504)
             # the probe for batch size, modify the denominator
-            if is_probe:
-                denominator = (self.nsamples[update_indices].unsqueeze(0) + inp.shape[0])
-            else:
-                denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
+            # if is_probe:
+            #     denominator = (self.nsamples[update_indices].unsqueeze(0) + inp.shape[0])
+            # else:
+            denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
             self.scaler_inp[update_indices] += torch.sum(norm_squared / denominator, dim=0)
         elif self.prune_metric == "flap":
             # TODO: update later
@@ -306,6 +311,7 @@ class Linear(nn.Linear, EriLayer):
         with torch.no_grad():
             previous_dtype = x.dtype
             if cfg['calibration_stage'] == True:
+                print('calibration_stage', flush=True)
                 self.update_global_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
             elif 'runningmean' in cfg['prune_method']:
                 if 'probe_in_dim_indices' in kwargs:
