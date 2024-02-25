@@ -94,7 +94,10 @@ def main():
     log_interval = args['log_interval']
     device = args['device']
     file = args['file']
+    print('file', file)
     data = args['data'].split('_')
+    data = [x.replace('\r', '') for x in data]
+    print('data', data)
     
     gpu_ids = [','.join(str(i) for i in list(range(x, x + world_size))) for x in list(range(0, num_gpus, world_size))]
     init_seeds = [list(range(init_seed, init_seed + num_experiments, experiment_step))]
@@ -132,6 +135,7 @@ def main():
         # print('---controls', controls)
         return controls
     
+    print('file==test_model', file == 'test_model')
     if file == 'test_model':
         controls = []
         script_name = [[f'{filename}.py']]
@@ -386,7 +390,7 @@ def main():
                             ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
-            
+            print(controls)
             pass
         elif 'csr' in data:
             # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None'],

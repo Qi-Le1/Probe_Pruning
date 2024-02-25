@@ -23,39 +23,42 @@ def process_control():
     cfg['prune_name'] = prune_name_list[0]
     cfg['prune_metric'] = None
     prune_name_sub_list = cfg['prune_name'].split('-')
-    cfg['prune_method'] = prune_name_sub_list[1]
-    cfg['prune_metric'] = prune_name_sub_list[2]
-    if 'probe' in cfg['prune_method']:
-        cfg['qk_proj_prune'] = prune_name_sub_list[3]  
-        # fill or each
-        cfg['vo_proj_prune'] = prune_name_sub_list[4]
-    
-    if 'svd' in cfg['prune_method']:
-        match = re.search(r'svd(\d+\.\d+)', cfg['prune_metric'])
-        if match:
-            # Convert the matched string to a float
-            float_value = float(match.group(1))
-        else:
-            float_value = None  # Or some default value or error handling
-        cfg['svd_ratio'] = float_value
+    if len(prune_name_sub_list) > 1:
+        cfg['prune_method'] = prune_name_sub_list[1]
+        cfg['prune_metric'] = prune_name_sub_list[2]
+        if 'probe' in cfg['prune_method']:
+            cfg['qk_proj_prune'] = prune_name_sub_list[3]  
+            # fill or each
+            cfg['vo_proj_prune'] = prune_name_sub_list[4]
+        
+        if 'svd' in cfg['prune_method']:
+            match = re.search(r'svd(\d+\.\d+)', cfg['prune_metric'])
+            if match:
+                # Convert the matched string to a float
+                float_value = float(match.group(1))
+            else:
+                float_value = None  # Or some default value or error handling
+            cfg['svd_ratio'] = float_value
 
-    cfg['calibration_stage'] = False
-    if 'calib' in cfg['prune_method']:
-        calib_info_list = prune_name_list[1].split('-')
-        cfg['calibration_dataset'] = calib_info_list[0]
-        cfg['calibration_nsamples'] = calib_info_list[1]
-        # set all to all samples in the calibration dataset
-        if not isinstance(cfg['calibration_nsamples'], str):
-            cfg['calibration_nsamples'] = int(cfg['calibration_nsamples'])  
+        cfg['calibration_stage'] = False
+        if 'calib' in cfg['prune_method']:
+            calib_info_list = prune_name_list[1].split('-')
+            cfg['calibration_dataset'] = calib_info_list[0]
+            cfg['calibration_nsamples'] = calib_info_list[1]
+            # set all to all samples in the calibration dataset
+            if not isinstance(cfg['calibration_nsamples'], str):
+                cfg['calibration_nsamples'] = int(cfg['calibration_nsamples'])  
     
-    if 'probe' in cfg['prune_method'] and ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']):
-        match = re.search(r'probe(\d+\.\d+)', cfg['prune_method'])
-        if match:
-            # Convert the matched string to a float
-            float_value = float(match.group(1))
-        else:
-            float_value = None  # Or some default value or error handling
-        cfg['ema_momentum'] = float_value
+        if 'probe' in cfg['prune_method'] and ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']):
+            match = re.search(r'probe(\d+\.\d+)', cfg['prune_method'])
+            if match:
+                # Convert the matched string to a float
+                float_value = float(match.group(1))
+            else:
+                float_value = None  # Or some default value or error handling
+            cfg['ema_momentum'] = float_value
+    else:
+        cfg['prune_method'] = ''
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:

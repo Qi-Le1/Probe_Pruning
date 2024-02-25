@@ -131,11 +131,11 @@ def make_dataset(data_name, subset_name=None, verbose=True):
     # obqa: OpenBookQA (Mihaylov et al., 2018)
     elif data_name in ['wikitext', 'arc', 'obqa']:
         # dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test[:10%]')
-        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test')
+        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test', cache_dir=root)
     elif data_name in ['wikivalid']:
-        dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='validation')
+        dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='validation', cache_dir=root)
     elif data_name in ['wikitest']:
-        dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
+        dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
     elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
     elif data_name in ['c4']:
