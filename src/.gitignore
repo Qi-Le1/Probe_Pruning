@@ -1,14 +1,18 @@
 # Ignore data folder
 data/
 
+
 # Ignore all files with .pbs ending
 *.pbs
+
 
 # Ignore output folder
 output/
 
+
 # Ignore DS_Store
 .DS_Store
+
 
 # Ignore folders starting with msiexp
 msiout*/
@@ -17,7 +21,9 @@ wslout*/
 .__*
 ._*
 
+
 # Ignore folders starting with msiexp
 cifar*/
+
 
 **/__pycache__/
