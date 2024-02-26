@@ -10,7 +10,7 @@ import copy
 import torch
 from functools import partial
 from collections import defaultdict
-from datasets import load_dataset, concatenate_datasets
+from datasets import load_dataset, concatenate_datasets, load_from_disk
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import default_collate
@@ -19,6 +19,8 @@ from torch.nn.utils.rnn import pad_sequence
 from config import cfg
 from model import make_model
 from module import to_device
+from datetime import datetime
+
 
 data_stats = {'MNIST': ((0.1307,), (0.3081,)), 'FashionMNIST': ((0.2860,), (0.3530,)),
               'CIFAR10': ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
@@ -28,9 +30,19 @@ data_stats = {'MNIST': ((0.1307,), (0.3081,)), 'FashionMNIST': ((0.2860,), (0.35
 
 def make_dataset(data_name, subset_name=None, verbose=True):
     dataset_ = {}
+    contains_keyword = "ubuntu_github_repos" in os.getcwd()
+    # if contains_keyword:
+    #     print('set HF_DATASETS_OFFLINE')
+    #     # set HF_DATASETS_OFFLINE="1" 
+    #     os.environ["HF_DATASETS_OFFLINE"] = "1"
     if verbose:
+        current_time = datetime.now()
+        current_time.strftime('%Y-%m-%d %H:%M:%S')
+        print('current_path', os.getcwd())
+        print('current_time', current_time)
         print('fetching data {}...'.format(data_name))
     root = os.path.join('data', data_name)
+    print('cache_dir', root)
     if data_name in ['MNIST', 'FashionMNIST']:
         dataset_['train'] = eval('dataset.{}(root=root, split="train", '
                                  'transform=dataset.Compose([transforms.ToTensor()]))'.format(data_name))
@@ -67,36 +79,6 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         dataset_['test'].transform = dataset.Compose([
             transforms.ToTensor(),
             transforms.Normalize(*data_stats[data_name])])
-    elif data_name in ['ptb']:
-        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
-        del dataset_['validation']
-    elif data_name in ['fpb']:
-        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
-        dataset_ = dataset_['train'].train_test_split(test_size=0.1, seed=cfg['seed'])
-        classes = dataset_['train'].features['label'].names
-        dataset_ = dataset_.map(
-            lambda x: {"text_label": [classes[label] for label in x["label"]]},
-            batched=True,
-            num_proc=1,
-        )
-    elif data_name in ['wikisql']:
-        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
-        del dataset_['validation']
-    elif data_name in ['samsum']:
-        dataset_ = load_dataset('json', data_files={
-            'train': f'{root}/train.json',
-            'test': f'{root}/test.json'
-        })
-    elif data_name in ['e2enlg']:
-        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
-        del dataset_['validation']
-    elif data_name in ['webnlg']:
-        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
-        dataset_['test'] = dataset_['dev']
-        del dataset_['dev']
-    elif data_name in ['dart']:
-        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
-        del dataset_['validation']
     # WikiSQL
     # SAMSum 
     # E2E NLG Challenge
@@ -131,11 +113,48 @@ def make_dataset(data_name, subset_name=None, verbose=True):
     # obqa: OpenBookQA (Mihaylov et al., 2018)
     elif data_name in ['wikitext', 'arc', 'obqa']:
         # dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test[:10%]')
-        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test', cache_dir=root)
+        if contains_keyword:
+            try:
+                dataset_['test'] = load_from_disk(dataset_path=root)
+            except FileNotFoundError:
+                # Load the dataset from Hugging Face datasets repository
+                dataset_['test'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
+                # Save the dataset to disk for future offline use
+                dataset_['test'].save_to_disk(root)
+                print('save to disk')
+                # Optionally, try loading from disk again to verify
+                dataset_['test'] = load_from_disk(dataset_path=root)
+        else:
+            dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test', cache_dir=root)
     elif data_name in ['wikivalid']:
-        dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='validation', cache_dir=root)
+        if contains_keyword:
+            try:
+                dataset_['train'] = load_from_disk(dataset_path=root)
+            except FileNotFoundError:
+                # Load the dataset from Hugging Face datasets repository
+                dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='validation', cache_dir=root)
+                # Save the dataset to disk for future offline use
+                dataset_['train'].save_to_disk(root)
+                print('save to disk')
+                # Optionally, try loading from disk again to verify
+                dataset_['train'] = load_from_disk(dataset_path=root)
+        else:
+            dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='validation', cache_dir=root)
     elif data_name in ['wikitest']:
-        dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
+        # alse hangs for wsl load_dataset
+        if contains_keyword:
+            try:
+                dataset_['train'] = load_from_disk(dataset_path=root)
+            except FileNotFoundError:
+                # Load the dataset from Hugging Face datasets repository
+                dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
+                # Save the dataset to disk for future offline use
+                dataset_['train'].save_to_disk(root)
+                print('save to disk')
+                # Optionally, try loading from disk again to verify
+                dataset_['train'] = load_from_disk(dataset_path=root)
+        else:
+            dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
     elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
     elif data_name in ['c4']:
@@ -371,21 +390,22 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     print('cfg[calibration_nsamples]', cfg['calibration_nsamples'])
                 input_chunks = []
                 mask_chunks = []
-                for i in range(cfg['calibration_nsamples']):
-                    i = random.randint(0, len(input_ids) - max_length - 1)
-                    j = i + max_length
-                    input_chunks.append(input_ids[i: j])
-                    mask_chunks.append(attention_mask[i: j])
-                    processed_calibrate_sample_num += 1
-                    if processed_calibrate_sample_num >= cfg['calibration_nsamples']:
-                        break
-
+                # for i in range(cfg['calibration_nsamples']):
+                #     i = random.randint(0, len(input_ids) - max_length - 1)
+                #     j = i + max_length
+                #     input_chunks.append(input_ids[i: j])
+                #     mask_chunks.append(attention_mask[i: j])
+                #     processed_calibrate_sample_num += 1
+                #     if processed_calibrate_sample_num >= cfg['calibration_nsamples']:
+                #         break
+                input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+                mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
                 final_inputs = {
                     'input_ids': [],
                     'attention_mask': [],
                     'labels': []
                 }
-                if processed_calibrate_sample_num >= cfg['calibration_nsamples']:
+                if processed_calibrate_sample_num > cfg['calibration_nsamples'] + 4:
                     return final_inputs
                 for i in range(len(input_chunks)):
                     # print('len(input_chunks[i])', len(input_chunks[i]))
@@ -444,13 +464,13 @@ def process_dataset(dataset, tokenizer):
                 num_samples = len(input_ids) // max_length
                 input_chunks = []
                 mask_chunks = []
-                for i in range(num_samples):
-                    i = random.randint(0, len(input_ids) - max_length - 1)
-                    j = i + max_length
-                    input_chunks.append(input_ids[i: j])
-                    mask_chunks.append(attention_mask[i: j])
-                # input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
-                # mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+                # for i in range(num_samples):
+                #     i = random.randint(0, len(input_ids) - max_length - 1)
+                #     j = i + max_length
+                #     input_chunks.append(input_ids[i: j])
+                #     mask_chunks.append(attention_mask[i: j])
+                input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+                mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
                 final_inputs = defaultdict(list)
                 for i in range(len(input_chunks)):
                     # print('len(input_chunks[i])', len(input_chunks[i]))

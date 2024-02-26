@@ -87,7 +87,9 @@ def runExperiment():
     if cfg['model_name'] in MULTIGPUS_MODEL_NAME_LIST:
         device = model.hf_device_map["lm_head"] # for 30b and 65b we use device_map to load onto multiple A6000 GPUs, thus the processing here.
     # wrap with EWI layer, so pass model.model
+    cfg['calibration_stage'] = True
     logger_info = calibrate_model(model.model, tokenizer, calibration_data_loader['train'], device)
+    cfg['calibration_stage'] = False
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     test_logger.append(logger_info, 'test', 1)

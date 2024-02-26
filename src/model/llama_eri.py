@@ -260,13 +260,17 @@ class Linear(nn.Linear, EriLayer):
             self.nsamples = self.nsamples.to(cur_device)
             update_indices = update_indices.to(cur_device)
             self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-            norm_squared = torch.clamp(torch.norm(inp, p=2, dim=1) ** 2, min=None, max=65504)
-            # the probe for batch size, modify the denominator
-            # if is_probe:
-            #     denominator = (self.nsamples[update_indices].unsqueeze(0) + inp.shape[0])
-            # else:
-            denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
-            self.scaler_inp[update_indices] += torch.sum(norm_squared / denominator, dim=0)
+            # 感觉norm再加个bsz有点size不对，应该bsz不同global distribution就不同了
+            # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+            # print(f'{self.key}_norm_squared', norm_squared, flush=True)
+            # denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
+            # self.scaler_inp[update_indices] += torch.sum(norm_squared / denominator, dim=0)
+
+            norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=None, max=65504)
+            # print(f'{self.key}_norm_squared', norm_squared, flush=True)
+            denominator = (self.nsamples[update_indices] + batch_size)
+            self.scaler_inp[update_indices] += norm_squared / denominator
+            # print('self.scaler_inp', self.scaler_inp, flush=True)
         elif self.prune_metric == "flap":
             # TODO: update later
             old_baseline_inp = self.baseline_inp
@@ -311,7 +315,7 @@ class Linear(nn.Linear, EriLayer):
         with torch.no_grad():
             previous_dtype = x.dtype
             if cfg['calibration_stage'] == True:
-                print('calibration_stage', flush=True)
+                # print('calibration_stage', flush=True)
                 self.update_global_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
             elif 'runningmean' in cfg['prune_method']:
                 if 'probe_in_dim_indices' in kwargs:
@@ -320,11 +324,22 @@ class Linear(nn.Linear, EriLayer):
                     self.update_global_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
 
             if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
-                result = F.linear(x, self.weight)
+                # print('probeinput', x.dtype, x.shape, x, flush=True)
+                # print('probeweight', self.weight.dtype, self.weight.shape, self.weight, flush=True)
+                # x = x.to(torch.float32)
+                # weight = self.weight.to(torch.float32)
+                # print('probeinput 2 ', x.dtype, x.shape, x, flush=True)
+                # for i in range(x.shape[-2]):
+                #     print('\n\n', i)
+                #     for j in range(x.shape[-1]):
+                #         print(x[:, i, j])
+                # print('probeweight2 ', weight.dtype, weight.shape, weight, flush=True)
+                result = F.linear(x, self.weight, bias=None)
+                # print('proberesult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)
                 return result
             elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:                 
-                result = F.linear(x, self.weight)
+                result = F.linear(x, self.weight, bias=None)
                 result = result.to(previous_dtype)
                 return result
 
@@ -343,7 +358,7 @@ class Linear(nn.Linear, EriLayer):
                         self.out_selected_dim = kwargs['probe_out_dim_indices']
                 else:
                     weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
-                result = F.linear(x, weight)
+                result = F.linear(x, weight, bias=None)
                 if 'attn' in self.key:
                     if self.check_fill_case():
                         refilling_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
@@ -358,10 +373,11 @@ class Linear(nn.Linear, EriLayer):
                     weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
                 else:
                     weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
-                result = F.linear(x, weight)
+                result = F.linear(x, weight, bias=None)
                 result = result.to(previous_dtype)
                 return result
             else:
+                # only prune input in each layer
                 if 'traditional' in cfg['prune_method']:
                     x, pruned_dim, preserve_channels = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.is_prune_out_dim)
                     weight = self.extract_in_weight(input_dim, pruned_dim, preserve_channels, self.layer_type)
@@ -377,6 +393,15 @@ class Linear(nn.Linear, EriLayer):
                 # result = F.linear(x, weight, bias=output_bias)
                 pass
             else:
-                result = F.linear(x, weight)
+                # print('calibrateinput', x.dtype, x.shape, x, flush=True)
+                # print('calibrateweight', weight.dtype, weight.shape, weight, flush=True)
+                # for i in range(x.shape[-2]):
+                #     print(x[:, i, :])
+                # x = x.to(torch.float32)
+                # weight = weight.to(torch.float32)
+                # print('calibrateinput 2', x.dtype, x.shape, x, flush=True)
+                # print('calibrateweight 2', weight.dtype, weight.shape, weight, flush=True)
+                result = F.linear(x, weight, bias=None)
+                # print('calibrateresult', result.dtype, result.shape, result, flush=True)
             result = result.to(previous_dtype)
         return result

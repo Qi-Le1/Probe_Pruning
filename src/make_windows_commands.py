@@ -360,37 +360,36 @@ def main():
 
             # calib (calibdataset-all), fixprune, runningmean, prune_metric放第三个, probe默认meanbsz, fillpbmetric
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-            #                  ['mag-probe0.9calib-probe-None-None+wikivalid-all', 'mag-probe0.9calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all'
-            #                   'mag-probe0.9runningmean-probe-None-None', 'mag-probe0.9runningmeanfillpbmetric-probe-None-None', 'mag-probe0.9calibrunningmean-probe-None-None+wikitest-all'],
+            #                  ['mag-nmlprobe0.9calib-probe-None-None+wikivalid-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all'
+            #                   'mag-nmlprobe0.9runningmean-probe-None-None', 'mag-nmlprobe0.9runningmeanfillpbmetric-probe-None-None', 'mag-nmlprobe0.9calibrunningmean-probe-None-None+wikitest-all', 'mag-probe-probe-None-None'],
             #                 ['gate-proj+up-proj+down-proj']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-            #                  ['mag-probe0.9runningmean-probe-None-None', 'mag-probe0.9calib-probe-None-None+wikivalid-all', 
+            #                  ['mag-probe0.9runningmean-probe-None-None', 'mag-probe0.9calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None'
             #                  'mag-probe0.9calib-probe-None-None+wikitest-all', 'mag-probe-probe-None-None'],
             #                 ['gate-proj+up-proj+down-proj']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-                             ['mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all'],
-                            ['gate-proj+up-proj+down-proj']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5', '0.6'], 
+            #                  ['mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-nmlprobe0.5calib-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-probe0.9calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-                             ['mag-probe0.9runningmean-probe-None-None'],
-                            ['gate-proj+up-proj+down-proj']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5', '0.6'], 
+            #                  ['mag-probefullinf-probe-None-None'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-                             ['mag-runningmean-probe-None-None'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5', '0.6'], 
+                             ['mag-probe0.9runningmeancalib-probe-None-None+wikitest-all'],
                             ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
-            print(controls)
             pass
         elif 'csr' in data:
             # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None'],
@@ -601,24 +600,25 @@ def main():
         if is_gpt:
             temp_mem = int(1.5 * temp_mem)
         s = '#!/bin/bash -l\n'
-        s += f'#SBATCH --time={run_time}\n'
-        s += f'#SBATCH --nodes={task_parallel_num}\n'
-        s += f'#SBATCH --ntasks={task_parallel_num}\n'
-        # s += '#SBATCH --cpus-per-task=2'
-        s += '#SBATCH --gres=gpu:a100:1\n'
-        s += '#SBATCH --partition=a100-4\n'
-        s += f'#SBATCH --mem={temp_mem}gb\n'
-        # s += '#SBATCH --mail-type=ALL \n'
-        # s += '#SBATCH --mail-user=le000288@umn.edu\n'
-        s += f'#SBATCH -o {res_path}/{filename}_%j.out\n'
-        s += f'#SBATCH -e {res_path}/{filename}_%j.err\n'
-        s += '\n'
-        s += f'cd /home/aanwar/le000288/{code_folder}/src\n'
-        s += '\n'
-        s += 'export PATH=/home/aanwar/le000288/miniconda3/envs/eri/bin:$PATH\n'
+        # s += f'#SBATCH --time={run_time}\n'
+        # s += f'#SBATCH --nodes={task_parallel_num}\n'
+        # s += f'#SBATCH --ntasks={task_parallel_num}\n'
+        # # s += '#SBATCH --cpus-per-task=2'
+        # s += '#SBATCH --gres=gpu:a100:1\n'
+        # s += '#SBATCH --partition=a100-4\n'
+        # s += f'#SBATCH --mem={temp_mem}gb\n'
+        # # s += '#SBATCH --mail-type=ALL \n'
+        # # s += '#SBATCH --mail-user=le000288@umn.edu\n'
+        # s += f'#SBATCH -o {res_path}/{filename}_%j.out\n'
+        # s += f'#SBATCH -e {res_path}/{filename}_%j.err\n'
+        # s += '\n'
+        # s += f'cd /home/aanwar/le000288/{code_folder}/src\n'
+        # s += '\n'
+        # s += 'export PATH=/home/aanwar/le000288/miniconda3/envs/eri/bin:$PATH\n'
         # if 'max' in controls[i][-1]:
         #     s_for_max = s_for_max + 'CUDA_VISIBLE_DEVICES=\"{}\" python {} --init_seed {} --world_size {} --num_experiments {} ' \
         #         '--resume_mode {} --log_interval {} --device {} --control_name {}&\n'.format(gpu_ids[k % len(gpu_ids)], *controls[i])
+        s += 'timestamp=$(date +%Y%m%d%H%M%S)'
 
         #     if k_for_max % round == round - 1:
         #         s_for_max = s_for_max[:-2] + '\nwait\n'
@@ -626,10 +626,11 @@ def main():
         #     continue
         # while i < len(controls):
         # srun --nodes=1 --ntasks=1 
+        # time_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
         for item in sub_controls:
             s += '\n'
-            s = s + 'srun --nodes=1 --ntasks=1 python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
-        
+            s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
+
         s += 'wait\n'
         # controls[i][0] = 'test_classifier_fl.py'
         # for item in sub_controls:
@@ -638,7 +639,7 @@ def main():
         #     s += '\n'
         #     s = s + 'srun --nodes=1 --ntasks=1 python {} --device {} --resume_mode {} --init_seed {} --control_name {}&\n'.format(*item)
         # s += 'wait\n'
-        pbs_file_name = './{}.pbs'.format(f'{filename}')
+        pbs_file_name = './{}.sh'.format(f'{filename}')
         # Check if the file exists
         if os.path.exists(pbs_file_name):
             # Delete the file if it exists
@@ -648,7 +649,7 @@ def main():
         run_file.close()
 
         run_file = open(bash_file_name, 'a')
-        command = f'sbatch {filename}.pbs --wait\n'
+        command = f'bash {filename}.sh --wait\n'
         run_file.write(command)
         run_file.close()
 
@@ -656,7 +657,7 @@ def main():
             line_count = sum(1 for line in cur_file)
 
         if line_count > 180:
-            bash_file_name = './{}.bash'.format(f'msi_{file}_{data[0]}_{i}')
+            bash_file_name = './{}.sh'.format(f'msi_{file}_{data[0]}_{i}')
             print('bash_file_name', bash_file_name)
             delete_file_if_exist(bash_file_name)
     return

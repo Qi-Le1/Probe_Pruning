@@ -17,7 +17,7 @@ from module import save, to_device, process_control, resume, makedir_exist_ok, \
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 
 
-
+iterate_small_samples = False
 cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='cfg')
 for k in cfg:
@@ -89,6 +89,8 @@ def runExperiment():
     
     # print('dense_info_list', dense_info_list[0], dense_info_list[1])
     summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, test_logger)
+    evaluation = metric.evaluate('test', 'full')
+    print('evaluation_for_full', evaluation)
     # thread lock bug
     test_logger.writer = None
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
@@ -100,7 +102,7 @@ def runExperiment():
 
 def run_calibration(model, data_loader):
     with torch.no_grad():
-        model.train(False)
+        model.eval()
         for i, input in enumerate(data_loader):
             print('calibration', i)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
@@ -140,6 +142,9 @@ def run_calibration(model, data_loader):
                                                         max_new_tokens=cfg['max_new_tokens'],
                                                         eos_token_id=cfg['pad_token_id'],
                                                         no_repeat_ngram_size=2)
+            if iterate_small_samples:
+                if i == 100:
+                    break
     return
 
 
@@ -149,7 +154,7 @@ def test(data_loader, model, model_prof, metric, logger):
     start_time = time.time()
     with torch.no_grad():
         model_prof.start_profile()
-        model.train(False)
+        model.eval()
         # print("Debug 12.011: Test logger created", flush=True)
         for i, input in enumerate(data_loader):
             # print("Debug 12.1: Test logger created", flush=True)
@@ -195,7 +200,12 @@ def test(data_loader, model, model_prof, metric, logger):
             print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
+            if iterate_small_samples:
+                if i == 100:
+                    break
             # if i == 50:
+            # if i == 100:
+            #     break
             # if i == 10:
             #     break
             # break

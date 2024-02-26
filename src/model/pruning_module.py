@@ -254,23 +254,37 @@ def cal_prune_metric(probe_out, weight, metric_type, global_distribution=None):
         if probe_out.dim() == 2:
             probe_out.unsqueeze_(0)
         size = probe_out.shape[0]
-        weight_factor = 1.0 / size
         # sum_squared_norms = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0)
-        average_squared_norm = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0).clamp(min=None, max=65504)
+        norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
         if global_distribution is not None:
-            average_squared_norm = cfg['ema_momentum'] * global_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * average_squared_norm
-        probe_out_dim_metric = (torch.sqrt(average_squared_norm.unsqueeze_(0).reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
+            norm_squared = cfg['ema_momentum'] * global_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_squared
+        probe_out_dim_metric = (torch.sqrt(norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
     elif 'flap' in metric_type:
         pass
     elif 'probe' in metric_type:
+        # self.scaler_inp = self.scaler_inp.to(cur_device)
+        # self.nsamples = self.nsamples.to(cur_device)
+        # update_indices = update_indices.to(cur_device)
+        # self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+        # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=1) ** 2, min=None, max=65504)
+        # # the probe for batch size, modify the denominator
+        # # if is_probe:
+        # #     denominator = (self.nsamples[update_indices].unsqueeze(0) + inp.shape[0])
+        # # else:
+        # denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
+        # self.scaler_inp[update_indices] += torch.sum(norm_squared / denominator, dim=0)
+
         if probe_out.dim() == 2:
             probe_out.unsqueeze_(0)
+        # print('probe_out', probe_out.shape, probe_out)
         size = probe_out.shape[0]
-        weight_factor = 1.0 / size
-        average_squared_norm = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0).clamp(min=None, max=65504)
+        norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
+        # print('norm_squared', norm_squared.shape, norm_squared)
         if global_distribution is not None:
-            average_squared_norm = cfg['ema_momentum'] * global_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * average_squared_norm
-        probe_out_dim_metric = torch.sqrt(((average_squared_norm.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+            # print('global_distribution', global_distribution.shape, global_distribution)
+            norm_squared = cfg['ema_momentum'] * global_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_squared
+            # print('norm_squared new', norm_squared.shape, norm_squared)
+        probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
 
     return probe_out_dim_metric
 

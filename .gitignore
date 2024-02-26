@@ -12,7 +12,7 @@ output/
 
 # Ignore folders starting with msiexp
 msiout*/
-
+wslout*/
 # Ignore files starting with .__
 .__*
 ._*
