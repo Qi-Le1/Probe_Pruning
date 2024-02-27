@@ -18,6 +18,7 @@ from deepspeed.profiling.flops_profiler import FlopsProfiler
 
 
 iterate_small_samples = False
+# iterate_small_samples = True
 cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='cfg')
 for k in cfg:
@@ -203,6 +204,13 @@ def test(data_loader, model, model_prof, metric, logger):
             if iterate_small_samples:
                 if i == 100:
                     break
+            for name, module in model.named_modules():
+                if hasattr(module, 'cur_bsz_mean_intersection_ratio'):
+                    print('name', name)
+                    logger.append({f'{name}_cur_bsz_mean_intersection_ratio': module.cur_bsz_mean_intersection_ratio}, 'test')
+                if hasattr(module, 'probe_mean_intersection_ratio'):
+                    print('name', name)
+                    logger.append({f'{name}_probe_mean_intersection_ratio': module.probe_mean_intersection_ratio}, 'test')
             # if i == 50:
             # if i == 100:
             #     break

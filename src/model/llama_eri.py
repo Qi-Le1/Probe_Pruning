@@ -334,7 +334,11 @@ class Linear(nn.Linear, EriLayer):
                 #     for j in range(x.shape[-1]):
                 #         print(x[:, i, j])
                 # print('probeweight2 ', weight.dtype, weight.shape, weight, flush=True)
-                result = F.linear(x, self.weight, bias=None)
+                if 'square' in cfg['prune_method']:
+                    result = torch.clamp(F.linear(x, self.weight ** 2, bias=None), min=None, max=65504)
+                    print('probesquareresult', result.dtype, result.shape, result, flush=True)
+                else:
+                    result = F.linear(x, self.weight, bias=None)
                 # print('proberesult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)
                 return result
