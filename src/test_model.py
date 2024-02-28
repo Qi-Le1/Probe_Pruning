@@ -18,6 +18,7 @@ from deepspeed.profiling.flops_profiler import FlopsProfiler
 
 
 iterate_small_samples = False
+# iterate_small_samples = True
 cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='cfg')
 for k in cfg:
@@ -203,6 +204,16 @@ def test(data_loader, model, model_prof, metric, logger):
             if iterate_small_samples:
                 if i == 100:
                     break
+            for name, module in model.named_modules():
+                for attr_name in dir(module):
+                    # Check if the attribute name contains 'mean_intersection_ratio'
+                    if 'mean_intersection_ratio' in attr_name:
+                        # Retrieve the attribute value
+                        attr_value = getattr(module, attr_name)
+                        # Print the module name and attribute name
+                        # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
+                        # Append the attribute to the logger
+                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')
             # if i == 50:
             # if i == 100:
             #     break

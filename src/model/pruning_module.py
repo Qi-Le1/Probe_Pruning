@@ -249,6 +249,52 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     pq_indices = pq_indices_varying_length.to(cfg['device'])
     return int(prune_channels_count), pq_indices
 
+
+
+
+def cal_mean_intersection_ratio(first_indices, second_indices):
+    if first_indices.dim() == 1:
+        first_indices = first_indices.unsqueeze(0)
+    bsz = first_indices.shape[0]
+    intersection_ratios = []
+    for i in range(bsz):
+        set_first = set(first_indices[i].cpu().numpy())
+        set_second = set(second_indices.cpu().numpy().flatten())
+        intersection = set_first.intersection(set_second)
+        intersection_ratio = len(intersection) / len(set_first)
+        intersection_ratios.append(intersection_ratio)
+    return sum(intersection_ratios) / len(intersection_ratios)
+
+def cal_intersection_ratio(output, probe, weight, pruning_module, multiple):
+
+    bsz = output.shape[0]
+    in_size = weight.shape[1]
+    out_size = weight.shape[0]
+    # for each sample
+    optimal_norm_squared = torch.clamp(torch.norm(output, p=2, dim=1) ** 2, min=None, max=65504)
+    optimal_weight = weight.unsqueeze(0)
+    optimal_dim_metric = torch.sqrt(((optimal_norm_squared.unsqueeze_(1).reshape((-1, 1, in_size))) * torch.pow(optimal_weight, 2)).sum(dim=1).clamp(min=None, max=65504))
+    # print('optimal_dim_metric', optimal_dim_metric.shape)
+    optimal_out_dim_indices, optimal_prune_out_dim_indices = pruning_module.sort_probe_mlp_metric_parallel(optimal_dim_metric, multiple)
+    # print('optimal_probe_out_dim_indices', optimal_out_dim_indices.shape, optimal_prune_out_dim_indices.shape, optimal_prune_out_dim_indices)
+    fullinf_metric = cal_prune_metric(output, weight, cfg['prune_metric'])
+    fullinf_probe_out_dim_indices, fullinf_prune_out_dim_indices = pruning_module.sort_probe_mlp_metric(fullinf_metric, multiple)
+    
+    fullinf_vs_optimal_select_mean_intersection_ratio = cal_mean_intersection_ratio(optimal_out_dim_indices, fullinf_probe_out_dim_indices)
+    fullinf_vs_optimal_prune_mean_intersection_ratio = cal_mean_intersection_ratio(optimal_prune_out_dim_indices, fullinf_prune_out_dim_indices)
+
+    probe_metric = cal_prune_metric(probe, weight, cfg['prune_metric'])
+    probe_out_dim_indices, prune_out_dim_indices = pruning_module.sort_probe_mlp_metric(probe_metric, multiple)
+    probe_vs_optimal_select_mean_intersection_ratio = cal_mean_intersection_ratio(optimal_out_dim_indices, probe_out_dim_indices)
+    probe_vs_optimal_prune_mean_intersection_ratio = cal_mean_intersection_ratio(optimal_prune_out_dim_indices, prune_out_dim_indices)
+
+    probe_vs_fullinf_select_mean_intersection_ratio = cal_mean_intersection_ratio(fullinf_probe_out_dim_indices, probe_out_dim_indices)
+    probe_vs_fullinf_prune_mean_intersection_ratio = cal_mean_intersection_ratio(fullinf_prune_out_dim_indices, prune_out_dim_indices)
+    # print('cur_bsz_mean_intersection_ratio', cur_bsz_mean_intersection_ratio, 'probe_mean_intersection_ratio', probe_mean_intersection_ratio)
+    return fullinf_vs_optimal_select_mean_intersection_ratio, probe_vs_optimal_select_mean_intersection_ratio, probe_vs_fullinf_select_mean_intersection_ratio, \
+        fullinf_vs_optimal_prune_mean_intersection_ratio, probe_vs_optimal_prune_mean_intersection_ratio, probe_vs_fullinf_prune_mean_intersection_ratio
+
+
 def cal_prune_metric(probe_out, weight, metric_type, global_distribution=None):
     if 'wandasp' in metric_type:
         if probe_out.dim() == 2:
@@ -278,7 +324,10 @@ def cal_prune_metric(probe_out, weight, metric_type, global_distribution=None):
             probe_out.unsqueeze_(0)
         # print('probe_out', probe_out.shape, probe_out)
         size = probe_out.shape[0]
-        norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
+        if 'square' in cfg['prune_method']:
+            norm_squared = torch.clamp(torch.sum(probe_out, dim=(0, 1)), min=None, max=65504) / size
+        else:
+            norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
         # print('norm_squared', norm_squared.shape, norm_squared)
         if global_distribution is not None:
             # print('global_distribution', global_distribution.shape, global_distribution)
@@ -298,6 +347,8 @@ def cal_running_mean_prune_metric(running_mean, weight, metric_type):
     elif 'probe' in metric_type:
         probe_out_dim_metric = torch.sqrt(((running_mean.reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
     return probe_out_dim_metric
+
+
 
 class HiddenRepresentationPruning(BasePruning):
 
@@ -320,7 +371,7 @@ class HiddenRepresentationPruning(BasePruning):
         # probe_out_dim_metric = probe_out_dim_metric.to(torch.float32)
         # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
         sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
-        print(f'{self.key} sorted_value', sorted_value)
+        # print(f'{self.key} sorted_value', sorted_value)
         # normalized_sorted_value = sorted_value / sorted_value.sum()
         # print(f'{self.key} normalized_sorted_value', normalized_sorted_value)
         # mean = torch.mean(sorted_value)
@@ -337,6 +388,29 @@ class HiddenRepresentationPruning(BasePruning):
         # let the remaining element be the multiple of multiple to fit tensor cores
         num_prune = num_prune + ((probe_out_dim_metric.shape[0] - num_prune) % multiple)
         return sorted_indices[num_prune:], sorted_indices[:num_prune]
+    
+    def sort_probe_mlp_metric_parallel(self, probe_out_dim_metric, multiple):
+        probe_out_dim_metric.abs_()
+        # probe_out_dim_metric = probe_out_dim_metric.to(torch.float32)
+        # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
+        sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=-1)
+        # print(f'{self.key} sort_probe_mlp_metric_parallel sorted_value', sorted_value)
+        # normalized_sorted_value = sorted_value / sorted_value.sum()
+        # print(f'{self.key} normalized_sorted_value', normalized_sorted_value)
+        # mean = torch.mean(sorted_value)
+        # std = torch.std(sorted_value)
+
+        # # Then, normalize the tensor: (sorted_value - mean) / std
+        # standardlized_value = (sorted_value - mean) / std
+        # print(f'{self.key} standardlized_value', standardlized_value)
+        if 'mag' in cfg['prune_name']:
+            num_prune = int(self.prune_hyper * probe_out_dim_metric.shape[-1])
+        elif 'pq' in cfg['prune_name']:
+            num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
+        
+        # let the remaining element be the multiple of multiple to fit tensor cores
+        num_prune = num_prune + ((probe_out_dim_metric.shape[0] - num_prune) % multiple)
+        return sorted_indices[..., num_prune:], sorted_indices[...,:num_prune]
     
     # def cal_probe_attn_weights_metric(self, attn_weights_metric):
         
@@ -610,6 +684,7 @@ class HiddenRepresentationPruning(BasePruning):
         # print('preserve_channels', preserve_channels)
         self.update_pruning_info(info)
         return preserve_channels
+
 
 
 

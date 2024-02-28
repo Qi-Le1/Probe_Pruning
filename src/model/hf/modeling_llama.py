@@ -46,7 +46,7 @@ from transformers.utils.import_utils import is_torch_fx_available
 from transformers import LlamaConfig
 
 from config import cfg
-from ..pruning_module import HiddenRepresentationPruning, cal_prune_metric, cal_running_mean_prune_metric
+from ..pruning_module import HiddenRepresentationPruning,cal_intersection_ratio, cal_prune_metric, cal_running_mean_prune_metric
 from module import nearest_even_number
 '''
 Note: transformers 4.35.0 version
@@ -380,7 +380,13 @@ class LlamaMLP(nn.Module):
             elif cfg['calibration_stage'] == False:
                 if 'probe' in cfg['prune_method'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
                     time_start = time.time()
-                    if 'nml' in cfg['prune_method']:
+                    if 'l2nml' in cfg['prune_method']:
+                        abs_x = torch.abs(x).to(torch.float32)
+                        norm_across_bsz = torch.norm(x, p=2, dim=0, keepdim=True)
+                        proportion = (abs_x / (norm_across_bsz + 1e-10)).to(x.dtype)
+                        comp_across_bsz = torch.sum(x * proportion, dim=0)
+                        comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                    elif 'nml' in cfg['prune_method']:
                         # abs_x = torch.abs(x).to(torch.float32)
                         # porportion = abs_x / abs_x.sum(dim=0, keepdim=True)
                         # print('porportion', porportion, porportion.dtype, porportion.shape, flush=True)
@@ -412,6 +418,21 @@ class LlamaMLP(nn.Module):
                         comp_across_bsz = comp_across_bsz.unsqueeze(0)
                     elif 'fullinf' in cfg['prune_method']:
                         comp_across_bsz = x
+                    elif 'pcabszseq' in cfg['prune_method']:
+                        start_time = time.time()
+                        inp = x.reshape(-1, x.shape[-1]).to(torch.float32).t()
+                        # This V is the transpose of the V in the SVD
+                        U, S, V = torch.svd(inp)
+                        extract_element = int(round(1/bsz * inp.shape[-1]))
+                        print('extract_element', extract_element, flush=True)
+                        comp_across_bsz = torch.matmul(inp, V.T[:, :extract_element]).to(x.dtype)
+                        comp_across_bsz = comp_across_bsz.t()
+                        end_time = time.time()
+                        print('svd_duration', end_time - start_time, flush=True)
+                    elif 'twoprobe' in cfg['prune_method']:
+                        probe_one = x.mean(axis=0)
+                        probe_two = x.mean(axis=1)
+                        comp_across_bsz = torch.cat((probe_one, probe_two), dim=0)
                     else:
                         comp_across_bsz = x.mean(axis=0)
                         comp_across_bsz = comp_across_bsz.unsqueeze(0)
@@ -440,13 +461,24 @@ class LlamaMLP(nn.Module):
                         up_out = self.up_proj(x)
 
                     probe_out = gate_out * up_out
+                    if 'twoprobe' in cfg['prune_method']:
+                        probe_one = probe_out[:x.shape[1], :].unsqueeze(0)
+                        print('probe_one twoprobe', probe_one.shape, flush=True)
+                        probe_two = probe_out[x.shape[1]:, :].unsqueeze(1)
+                        print('probe_two twoprobe', probe_two.shape, flush=True)
+                        probe_out = probe_one * probe_two
+                        print('probe_out twoprobe', probe_out.shape, flush=True)
+
                     # print('probe_out gateup', probe_out, flush=True)
 
                     # incorporate the global distribution
-                    if 'intersect' in cfg['prune_method']:
-                        # full_gate_out = self.act_fn(self.gate_proj(x))
-                        # full_up_out = self.up_proj(x)
-                        pass
+                    # if 'intersect' in cfg['prune_method']:
+                    full_gate_out = self.act_fn(self.gate_proj(x))
+                    full_up_out = self.up_proj(x)
+
+                    self.fullinf_vs_optimal_select_mean_intersection_ratio, self.probe_vs_optimal_select_mean_intersection_ratio, self.probe_vs_fullinf_select_mean_intersection_ratio, \
+                    self.fullinf_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_fullinf_prune_mean_intersection_ratio = \
+                        cal_intersection_ratio(full_gate_out * full_up_out, probe_out, self.down_proj.weight.data, self.pruning_module, multiple)
                     
                     if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
                         probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_distribution=self.down_proj.get_global_distribution())
