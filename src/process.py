@@ -1376,7 +1376,20 @@ def make_vis(df_exp, df_history):
                             #         key_for_dict = f"Dense"
                             #     else:
                             #         key_for_dict = f"Mag"
-                            
+                    
+    
+                    if 'position' in index:
+                        layer_number = index.split('/')[1]
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, layer_number, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'position_distribution'])
+                        fig[fig_name] = plt.figure(fig_name)
+                        # x = fullinf_vs_optimal_select_mean_intersection_ratio_order
+                        # cur_bsz_mean_intersection_ratio_order += 1
+                        y = row.tolist()[0]
+                        yerr = row_std.tolist()[0]
+                        key_for_dict = prune_name
+                        draw_histogram(plt, y, bins=100, density=True, x_label='Value', y_label='Nums', title='Position Distribution')
+
+
                     if 'fullinf_vs_optimal_select_mean_intersection_ratio' in index:
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'fullinf_vs_optimal_select_mean_intersection_ratio'])
                         fig[fig_name] = plt.figure(fig_name)

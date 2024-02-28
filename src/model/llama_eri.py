@@ -235,6 +235,10 @@ class Linear(nn.Linear, EriLayer):
         self.in_features = in_features
         self.prune_metric = cfg['prune_metric']
 
+        self.samples_num = torch.zeros((in_features), device=self.weight.data.device)
+        # self.mean_for_all_batches = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+        # self.variance_for_all_batches = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+
         self.baseline_inp = torch.zeros((in_features), device=self.weight.data.device)
         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
             self.scaler_inp = torch.zeros((in_features), device=self.weight.data.device)
@@ -244,8 +248,63 @@ class Linear(nn.Linear, EriLayer):
             raise ValueError(f"Unknown pruning method {self.prune_name}")
         self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
 
-    # def update_global_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
-    def update_global_distribution(self, inp, update_indices):
+        self.position_1 = []
+        self.position_2 = []
+        self.position_3 = []
+        self.position_4 = []
+        self.position_5 = []
+
+    def update_global_input_distribution(self, inp, update_indices):
+        if len(inp.shape) == 2:
+            inp = inp.unsqueeze(0)
+        # batch_size = inp.shape[0] if batch_size is None else batch_size
+        batch_size = inp.shape[0]
+        default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
+        if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
+            raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
+        
+        # cur_device = inp.device
+        # self.mean_for_all_batches = self.mean_for_all_batches.to(cur_device)
+        # self.variance_for_all_batches = self.variance_for_all_batches.to(cur_device)
+        # self.samples_num = self.samples_num.to(cur_device)
+        # update_indices = update_indices.to(cur_device)
+
+        for new_sample in inp:
+            # sample_count += 1
+            # delta = new_sample - running_mean
+            # running_mean += delta / sample_count
+            # delta2 = new_sample - running_mean  # Recalculate delta after updating the mean
+            # running_variance += delta * delta2
+            # self.samples_num[update_indices] += 1
+            # delta = new_sample - self.mean_for_all_batches[:, update_indices]
+            # self.mean_for_all_batches[:, update_indices] += delta / self.samples_num[update_indices]
+            # delta2 = new_sample - self.mean_for_all_batches[:, update_indices]  # Recalculate delta after updating the mean
+            # self.variance_for_all_batches[:, update_indices] += delta * delta2
+            # print('new_sample', new_sample.shape, flush=True)
+            if 'up_proj' in self.key:
+                # print('self.key', self.key, flush=True)
+                self.position_1.append(new_sample[0][0].item())
+                self.position_2.append(new_sample[1][20].item())
+                self.position_3.append(new_sample[2][400].item())
+                self.position_4.append(new_sample[3][600].item())
+                self.position_5.append(new_sample[4][800].item())
+        # print('self.position_1', len(self.position_1), flush=True)
+        # running_variance_increment = torch.zeros((inp.shape[1]), device=inp.device, dtype=torch.float32)
+        # self.mean_for_all_batches = self.mean_for_all_batches.to(cur_device)
+        # self.samples_num = self.samples_num.to(cur_device)
+        # update_indices = update_indices.to(cur_device)
+        # self.mean_for_all_batches[update_indices] *= self.samples_num[update_indices] / (self.samples_num[update_indices] + batch_size)
+        # inp = torch.clamp(inp, min=None, max=65504)
+        # denominator = (self.samples_num[update_indices] + batch_size)
+        # self.mean_for_all_batches[update_indices] += inp / denominator
+
+        # self.variance_for_all_batches[update_indices] +=
+
+
+
+
+    # def update_global_metric_score_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
+    def update_global_metric_score_distribution(self, inp, update_indices):
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
         # batch_size = inp.shape[0] if batch_size is None else batch_size
@@ -260,12 +319,6 @@ class Linear(nn.Linear, EriLayer):
             self.nsamples = self.nsamples.to(cur_device)
             update_indices = update_indices.to(cur_device)
             self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-            # 感觉norm再加个bsz有点size不对，应该bsz不同global distribution就不同了
-            # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
-            # print(f'{self.key}_norm_squared', norm_squared, flush=True)
-            # denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
-            # self.scaler_inp[update_indices] += torch.sum(norm_squared / denominator, dim=0)
-
             norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=None, max=65504)
             # print(f'{self.key}_norm_squared', norm_squared, flush=True)
             denominator = (self.nsamples[update_indices] + batch_size)
@@ -286,11 +339,17 @@ class Linear(nn.Linear, EriLayer):
                 self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
         self.nsamples[update_indices] += batch_size
 
-    def get_global_distribution(self):
+    def get_global_input_distribution(self):
+        # return mean and std
+        print('self.samples_num', self.samples_num, flush=True)
+        return self.mean_for_all_batches, torch.sqrt(self.variance_for_all_batches / (self.samples_num - 1))
+        
+    def get_global_metric_score_distribution(self):
         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
             return self.scaler_inp
         elif self.prune_metric == "flap":
             return self.fluc_inp
+
 
     def free(self):
         if hasattr(self, 'baseline_inp'):
@@ -316,12 +375,18 @@ class Linear(nn.Linear, EriLayer):
             previous_dtype = x.dtype
             if cfg['calibration_stage'] == True:
                 # print('calibration_stage', flush=True)
-                self.update_global_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
+                self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
+                self.update_global_input_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
+
+                # metric_score = self.get_global_metric_score_distribution()
+                # mean_for_all_batches, std_for_all_batches = self.get_global_input_distribution()
+
+
             elif 'runningmean' in cfg['prune_method']:
                 if 'probe_in_dim_indices' in kwargs:
-                    self.update_global_distribution(x, kwargs['probe_in_dim_indices'])
+                    self.update_global_metric_score_distribution(x, kwargs['probe_in_dim_indices'])
                 else:
-                    self.update_global_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
+                    self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
 
             if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
                 # print('probeinput', x.dtype, x.shape, x, flush=True)

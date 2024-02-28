@@ -295,15 +295,15 @@ def cal_intersection_ratio(output, probe, weight, pruning_module, multiple):
         fullinf_vs_optimal_prune_mean_intersection_ratio, probe_vs_optimal_prune_mean_intersection_ratio, probe_vs_fullinf_prune_mean_intersection_ratio
 
 
-def cal_prune_metric(probe_out, weight, metric_type, global_distribution=None):
+def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distribution=None):
     if 'wandasp' in metric_type:
         if probe_out.dim() == 2:
             probe_out.unsqueeze_(0)
         size = probe_out.shape[0]
         # sum_squared_norms = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0)
         norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
-        if global_distribution is not None:
-            norm_squared = cfg['ema_momentum'] * global_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_squared
+        if global_metric_score_distribution is not None:
+            norm_squared = cfg['ema_momentum'] * global_metric_score_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_squared
         probe_out_dim_metric = (torch.sqrt(norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
     elif 'flap' in metric_type:
         pass
@@ -329,9 +329,9 @@ def cal_prune_metric(probe_out, weight, metric_type, global_distribution=None):
         else:
             norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
         # print('norm_squared', norm_squared.shape, norm_squared)
-        if global_distribution is not None:
-            # print('global_distribution', global_distribution.shape, global_distribution)
-            norm_squared = cfg['ema_momentum'] * global_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_squared
+        if global_metric_score_distribution is not None:
+            # print('global_metric_score_distribution', global_metric_score_distribution.shape, global_metric_score_distribution)
+            norm_squared = cfg['ema_momentum'] * global_metric_score_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_squared
             # print('norm_squared new', norm_squared.shape, norm_squared)
         probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
 
