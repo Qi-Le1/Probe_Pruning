@@ -12,6 +12,7 @@ output/
 
 # Ignore DS_Store
 .DS_Store
+/.DS_Store
 
 
 # Ignore folders starting with msiexp
@@ -26,6 +27,6 @@ wslout*/
 cifar*/
 
 
-**/__pycache__/
+/__pycache__/
 
 msi_test_model_clm.bash
