@@ -30,7 +30,8 @@ data_stats = {'MNIST': ((0.1307,), (0.3081,)), 'FashionMNIST': ((0.2860,), (0.35
 
 def make_dataset(data_name, subset_name=None, verbose=True):
     dataset_ = {}
-    contains_keyword = "ubuntu_github_repos" in os.getcwd()
+    # contains_keyword = "ubuntu_github_repos" in os.getcwd()
+    contains_keyword = True
     # if contains_keyword:
     #     print('set HF_DATASETS_OFFLINE')
     #     # set HF_DATASETS_OFFLINE="1" 
@@ -41,7 +42,10 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         print('current_path', os.getcwd())
         print('current_time', current_time)
         print('fetching data {}...'.format(data_name))
-    root = os.path.join('data', data_name)
+    if subset_name != 'none' and subset_name is not None:
+        root = os.path.join('data', f'{data_name}_{subset_name}')
+    else:
+        root = os.path.join('data', data_name)
     print('cache_dir', root)
     if data_name in ['MNIST', 'FashionMNIST']:
         dataset_['train'] = eval('dataset.{}(root=root, split="train", '
