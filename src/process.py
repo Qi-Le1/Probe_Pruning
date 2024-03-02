@@ -210,33 +210,33 @@ def make_control_list(file):
 
 
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-                         ['mag-probe0.9runningmean-probe-None-None', 'mag-probe0.9calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None',
-                         'mag-probe0.9calib-probe-None-None+wikitest-all', 'mag-probefullinf-probe-None-None', 'mag-fullinfprobe0.1calib-probe-None-None+wikitest-all'],
-                        ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-                             ['mag-nmlprobe0.9calib-probe-None-None+wikivalid-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all',
-                              'mag-nmlprobe0.9runningmean-probe-None-None', 'mag-nmlprobe0.9runningmeanfillpbmetric-probe-None-None', 
-                              'mag-probe-probe-None-None', 'mag-probefullinf-probe-None-None', 'mag-fullinfprobe0.9calib-probe-None-None+wikitest-all',
-                              'mag-nmlprobe0.7calib-probe-None-None+wikivalid-all', 'mag-pcabszseqprobe0.9calib-probe-None-None+wikivalid-all',
-                              'mag-twoprobe0.9calib-probe-None-None+wikivalid-all', 'mag-fullinfprobe0.1calib-probe-None-None+wikitest-all',
-                              ],
-                            ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
+        #                  ['mag-probe0.9runningmean-probe-None-None', 'mag-probe0.9calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None',
+        #                  'mag-probe0.9calib-probe-None-None+wikitest-all', 'mag-probefullinf-probe-None-None', 'mag-fullinfprobe0.1calib-probe-None-None+wikitest-all'],
+        #                 ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
 
         # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-        #                      ['mag-nmlprobe0.9calib-probe-None-None+wikivalid-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 
+        #                      ['mag-nmlprobe0.9calib-probe-None-None+wikivalid-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all',
+        #                       'mag-nmlprobe0.9runningmean-probe-None-None', 'mag-nmlprobe0.9runningmeanfillpbmetric-probe-None-None', 
+        #                       'mag-probe-probe-None-None', 'mag-probefullinf-probe-None-None', 'mag-fullinfprobe0.9calib-probe-None-None+wikitest-all',
+        #                       'mag-nmlprobe0.7calib-probe-None-None+wikivalid-all', 'mag-pcabszseqprobe0.9calib-probe-None-None+wikivalid-all',
+        #                       'mag-twoprobe0.9calib-probe-None-None+wikivalid-all', 'mag-fullinfprobe0.1calib-probe-None-None+wikitest-all',
         #                       ],
         #                     ['gate-proj+up-proj+down-proj']]]
         # CIFAR10_controls_9 = make_controls( control_name)
         # controls.extend(CIFAR10_controls_9)
+
+
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['50'], ['128'], ['0.1'], 
+                             ['mag-gauexpcalib-probe-None-None+wikivalid-all'
+                              ],
+                            ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
     elif file == 'wikitext-baseline':
         # control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
         #             ['o-proj','down-proj', 'o-proj+down-proj']]]
@@ -1378,16 +1378,19 @@ def make_vis(df_exp, df_history):
                             #         key_for_dict = f"Mag"
                     
     
-                    if 'position' in index:
+                    if 'position_distribution_1' in index:
                         layer_number = index.split('/')[1]
                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, layer_number, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'position_distribution'])
                         fig[fig_name] = plt.figure(fig_name)
                         # x = fullinf_vs_optimal_select_mean_intersection_ratio_order
                         # cur_bsz_mean_intersection_ratio_order += 1
-                        y = row.tolist()[0]
-                        yerr = row_std.tolist()[0]
+                        
+                        y = row.tolist()
+                        yerr = row_std.tolist()
+                        if 'position_distribution_1' in index:
+                            print('\nposition_distribution_1', len(y), layer_number)
                         key_for_dict = prune_name
-                        draw_histogram(plt, y, bins=100, density=True, x_label='Value', y_label='Nums', title='Position Distribution')
+                        draw_histogram(plt, y, bins=2000, density=True, x_label='Value', y_label='Nums', title='Position Distribution')
 
 
                     if 'fullinf_vs_optimal_select_mean_intersection_ratio' in index:

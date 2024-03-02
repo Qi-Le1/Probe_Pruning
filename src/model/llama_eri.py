@@ -248,11 +248,11 @@ class Linear(nn.Linear, EriLayer):
             raise ValueError(f"Unknown pruning method {self.prune_name}")
         self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
 
-        self.position_1 = []
-        self.position_2 = []
-        self.position_3 = []
-        self.position_4 = []
-        self.position_5 = []
+        self.position_distribution_1 = []
+        self.position_distribution_2 = []
+        self.position_distribution_3 = []
+        self.position_distribution_4 = []
+        self.position_distribution_5 = []
 
     def update_global_input_distribution(self, inp, update_indices):
         if len(inp.shape) == 2:
@@ -283,11 +283,11 @@ class Linear(nn.Linear, EriLayer):
             # print('new_sample', new_sample.shape, flush=True)
             if 'up_proj' in self.key:
                 # print('self.key', self.key, flush=True)
-                self.position_1.append(new_sample[0][0].item())
-                self.position_2.append(new_sample[1][20].item())
-                self.position_3.append(new_sample[2][400].item())
-                self.position_4.append(new_sample[3][600].item())
-                self.position_5.append(new_sample[4][800].item())
+                self.position_distribution_1.append(new_sample[0][0].item())
+                self.position_distribution_2.append(new_sample[1][20].item())
+                self.position_distribution_3.append(new_sample[2][400].item())
+                self.position_distribution_4.append(new_sample[3][600].item())
+                self.position_distribution_5.append(new_sample[4][800].item())
         # print('self.position_1', len(self.position_1), flush=True)
         # running_variance_increment = torch.zeros((inp.shape[1]), device=inp.device, dtype=torch.float32)
         # self.mean_for_all_batches = self.mean_for_all_batches.to(cur_device)
