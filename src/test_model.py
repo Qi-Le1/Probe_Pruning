@@ -105,7 +105,7 @@ def run_calibration(model, data_loader):
     with torch.no_grad():
         model.eval()
         for i, input in enumerate(data_loader):
-            print('calibration', i)
+            print('calibration', i, flush=True)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -219,7 +219,7 @@ def test(data_loader, model, model_prof, metric, logger):
             #     break
             # if i == 10:
             #     break
-            break
+            # break
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))

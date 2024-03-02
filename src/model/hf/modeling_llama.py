@@ -48,6 +48,7 @@ from transformers import LlamaConfig
 from config import cfg
 from ..pruning_module import HiddenRepresentationPruning,cal_intersection_ratio, cal_prune_metric, cal_running_mean_prune_metric
 from module import nearest_even_number
+from torch.nn.functional import cosine_similarity
 '''
 Note: transformers 4.35.0 version
 '''
@@ -328,6 +329,9 @@ class LlamaMLP(nn.Module):
         self.running_mean = None
 
         self.probe_out_dim_indices = None
+
+        self.input_norm_gate_weight = None
+        self.input_norm_up_weight = None
     def forward(self, x, **kwargs):
         if self.config.pretraining_tp > 1:
             slice = self.intermediate_size // self.config.pretraining_tp
@@ -377,9 +381,88 @@ class LlamaMLP(nn.Module):
                     mlp_duration = time.time() - mlp_duration_start
                     # print('mlp_duration', mlp_duration, flush=True)
                     del temp_gate, temp_up
-            elif cfg['calibration_stage'] == False:
+                    return down_proj
+                # and self.layer_order >= 5
+            # elif cfg['calibration_stage'] == False and self.layer_order >= 5:
+            elif cfg['calibration_stage'] == False and self.layer_order > cfg['skip']:
+                print('zzz', self.layer_order, flush=True)
                 if 'probe' in cfg['prune_method'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
                     time_start = time.time()
+                    if 'similarityprobe' in cfg['prune_method']:
+                        start_time = time.time()
+                        
+
+                        def cal_sign_agreement_metrix(x_flattened):
+                            strength = torch.norm(x_flattened, p=2, dim=0)
+                            # Calculate the number of positions to select (top 10%)
+                            top_k = max(int(0.05 * strength.numel()), 1)  # Ensure at least one position is selected
+                            # print('top_k', top_k, strength.numel(), strength.shape, flush=True)
+                            # Use torch.topk to find the top k positions. 
+                            # torch.topk returns values and their corresponding indices.
+                            top_values, top_indices = torch.topk(strength, k=top_k)
+
+                            top_positions_flat = x_flattened[:, top_indices]  # [bsz, top_k]
+                            print('top_positions_flat', top_positions_flat, flush=True)
+                            signs_top_positions_flat = torch.sign(top_positions_flat)
+                            # print('signs_top_positions_flat', signs_top_positions_flat, flush=True)
+                            # sign_similarity = signs_top_positions_flat * signs_top_positions_flat.transpose(0, 1)
+                            # Expand dimensions for broadcasting
+                            expanded_signs = signs_top_positions_flat.unsqueeze(1)  # Shape: [bsz, 1, top_k]
+                            # Repeat signs for comparison across all pairs
+                            repeated_signs = signs_top_positions_flat.unsqueeze(0)  # Shape: [1, bsz, top_k]
+
+                            # Element-wise multiplication to check sign agreement (-1 * -1 = 1, 1 * 1 = 1, else = -1 or 0)
+                            sign_agreement = expanded_signs * repeated_signs  # Shape: [bsz, bsz, top_k]
+
+                            # Sum over the top_k dimension to count the number of agreements per pair
+                            sign_agreement_matrix = sign_agreement.sum(dim=-1)  # Shape: [bsz, bsz]
+                            # print('sign_agreement_matrix v1', sign_agreement_matrix, flush=True)
+                            sign_agreement_matrix = sign_agreement_matrix / top_k
+                            print('sign_agreement_matrix', sign_agreement_matrix, flush=True)
+                        #     print('top_positions_flat', top_positions_flat, flush=True)
+                        #     # Normalize
+                        #     norm_signs_top_positions_flat = signs_top_positions_flat / (torch.norm(signs_top_positions_flat, p=2, dim=-1, keepdim=True) + 1e-9)
+                        #    # Assuming norm_top_positions_flat is [bsz, top_k]
+                        #     similarity_matrix = torch.matmul(norm_signs_top_positions_flat, norm_signs_top_positions_flat.transpose(0, 1))
+                        
+                        if self.input_norm_gate_weight is None:
+                            self.input_norm_gate_weight = torch.norm(self.gate_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
+                        if self.input_norm_up_weight is None:
+                            self.input_norm_up_weight = torch.norm(self.up_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
+                        
+                        x_temp_gate = x * self.input_norm_gate_weight
+                        x_temp_up = x * self.input_norm_up_weight
+                        print('\nx_temp_gate')
+                        cal_sign_agreement_metrix(x_temp_gate.view(x_temp_gate.size(0), -1))
+                        print('\nx_temp_up')
+                        cal_sign_agreement_metrix(x_temp_up.view(x_temp_up.size(0), -1))
+                        # x_flattened = x.view(x.size(0), -1) 
+
+
+                        end_time = time.time()
+                        print('similarity_duration', self.layer_order, end_time - start_time, flush=True)
+
+                        # similarity_matrix = similarity_matrix.mean(dim=-1)
+                        # print('similarity_matrix', similarity_matrix, flush=True)
+
+                        # gate_weight_flatten = self.gate_proj.weight.data.view(-1)
+                        # down_weight_flatten = self.down_proj.weight.data.view(-1)
+                        # up_weight_flatten = self.up_proj.weight.data.view(-1)
+
+                        # top_k_gate_weight, top_k_gate_indices = torch.topk(gate_weight_flatten, k=top_k)
+                        # top_k_down_weight, top_k_down_indices = torch.topk(down_weight_flatten, k=top_k)
+                        # top_k_up_weight, top_k_up_indices = torch.topk(up_weight_flatten, k=top_k)
+                        # print('top_k_gate_weight', top_k_gate_weight, top_k_gate_indices, flush=True)
+                        # print('top_k_down_weight', top_k_down_weight, top_k_down_indices, flush=True)
+                        # print('top_k_up_weight', top_k_up_weight, top_k_up_indices, flush=True)
+                        abs_x = torch.abs(x).to(torch.float32)
+                        sum_across_bsz = abs_x.sum(dim=0, keepdim=True)
+                        # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
+                        proportion = (abs_x / (sum_across_bsz + 1e-10)).to(x.dtype)
+                        # proportion = 10
+                        # print('proportion ', proportion, flush=True)
+                        comp_across_bsz = torch.sum(x * proportion, dim=0)
+                        comp_across_bsz = comp_across_bsz.unsqueeze(0)
                     if 'gauexp' in cfg['prune_method']:
                         # mean_for_all_batches = self.gate_proj.mean_for_all_batches
                         # std_for_all_batches = self.gate_proj.std_for_all_batches
@@ -389,21 +472,41 @@ class LlamaMLP(nn.Module):
                         # print('std_for_all_batches', std_for_all_batches, flush=True)
                         # Compute z-scores
                         # print('x', x, flush=True)
-                        z_scores = (x - mean_for_all_batches) / std_for_all_batches
+                        # z_scores = (x - mean_for_all_batches) / std_for_all_batches
+                        delta = x - mean_for_all_batches
+                        weights = torch.abs(delta) ** 2
                         # print('z_scores', z_scores, flush=True)
 
                         # Calculate exponential weights
-                        weights = torch.exp(torch.abs(z_scores))
+                        # weights = torch.exp(torch.abs(z_scores))
                         # print('weights', weights, flush=True)
                         weights = weights / (weights.sum(dim=0, keepdim=True) + 1e-10)
                         # print('weights after nml', weights, flush=True)
                         # Apply weights and sum across the batch dimension
-                        comp_across_bsz = torch.sum(weights * x, dim=0)
-                    if 'l2nml' in cfg['prune_method']:
+                        comp_across_bsz = torch.sum(weights * delta + mean_for_all_batches, dim=0)
+                    elif 'l2nml' in cfg['prune_method']:
                         abs_x = torch.abs(x).to(torch.float32)
                         norm_across_bsz = torch.norm(x, p=2, dim=0, keepdim=True)
                         proportion = (abs_x / (norm_across_bsz + 1e-10)).to(x.dtype)
                         comp_across_bsz = torch.sum(x * proportion, dim=0)
+                        comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                    elif 'deltaplusmeannml' in cfg['prune_method']:
+                        mean_for_batch = x.mean(dim=0, keepdim=True)
+                        abs_delta = torch.abs(x - mean_for_batch).to(torch.float32)
+                        abs_sum = abs_delta.sum(dim=0, keepdim=True) + torch.abs(mean_for_batch)
+                        porportion = (torch.abs(mean_for_batch) + abs_delta) / (abs_sum + 1e-10) / torch.sum((torch.abs(mean_for_batch) + abs_delta) / (abs_sum + 1e-10), dim=0, keepdim=True)
+                        comp_across_bsz = (porportion * x).to(x.dtype)
+                        comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                    elif 'deltanml' in cfg['prune_method']:
+                        # mean_for_all_batches, std_for_all_batches = self.gate_proj.get_global_input_distribution()
+                        mean_for_batch = x.mean(dim=0, keepdim=True)
+                        delta = (x - mean_for_batch).to(torch.float32)
+                        abs_delta = torch.abs(delta)
+                        # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
+                        proportion = (abs_delta / (abs_delta.sum(dim=0, keepdim=True) + 1e-10)).to(x.dtype)
+                        # proportion = 10
+                        # print('proportion ', proportion, flush=True)
+                        comp_across_bsz = torch.sum(delta * proportion + mean_for_batch, dim=0).to(x.dtype)
                         comp_across_bsz = comp_across_bsz.unsqueeze(0)
                     elif 'nml' in cfg['prune_method']:
                         # abs_x = torch.abs(x).to(torch.float32)
@@ -452,6 +555,9 @@ class LlamaMLP(nn.Module):
                         probe_one = x.mean(axis=0)
                         probe_two = x.mean(axis=1)
                         comp_across_bsz = torch.cat((probe_one, probe_two), dim=0)
+                    elif 'normbsz' in cfg['prune_method']:
+                        comp_across_bsz = torch.norm(x, p=2, dim=0)
+                        comp_across_bsz = comp_across_bsz.unsqueeze(0)
                     else:
                         comp_across_bsz = x.mean(axis=0)
                         comp_across_bsz = comp_across_bsz.unsqueeze(0)
@@ -492,15 +598,18 @@ class LlamaMLP(nn.Module):
 
                     # incorporate the global distribution
                     # if 'intersect' in cfg['prune_method']:
-                    full_gate_out = self.act_fn(self.gate_proj(x))
-                    full_up_out = self.up_proj(x)
-
-                    self.fullinf_vs_optimal_select_mean_intersection_ratio, self.probe_vs_optimal_select_mean_intersection_ratio, self.probe_vs_fullinf_select_mean_intersection_ratio, \
-                    self.fullinf_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_fullinf_prune_mean_intersection_ratio = \
-                        cal_intersection_ratio(full_gate_out * full_up_out, probe_out, self.down_proj.weight.data, self.pruning_module, multiple)
+                    # record intersection ratio
+                    # full_gate_out = self.act_fn(self.gate_proj(x))
+                    # full_up_out = self.up_proj(x)
+                    # self.fullinf_vs_optimal_select_mean_intersection_ratio, self.probe_vs_optimal_select_mean_intersection_ratio, self.probe_vs_fullinf_select_mean_intersection_ratio, \
+                    # self.fullinf_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_fullinf_prune_mean_intersection_ratio = \
+                    #     cal_intersection_ratio(full_gate_out * full_up_out, probe_out, self.down_proj.weight.data, self.pruning_module, multiple)
                     
                     if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
-                        probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution())
+                        if 'saveseqdim' in cfg['prune_method']:
+                            probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
+                        else:
+                            probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution())
                     else:
                         probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
                     probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
@@ -550,7 +659,7 @@ class LlamaMLP(nn.Module):
                     custom_duration = time.time() - time_start
                     # print('fll_batch_duration', custom_duration, flush=True)
                     return down_proj
-                elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
+                elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order >= cfg['skip']:
                     bsz, _, _ = x.shape
                     time_start = time.time()
                     if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
@@ -558,7 +667,10 @@ class LlamaMLP(nn.Module):
                         # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
                         # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
                     else:
-                        probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                        if 'meanglobalinput' in cfg['prune_method']:
+                            probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_input_distribution()[0], self.down_proj.weight.data, cfg['prune_metric'])
+                        else:
+                            probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
                         probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
 
                     temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
@@ -611,25 +723,25 @@ class LlamaMLP(nn.Module):
                 #     print('fll_batch_duration', custom_duration, flush=True)
                 #     return down_proj
                 
-                else:
-                    mlp_duration_start = time.time()
-                    time_start = time.time()
-                    temp_gate = self.act_fn(self.gate_proj(x))
-                    custom_duration = time.time() - time_start
-                    print('custom_duration gate', custom_duration, flush=True)
+            else:
+                mlp_duration_start = time.time()
+                time_start = time.time()
+                temp_gate = self.act_fn(self.gate_proj(x))
+                custom_duration = time.time() - time_start
+                print('custom_duration gate', custom_duration, flush=True)
 
-                    time_start = time.time()
-                    temp_up = self.up_proj(x)
-                    custom_duration = time.time() - time_start
-                    print('custom_duration up', custom_duration, flush=True)
-                    time_start = time.time()
-                    down_proj = self.down_proj(temp_gate * temp_up)
-                    custom_duration = time.time() - time_start
-                    print('custom_duration down', custom_duration, flush=True)
-                    mlp_duration = time.time() - mlp_duration_start
-                    print('mlp_duration', mlp_duration, flush=True)
-                    del temp_gate, temp_up
-        return down_proj
+                time_start = time.time()
+                temp_up = self.up_proj(x)
+                custom_duration = time.time() - time_start
+                print('custom_duration up', custom_duration, flush=True)
+                time_start = time.time()
+                down_proj = self.down_proj(temp_gate * temp_up)
+                custom_duration = time.time() - time_start
+                print('custom_duration down', custom_duration, flush=True)
+                mlp_duration = time.time() - mlp_duration_start
+                print('mlp_duration', mlp_duration, flush=True)
+                del temp_gate, temp_up
+                return down_proj
 
 
 def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:

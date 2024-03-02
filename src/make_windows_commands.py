@@ -403,13 +403,27 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.7'], 
-                             ['mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-gauexpprobe0.9calib-probe-None-None+wikitest-all'],
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.7'], 
+            #                  ['mag-probefullinf-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all',\
+            #                    'mag-similarityprobe-probe-None-None+wikitest-all', 'mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'mag-normbszprobe0.9calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['50'], ['128'], ['0.7'], 
+            #                  ['mag-probefullinf-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all',\
+            #                    'mag-similarityprobe-probe-None-None+wikitest-all', 'mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'mag-normbszprobe0.9calib-probe-None-None+wikitest-all',
+            #                    'mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'pqlow-similarityprobe0.9calib-probe-None-None+wikitest-all', 'pqlow-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all',
+            #                    'pq-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            # 'mag-similarityprobe0.9calibskip5-probe-None-None+wikitest-all','mag-similarityprobe0.9calib-probe-None-None+wikitest-all',
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+                             ['mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.8calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.7calib-probe-None-None+wikitest-all'],
                             ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
-
-
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.7', '0.8'], 
             #                  ['mag-probesquare-probe-None-None', 'mag-probe-probe-None-None'],
             #                 ['up-proj+down-proj']]]
@@ -471,15 +485,25 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], [ 'opt-13b'], ['clm'], ['10'], ['128', '512', '1024'], ['0'], ['dense'],
-                    ['None']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], [ 'opt-13b'], ['clm'], ['10'], ['128', '512', '1024'], ['0'], ['dense'],
+            #         ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], [ 'llama-2-7b'], ['clm'], ['10'], ['128', '512', '1024'], ['0'], ['dense'],
+            #         ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            pass
         elif 'csr' in data:
             # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b', 'llama-2-13b', 'llama-2-70b'], ['csr'], ['10'], ['128'], ['0'], ['dense'],
             #         ['None']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
+            control_name = [[[ 'arc-e'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0'], ['dense'],
+                    ['None']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
             pass
     elif file == 'test_fix_pruned_model': 
         controls = []

@@ -40,6 +40,15 @@ def process_control():
                 float_value = None  # Or some default value or error handling
             cfg['svd_ratio'] = float_value
 
+        # no skip
+        cfg['skip'] = -1
+        if 'skip' in cfg['prune_method']:
+            match = re.search(r'skip(\d+)', cfg['prune_method'])
+            if match:
+                # Convert the matched string to a float
+                int_value = int(match.group(1))
+            cfg['skip'] = int_value
+
         cfg['calibration_stage'] = False
         if 'calib' in cfg['prune_method']:
             calib_info_list = prune_name_list[1].split('-')
