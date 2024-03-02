@@ -39,7 +39,7 @@ from transformers.utils import (
 )
 from transformers import OPTConfig
 from config import cfg
-from ..pruning_module import HiddenRepresentationPruning
+from ..pruning_module import HiddenRepresentationPruning, cal_prune_metric, cal_running_mean_prune_metric
 
 logger = logging.get_logger(__name__)
 
@@ -335,83 +335,87 @@ class OPTDecoderLayer(nn.Module):
         print('hidden_states_shape', hidden_states_shape, flush=True)
         # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
         residual = hidden_states
-        temp = hidden_states.reshape(-1, hidden_states.size(-1))
+        # temp = hidden_states.reshape(-1, hidden_states.size(-1))
         # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
         if self.do_layer_norm_before:
-            print('hidden_states before ln', hidden_states, flush=True)
             hidden_states = self.final_layer_norm(hidden_states)
-            print('hidden_states after ln', hidden_states, flush=True)
-            temp = self.final_layer_norm(temp)
-            print('temp after ln', temp, flush=True)
-        print('hidden_states', hidden_states.shape, flush=True)
-        if 'probe' in cfg['prune_name'] and ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']):
-            time_start = time.time()
-            multiple = check_multiple_for_tensor_cores(self.fc2.weight.dtype)
-            if 'keepseq' in cfg['prune_metric']:
-                if 'mbsz' in cfg['prune_metric']:
-                    comp_across_bsz_seq = hidden_states.mean(axis=0)
-                else:
-                    comp_across_bsz_seq = torch.linalg.vector_norm(hidden_states, ord=2, dim=0)
-            else:
-                if 'mbsz' in cfg['prune_metric']:
-                    x_mean_bsz = hidden_states.mean(axis=0)
-                    comp_across_bsz_seq = torch.linalg.vector_norm(x_mean_bsz, ord=2, dim=0).unsqueeze_(0)
-                elif 'mbszmseq' in cfg['prune_metric']:
-                    comp_across_bsz_seq = hidden_states.mean(axis=(0, 1)).unsqueeze_(0)
-                elif 'optim' in cfg['prune_metric']:
-                    comp_across_bsz_seq = torch.linalg.vector_norm(hidden_states, ord=2, dim=(0,1)).unsqueeze_(0)
-                else:
-                    print('here')
-                    comp_across_bsz_seq = torch.linalg.vector_norm(hidden_states, ord=2, dim=(0,1)).unsqueeze_(0)
-            print('comp_across_bsz_seq', comp_across_bsz_seq.shape, flush=True)
-            print('comp_across_bsz_seq', comp_across_bsz_seq)
-            print('fc1', self.fc1.weight)
-            probe_out = self.activation_fn(self.fc1(comp_across_bsz_seq, cal_mlp_probe_out_dim_metric=True))
-            print('probe_out', probe_out.shape, flush=True)
-            if 'keepseq' in cfg['prune_metric']:
-                probe_out = probe_out.t()
-                print('probe_out', probe_out.shape, flush=True)
-            
-            prev_probe_out_type = probe_out.dtype
-            prev_weight_type = self.fc2.weight.data.dtype
-            probe_out = probe_out.to(torch.float32)
-            self.fc2.weight.data = self.fc2.weight.data.to(torch.float32)
-            # ablation study for different metrics
-            if 'wandasp' in cfg['prune_metric']:
-                probe_out_dim_metric = (torch.linalg.vector_norm(probe_out, ord=2, dim=1).reshape((1, -1)) * torch.abs(self.fc2.weight.data)).sum(axis=0)
-            elif 'flap' in cfg['prune_metric']:
-                pass
-            elif 'probe' in cfg['prune_metric']:
+        
+        if cfg['calibration_stage'] == True:
+            if ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
+                hidden_states = self.fc1(hidden_states)
+                hidden_states = self.activation_fn(hidden_states)
+
+                hidden_states = self.fc2(hidden_states)
+        elif cfg['calibration_stage'] == False and self.layer_order > cfg['skip']:
+            if 'probe' in cfg['prune_name'] and ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']):
+                time_start = time.time()
+                multiple = check_multiple_for_tensor_cores(self.fc2.weight.dtype)
+                x = hidden_states
+                if 'nml' in cfg['prune_method']:
+                    # abs_x = torch.abs(x).to(torch.float32)
+                    # porportion = abs_x / abs_x.sum(dim=0, keepdim=True)
+                    # print('porportion', porportion, porportion.dtype, porportion.shape, flush=True)
+                    # comp_across_bsz = ((x.to(torch.float32) * porportion).sum(dim=0)).to(x.dtype)
+                    abs_x = torch.abs(x).to(torch.float32)
+                    sum_across_bsz = abs_x.sum(dim=0, keepdim=True)
+                    # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
+                    proportion = (abs_x / (sum_across_bsz + 1e-10)).to(x.dtype)
+                    # proportion = 10
+                    # print('proportion ', proportion, flush=True)
+                    comp_across_bsz = torch.sum(x * proportion, dim=0)
+                    comp_across_bsz = comp_across_bsz.unsqueeze(0)
+
+                probe_out = self.activation_fn(self.fc1(comp_across_bsz, cal_mlp_probe_out_dim_metric=True))
                 
-                probe_out_dim_metric = torch.sqrt((torch.sum(torch.pow(probe_out, 2), dim=1).reshape((1, -1)) * torch.pow(self.fc2.weight.data, 2)).sum(axis=0))
-            probe_out = probe_out.to(prev_probe_out_type)
-            self.fc2.weight.data = self.fc2.weight.data.to(prev_weight_type)
+                if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
+                    if 'saveseqdim' in cfg['prune_method']:
+                        probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
+                    else:
+                        probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution())
+                else:
+                    probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
+                probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
 
-            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.cal_probe_mlp_metric(probe_out_dim_metric, multiple)
-            if self.probe_out_dim_indices is None:
-                self.probe_out_dim_indices = probe_out_dim_indices
-            else:
-                # Convert lists to sets
-                set_self = set(self.probe_out_dim_indices.tolist())
-                set_probe = set(probe_out_dim_indices.tolist())
 
-                # Find the intersection
-                intersection = set_self & set_probe
+                # if self.probe_out_dim_indices is None:
+                #     self.probe_out_dim_indices = probe_out_dim_indices
+                # else:
+                #     # Convert lists to sets
+                #     set_self = set(self.probe_out_dim_indices.tolist())
+                #     set_probe = set(probe_out_dim_indices.tolist())
 
-                # Count the number of elements in the intersection
-                intersection_count = len(intersection)
-                intersection_ratio = intersection_count / len(set_self)
-                print('intersection_ratio', intersection_ratio, flush=True)
-                self.probe_out_dim_indices = probe_out_dim_indices
-            print('probe_out_dim_indices', probe_out_dim_indices.shape, flush=True)
-            kwargs['probe_out_dim_indices'] = probe_out_dim_indices
+                #     # Find the intersection
+                #     intersection = set_self & set_probe
 
-            time_start = time.time()
-            hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states, probe_out_dim_indices=probe_out_dim_indices)), **kwargs)
-            # if 'restore' in cfg['prune_name']:
-            #     down_proj = down_proj + restore
-            custom_duration = time.time() - time_start
-            print('fll_batch_duration', custom_duration, flush=True)
+                #     # Count the number of elements in the intersection
+                #     intersection_count = len(intersection)
+                #     intersection_ratio = intersection_count / len(set_self)
+                #     print('intersection_ratio', intersection_ratio, flush=True)
+                #     self.probe_out_dim_indices = probe_out_dim_indices
+                # print('probe_out_dim_indices', probe_out_dim_indices.shape, flush=True)
+                kwargs['probe_in_dim_indices'] = probe_out_dim_indices
+
+                time_start = time.time()
+                hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states, probe_out_dim_indices=probe_out_dim_indices)), **kwargs)
+                # if 'restore' in cfg['prune_name']:
+                #     down_proj = down_proj + restore
+                custom_duration = time.time() - time_start
+                print('fll_batch_duration', custom_duration, flush=True)
+            elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order >= cfg['skip']:
+                bsz, _, _ = x.shape
+                time_start = time.time()
+                if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
+                    probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
+                    # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
+                    # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
+                else:
+                    if 'meanglobalinput' in cfg['prune_method']:
+                        probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_input_distribution()[0], self.down_proj.weight.data, cfg['prune_metric'])
+                    else:
+                        probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                    probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+
+                hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states, probe_out_dim_indices=probe_out_dim_indices)))
         else:
             hidden_states = self.fc1(hidden_states)
             hidden_states = self.activation_fn(hidden_states)

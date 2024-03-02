@@ -329,6 +329,9 @@ class LlamaMLP(nn.Module):
         self.running_mean = None
 
         self.probe_out_dim_indices = None
+
+        self.input_norm_gate_weight = None
+        self.input_norm_up_weight = None
     def forward(self, x, **kwargs):
         if self.config.pretraining_tp > 1:
             slice = self.intermediate_size // self.config.pretraining_tp
@@ -387,54 +390,71 @@ class LlamaMLP(nn.Module):
                     time_start = time.time()
                     if 'similarityprobe' in cfg['prune_method']:
                         start_time = time.time()
-                        x_flattened = x.view(x.size(0), -1) 
-                        strength = torch.norm(x_flattened, p=2, dim=0)
-                        # Calculate the number of positions to select (top 10%)
-                        top_k = max(int(0.05 * strength.numel()), 1)  # Ensure at least one position is selected
-                        # print('top_k', top_k, strength.numel(), strength.shape, flush=True)
-                        # Use torch.topk to find the top k positions. 
-                        # torch.topk returns values and their corresponding indices.
-                        top_values, top_indices = torch.topk(strength, k=top_k)
+                        
 
-                        top_positions_flat = x_flattened[:, top_indices]  # [bsz, top_k]
-                        print('top_positions_flat', top_positions_flat, flush=True)
-                        signs_top_positions_flat = torch.sign(top_positions_flat)
-                        # print('signs_top_positions_flat', signs_top_positions_flat, flush=True)
-                        # sign_similarity = signs_top_positions_flat * signs_top_positions_flat.transpose(0, 1)
-                        # Expand dimensions for broadcasting
-                        expanded_signs = signs_top_positions_flat.unsqueeze(1)  # Shape: [bsz, 1, top_k]
-                        # Repeat signs for comparison across all pairs
-                        repeated_signs = signs_top_positions_flat.unsqueeze(0)  # Shape: [1, bsz, top_k]
+                        def cal_sign_agreement_metrix(x_flattened):
+                            strength = torch.norm(x_flattened, p=2, dim=0)
+                            # Calculate the number of positions to select (top 10%)
+                            top_k = max(int(0.05 * strength.numel()), 1)  # Ensure at least one position is selected
+                            # print('top_k', top_k, strength.numel(), strength.shape, flush=True)
+                            # Use torch.topk to find the top k positions. 
+                            # torch.topk returns values and their corresponding indices.
+                            top_values, top_indices = torch.topk(strength, k=top_k)
 
-                        # Element-wise multiplication to check sign agreement (-1 * -1 = 1, 1 * 1 = 1, else = -1 or 0)
-                        sign_agreement = expanded_signs * repeated_signs  # Shape: [bsz, bsz, top_k]
+                            top_positions_flat = x_flattened[:, top_indices]  # [bsz, top_k]
+                            print('top_positions_flat', top_positions_flat, flush=True)
+                            signs_top_positions_flat = torch.sign(top_positions_flat)
+                            # print('signs_top_positions_flat', signs_top_positions_flat, flush=True)
+                            # sign_similarity = signs_top_positions_flat * signs_top_positions_flat.transpose(0, 1)
+                            # Expand dimensions for broadcasting
+                            expanded_signs = signs_top_positions_flat.unsqueeze(1)  # Shape: [bsz, 1, top_k]
+                            # Repeat signs for comparison across all pairs
+                            repeated_signs = signs_top_positions_flat.unsqueeze(0)  # Shape: [1, bsz, top_k]
 
-                        # Sum over the top_k dimension to count the number of agreements per pair
-                        sign_agreement_matrix = sign_agreement.sum(dim=-1)  # Shape: [bsz, bsz]
-                        # print('sign_agreement_matrix v1', sign_agreement_matrix, flush=True)
-                        sign_agreement_matrix = sign_agreement_matrix / top_k
-                        print('sign_agreement_matrix', sign_agreement_matrix, flush=True)
-                    #     print('top_positions_flat', top_positions_flat, flush=True)
-                    #     # Normalize
-                    #     norm_signs_top_positions_flat = signs_top_positions_flat / (torch.norm(signs_top_positions_flat, p=2, dim=-1, keepdim=True) + 1e-9)
-                    #    # Assuming norm_top_positions_flat is [bsz, top_k]
-                    #     similarity_matrix = torch.matmul(norm_signs_top_positions_flat, norm_signs_top_positions_flat.transpose(0, 1))
+                            # Element-wise multiplication to check sign agreement (-1 * -1 = 1, 1 * 1 = 1, else = -1 or 0)
+                            sign_agreement = expanded_signs * repeated_signs  # Shape: [bsz, bsz, top_k]
+
+                            # Sum over the top_k dimension to count the number of agreements per pair
+                            sign_agreement_matrix = sign_agreement.sum(dim=-1)  # Shape: [bsz, bsz]
+                            # print('sign_agreement_matrix v1', sign_agreement_matrix, flush=True)
+                            sign_agreement_matrix = sign_agreement_matrix / top_k
+                            print('sign_agreement_matrix', sign_agreement_matrix, flush=True)
+                        #     print('top_positions_flat', top_positions_flat, flush=True)
+                        #     # Normalize
+                        #     norm_signs_top_positions_flat = signs_top_positions_flat / (torch.norm(signs_top_positions_flat, p=2, dim=-1, keepdim=True) + 1e-9)
+                        #    # Assuming norm_top_positions_flat is [bsz, top_k]
+                        #     similarity_matrix = torch.matmul(norm_signs_top_positions_flat, norm_signs_top_positions_flat.transpose(0, 1))
+                        
+                        if self.input_norm_gate_weight is None:
+                            self.input_norm_gate_weight = torch.norm(self.gate_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
+                        if self.input_norm_up_weight is None:
+                            self.input_norm_up_weight = torch.norm(self.up_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
+                        
+                        x_temp_gate = x * self.input_norm_gate_weight
+                        x_temp_up = x * self.input_norm_up_weight
+                        print('\nx_temp_gate')
+                        cal_sign_agreement_metrix(x_temp_gate.view(x_temp_gate.size(0), -1))
+                        print('\nx_temp_up')
+                        cal_sign_agreement_metrix(x_temp_up.view(x_temp_up.size(0), -1))
+                        # x_flattened = x.view(x.size(0), -1) 
+
+
                         end_time = time.time()
                         print('similarity_duration', self.layer_order, end_time - start_time, flush=True)
 
                         # similarity_matrix = similarity_matrix.mean(dim=-1)
                         # print('similarity_matrix', similarity_matrix, flush=True)
 
-                        gate_weight_flatten = self.gate_proj.weight.data.view(-1)
-                        down_weight_flatten = self.down_proj.weight.data.view(-1)
-                        up_weight_flatten = self.up_proj.weight.data.view(-1)
+                        # gate_weight_flatten = self.gate_proj.weight.data.view(-1)
+                        # down_weight_flatten = self.down_proj.weight.data.view(-1)
+                        # up_weight_flatten = self.up_proj.weight.data.view(-1)
 
-                        top_k_gate_weight, top_k_gate_indices = torch.topk(gate_weight_flatten, k=top_k)
-                        top_k_down_weight, top_k_down_indices = torch.topk(down_weight_flatten, k=top_k)
-                        top_k_up_weight, top_k_up_indices = torch.topk(up_weight_flatten, k=top_k)
-                        print('top_k_gate_weight', top_k_gate_weight, top_k_gate_indices, flush=True)
-                        print('top_k_down_weight', top_k_down_weight, top_k_down_indices, flush=True)
-                        print('top_k_up_weight', top_k_up_weight, top_k_up_indices, flush=True)
+                        # top_k_gate_weight, top_k_gate_indices = torch.topk(gate_weight_flatten, k=top_k)
+                        # top_k_down_weight, top_k_down_indices = torch.topk(down_weight_flatten, k=top_k)
+                        # top_k_up_weight, top_k_up_indices = torch.topk(up_weight_flatten, k=top_k)
+                        # print('top_k_gate_weight', top_k_gate_weight, top_k_gate_indices, flush=True)
+                        # print('top_k_down_weight', top_k_down_weight, top_k_down_indices, flush=True)
+                        # print('top_k_up_weight', top_k_up_weight, top_k_up_indices, flush=True)
                         abs_x = torch.abs(x).to(torch.float32)
                         sum_across_bsz = abs_x.sum(dim=0, keepdim=True)
                         # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)

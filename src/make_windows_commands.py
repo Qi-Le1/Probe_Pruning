@@ -420,7 +420,7 @@ def main():
             # controls.extend(CIFAR10_controls_9)
             # 'mag-similarityprobe0.9calibskip5-probe-None-None+wikitest-all','mag-similarityprobe0.9calib-probe-None-None+wikitest-all',
             control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
-                             [ 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.8calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.7calib-probe-None-None+wikitest-all'],
+                             ['mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.8calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.7calib-probe-None-None+wikitest-all'],
                             ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
