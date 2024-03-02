@@ -23,3 +23,5 @@ if __name__ == "__main__":
             model, tokenizer = make_model(cfg['model_name'])
             dataset = process_dataset(dataset, tokenizer)
             print('{}: {}'.format(data_name, cfg['data_size']))
+
+

@@ -79,29 +79,10 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         dataset_['test'].transform = dataset.Compose([
             transforms.ToTensor(),
             transforms.Normalize(*data_stats[data_name])])
-    # WikiSQL
-    # SAMSum 
-    # E2E NLG Challenge
-    # WebNLG
-    # DART
-    elif data_name in ['glue']:
-        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
-        if subset_name in ['mnli']:
-            dataset_['test'] = concatenate_datasets([dataset_['validation_matched'], dataset_['validation_mismatched']])
-            del dataset_['test_matched']
-            del dataset_['test_mismatched']
-            del dataset_['validation_matched']
-            del dataset_['validation_mismatched']
-        else:
-            dataset_['test'] = dataset_['validation']
-            del dataset_['validation']
-    elif data_name in ['dolly']:
-        dataset_ = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], cache_dir=root)
-        dataset_ = dataset_['train'].train_test_split(test_size=0.1, seed=cfg['seed'])
     elif data_name in ['c4']:
         # please follow the instruction here: https://huggingface.co/datasets/allenai/c4
-        dataset_['train'] = load_dataset('json', data_files={'train': 'data/c4/c4-train.00000-of-01024.json.gz'}, split='train')
-        dataset_['test'] = load_dataset('json', data_files={'validation': 'data/c4/c4-validation.00000-of-00008.json.gz'}, split='validation')
+        dataset_['train'] = load_dataset('json', data_files={'train': 'data/c4/c4-train.00000-of-01024.json.gz'}, split='train[:10%]')
+        dataset_['test'] = load_dataset('json', data_files={'validation': 'data/c4/c4-validation.00000-of-00008.json.gz'}, split='validation[:10%]')
         # Randomly sample 128 examples
         # dataset_['train'] = dataset_['train'].train_test_split(test_size=cfg['calibration_nsamples'], seed=cfg['seed'])["test"]
     # piqa: piqa
@@ -118,7 +99,7 @@ def make_dataset(data_name, subset_name=None, verbose=True):
                 dataset_['test'] = load_from_disk(dataset_path=root)
             except FileNotFoundError:
                 # Load the dataset from Hugging Face datasets repository
-                dataset_['test'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
+                dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test', cache_dir=root)
                 # Save the dataset to disk for future offline use
                 dataset_['test'].save_to_disk(root)
                 print('save to disk')
@@ -156,35 +137,19 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         else:
             dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
     elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq']:
-        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
-    elif data_name in ['c4']:
-        dataset_['train'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='train[:10%]')
-        dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation[:10%]')
-    elif data_name in ['dreambooth']:
-        model, tokenizer = make_model(cfg['model_name'])
-
-        # other prompts can be found in: https://github.com/google/dreambooth/blob/main/dataset/prompts_and_classes.txt
-        dataset_['train'] = dataset.DreamBooth(
-            root=root,
-            split='train',
-            model=model,
-            tokenizer=tokenizer,
-            instance_data_dir=cfg['subset_name'],
-            instance_prompt=f"a photo of {cfg['unique_id']} {cfg['unique_class']}",
-            class_data_dir=f"{cfg['subset_name']}_class",
-            class_prompt=f"a photo of {cfg['unique_class']}",
-        )
-
-        size = cfg[cfg['model_name']]['resolution']
-        center_crop = False
-        dataset_['train'].transform = transforms.Compose(
-            [
-                transforms.Resize(size, interpolation=transforms.InterpolationMode.BILINEAR),
-                transforms.CenterCrop(size) if center_crop else transforms.RandomCrop(size),
-                transforms.ToTensor(),
-                transforms.Normalize([0.5], [0.5])
-            ]
-        )
+        if contains_keyword:
+            try:
+                dataset_['test'] = load_from_disk(dataset_path=root)
+            except FileNotFoundError:
+                # Load the dataset from Hugging Face datasets repository
+                dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation', cache_dir=root)
+                # Save the dataset to disk for future offline use
+                dataset_['test'].save_to_disk(root)
+                print('save to disk')
+                # Optionally, try loading from disk again to verify
+                dataset_['test'] = load_from_disk(dataset_path=root)
+        else:
+            dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
     else:
         raise ValueError('Not valid dataset name')
     if verbose:
@@ -450,8 +415,6 @@ def process_dataset(dataset, tokenizer):
 
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
-
-    
             def preprocess_function_test(examples):   
                 print('times')
                 all_text = "\n\n".join(examples[text_column[0]])

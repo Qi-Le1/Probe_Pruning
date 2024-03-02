@@ -295,7 +295,7 @@ def cal_intersection_ratio(output, probe, weight, pruning_module, multiple):
         fullinf_vs_optimal_prune_mean_intersection_ratio, probe_vs_optimal_prune_mean_intersection_ratio, probe_vs_fullinf_prune_mean_intersection_ratio
 
 
-def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distribution=None):
+def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distribution=None, global_input_distribution=None):
     if 'wandasp' in metric_type:
         if probe_out.dim() == 2:
             probe_out.unsqueeze_(0)
@@ -319,21 +319,32 @@ def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distrib
         # # else:
         # denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
         # self.scaler_inp[update_indices] += torch.sum(norm_squared / denominator, dim=0)
-
+    
         if probe_out.dim() == 2:
             probe_out.unsqueeze_(0)
         # print('probe_out', probe_out.shape, probe_out)
         size = probe_out.shape[0]
-        if 'square' in cfg['prune_method']:
-            norm_squared = torch.clamp(torch.sum(probe_out, dim=(0, 1)), min=None, max=65504) / size
+        if global_input_distribution is not None:
+            # print('norm_squared', norm_squared.shape, norm_squared)
+                # print('global_metric_score_distribution', global_metric_score_distribution.shape, global_metric_score_distribution)
+            ema = cfg['ema_momentum'] * global_input_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * probe_out
+                # print('norm_squared new', norm_squared.shape, norm_squared)
+            norm_squared = torch.clamp(torch.norm(ema, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
+            probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
         else:
-            norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
-        # print('norm_squared', norm_squared.shape, norm_squared)
-        if global_metric_score_distribution is not None:
-            # print('global_metric_score_distribution', global_metric_score_distribution.shape, global_metric_score_distribution)
-            norm_squared = cfg['ema_momentum'] * global_metric_score_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_squared
-            # print('norm_squared new', norm_squared.shape, norm_squared)
-        probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+            if 'savemetricseq' in cfg['prune_method']:
+                norm_probe_out = torch.norm(probe_out, p=2, dim=0) ** 2
+                ema = cfg['ema_momentum'] * global_metric_score_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_probe_out
+                norm_squared = torch.clamp(torch.norm(ema, p=2, dim=0) ** 2, min=None, max=65504) / size
+                probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+            else:
+                norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
+                # print('norm_squared', norm_squared.shape, norm_squared)
+                if global_metric_score_distribution is not None:
+                    # print('global_metric_score_distribution', global_metric_score_distribution.shape, global_metric_score_distribution)
+                    norm_squared = cfg['ema_momentum'] * global_metric_score_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_squared
+                    # print('norm_squared new', norm_squared.shape, norm_squared)
+                probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
 
     return probe_out_dim_metric
 
@@ -341,10 +352,14 @@ def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distrib
 
 def cal_running_mean_prune_metric(running_mean, weight, metric_type):
     if 'wandasp' in metric_type:
+        
         probe_out_dim_metric = (torch.sqrt(running_mean.reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
     elif 'flap' in metric_type:
         pass
     elif 'probe' in metric_type:
+        if 'meanglobalinput' in cfg['prune_method']:
+            running_mean = torch.norm(running_mean, p=2, dim=0) ** 2
+        # print('running_mean', running_mean.shape, running_mean)
         probe_out_dim_metric = torch.sqrt(((running_mean.reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
     return probe_out_dim_metric
 
@@ -371,7 +386,7 @@ class HiddenRepresentationPruning(BasePruning):
         # probe_out_dim_metric = probe_out_dim_metric.to(torch.float32)
         # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
         sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
-        # print(f'{self.key} sorted_value', sorted_value)
+        print(f'{self.key} sorted_value', sorted_value)
         # normalized_sorted_value = sorted_value / sorted_value.sum()
         # print(f'{self.key} normalized_sorted_value', normalized_sorted_value)
         # mean = torch.mean(sorted_value)
@@ -380,10 +395,16 @@ class HiddenRepresentationPruning(BasePruning):
         # # Then, normalize the tensor: (sorted_value - mean) / std
         # standardlized_value = (sorted_value - mean) / std
         # print(f'{self.key} standardlized_value', standardlized_value)
+        # num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
         if 'mag' in cfg['prune_name']:
             num_prune = int(self.prune_hyper * probe_out_dim_metric.shape[0])
         elif 'pq' in cfg['prune_name']:
             num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
+            # nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_value, 1, 0.5)
+            # # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm)
+            # # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm)
+            # ratio = (nominator_varying_vector_norm / denominator_varying_vector_norm)
+            # print(f'{self.key}_ratio', ratio)
         
         # let the remaining element be the multiple of multiple to fit tensor cores
         num_prune = num_prune + ((probe_out_dim_metric.shape[0] - num_prune) % multiple)
@@ -407,7 +428,7 @@ class HiddenRepresentationPruning(BasePruning):
             num_prune = int(self.prune_hyper * probe_out_dim_metric.shape[-1])
         elif 'pq' in cfg['prune_name']:
             num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
-        
+
         # let the remaining element be the multiple of multiple to fit tensor cores
         num_prune = num_prune + ((probe_out_dim_metric.shape[0] - num_prune) % multiple)
         return sorted_indices[..., num_prune:], sorted_indices[...,:num_prune]
