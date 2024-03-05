@@ -17,7 +17,10 @@ def process_control():
     cfg['batch_size'] = int(cfg['control']['batch_size'])
     cfg['seq_len'] = int(cfg['control']['seq_len'])
     cfg['prune_hyper'] = float(cfg['control']['prune_hyper'])
-
+    cfg['calibration_stage'] = False
+    # no skip
+    cfg['skip'] = -1
+    
     prune_name_list = cfg['control']['prune_name'].split('+')
 
     cfg['prune_name'] = prune_name_list[0]
@@ -40,8 +43,6 @@ def process_control():
                 float_value = None  # Or some default value or error handling
             cfg['svd_ratio'] = float_value
 
-        # no skip
-        cfg['skip'] = -1
         if 'skip' in cfg['prune_method']:
             match = re.search(r'skip(\d+)', cfg['prune_method'])
             if match:
@@ -49,17 +50,26 @@ def process_control():
                 int_value = int(match.group(1))
             cfg['skip'] = int_value
 
-        cfg['calibration_stage'] = False
         if 'calib' in cfg['prune_method']:
             calib_info_list = prune_name_list[1].split('-')
             cfg['calibration_dataset'] = calib_info_list[0]
             cfg['calibration_nsamples'] = calib_info_list[1]
             # set all to all samples in the calibration dataset
-            if not isinstance(cfg['calibration_nsamples'], str):
+            if cfg['calibration_nsamples'] != 'all':
                 cfg['calibration_nsamples'] = int(cfg['calibration_nsamples'])  
-    
-        if 'probe' in cfg['prune_method'] and ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']):
-            match = re.search(r'probe(\d+\.\d+)', cfg['prune_method'])
+
+        if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['prune_method']:
+            match = re.search(r'probefixratio(\d+\.\d+)', cfg['prune_method'])
+            if match:
+                # Convert the matched string to a float
+                float_value = float(match.group(1))
+            else:
+                float_value = None
+            
+            cfg['probefixratio'] = float_value   
+
+        if 'ema' in cfg['prune_method']:
+            match = re.search(r'ema(\d+\.\d+)', cfg['prune_method'])
             if match:
                 # Convert the matched string to a float
                 float_value = float(match.group(1))

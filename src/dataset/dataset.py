@@ -265,6 +265,7 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
                                         worker_init_fn=np.random.seed(cfg['seed']))
         cfg['num_steps'][k] = len(data_loader[k])
         cfg['dataset_size'][k] = len(dataset[k])
+        print('dataset_size', k, cfg['dataset_size'][k] * batch_size_)
     return data_loader
 
 def make_calibration_dataloader(tokenizer):
