@@ -257,14 +257,15 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
             data_loader[k] = DataLoader(dataset=dataset[k], batch_size=batch_size_, shuffle=shuffle_,
                                         pin_memory=cfg['pin_memory'], num_workers=cfg['num_workers'],
                                         collate_fn=make_data_collate(cfg['collate_mode'], tokenizer),
-                                        worker_init_fn=np.random.seed(cfg['seed']))
+                                        worker_init_fn=np.random.seed(cfg['seed']), drop_last=True)
         else:
             data_loader[k] = DataLoader(dataset=dataset[k], batch_size=batch_size_, sampler=sampler[k],
                                         pin_memory=cfg['pin_memory'], num_workers=cfg['num_workers'],
                                         collate_fn=make_data_collate(cfg['collate_mode'], tokenizer),
-                                        worker_init_fn=np.random.seed(cfg['seed']))
+                                        worker_init_fn=np.random.seed(cfg['seed']), drop_last=True)
         cfg['num_steps'][k] = len(data_loader[k])
         cfg['dataset_size'][k] = len(dataset[k])
+        print('dataset_size', k, cfg['dataset_size'][k] * batch_size_)
     return data_loader
 
 def make_calibration_dataloader(tokenizer):

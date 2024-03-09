@@ -11,6 +11,10 @@ import random
 import collections
 from config import cfg
 from module import nearest_even_number
+from scipy import stats
+from scipy.stats import shapiro
+import matplotlib.pyplot as plt
+import os
 
 class BasePruning:
     def __init__(self, cfg):
@@ -84,7 +88,7 @@ def parallel_cal_varying_length_norm(sorted_norm, norm):
             
 def parallel_cal_varying_length_info(sorted_norm, pq_p, pq_q, reversed=False):
     if reversed:
-        sorted_norm = torch.flip(sorted_norm, [1])
+        sorted_norm = torch.flip(sorted_norm, [-1])
     nominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, pq_p)
     denominator_varying_vector_norm = parallel_cal_varying_length_norm(sorted_norm, pq_q)
 
@@ -143,6 +147,39 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     pq_indices_varying_length = (1 - dimension ** (1/pq_q - 1/pq_p) * (nominator_varying_vector_norm / denominator_varying_vector_norm))
     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * ((1 - pq_indices_varying_length) ** (pq_q * pq_p / (pq_q - pq_p)))
     
+    reversed_nominator_varying_vector_norm, reversed_denominator_varying_vector_norm, reversed_dimension = parallel_cal_varying_length_info(sorted_tensor, pq_p, pq_q, reversed=True)
+    print('shape', reversed_dimension.shape)
+    res = (nominator_varying_vector_norm[-1].expand(reversed_dimension.shape[0]) / reversed_nominator_varying_vector_norm) - 1
+    print('res', res)
+
+    res_numpy = res.cpu().numpy() if isinstance(res, torch.Tensor) else res
+
+    # Find positions where 'res' is approximately 0 (accounting for floating-point precision)
+    # Note: Using a tolerance for comparison due to the nature of floating-point arithmetic
+    zero_positions = np.where(np.isclose(res_numpy, 0, atol=1e-2))[0]
+
+    # Plotting 'res'
+    plt.figure(figsize=(10, 6))
+    plt.plot(res_numpy, label='res')
+    plt.scatter(zero_positions, res_numpy[zero_positions], color='red', label='res = 1', zorder=5)  # Highlight with red dots
+    plt.xlabel('Position')
+    plt.ylabel('Value')
+    plt.title('Visualization of res with Points Where res = 1 Highlighted')
+    plt.legend()
+
+    # Ensure the output directory exists
+    output_dir = 'output/vis/eta'
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Save the plot
+    # key = 'your_key_here'  # Make sure you define 'key' appropriately
+    output_path = os.path.join(output_dir, f'{key}_res_plot.png')
+    plt.savefig(output_path)
+    plt.close()
+
+    print(f"Plot saved to {output_path}")
+
+    # * reversed_dimension ** (1/pq_p - 1/pq_q))
     # lower_bound = lower_bound.cpu().numpy()
     # x = list(range(len(lower_bound.tolist())))
     # dx = np.diff(x)
@@ -296,9 +333,13 @@ def cal_intersection_ratio(output, probe, weight, pruning_module, multiple):
 
 
 def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distribution=None, global_input_distribution=None):
+    if probe_out.size(0) != 1 and probe_out.size(0) != cfg['probe_num']:
+        raise ValueError('probe_out size in calculating metric should be 1 or probe_num')
+    
+    probe_num = probe_out.size(0)
     if 'wandasp' in metric_type:
-        if probe_out.dim() == 2:
-            probe_out.unsqueeze_(0)
+        # if probe_out.dim() == 2:
+        #     probe_out.unsqueeze_(0)
         size = probe_out.shape[0]
         # sum_squared_norms = torch.sum(torch.norm(probe_out, p=2, dim=1) ** 2 * weight_factor, dim=0)
         norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
@@ -319,34 +360,110 @@ def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distrib
         # # else:
         # denominator = (self.nsamples[update_indices].unsqueeze(0) + batch_size)
         # self.scaler_inp[update_indices] += torch.sum(norm_squared / denominator, dim=0)
-    
-        if probe_out.dim() == 2:
-            probe_out.unsqueeze_(0)
+        combined_probe_out = None
+        # if probe_out.dim() == 2:
+        #     probe_out.unsqueeze_(0)
         # print('probe_out', probe_out.shape, probe_out)
-        size = probe_out.shape[0]
-        if global_input_distribution is not None:
-            # print('norm_squared', norm_squared.shape, norm_squared)
-                # print('global_metric_score_distribution', global_metric_score_distribution.shape, global_metric_score_distribution)
-            ema = cfg['ema_momentum'] * global_input_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * probe_out
-                # print('norm_squared new', norm_squared.shape, norm_squared)
-            norm_squared = torch.clamp(torch.norm(ema, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
-            probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
-        else:
-            if 'savemetricseq' in cfg['prune_method']:
-                norm_probe_out = torch.norm(probe_out, p=2, dim=0) ** 2
-                ema = cfg['ema_momentum'] * global_metric_score_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_probe_out
-                norm_squared = torch.clamp(torch.norm(ema, p=2, dim=0) ** 2, min=None, max=65504) / size
-                probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
-            else:
-                norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
-                # print('norm_squared', norm_squared.shape, norm_squared)
-                if global_metric_score_distribution is not None:
-                    # print('global_metric_score_distribution', global_metric_score_distribution.shape, global_metric_score_distribution)
-                    norm_squared = cfg['ema_momentum'] * global_metric_score_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * norm_squared
-                    # print('norm_squared new', norm_squared.shape, norm_squared)
+        # probe_size = probe_out.shape[0]
+        # if size != 1:
+        #     raise ValueError('probe_out size should be 1')
+        # if global_input_distribution is not None:
+        #     # print('norm_squared', norm_squared.shape, norm_squared)
+        #         # print('global_metric_score_distribution', global_metric_score_distribution.shape, global_metric_score_distribution)
+        #     ema = cfg['ema_momentum'] * global_input_distribution.to(probe_out.device) + (1 - cfg['ema_momentum']) * probe_out
+        #         # print('norm_squared new', norm_squared.shape, norm_squared)
+        #     norm_squared = torch.clamp(torch.norm(ema, p=2, dim=(0, 1)) ** 2, min=None, max=65504) / size
+        #     probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+        # else:
+        if 'savemetricseq' in cfg['prune_method']:
+            
+            # norm_probe_out = torch.norm(probe_out, p=2, dim=0)
+            if global_metric_score_distribution is not None:
+                norm_probe_out_square = torch.norm(probe_out, p=2, dim=0) ** 2 
+                # norm_probe_out = cfg['fix_seq_merge_ratio'] * global_metric_score_distribution.to(probe_out.device) + (1 - cfg['fix_seq_merge_ratio']) * norm_probe_out
+                if 'probefixratio' in cfg['prune_method']:
+                    # denominator = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2 + global_metric_score_distribution.to(probe_out.device), min=None, max=65504)
+                    # global_ratio =  global_metric_score_distribution.to(probe_out.device) / (denominator + 1e-10)
+                    # probe_ratio = torch.norm(probe_out, p=2, dim=0) ** 2 /(denominator + 1e-10)
+                    combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution.to(probe_out.device) + (1-cfg['probefixratio']) * (norm_probe_out_square)
+                    norm_probe_out = torch.sqrt(combined_probe_out)
+                    # norm_probe_out = cfg['ema_momentum'] * torch.sqrt(global_metric_score_distribution.to(probe_out.device)) + (1 - cfg['ema_momentum']) * torch.norm(probe_out, p=2, dim=0) 
+                # if 'savemetricseqv1ratio' in cfg['prune_method']:
+                #     denominator = torch.norm(probe_out, p=2, dim=0) + torch.sqrt(global_metric_score_distribution.to(probe_out.device))
+                #     global_ratio =  torch.sqrt(global_metric_score_distribution.to(probe_out.device)) / (denominator + 1e-10)
+                #     probe_ratio = torch.norm(probe_out, p=2, dim=0) / (denominator + 1e-10)
+                #     norm_probe_out = global_ratio * global_metric_score_distribution.to(probe_out.device) + probe_ratio * torch.norm(probe_out, p=2, dim=0)
+                elif 'probedynaratio' in cfg['prune_method']:
+                    denominator = torch.clamp(norm_probe_out_square + global_metric_score_distribution.to(probe_out.device), min=None, max=65504)
+                    probe_ratio = (norm_probe_out_square / (denominator + 1e-10))
+                    # global_metric_score_distribution.to(probe_out.device) / (denominator + 1e-10)
+                    global_ratio = 1 - probe_ratio
+                    combined_probe_out = global_ratio * global_metric_score_distribution.to(probe_out.device) + probe_ratio * norm_probe_out_square
+                    norm_probe_out = torch.sqrt(combined_probe_out)
+                elif 'probeadd' in cfg['prune_method']:
+                    norm_probe_out = torch.sqrt(torch.clamp(norm_probe_out_square + global_metric_score_distribution.to(probe_out.device), min=None, max=65504))
+                    # norm_probe_out = cfg['ema_momentum'] * torch.sqrt(global_metric_score_distribution.to(probe_out.device)) + (1 - cfg['ema_momentum']) * torch.norm(probe_out, p=2, dim=0) 
+                print('norm_probe_out.shaope', norm_probe_out.shape)
+                norm_squared = torch.clamp(torch.norm(norm_probe_out, p=2, dim=0) ** 2, min=None, max=65504)
+                # norm_squared = torch.sum(norm_probe_out, dim=0)
                 probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
 
-    return probe_out_dim_metric
+                if 'fillpbmetriccombine' in cfg['prune_method']:
+                # in update, first take l2 then square
+                # take l2 -> sqrt of the sum of square 
+                # take square -> what we want to store
+                    return probe_out_dim_metric, torch.sqrt(combined_probe_out).unsqueeze_(0)
+                else:
+                    return probe_out_dim_metric, None
+            else:
+                norm_probe_out_square = torch.norm(probe_out, p=2, dim=(0,1)) ** 2 
+                # norm_squared = torch.clamp(torch.norm(norm_probe_out, p=2, dim=0) ** 2, min=None, max=65504) / size
+                # norm_squared = torch.sum(norm_probe_out, dim=0)
+                probe_out_dim_metric = torch.sqrt(((norm_probe_out_square.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+                return probe_out_dim_metric, None
+            # combined_probe_out = norm_probe_out
+            # else:
+            #     norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2, min=None, max=65504) / size
+            #     probe_out_dim_metric = torch.sqrt(((norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+        else:
+            norm_probe_out_square = torch.norm(probe_out, p=2, dim=(0,1)) ** 2 
+            if global_metric_score_distribution is not None:
+                # norm_probe_out = cfg['fix_seq_merge_ratio'] * global_metric_score_distribution.to(probe_out.device) + (1 - cfg['fix_seq_merge_ratio']) * norm_probe_out
+                if 'probefixratio' in cfg['prune_method']:
+                    # denominator = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2 + global_metric_score_distribution.to(probe_out.device), min=None, max=65504)
+                    # global_ratio =  global_metric_score_distribution.to(probe_out.device) / (denominator + 1e-10)
+                    # probe_ratio = torch.norm(probe_out, p=2, dim=0) ** 2 /(denominator + 1e-10)
+                    combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution.to(probe_out.device) + (1-cfg['probefixratio']) * (norm_probe_out_square)
+                    # norm_probe_out = torch.sqrt(combined_probe_out)
+                    # norm_probe_out = cfg['ema_momentum'] * torch.sqrt(global_metric_score_distribution.to(probe_out.device)) + (1 - cfg['ema_momentum']) * torch.norm(probe_out, p=2, dim=0) 
+                # if 'savemetricseqv1ratio' in cfg['prune_method']:
+                #     denominator = torch.norm(probe_out, p=2, dim=0) + torch.sqrt(global_metric_score_distribution.to(probe_out.device))
+                #     global_ratio =  torch.sqrt(global_metric_score_distribution.to(probe_out.device)) / (denominator + 1e-10)
+                #     probe_ratio = torch.norm(probe_out, p=2, dim=0) / (denominator + 1e-10)
+                #     norm_probe_out = global_ratio * global_metric_score_distribution.to(probe_out.device) + probe_ratio * torch.norm(probe_out, p=2, dim=0)
+                elif 'probedynaratio' in cfg['prune_method']:
+                    denominator = torch.clamp(norm_probe_out_square + global_metric_score_distribution.to(probe_out.device), min=None, max=65504)
+                    global_ratio =  global_metric_score_distribution.to(probe_out.device) / (denominator + 1e-10)
+                    probe_ratio = norm_probe_out_square /(denominator + 1e-10)
+                    combined_probe_out = global_ratio * global_metric_score_distribution.to(probe_out.device) + probe_ratio * norm_probe_out_square
+                    # norm_probe_out = torch.sqrt(combined_probe_out)
+                    # norm_probe_out = cfg['ema_momentum'] * torch.sqrt(global_metric_score_distribution.to(probe_out.device)) + (1 - cfg['ema_momentum']) * torch.norm(probe_out, p=2, dim=0) 
+                print('norm_probe_out.shaope', norm_probe_out.shape)
+                # norm_squared = torch.clamp(torch.norm(norm_probe_out, p=2, dim=0) ** 2, min=None, max=65504) / size
+                # norm_squared = torch.sum(norm_probe_out, dim=0)
+                probe_out_dim_metric = torch.sqrt(((combined_probe_out.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+            # combined_probe_out = norm_probe_out
+            else:
+                # norm_squared = torch.clamp(torch.norm(probe_out, p=2, dim=(0,1)) ** 2, min=None, max=65504) / size
+                probe_out_dim_metric = torch.sqrt(((norm_probe_out_square.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+
+            if 'fillpbmetriccombine' in cfg['prune_method']:
+                # in update, first take l2 then square
+                # take l2 -> still sqrt
+                # take square -> current value
+                return probe_out_dim_metric, torch.sqrt(combined_probe_out).unsqueeze_(0).unsqueeze_(0)
+            else:
+                return probe_out_dim_metric, None
 
 
 
@@ -381,12 +498,24 @@ class HiddenRepresentationPruning(BasePruning):
             self.pq_beta = cfg['pq_beta']
             self.pq_gamma = cfg['pq_gamma']
 
-    def sort_probe_mlp_metric(self, probe_out_dim_metric, multiple):
+    def box_cox_transformation(self, x, lam):
+        """
+        Apply the Box-Cox Transformation to a tensor x.
+        Note: x must be positive (>0).
+        """
+        if lam == 0:
+            return torch.log(x)
+        else:
+            return (x ** lam - 1) / lam
+        
+    def sort_probe_mlp_metric(self, probe_out_dim_metric, multiple, pruning_ratio=None):
+        self.prune_hyper = pruning_ratio if pruning_ratio is not None else self.prune_hyper
         probe_out_dim_metric.abs_()
         # probe_out_dim_metric = probe_out_dim_metric.to(torch.float32)
         # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
         sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
         print(f'{self.key} sorted_value', sorted_value)
+        print(f'{self.key} pruning ratio', self.prune_hyper)
         # normalized_sorted_value = sorted_value / sorted_value.sum()
         # print(f'{self.key} normalized_sorted_value', normalized_sorted_value)
         # mean = torch.mean(sorted_value)
@@ -399,13 +528,183 @@ class HiddenRepresentationPruning(BasePruning):
         if 'mag' in cfg['prune_name']:
             num_prune = int(self.prune_hyper * probe_out_dim_metric.shape[0])
         elif 'pq' in cfg['prune_name']:
+            print('mean', torch.mean(sorted_value), 'std', torch.std(sorted_value))
+
+            # mean = torch.mean(sorted_value)
+            # std = torch.std(sorted_value)
+
+            # # Define the bounds for being within 4 standard deviations
+            # lower_bound = mean - 3 * std
+            # upper_bound = mean + 3 * std
+
+            # # Find points outside of 4 standard deviations
+            # low_outliers = sorted_value < lower_bound
+            # high_outliers = sorted_value > upper_bound
+            # # outliers = ((sorted_value < lower_bound) | (sorted_value > upper_bound))
+            # low_outliers_num = torch.sum(low_outliers).item()
+            # high_outliers_num = torch.sum(high_outliers).item()
+            # print(f'Number of points below 4 standard deviations: {low_outliers_num}')
+            # print(f'Number of points above 4 standard deviations: {high_outliers_num}')
+
+            # # 假设sorted_value是你的张量
+            # q1 = torch.quantile(sorted_value, 0.25)
+            # q3 = torch.quantile(sorted_value, 0.75)
+            # iqr = q3 - q1
+
+            # # # 定义异常值的界限为Q1 - 3IQR和Q3 + 3IQR
+            # lower_bound = q1 - 3 * iqr
+            # upper_bound = q3 + 3 * iqr
+
+            # # # 找到低于或高于界限的点
+            # low_outliers = sorted_value < lower_bound
+            # high_outliers = sorted_value > upper_bound
+
+            # # 计算低于和高于界限的点的数量
+            # low_outliers_num = torch.sum(low_outliers).item()
+            # high_outliers_num = torch.sum(high_outliers).item()
+
+            # print(f'Number of points below Q1 - 3IQR: {low_outliers_num}')
+            # print(f'Number of points above Q3 + 3IQR: {high_outliers_num}')
+
+            # # Count the number of outliers
+            # # num_outliers = torch.sum(outliers).item()
+
+            # # print(f'Number of points outside of 4 standard deviations: {num_outliers}')
+            # print(f'{self.key} box_cox_transformation', sorted_value)
+            # if high_outliers_num > 0:  # Check to ensure we have outliers to exclude
+            #     sorted_value = sorted_value[: -high_outliers_num]
+            #     print('shape', sorted_value.shape)
+            # else:
+                # adjusted_sorted_value = sorted_value
             num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
-            # nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_value, 1, 0.5)
-            # # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm)
-            # # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm)
-            # ratio = (nominator_varying_vector_norm / denominator_varying_vector_norm)
-            # print(f'{self.key}_ratio', ratio)
-        
+
+#             data = sorted_value.cpu().numpy()
+#             stat, p = shapiro(data)
+#             print('Shapiro-Wilk Test: Statistics=%.3f, p=%.3f' % (stat, p))
+
+#             # Interpret
+#             alpha = 0.05
+#             if p > alpha:
+#                 print('Sample looks Gaussian (fail to reject H0)')
+#             else:
+#                 print('Sample does not look Gaussian (reject H0)')
+
+
+#             from scipy.stats import kstest, norm, laplace
+
+# # Assuming 'data' is your raw data
+#             # Note: No pre-normalization before these tests
+#             # You can estimate the parameters (mean and std for Gaussian, location and scale for Laplace) from your data if needed.
+
+#             # KS test against Gaussian distribution, using data as-is or with estimated parameters
+#             stat, p = kstest(data, 'norm', args=(data.mean(), data.std()))
+#             print(f'KS Test against Gaussian: stat={stat:.3f}, p={p:.3f}')
+
+#             # KS test against Laplace distribution, using data as-is or with estimated parameters
+#             # For Laplace, parameters are location (median) and scale (diversity, which can be estimated)
+#             location, scale = laplace.fit(data)  # Fit might be used to estimate parameters based on your data
+#             stat_laplace, p_laplace = kstest(data, 'laplace', args=(location, scale))
+#             print(f'KS Test against Laplace: stat={stat_laplace:.3f}, p={p_laplace:.3f}')
+
+#             from scipy.stats import kstest, gamma
+#             a, loc, scale = gamma.fit(data)
+#             print(f'Gamma distribution fit: a={a:.3f}, loc={loc:.3f}, scale={scale:.3f}')
+#             # Perform the KS test against the Gamma distribution
+#             stat, p = kstest(data, 'gamma', args=(a, loc, scale))
+
+#             print(f'KS Test against Gamma: stat={stat:.3f}, p={p:.3f}')
+
+
+#             from scipy.stats import kstest, lognorm
+
+#             # Fit parameters from data
+#             shape, loc, scale = lognorm.fit(data, floc=0)  # Force location parameter to zero for fitting
+
+#             # Perform KS test against fitted log-normal distribution
+#             stat, p = kstest(data, 'lognorm', args=(shape, loc, scale))
+#             print(f'KS Test against Log-Normal: stat={stat:.3f}, p-value={p:.3f}')
+#                         # print('\nstdddddddd')
+#             import scipy.stats as stats
+
+#             # Assuming 'data' is your layer's data
+#             skewness = stats.skew(data)
+#             kurtosis = stats.kurtosis(data, fisher=False)  # Set fisher=False to get kurtosis in comparison to normal distribution (which is 3)
+
+#             print(f"Skewness: {skewness}")
+#             print(f"Kurtosis: {kurtosis}")
+#             # sorted_value = (sorted_value - torch.mean(sorted_value)) / torch.std(sorted_value) 
+#             # print(f'{self.key} standardlized_value', sorted_value)
+#             # # ensure value > 0
+#             # sorted_value = (sorted_value - torch.min(sorted_value))
+     
+#             # # sorted_value, best_lambda = stats.boxcox(sorted_value)
+#             # # print(f'{self.key} box_cox_transformation', sorted_value)
+#             # # if high_outliers_num > 0:  # Check to ensure we have outliers to exclude
+#             # #     sorted_value = sorted_value[: -high_outliers_num]
+#             # # else:
+#             # #     adjusted_sorted_value = sorted_value
+#             # num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
+#             # nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_value, 1, 0.5)
+#             # # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm)
+#             # # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm)
+#             # ratio = (nominator_varying_vector_norm / denominator_varying_vector_norm)
+#             # print(f'{self.key}_ratio', ratio)
+#                # print(f'{self.key} standardlized_value after adding', sorted_value)
+#             # Choose a lambda for the Box-Cox transformation
+#             # lam = 0.5  # Example lambda value, you might need to adjust this based on your data
+#             # total_sum = sorted_value.sum()
+#             # sorted_value = sorted_value / total_sum
+#             # # Apply the Box-Cox transformation
+#             # sorted_value = self.box_cox_transformation(sorted_value, -2)
+#             # sorted_value_np = sorted_value.cpu().numpy()
+
+#             # # Apply the Box-Cox transformation
+#             # transformed_value, best_lambda = stats.boxcox(sorted_value_np)
+
+#             # # Optionally, convert the transformed data back to a PyTorch tensor
+#             # sorted_value = torch.from_numpy(transformed_value).to(probe_out_dim_metric.device)
+
+#             import numpy as np
+#             import matplotlib.pyplot as plt
+#             from scipy.signal import find_peaks
+#             from scipy.interpolate import interp1d
+
+#             def calculate_FWHM(data, bins=100, plot=False):
+#                 # Create a histogram of the data
+#                 counts, bin_edges = np.histogram(data, bins=bins, density=True)
+#                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                
+#                 # Find the peak of the histogram
+#                 peak_idx = np.argmax(counts)
+#                 peak_value = bin_centers[peak_idx]
+#                 half_max = counts[peak_idx] / 2
+                
+#                 # Interpolate to find the FWHM
+#                 interp = interp1d(bin_centers, counts - half_max, kind='cubic')
+#                 roots = interp1d(bin_centers, counts - half_max, kind='cubic').roots()
+                
+#                 # Find the roots closest to the peak to define the FWHM
+#                 valid_roots = roots[(roots > bin_centers[0]) & (roots < bin_centers[-1])]
+#                 left_root = valid_roots[valid_roots < peak_value][-1]
+#                 right_root = valid_roots[valid_roots > peak_value][0]
+                
+#                 fwhm = right_root - left_root
+                
+#                 if plot:
+#                     plt.plot(bin_centers, counts, label='Data Histogram')
+#                     plt.plot([left_root, right_root], [half_max, half_max], 'ro-')
+#                     plt.title('Histogram and FWHM')
+#                     plt.legend()
+#                     plt.show()
+                
+#                 return fwhm
+
+#             # Assuming 'data' is your dataset
+#             data = sorted_value.cpu().numpy()  # Example: Converting from PyTorch tensor to NumPy array
+#             fwhm = calculate_FWHM(data, plot=False)
+
+            # print(f"FWHM: {fwhm}")
+            # print(f'{self.key} box_cox_transformation', transformed_value_tensor)
         # let the remaining element be the multiple of multiple to fit tensor cores
         num_prune = num_prune + ((probe_out_dim_metric.shape[0] - num_prune) % multiple)
         return sorted_indices[num_prune:], sorted_indices[:num_prune]

@@ -15,7 +15,8 @@ from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
     record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load
 from deepspeed.profiling.flops_profiler import FlopsProfiler
-
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 iterate_small_samples = False
 # iterate_small_samples = True
@@ -100,52 +101,156 @@ def runExperiment():
     save(result, os.path.join(result_path, cfg['model_tag']))
     return
 
+def cal_prune_metric(x, weight, metric_type):
+    if 'savemetricseq' in cfg['prune_method']:
+        x = torch.clamp(torch.sum(x, dim=0), min=None, max=65504)
+        # x = torch.clamp(torch.norm(x, p=2, dim=0) ** 2, min=None, max=65504)
+    if 'wandasp' in metric_type:
+        # probe_out_dim_metric = (torch.sqrt(norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
+        pass
+    elif 'flap' in metric_type:
+        pass
+    elif 'probe' in metric_type:    
+        x = torch.sqrt(((x.unsqueeze(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+    return x
+
+def global_determine_ratio(model, if_log=False):
+    attn_metric_list, mlp_metric_list = [], []
+    if 'llama' in cfg['model_name']:
+        for name, module in model.named_modules():
+            if 'down_proj' not in name:
+                continue
+            x = copy.deepcopy(module.get_global_metric_score_distribution())
+            x = cal_prune_metric(x, module.weight.data, cfg['prune_metric'])
+            if if_log:
+                x = torch.log(x + 1)
+            # if 'savemetricseq' in cfg['prune_method']:
+            #     x = torch.clamp(torch.sum(x, dim=0), min=None, max=65504)
+            if 'globalratiostd' in cfg['prune_method']:
+                x = (x - torch.mean(x, axis=-1, keepdim=True)) / torch.std(x, axis=-1, keepdim=True)
+                mlp_metric_list.append(x)
+            # Print the module name and attribute name
+            print('name', name)
+        mlp_metric = torch.stack(mlp_metric_list)
+        sorted_prune, indices = torch.sort(mlp_metric.view(-1))
+        threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
+
+        output_dir = "output/vis"
+        os.makedirs(output_dir, exist_ok=True)
+
+        for name, module in model.named_modules():
+            if 'down_proj' not in name:
+                continue
+            x = copy.deepcopy(module.get_global_metric_score_distribution())
+            x = cal_prune_metric(x, module.weight.data, cfg['prune_metric'])
+            if if_log:
+                x = torch.log(x + 1)
+            # if 'savemetricseq' in cfg['prune_method']:
+            #     x = torch.clamp(torch.sum(x, dim=0), min=None, max=65504)
+            print('name', name, 'x', x, 'sorted_x', torch.sort(x)[0])
+            print('mean', torch.mean(x, axis=-1), 'std', torch.std(x, axis=-1))
+            if 'globalratiostd' in cfg['prune_method']:
+                x = (x - torch.mean(x, axis=-1, keepdim=True)) / torch.std(x, axis=-1, keepdim=True)
+            sorted_metric, indices = torch.sort(x)
+
+            # Your existing code to plot sorted_metric
+            # plt.figure()
+            # plt.plot(sorted_metric.cpu().numpy())
+            # plt.title(f'Sorted Metric for {name}')
+            # plt.xlabel('Index')
+            # plt.ylabel('Metric Value')
+            # plt.savefig(os.path.join(output_dir, f"{name.replace('/', '_')}_sorted_metric.png"))
+            # plt.close()
+
+            # New code to plot and save the PDF using seaborn's kdeplot
+            # plt.figure()
+            # sns.kdeplot(sorted_metric.cpu().numpy(), bw_adjust=0.5)
+            # plt.title(f'PDF of Sorted Metric for {name}')
+            # plt.xlabel('Metric Value')
+            # plt.ylabel('Density')
+            # pdf_filename = f"{name.replace('/', '_')}_sorted_metric_pdf.png"
+            # plt.savefig(os.path.join(output_dir, pdf_filename))
+            # plt.close()
+            
+            # data = sorted_metric.cpu().numpy()
+            # # Plot the CDF using seaborn's kdeplot with the cumulative option
+            # plt.figure()
+            # sns.kdeplot(data, bw_adjust=0.5, cumulative=True, fill=True)
+            # plt.title(f'CDF of Sorted Metric for {name}')
+            # plt.xlabel('Metric Value')
+            # plt.ylabel('CDF')
+
+            # # Save the plot
+            # cdf_filename = f"{name.replace('/', '_')}_sorted_metric_cdf.png"
+            # plt.savefig(os.path.join(output_dir, cdf_filename))
+            # plt.close()
+            # # # Print statement for the new PDF plot
+            # # print(f"PDF plot saved to {os.path.join(output_dir, pdf_filename)}")
+            
+
+            module.pruning_ratio = sorted_metric[sorted_metric < threshold].numel() / sorted_metric.numel()
+            
+            print('threshold', threshold, 'module.sorted_metric', sorted_metric)
+            print('name', name, 'module.pruning_ratio', module.pruning_ratio)
+        
+    elif 'opt' in cfg['model_name']:
+        pass
+
+    
+    return
 
 def run_calibration(model, data_loader):
     with torch.no_grad():
         model.eval()
         for i, input in enumerate(data_loader):
             print('calibration', i, flush=True)
-            if cfg['task_name'] in ['s2s', 'sc', 'clm']:
-                input_size = input['labels'].size(0)
-                input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
-                        'labels': input['labels']}
-                input = to_device(input, cfg['device'])
-                output = model(**input)
-                input_ = {'target': input['labels']}
-                output_ = {'target': output['logits'], 'loss': output['loss']}
-            elif cfg['task_name'] in ['csr']:
-                input_size = input['labels'].size(0)
-                input_indices = input['input_indices']
-                correct_labels = input['correct_labels']
-                # print('input', input)
-                input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
-                        'labels': input['labels']}
-                input = to_device(input, cfg['device'])
-                output = model(**input)
-                input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
-                output_ = {'target': output['logits'], 'loss': output['loss']}
-                # print('outputloss', output['loss'])
-            else:
-                input = collate(input)
-                input_size = input['data'].size(0)
-                input = to_device(input, cfg['device'])
-                output = model(**input)
-                input_ = {'target': input['target']}
-                output_ = {'target': output['target'], 'loss': output['loss']}
-            if cfg['task_name'] == 's2s':
-                output_['generate'] = model.generate(input_ids=input["input_ids"],
-                                                    max_new_tokens=cfg['max_new_tokens'])
-            elif cfg['task_name'] == 'clm':
-                if cfg['data_name'] in ['dolly']:
-                    output_['generate'] = model.generate(input_ids=input["input_ids"],
-                                                        attention_mask=input["attention_mask"],
-                                                        max_new_tokens=cfg['max_new_tokens'],
-                                                        eos_token_id=cfg['pad_token_id'],
-                                                        no_repeat_ngram_size=2)
+            # if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+            # now, the wikitext and c4 datsets used for calibration are clm tasks
+            input_size = input['labels'].size(0)
+            input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                    'labels': input['labels']}
+            input = to_device(input, cfg['device'])
+            output = model(**input)
+            input_ = {'target': input['labels']}
+            output_ = {'target': output['logits'], 'loss': output['loss']}
+            # elif cfg['task_name'] in ['csr']:
+            #     input_size = input['labels'].size(0)
+            #     input_indices = input['input_indices']
+            #     correct_labels = input['correct_labels']
+            #     # print('input', input)
+            #     input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+            #             'labels': input['labels']}
+            #     input = to_device(input, cfg['device'])
+            #     output = model(**input)
+            #     input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
+            #     output_ = {'target': output['logits'], 'loss': output['loss']}
+            #     # print('outputloss', output['loss'])
+            # else:
+            #     input = collate(input)
+            #     input_size = input['data'].size(0)
+            #     input = to_device(input, cfg['device'])
+            #     output = model(**input)
+            #     input_ = {'target': input['target']}
+            #     output_ = {'target': output['target'], 'loss': output['loss']}
+            # if cfg['task_name'] == 's2s':
+            #     output_['generate'] = model.generate(input_ids=input["input_ids"],
+            #                                         max_new_tokens=cfg['max_new_tokens'])
+            # elif cfg['task_name'] == 'clm':
+            #     if cfg['data_name'] in ['dolly']:
+            #         output_['generate'] = model.generate(input_ids=input["input_ids"],
+            #                                             attention_mask=input["attention_mask"],
+            #                                             max_new_tokens=cfg['max_new_tokens'],
+            #                                             eos_token_id=cfg['pad_token_id'],
+            #                                             no_repeat_ngram_size=2)
             if iterate_small_samples:
                 if i == 100:
                     break
+            # break
+        if 'globalratio' in cfg['prune_method']:
+            global_determine_ratio(model)
+            # global_determine_ratio(model, if_log=True)
+            # raise ValueError('Global Determine Ratio Done...')
+        # raise ValueError('Calibration Done...')
     return
 
 
@@ -201,6 +306,7 @@ def test(data_loader, model, model_prof, metric, logger):
             print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
+            # break
             if iterate_small_samples:
                 if i == 100:
                     break

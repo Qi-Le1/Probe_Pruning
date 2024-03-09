@@ -419,18 +419,240 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
             # 'mag-similarityprobe0.9calibskip5-probe-None-None+wikitest-all','mag-similarityprobe0.9calib-probe-None-None+wikitest-all',
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
-                             ['mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.8calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.7calib-probe-None-None+wikitest-all'],
-                            ['gate-proj+up-proj+down-proj']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  ['mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.8calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.7calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  ['mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+c4-2000', 'mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+wikivalid-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  ['mag-globalratiostd0.9calib-probe-None-None+c4-2000', 'mag-globalratiostdnmlprobe0.9calib-probe-None-None+c4-2000', 'mag-globalratiostdsavemetricseqv1nmlprobe0.9calib-probe-None-None+c4-2000',
+            #                   'mag-globalratiostdnmlprobe0.9calibrunningmean-probe-None-None+c4-2000', 'mag-globalratiostdnmlprobe0.9calibrunningmeanfillpbmetric-probe-None-None+c4-2000',
+            #                   'mag-globalratiostd0.9calib-probe-None-None+wikitest-all', 'mag-globalratiostdnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all',
+            #                   'mag-globalratiostd0.9calib-probe-None-None+wikivalid-all', 'mag-globalratiostdnmlprobe0.9calib-probe-None-None+wikivalid-all', 'mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+wikivalid-all',],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  [    'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calibcoeffrunningmean-probe-None-None+c4-2000', 'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calibrunningmean-probe-None-None+c4-2000'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  ['pq-nmlprobe0.9calib-probe-None-None+c4-2000'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            
+            
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.7', '0.8'], 
             #                  ['mag-probesquare-probe-None-None', 'mag-probe-probe-None-None'],
             #                 ['up-proj+down-proj']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.6', '0.7', '0.8', '0.9'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
+                             [
+                            #      'mag-calib-probe-None-None+c4-2000',
+                            #   'mag-calibrunningmean-probe-None-None+c4-2000',
+                            # 'mag-calibema0.99-probe-None-None+c4-2000',
+                            # 'mag-nmlprobe-probe-None-None+c4-2000',
+                            # 'mag-similarityprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with full inf fill and no clib (totally last round)
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with full inf fill
+                            'mag-nmlhalfsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with different momentum
+                            'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async multi probe
+                            'mag-nmlsquareasync0.0multiproble2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseq-probe-None-None+c4-2000',
+
+                            # 对比一下不加calib
+                            'mag-nmlmultiprobe5probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probesavemetricseq-probe-None-None+c4-2000',
+   
+                            # 验证当前的epoch multiprobe
+                            'mag-fullinfprobe-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+
+                            # 'mag-nmlprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # 'mag-nmlprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             'mag-nmldynaprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+# #
+#                             'mag-probefullinf-probe-None-None+c4-2000',
+                            
+                            #  'mag-nmlprobedynaratiosavemetricseqfillpbmetriccombineema0.99calib-probe-None-None+c4-2000',
+                            #   'mag-nmlprobedynaratiosavemetricseqfillpbmetricoriginalema0.99calib-probe-None-None+c4-2000'
+                            # # 'mag-nmlpr
+                            # obedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlprobedynaratiosavemetricseqrunningmeancalib-probe-None-None+c4-2000',
+
+                            # 'mag-globalratiostdema0.99calib-probe-None-None+c4-2000',
+                            # # 'mag-nmlprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-globalratiostdnmlprobedynaratiosavemetricseqrunningmeancalib-probe-None-None+c4-2000',
+                            # 'mag-nmlprobedynaratiosavemetricseqfillpbmetricoriginalema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlprobedynaratiosavemetricseqcompressfillpbmetriccombineema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlprobedynaratiosavemetricseqfillpbmetricoriginalema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            # 'mag-nmlprobedynaratiosavemetricseqcompressfillpbmetricoriginalema0.99calib-probe-None-None+c4-2000',
+                            ],
+                            #   'mag-globalratiostdcalib-probe-None-None+c4-2000',
+                            #   'mag-nmlprobe0.9calib-probe-None-None+c4-2000',
+                            #   'mag-globalratiostdnmlprobe0.9calib-probe-None-None+c4-2000',
+                            #   'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calib-probe-None-None+c4-2000',
+                            #   'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calibrunningmean-probe-None-None+c4-2000'],
+                            ['gate-proj+up-proj+down-proj']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
+                             [
+                            #      'mag-calib-probe-None-None+c4-2000',
+                            #   'mag-calibrunningmean-probe-None-None+c4-2000',
+                            # 'mag-calibema0.99-probe-None-None+c4-2000',
+                            # 'mag-nmlprobe-probe-None-None+c4-2000',
+                            # 'mag-similarityprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with full inf fill and no clib (totally last round)
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with full inf fill
+                            'mag-nmlhalfsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with different momentum
+                            'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async multi probe
+                            'mag-nmlsquareasync0.0multiproble2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseq-probe-None-None+c4-2000',
+
+                            # 对比一下不加calib
+                            'mag-nmlmultiprobe5probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probesavemetricseq-probe-None-None+c4-2000',
+   
+                            # 验证当前的epoch multiprobe
+                            'mag-fullinfprobe-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            ],
+
+                            ['gate-proj+up-proj+down-proj']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
             pass
         elif 'csr' in data:
+
+            control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
+                             [
+                            #      'mag-calib-probe-None-None+c4-2000',
+                            #   'mag-calibrunningmean-probe-None-None+c4-2000',
+                            # 'mag-calibema0.99-probe-None-None+c4-2000',
+                            # 'mag-nmlprobe-probe-None-None+c4-2000',
+                            # 'mag-similarityprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with full inf fill and no clib (totally last round)
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with full inf fill
+                            'mag-nmlhalfsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with different momentum
+                            'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async multi probe
+                            'mag-nmlsquareasync0.0multiproble2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseq-probe-None-None+c4-2000',
+
+                            # 对比一下不加calib
+                            'mag-nmlmultiprobe5probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probesavemetricseq-probe-None-None+c4-2000',
+   
+                            # 验证当前的epoch multiprobe
+                            'mag-fullinfprobe-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            ],
+                            #   'mag-globalratiostdcalib-probe-None-None+c4-2000',
+                            #   'mag-nmlprobe0.9calib-probe-None-None+c4-2000',
+                            #   'mag-globalratiostdnmlprobe0.9calib-probe-None-None+c4-2000',
+                            #   'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calib-probe-None-None+c4-2000',
+                            #   'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calibrunningmean-probe-None-None+c4-2000'],
+                            ['gate-proj+up-proj+down-proj']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0.6'], 
+            #                  [
+                                 
+            #                 #      'mag-calib-probe-None-None+c4-2000',
+            #                 #   'mag-calibrunningmean-probe-None-None+c4-2000',
+            #                 # 'mag-calibema0.9-probe-None-None+c4-2000',
+            #                 # 'mag-calibema0.99-probe-None-None+c4-2000',
+            #                 # 'mag-calibema0.999-probe-None-None+c4-2000'
+            #                 'mag-nmlprobedynaratiosavemetricseqfillpbmetricoriginalema0.99calib-probe-None-None+c4-2000',
+            #                 # 'mag-nmlprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+            #                 ],
+            #                 #   'mag-globalratiostdcalib-probe-None-None+c4-2000',
+            #                 #   'mag-nmlprobe0.9calib-probe-None-None+c4-2000',
+            #                 #   'mag-globalratiostdnmlprobe0.9calib-probe-None-None+c4-2000',
+            #                 #   'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calib-probe-None-None+c4-2000',
+            #                 #   'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calibrunningmean-probe-None-None+c4-2000'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None'],
             #         ['gate-proj+up-proj+down-proj']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
