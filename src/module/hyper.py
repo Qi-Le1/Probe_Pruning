@@ -19,12 +19,13 @@ def process_control():
     cfg['prune_hyper'] = float(cfg['control']['prune_hyper'])
     cfg['calibration_stage'] = False
     # no skip
-    cfg['skip'] = -1
+    cfg['skip'] = 2
     
     prune_name_list = cfg['control']['prune_name'].split('+')
 
     cfg['prune_name'] = prune_name_list[0]
     cfg['prune_metric'] = None
+    cfg['probe_num'] = 1
     prune_name_sub_list = cfg['prune_name'].split('-')
     if len(prune_name_sub_list) > 1:
         cfg['prune_method'] = prune_name_sub_list[1]
@@ -43,12 +44,12 @@ def process_control():
                 float_value = None  # Or some default value or error handling
             cfg['svd_ratio'] = float_value
 
-        if 'skip' in cfg['prune_method']:
-            match = re.search(r'skip(\d+)', cfg['prune_method'])
-            if match:
-                # Convert the matched string to a float
-                int_value = int(match.group(1))
-            cfg['skip'] = int_value
+        # if 'skip' in cfg['prune_method']:
+        #     match = re.search(r'skip(\d+)', cfg['prune_method'])
+        #     if match:
+        #         # Convert the matched string to a float
+        #         int_value = int(match.group(1))
+        #     cfg['skip'] = int_value
 
         if 'calib' in cfg['prune_method']:
             calib_info_list = prune_name_list[1].split('-')
@@ -67,6 +68,27 @@ def process_control():
                 float_value = None
             
             cfg['probefixratio'] = float_value   
+
+        if 'multiprobe' in cfg['prune_method']:
+            match = re.search(r'multiprobe(\d+)', cfg['prune_method'])
+            if match:
+                # Convert the matched string to a float
+                int_value = int(match.group(1))
+            else:
+                int_value = None
+            
+            cfg['probe_num'] = int_value   
+            # cfg['probe_size'] = 
+
+        if 'async' in cfg['prune_method']:
+            match = re.search(r'async(\d+\.\d+)', cfg['prune_method'])
+            if match:
+                # Convert the matched string to a float
+                float_value = float(match.group(1))
+            else:
+                float_value = None
+            
+            cfg['asyncratio'] = float_value   
 
         if 'ema' in cfg['prune_method']:
             match = re.search(r'ema(\d+\.\d+)', cfg['prune_method'])
@@ -133,6 +155,10 @@ def process_control():
     else:
         raise ValueError('Not valid task name')
 
+    cfg['probe_size'] = int(cfg[model_name]['batch_size']['test'] / cfg['probe_num'])
+    if cfg[model_name]['batch_size']['test'] % cfg['probe_num'] != 0:
+        raise ValueError('probe_num needs to be divisible by batch size')
+    
     cfg['logger_detailed_info'] = False
     print(cfg['prune_hyper'] == 9999)
     print('cfg: ', cfg)

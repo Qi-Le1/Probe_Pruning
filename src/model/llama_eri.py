@@ -320,31 +320,34 @@ class Linear(nn.Linear, EriLayer):
             raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
         cur_device = inp.device
 
+        momentum = cfg['ema_momentum']
+        if is_probe and 'compressfillpbmetric' in cfg['prune_method']:
+            momentum = 1 - ((1 - momentum) / (default_batch_size))
         if 'savemetricseq' in cfg['prune_method']:
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
                 self.scaler_inp = self.scaler_inp.to(cur_device)
                 self.nsamples = self.nsamples.to(cur_device)
                 update_indices = update_indices.to(cur_device)
-                self.scaler_inp[:, update_indices] *= cfg['ema_momentum']
+                self.scaler_inp[:, update_indices] *= momentum
                 if cfg['calibration_stage'] == True:
                     norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
                 elif cfg['calibration_stage'] == False:
                     norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
                 # denominator = (self.nsamples[update_indices] + )
-                self.scaler_inp[:, update_indices] += (1-cfg['ema_momentum']) * norm_squared / batch_size
+                self.scaler_inp[:, update_indices] += (1 - momentum) * norm_squared / batch_size
         else:
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
                 self.scaler_inp = self.scaler_inp.to(cur_device)
                 self.nsamples = self.nsamples.to(cur_device)
                 update_indices = update_indices.to(cur_device)
 
-                self.scaler_inp[update_indices] *= cfg['ema_momentum']
+                self.scaler_inp[update_indices] *= momentum
                 norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=None, max=65504)
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 # print('update_indices', update_indices.shape, flush=True)
                 # print('norm_squared', norm_squared.shape, flush=True)
                 # denominator = (self.nsamples[update_indices] + batch_size)
-                self.scaler_inp[update_indices] += (1-cfg['ema_momentum']) * norm_squared / batch_size
+                self.scaler_inp[update_indices] += (1 - momentum) * norm_squared / batch_size
                 # print('self.scaler_inp', self.scaler_inp, flush=True)
             elif self.prune_metric == "flap":
                pass
@@ -519,11 +522,11 @@ class Linear(nn.Linear, EriLayer):
                 #     for j in range(x.shape[-1]):
                 #         print(x[:, i, j])
                 # print('probeweight2 ', weight.dtype, weight.shape, weight, flush=True)
-                if 'square' in cfg['prune_method']:
-                    result = torch.clamp(F.linear(x, self.weight ** 2, bias=None), min=None, max=65504)
-                    print('probesquareresult', result.dtype, result.shape, result, flush=True)
-                else:
-                    result = F.linear(x, self.weight, bias=None)
+                # if 'square' in cfg['prune_method']:
+                #     result = torch.clamp(F.linear(x, self.weight ** 2, bias=None), min=None, max=65504)
+                #     print('probesquareresult', result.dtype, result.shape, result, flush=True)
+                # else:
+                result = F.linear(x, self.weight, bias=None)
                 # print('proberesult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)
                 return result
@@ -590,6 +593,7 @@ class Linear(nn.Linear, EriLayer):
                 # weight = weight.to(torch.float32)
                 # print('calibrateinput 2', x.dtype, x.shape, x, flush=True)
                 # print('calibrateweight 2', weight.dtype, weight.shape, weight, flush=True)
+                # print('here')
                 result = F.linear(x, weight, bias=None)
                 # print('calibrateresult', result.dtype, result.shape, result, flush=True)
             result = result.to(previous_dtype)

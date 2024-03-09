@@ -306,6 +306,7 @@ def test(data_loader, model, model_prof, metric, logger):
             print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
+            # break
             if iterate_small_samples:
                 if i == 100:
                     break
