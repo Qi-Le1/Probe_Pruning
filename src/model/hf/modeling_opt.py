@@ -283,6 +283,8 @@ class OPTDecoderLayer(nn.Module):
         self.pruning_module = HiddenRepresentationPruning(cfg, f'opt_mlp_{layer_order}')
         self.probe_out_dim_indices = None
 
+        self.layer_order = layer_order
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -341,7 +343,7 @@ class OPTDecoderLayer(nn.Module):
             hidden_states = self.final_layer_norm(hidden_states)
         
         if cfg['calibration_stage'] == True:
-            if ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
+            if ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']):
                 hidden_states = self.fc1(hidden_states)
                 hidden_states = self.activation_fn(hidden_states)
 
@@ -369,11 +371,11 @@ class OPTDecoderLayer(nn.Module):
                 
                 if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
                     if 'saveseqdim' in cfg['prune_method']:
-                        probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
+                        probe_out_dim_metric = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], global_input_distribution=self.fc2.get_global_input_distribution()[0])
                     else:
-                        probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution())
+                        probe_out_dim_metric = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.fc2.get_global_metric_score_distribution())
                 else:
-                    probe_out_dim_metric = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
+                    probe_out_dim_metric = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'])
                 probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
 
 
@@ -401,18 +403,18 @@ class OPTDecoderLayer(nn.Module):
                 #     down_proj = down_proj + restore
                 custom_duration = time.time() - time_start
                 print('fll_batch_duration', custom_duration, flush=True)
-            elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order >= cfg['skip']:
+            elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) and self.layer_order >= cfg['skip']:
                 bsz, _, _ = x.shape
                 time_start = time.time()
-                if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
+                if torch.all(self.fc2.get_global_metric_score_distribution() == 0):
                     probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
                     # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
                     # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
                 else:
                     if 'meanglobalinput' in cfg['prune_method']:
-                        probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_input_distribution()[0], self.down_proj.weight.data, cfg['prune_metric'])
+                        probe_out_dim_metric = cal_running_mean_prune_metric(self.fc2.get_global_input_distribution()[0], self.fc2.weight.data, cfg['prune_metric'])
                     else:
-                        probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                        probe_out_dim_metric = cal_running_mean_prune_metric(self.fc2.get_global_metric_score_distribution(), self.fc2.weight.data, cfg['prune_metric'])
                     probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
 
                 hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states, probe_out_dim_indices=probe_out_dim_indices)))

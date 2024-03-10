@@ -335,7 +335,7 @@ def cal_intersection_ratio(output, probe, weight, pruning_module, multiple):
 def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distribution=None, global_input_distribution=None):
     # if probe_out.size(0) != 1 and probe_out.size(0) != cfg['probe_num']:
     #     raise ValueError('probe_out size in calculating metric should be 1 or probe_num')
-    
+    print('probe_out shape', probe_out.shape)
     probe_num = probe_out.size(0)
     if 'wandasp' in metric_type:
         # if probe_out.dim() == 2:

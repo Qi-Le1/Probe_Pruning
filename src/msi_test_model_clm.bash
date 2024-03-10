@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 bash clm0wikitext-2v1_llama-2-7b_clm_10_128_0.1_mag-calibema0.99-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.sh --wait
 bash clm0wikitext-2v1_llama-2-7b_clm_10_128_0.1_mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.sh --wait
 bash clm0wikitext-2v1_llama-2-7b_clm_10_128_0.1_mag-fullinfprobe-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.sh --wait
@@ -52,3 +53,23 @@ bash clm0wikitext-2v1_llama-2-7b_clm_10_128_0.9_mag-fullinfprobe-probe-None-None
 bash clm0wikitext-2v1_llama-2-7b_clm_10_128_0.9_mag-nmlmultiprobe10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.sh --wait
 bash clm0wikitext-2v1_llama-2-7b_clm_10_128_0.9_mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.sh --wait
 bash clm0wikitext-2v1_llama-2-7b_clm_10_128_0.9_mag-nmlmultiprobe1probedynaratiosavemetricseqrunningmeancalib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.sh --wait
+=======
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.1_mag-calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.1_mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.2_mag-calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.2_mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.3_mag-calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.3_mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.4_mag-calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.4_mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.5_mag-calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.5_mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.6_mag-calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.6_mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.7_mag-calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.7_mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.8_mag-calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.8_mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.9_mag-calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_128_0.9_mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000_gate-proj+up-proj+down-proj.pbs --wait
+>>>>>>> 70a141cc666a1279347bf2a3219b45b30e5795fd
