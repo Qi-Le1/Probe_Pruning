@@ -567,7 +567,8 @@ class LlamaMLP(nn.Module):
                         else:
                             abs_x = torch.abs(x)
                             sum_across_bsz = abs_x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)).sum(dim=1, keepdim=True)
-                            proportion = abs_x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)) / (sum_across_bsz + 1e-10)
+                            safe_denominator = torch.clamp(sum_across_bsz, min=1e-6)
+                            proportion = abs_x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)) / safe_denominator
                             comp_across_bsz = (x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)) * proportion).sum(dim=1)
 
                         end_time = time.time()
@@ -1875,6 +1876,7 @@ class LlamaModel(LlamaPreTrainedModel):
             attention_mask = attention_mask if (attention_mask is not None and 0 in attention_mask) else None
         else:
             # 4d mask is passed through the layers
+            # print(attention_mask.shape)
             attention_mask = _prepare_4d_causal_attention_mask(
                 attention_mask, (batch_size, seq_length), inputs_embeds, past_key_values_length
             )

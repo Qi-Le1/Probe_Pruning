@@ -203,7 +203,7 @@ def run_calibration(model, data_loader):
     with torch.no_grad():
         model.eval()
         for i, input in enumerate(data_loader):
-            print('calibration', i, flush=True)
+            print('calibration', i, input['input_ids'].shape, flush=True)
             # if cfg['task_name'] in ['s2s', 'sc', 'clm']:
             # now, the wikitext and c4 datsets used for calibration are clm tasks
             input_size = input['labels'].size(0)

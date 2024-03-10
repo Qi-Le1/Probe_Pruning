@@ -360,16 +360,16 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     print('cfg[calibration_nsamples]', cfg['calibration_nsamples'])
                 input_chunks = []
                 mask_chunks = []
-                # for i in range(cfg['calibration_nsamples']):
-                #     i = random.randint(0, len(input_ids) - max_length - 1)
-                #     j = i + max_length
-                #     input_chunks.append(input_ids[i: j])
-                #     mask_chunks.append(attention_mask[i: j])
-                #     processed_calibrate_sample_num += 1
-                #     if processed_calibrate_sample_num >= cfg['calibration_nsamples']:
-                #         break
-                input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
-                mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+                for i in range(cfg['calibration_nsamples']):
+                    i = random.randint(0, len(input_ids) - max_length - 1)
+                    j = i + max_length
+                    input_chunks.append(input_ids[i: j])
+                    mask_chunks.append(attention_mask[i: j])
+                    processed_calibrate_sample_num += 1
+                    if processed_calibrate_sample_num >= cfg['calibration_nsamples']:
+                        break
+                # input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+                # mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
                 final_inputs = {
                     'input_ids': [],
                     'attention_mask': [],
@@ -432,13 +432,13 @@ def process_dataset(dataset, tokenizer):
                 num_samples = len(input_ids) // max_length
                 input_chunks = []
                 mask_chunks = []
-                # for i in range(num_samples):
-                #     i = random.randint(0, len(input_ids) - max_length - 1)
-                #     j = i + max_length
-                #     input_chunks.append(input_ids[i: j])
-                #     mask_chunks.append(attention_mask[i: j])
-                input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
-                mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+                for i in range(num_samples):
+                    i = random.randint(0, len(input_ids) - max_length - 1)
+                    j = i + max_length
+                    input_chunks.append(input_ids[i: j])
+                    mask_chunks.append(attention_mask[i: j])
+                # input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+                # mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
                 final_inputs = defaultdict(list)
                 for i in range(len(input_chunks)):
                     # print('len(input_chunks[i])', len(input_chunks[i]))

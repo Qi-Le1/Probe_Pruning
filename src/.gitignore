@@ -28,5 +28,6 @@ cifar*/
 
 
 /__pycache__/
+__pycache__/
 
 msi_test_model_clm.bash

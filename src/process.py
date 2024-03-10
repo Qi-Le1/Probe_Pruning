@@ -231,11 +231,51 @@ def make_control_list(file):
 
 
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['50'], ['128'], ['0.1'], 
-                             ['mag-gauexpcalib-probe-None-None+wikivalid-all'
-                              ],
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['50'], ['128'], ['0.1'], 
+        #                      ['mag-gauexpcalib-probe-None-None+wikivalid-all'
+        #                       ],
+        #                     ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
+                             [
+                                 'mag-calib-probe-None-None+c4-2000',
+                            'mag-calibema0.99-probe-None-None+c4-2000',
+
+                            # async probe with full inf fill and no clib (totally last round)
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with full inf fill
+                            'mag-nmlhalfsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with different momentum
+                            'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async multi probe
+                            'mag-nmlsquareasync0.0multiproble2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseq-probe-None-None+c4-2000',
+
+                            # 对比一下不加calib
+                            'mag-nmlmultiprobe5probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probesavemetricseq-probe-None-None+c4-2000',
+   
+                            # 验证当前的epoch multiprobe
+                            'mag-fullinfprobe-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            ],
                             ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
+        CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'wikitext-baseline':
         # control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
@@ -260,23 +300,64 @@ def make_control_list(file):
         pass
 
     elif file == 'zeroshot-probe':
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None'],
-                    ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None'],
+        #             ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-fill-each', 'mag-probe-fill-each-delseq'],
-                ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-fill-each', 'mag-probe-fill-each-delseq'],
+        #         ['q-proj+k-proj+v-proj+o-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probembsz-fill-each-delseq'],
-                    ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probembsz-fill-each-delseq'],
+        #             ['q-proj+k-proj+v-proj+o-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probe-fill-each', 'mag-probembsz-fill-each-delseq'],
-                    ['default']]]
+        # control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probe-fill-each', 'mag-probembsz-fill-each-delseq'],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
+                             [
+                            
+                            'mag-calib-probe-None-None+c4-2000',
+                            'mag-calibema0.99-probe-None-None+c4-2000',
+                            # async probe with full inf fill and no clib (totally last round)
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # # async probe with full inf fill
+                            'mag-nmlhalfsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlhalfsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async probe with different momentum
+                            'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+                            # async multi probe
+                            'mag-nmlsquareasync0.0multiproble2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseq-probe-None-None+c4-2000',
+
+                            # 对比一下不加calib
+                            'mag-nmlmultiprobe5probesavemetricseq-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probesavemetricseq-probe-None-None+c4-2000',
+   
+                            # 验证当前的epoch multiprobe
+                            'mag-fullinfprobe-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            'mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+                            ],
+
+                            ['gate-proj+up-proj+down-proj']]]
         CIFAR10_controls_9 = make_controls( control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'zeroshot-baseline':
@@ -1348,7 +1429,7 @@ def make_vis(df_exp, df_history):
                             print('performancevssparsity', performance_vs_total_FLOPs_ratio, flops_metric_name, prune_hyper)
                             fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules, 'FIG:all_methods_performance_vs_prune_ratio_for_all_layers'])
                             fig[fig_name] = plt.figure(fig_name)
-                            x = prune_hyper
+                            x = float(prune_hyper)
                             
                             y = min(performance_metric_max, row.tolist()[0])
                             yerr = min(performance_metric_max, row_std.tolist()[0])
@@ -1361,13 +1442,13 @@ def make_vis(df_exp, df_history):
                             # elif 'IFN' in prune_metric:
                             #     prune_name += prune_metric
                             key_for_dict = f"{prune_name}"
-                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Pruned ratio', y_label=flops_metric_name)
                             if batch_size == '1':
                                 temp_list = ['10']
                                 for item in temp_list:
                                     fig_name = '_'.join([data_name, model_name, task_name, item, seq_len, cust_tgt_modules, 'FIG:all_methods_performance_vs_prune_ratio_for_all_layers'])
                                     key_for_dict = 'bsz1_' + key_for_dict
-                                    record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                                    record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Pruned ratio', y_label=flops_metric_name)
                             # if 'pq' in prune_name:
                             #     key_for_dict = f"Our"
                             # elif 'mag' in prune_name:
@@ -1554,6 +1635,9 @@ def make_vis(df_exp, df_history):
             if 'time_cost_per_sample' in fig_name:
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
             if 'all_methods_performance_vs_prune_ratio_for_all_layers' in fig_name:
+                print('all_methods_performance_vs_prune_ratio_for_all_layers', fig_name)
+                print('x', x)
+                print('y', y)
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
             if 'mean_intersection_ratio' in fig_name:
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
