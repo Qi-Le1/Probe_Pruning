@@ -33,85 +33,108 @@ import torch.nn as nn
 from transformers import AutoTokenizer
 
 
-input = torch.randn(2, 3, 4)
-weight = torch.randn(4, 5)
+# input = torch.randn(2, 3, 4)
+# weight = torch.randn(4, 5)
 
-norm_bsz_seq_input =  torch.linalg.vector_norm(input, ord=2, dim=(0,1)).un
+# norm_bsz_seq_input =  torch.linalg.vector_norm(input, ord=2, dim=(0,1)).un
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Define the function f(x)
+def f(x):
+    return x / (631.25 + x) * 0.25 + 0.001 * x**2 / (3360 + 0.001 * x**2) * 0.6
+
+# Generate x values from 0 to 1000
+x = np.linspace(0, 7000, 7000)
+
+# Calculate y values using the defined function
+y = f(x)
+
+# Create the plot
+plt.figure(figsize=(10, 6))
+plt.plot(x, y, label='f(x) = x/(631.25+x) * 0.25 + 0.001 * x^2 / (3360+0.001*x^2) * 0.6')
+plt.xlabel('x')
+plt.ylabel('f(x)')
+plt.title('Plot of the function f(x)')
+plt.grid(True)
+plt.legend()
+
+# Show the plot
+plt.show()
 
 
+# for i in range(173):
+#     cur_number = i * 64
+#     ratio = cur_number / 11008
+#     print(ratio)
 
 
-for i in range(173):
-    cur_number = i * 64
-    ratio = cur_number / 11008
-    print(ratio)
+# a = np.std([5], axis=0).item()
 
 
-a = np.std([5], axis=0).item()
+# # Load a pre-trained tokenizer
+# tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
 
+# # List of strings
+# texts = ["Hello, world!", "Transformers are great for NLP tasks."]
 
-# Load a pre-trained tokenizer
-tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+# # Tokenize the list of strings
+# tokenized_outputs = tokenizer(texts, padding=True, return_tensors="pt")
 
-# List of strings
-texts = ["Hello, world!", "Transformers are great for NLP tasks."]
+# print(tokenized_outputs)
+# a = np.array([-5, -4])
+# c = np.argmax(a)
+# # Define CrossEntropyLoss with no reduction
+# loss_fn = nn.CrossEntropyLoss(reduction='none')
 
-# Tokenize the list of strings
-tokenized_outputs = tokenizer(texts, padding=True, return_tensors="pt")
+# # Example input logits (batch size of 3, 4 classes)
+# logits = torch.tensor([[2.0, 0.5, 1.0, 0.2],
+#                        [0.5, 2.0, 1.0, 0.2],
+#                        [0.2, 0.5, 2.0, 1.0]])
 
-print(tokenized_outputs)
-a = np.array([-5, -4])
-c = np.argmax(a)
-# Define CrossEntropyLoss with no reduction
-loss_fn = nn.CrossEntropyLoss(reduction='none')
+# # Corresponding labels (batch size of 3)
+# labels = torch.tensor([0, 1, 2])
 
-# Example input logits (batch size of 3, 4 classes)
-logits = torch.tensor([[2.0, 0.5, 1.0, 0.2],
-                       [0.5, 2.0, 1.0, 0.2],
-                       [0.2, 0.5, 2.0, 1.0]])
+# # Calculate loss
+# loss = loss_fn(logits, labels)
 
-# Corresponding labels (batch size of 3)
-labels = torch.tensor([0, 1, 2])
+# print(loss)
 
-# Calculate loss
-loss = loss_fn(logits, labels)
+# modified_logs = F.log_softmax(logits, dim=-1)
+# print(modified_logs)
 
-print(loss)
+# a = []
+# # a.extend(6)
+# a.extend([6])
+# a.extend([7])
+# print(a)
+# # Sample input
+# bsz = 4  # Example batch size
+# h = torch.randn(bsz, 10)  # Example tensor with shape [batch_size, features]
 
-modified_logs = F.log_softmax(logits, dim=-1)
-print(modified_logs)
+# # Simulated layer weights
+# layer_info = {'weight': torch.randn(10)}
 
-a = []
-# a.extend(6)
-a.extend([6])
-a.extend([7])
-print(a)
-# Sample input
-bsz = 4  # Example batch size
-h = torch.randn(bsz, 10)  # Example tensor with shape [batch_size, features]
+# # First piece
+# sum_squared_norms = torch.sum(torch.norm(h, p=2, dim=1) ** 2, dim=0)
+# average_squared_norm = sum_squared_norms / torch.tensor(bsz, device=h.device, dtype=torch.float)
+# norm_across_other_dims_first = (torch.sqrt(average_squared_norm.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
 
-# Simulated layer weights
-layer_info = {'weight': torch.randn(10)}
+# # Second piece
+# scaler_inp = torch.zeros_like(sum_squared_norms)
+# nsamples = 0
+# for i in range(bsz):
+#     scaler_inp *= nsamples / (nsamples + 1)
+#     temp = torch.norm(h[i], p=2, dim=0) ** 2
+#     scaler_inp +=  temp / (nsamples + 1)
+#     nsamples += 1
+# norm_across_other_dims_second = (torch.sqrt(scaler_inp.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
 
-# First piece
-sum_squared_norms = torch.sum(torch.norm(h, p=2, dim=1) ** 2, dim=0)
-average_squared_norm = sum_squared_norms / torch.tensor(bsz, device=h.device, dtype=torch.float)
-norm_across_other_dims_first = (torch.sqrt(average_squared_norm.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
+# # Compare the results
+# are_equivalent = torch.isclose(norm_across_other_dims_first, norm_across_other_dims_second, atol=1e-6)
 
-# Second piece
-scaler_inp = torch.zeros_like(sum_squared_norms)
-nsamples = 0
-for i in range(bsz):
-    scaler_inp *= nsamples / (nsamples + 1)
-    temp = torch.norm(h[i], p=2, dim=0) ** 2
-    scaler_inp +=  temp / (nsamples + 1)
-    nsamples += 1
-norm_across_other_dims_second = (torch.sqrt(scaler_inp.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
-
-# Compare the results
-are_equivalent = torch.isclose(norm_across_other_dims_first, norm_across_other_dims_second, atol=1e-6)
-
-print(f"Are the computations equivalent? {are_equivalent}")
+# print(f"Are the computations equivalent? {are_equivalent}")
 
 
 # a = torch.randn(1, 2, 3)
