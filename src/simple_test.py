@@ -33,909 +33,1001 @@ import torch.nn as nn
 from transformers import AutoTokenizer
 
 
+
+import torch
+import time
+
+
+import torch
+import torch.nn as nn
+
+class CustomModel(nn.Module):
+    def __init__(self, in_shape=4096, out_shape=11008, device='cuda:0'):
+        super(CustomModel, self).__init__()
+        # Initialize the large matrix as a parameter
+        # self.large_matrix = nn.Parameter(torch.randn(rows, cols, device=device))
+
+        self.linear1 = torch.nn.Linear(in_shape, out_shape, device=device)
+        # Optionally, you can set `requires_grad=False` if you don't want to update this matrix during training
+        
+    def forward(self, indices):
+        """
+        Extracts columns from the large matrix based on the provided indices.
+        Indices should be a tensor of column indices to extract.
+        """
+        # Ensure indices are on the same device as the matrix
+        indices = indices.to(self.large_matrix.device)
+        # Extract columns based on indices
+        extracted_columns = self.large_matrix[:, indices]
+        return extracted_columns
+
+# Example usage
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = CustomModel(device=device)
+model.to(device)  # Move model to the appropriate device
+
+# Function to measure extraction time
+def measure_extraction_time(indices):
+    start = time.time()
+    # Ensure the operation is performed on the GPU
+    _ = model.linear1.weight[indices, :].to(device)
+    torch.cuda.synchronize()  # Wait for GPU operations to complete
+    return time.time() - start
+
+def measure_row_extraction_time(indices):
+    start = time.time()
+    # Ensure the operation is performed on the GPU
+    _ = model.linear1.weight[:, indices].to(device)
+    torch.cuda.synchronize()  # Wait for GPU operations to complete
+    return time.time() - start
+
+# Extraction sizes and their corresponding times
+extraction_sizes = [640, 1280, 2560, 4096]
+sorted_times = []
+unsorted_times = []
+
+for size in extraction_sizes:
+    # Sorted indices
+    sorted_indices = torch.arange(size, device=device)
+    
+    # Unsorted indices: Shuffle the sorted indices
+    unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
+    print('sorted_indices', sorted_indices)
+    print('unsorted_indices', unsorted_indices)
+    # Measure time for sorted indices
+    time_sorted = measure_extraction_time(sorted_indices)
+    sorted_times.append(time_sorted)
+    
+    # Measure time for unsorted indices
+    time_unsorted = measure_extraction_time(unsorted_indices)
+    unsorted_times.append(time_unsorted)
+
+    print(f"Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds, Time (unsorted): {time_unsorted:.6f} seconds")
+
+extraction_sizes = [640, 1280, 2560, 4096]
+sorted_times = []
+unsorted_times = []
+
+for size in extraction_sizes:
+    # Sorted indices
+    sorted_indices = torch.arange(size, device=device)
+    
+    # Unsorted indices: Shuffle the sorted indices
+    unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
+    
+    # Measure time for sorted indices
+    time_sorted = measure_row_extraction_time(sorted_indices)
+    sorted_times.append(time_sorted)
+    
+    # Measure time for unsorted indices
+    time_unsorted = measure_row_extraction_time(unsorted_indices)
+    unsorted_times.append(time_unsorted)
+
+    print(f"Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds, Time (unsorted): {time_unsorted:.6f} seconds")
+
 # input = torch.randn(2, 3, 4)
 # weight = torch.randn(4, 5)
 
 # norm_bsz_seq_input =  torch.linalg.vector_norm(input, ord=2, dim=(0,1)).un
 
-import matplotlib.pyplot as plt
-import numpy as np
-
-# Define the function f(x)
-def f(x):
-    return x / (631.25 + x) * 0.25 + 0.001 * x**2 / (3360 + 0.001 * x**2) * 0.6
-
-# Generate x values from 0 to 1000
-x = np.linspace(0, 7000, 7000)
-
-# Calculate y values using the defined function
-y = f(x)
-
-# Create the plot
-plt.figure(figsize=(10, 6))
-plt.plot(x, y, label='f(x) = x/(631.25+x) * 0.25 + 0.001 * x^2 / (3360+0.001*x^2) * 0.6')
-plt.xlabel('x')
-plt.ylabel('f(x)')
-plt.title('Plot of the function f(x)')
-plt.grid(True)
-plt.legend()
-
-# Show the plot
-plt.show()
-
-
-# for i in range(173):
-#     cur_number = i * 64
-#     ratio = cur_number / 11008
-#     print(ratio)
-
-
-# a = np.std([5], axis=0).item()
-
-
-# # Load a pre-trained tokenizer
-# tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-
-# # List of strings
-# texts = ["Hello, world!", "Transformers are great for NLP tasks."]
-
-# # Tokenize the list of strings
-# tokenized_outputs = tokenizer(texts, padding=True, return_tensors="pt")
-
-# print(tokenized_outputs)
-# a = np.array([-5, -4])
-# c = np.argmax(a)
-# # Define CrossEntropyLoss with no reduction
-# loss_fn = nn.CrossEntropyLoss(reduction='none')
-
-# # Example input logits (batch size of 3, 4 classes)
-# logits = torch.tensor([[2.0, 0.5, 1.0, 0.2],
-#                        [0.5, 2.0, 1.0, 0.2],
-#                        [0.2, 0.5, 2.0, 1.0]])
-
-# # Corresponding labels (batch size of 3)
-# labels = torch.tensor([0, 1, 2])
-
-# # Calculate loss
-# loss = loss_fn(logits, labels)
-
-# print(loss)
-
-# modified_logs = F.log_softmax(logits, dim=-1)
-# print(modified_logs)
-
-# a = []
-# # a.extend(6)
-# a.extend([6])
-# a.extend([7])
-# print(a)
-# # Sample input
-# bsz = 4  # Example batch size
-# h = torch.randn(bsz, 10)  # Example tensor with shape [batch_size, features]
-
-# # Simulated layer weights
-# layer_info = {'weight': torch.randn(10)}
-
-# # First piece
-# sum_squared_norms = torch.sum(torch.norm(h, p=2, dim=1) ** 2, dim=0)
-# average_squared_norm = sum_squared_norms / torch.tensor(bsz, device=h.device, dtype=torch.float)
-# norm_across_other_dims_first = (torch.sqrt(average_squared_norm.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
-
-# # Second piece
-# scaler_inp = torch.zeros_like(sum_squared_norms)
-# nsamples = 0
-# for i in range(bsz):
-#     scaler_inp *= nsamples / (nsamples + 1)
-#     temp = torch.norm(h[i], p=2, dim=0) ** 2
-#     scaler_inp +=  temp / (nsamples + 1)
-#     nsamples += 1
-# norm_across_other_dims_second = (torch.sqrt(scaler_inp.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
-
-# # Compare the results
-# are_equivalent = torch.isclose(norm_across_other_dims_first, norm_across_other_dims_second, atol=1e-6)
-
-# print(f"Are the computations equivalent? {are_equivalent}")
-
-
-# a = torch.randn(1, 2, 3)
-# b = torch.linalg.vector_norm(a, ord=2, dim=1)
-# c = torch.linalg.vector_norm(a, ord=2, dim=(0, 1)).reshape(1,-1)
-# d = 5
-
-# # Create two tensors with different data types
-# tensor1 = torch.randn(5, dtype=torch.float32)
-# tensor2 = torch.randn(5, dtype=torch.float16)
-
-# # Attempt to add them
-# result = tensor1 * tensor2
-# b = result.dtype
-# a = 5
-
-a = torch.randn(4, 5, 5)
-b = torch.tensor([[0, 1],[0, 1]])
-
-# a = a[]
-# a = torch.randn(4, 5, 5)
-# a_mean = a.mean(axis=0)
-# print('a_mean', a_mean.shape)
-# print('a', a.shape)
-# b = torch.randn(4, 5)
-# e = torch.randn(4, 5)
-# c = torch.matmul(a, b.T)
-# # print(c)
-# c = nn.functional.softmax(c, dim=-1)
-# print('original after softmax', c)
-# c = torch.matmul(c, e)
-# print('new after v', c)
-
-# a[:, 0] = 0
-# b[:, 0] = 0
-# e[:, 0] = 0
-# d = torch.matmul(a, b.T)
-# # print(d)
-# d = nn.functional.softmax(d, dim=-1)
-# print('new after softmax', d)
-# d = torch.matmul(d, e)
-# print('new after v', d)
-# 假设 a 和 b 是两个三维张量
-# a = torch.rand(2, 3)
-# b = torch.rand(3, 4)
-
-# c = F.linear(a, b.T)
-# d = torch.tensordot(a, b, dims=[[1]])
-# dd = c == d
-# ddd = d.shape
-# # 在 a 的最后一个维度和 b 的第一个维度上进行点积
-# e = 5
-import torch
-import torch.nn as nn
-
-
-import torch
-
-# Example tensor initialization
-# cos = torch.randn(32, 128, 128)
-# probe_out_dim_indices_for_rope = torch.randint(0, 128, (32, 122))  # Example indices
-
-# # Create a grid of indices for the batch dimension
-# batch_dim_indices = torch.arange(32).view(-1, 1).expand(-1, 122).to(cos.device)
-
-# # Use advanced indexing to extract the values
-# extracted_values = cos[batch_dim_indices, :, probe_out_dim_indices_for_rope]
-
-# # Check the shape of the extracted values
-# print(extracted_values.shape)  # Should be [32, 128, 122]
-
-import torch
-
-# Example tensors
-# cos = torch.randn(32, 128, 128)
-
-# # Assuming position_ids contains indices for the second dimension of cos
-# # and we use every index from 0 to 127 (which is the size of the second dimension of cos)
-# position_ids = torch.arange(128).unsqueeze(0)  # Shape [1, 128]
-
-# # Perform the indexing operation
-# result = cos[position_ids]
-
-# # Print the output shape
-# print(result.shape)
-
-
-# cos = torch.randn(128, 128)
-
-# # Assuming position_ids contains indices for the second dimension of cos
-# # and we use every index from 0 to 127 (which is the size of the second dimension of cos)
-# position_ids = torch.arange(128).unsqueeze(0)  # Shape [1, 128]
-
-# # Perform the indexing operation
-# result = cos[position_ids]
-
-# # Print the output shape
-# print(result.shape)
-
-# a = 6
-
-import torch
-import time
-
-# Initialize the tensors
-cos = torch.randn(10, 32, 128, 128)
-probe_out_dim_indices_for_rope = torch.randint(0, 127, (32, 122))  # Example indices
-
-# Operation 1: Loop-based extraction
-def loop_based_extraction(cos, probe_out_dim_indices_for_rope):
-    res = cos[:, 0, :, probe_out_dim_indices_for_rope[0]].unsqueeze(1)
-    for i in range(1, 32):
-        new = cos[:, i, :, probe_out_dim_indices_for_rope[i]].unsqueeze(1)
-        res = torch.cat((res, new), dim=1)
-    return res
-
-# Operation 2: torch.gather method
-def gather_method(cos, probe_out_dim_indices_for_rope):
-    # Creating index tensor for gather
-    indices = probe_out_dim_indices_for_rope.unsqueeze(0).unsqueeze(2).expand(10, -1, 128, -1)
-    # Using torch.gather
-    gathered = torch.gather(cos, 3, indices)
-    return gathered
-
-
-
-# Measure time for loop-based extraction
-start_time = time.time()
-result_loop = loop_based_extraction(cos, probe_out_dim_indices_for_rope)
-end_time = time.time()
-time_loop = end_time - start_time
-print(f"Time taken by loop-based extraction: {time_loop} seconds")
-
-# Measure time for torch.gather method
-start_time = time.time()
-result_gather = gather_method(cos, probe_out_dim_indices_for_rope)
-end_time = time.time()
-time_gather = end_time - start_time
-print(f"Time taken by torch.gather method: {time_gather} seconds")
-
-a = 5
-
-
-# class SimpleModel(nn.Module):
-#     def __init__(self):
-#         super(SimpleModel, self).__init__()
-#         # self.fc1 = nn.Linear(100, 200)
-#         # self.relu = nn.ReLU()
-#         # self.fc2 = nn.Linear(200, 10)
-
-#     def forward(self, x):
-#         return torch.matmul(x[0], x[1])
-#         # return x[0] * x[1]
-
-# # Instantiate the model
-# model = SimpleModel()
-
-
-# from deepspeed.profiling.flops_profiler import get_model_profile
-
-# # Define a batch size and input tensor
-# # batch_size = 32
-# # input_tensor = torch.randn(batch_size, 100)
-# x = torch.randn(2, 100)
-# # y = torch.randn(100)
-# # Use the profiler to get FLOPs and parameter counts
-# flops, macs, params = get_model_profile(model=model, 
-#                                  input_shape=(2,100))
-                                
-
-# print(f"MACs: {macs}")
-# print(f"Parameters: {params}")
-# c = 6
-# # Example instances
-# embedding_layer = nn.Embedding(num_embeddings=10, embedding_dim=3)
-# linear_layer = nn.Linear(in_features=10, out_features=5)
-
-# # Check if each instance is an instance of Embedding or Linear
-# print(isinstance(embedding_layer, nn.Embedding))  # True
-# print(isinstance(embedding_layer, nn.Linear))     # False
-
-# print(isinstance(linear_layer, nn.Embedding))     # False
-# print(isinstance(linear_layer, nn.Linear))        # True
-# self.exclude_dim_to_aggregate = None
-# self.sort_norm_dim = 0
-# a = torch.tensor([5])
-
-# # Add an extra dimension
-# # To add it at the 0th dimension (making it 1x1)
-# a = a.unsqueeze(0)
-
-# # Now a is a 2D tensor with shape (1, 1)
-# print(a)  # Outputs tensor([[5]])
-# print(a.shape)  # Outputs torch.Size([1, 1])
-# a = 'lora'
-
-# b = a.split('-')
-
-# print(b)
-# sub_dense_info = ['', 0, 3.74174427986145, 124647170, 0,'zzzz']
-# NUM_PARAMETER_UNIT = (1000000, 'Million')
-# FLOPS_UNIT = (1000000, 'Million')
-# # already in seconds unit
-# TIME_UNIT = (1, 's')
-# print(FLOPS_UNIT[0])
-# print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/FLOPS_UNIT[0]:.2f}" , flush=True)
-
-# print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/{FLOPS_UNIT[0]}:.2f} {FLOPS_UNIT[1]}Flops - {sub_dense_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} \
-#               - {sub_dense_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_dense_info[4]}", flush=True)
-
-# a = torch.tensor([1,2,3,4])
-
-# print(a.numel())
-
-# b = a[0:0]
-# print(b)
-# print(b.numel())
-import copy
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
-# input_data = np.array([0.1 for i in range(100053)])
-
-# # input_data_length = len(input_data)
-# compress_ratio = 1000
-# pace = int(len(input_data) // compress_ratio)
-# simplified_input_data = np.array([input_data[i] for i in range(0, len(input_data), pace)])
-# x = np.array(list(range(len(simplified_input_data)+1)))
-# y = np.array(list(range(len(simplified_input_data)+1)))
-# x, y = np.meshgrid(x, y)
-# eta = np.full(x.shape, np.nan)
-# # eta = np.full(x.shape, 6, dtype=float)
-# # mask = y < x
-# print('eta', eta.shape)
-# mask = y < x
-
-# # Applying the mask
-# x = np.where(mask, x, np.nan)  # Replace values not in the upper triangle with NaN
-# y = np.where(mask, y, np.nan)
-
-# pq_p = 1
-# pq_q = 2
-
-import torchvision.models as models
-import torch
-
-
-# def new_forward(self, x):
-#     x = self.conv1(x)
-#     x = self.bn1(x)
-#     x = self.relu(x)
-#     x = self.maxpool(x)
-
-#     x = self.layer1(x)
-#     x = self.layer2(x)
-#     x = self.layer3(x)
-#     x = self.layer4(x)
-#     return x
-
-
-# # define a resnet instance
-# resnet = models.resnet18()
-
-# # add new_forward function to the resnet instance as a class method
-# bound_method = new_forward.__get__(resnet, resnet.__class__)
-# setattr(resnet, 'forward', bound_method)
-# aa = resnet.forward
-a = 5
-# # print(len(x), len(x[0]))
-# for d in range(1, len(x)):
-#     # m at most equals to d-1
-#     cur_dimension = d * pace
-#     pq_index = simplified_input_data[d-1]
-#     for m in range(1, d):
-#     # for m in range(1, len(x[0])):
-#         cur_rest_dimension = m * pace
-
-#         sub_eta = ((cur_rest_dimension / (((1 - pq_index) ** (pq_q * pq_p / (pq_q - pq_p))) * cur_dimension)) ** (-(pq_q - pq_p) / pq_q)) - 1
-#         # print('sub_eta', sub_eta)
-#         # print(d, m, sub_eta)
-#         if sub_eta < -1:
-#             sub_eta = -1
-#         elif sub_eta > 2:
-#             sub_eta = 2
-#         # print(type(sub_eta))
-
-#         # print('d', d, 'm', m, 'sub_eta', sub_eta, type(d), type(m))
-#         eta[m][d] = sub_eta
-
-# # for i in range(1, len(x[0])):
-# #     # fix = i
-# #     # for j in range(1, fix):
-# #     for j in range(1, len(x[0])):
-# #         eta[i][j] = 3
-
-# z = np.sin(np.sqrt(x**2 + y**2))
-# print('z', z.shape)
-# # Create a figure and a 3D axis
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-# print('eta', eta)
-# # Plot a 3D surface
-# surf = ax.plot_surface(x, y, eta, cmap='viridis')
-# # surf = ax.plot_surface(x, y, z, cmap='viridis')
-# # Add a color bar which maps values to colors
-# fig.colorbar(surf, shrink=0.5, aspect=5)
-
-# ax.set_title('3D Heatmap')
-# ax.set_xlabel('d dimension')
-# ax.set_ylabel('m dimension')
-# ax.set_zlabel('eta')
-# plt.show()
-
-a = 5
-# a = [[0.40625],
-#  [0.4375 ]]
-
-# b = np.std(a, axis=1)
-# c = np.std(a, axis=0)
-# d = 5
-# c = torch.empty(0)
-# d = torch.empty(3, 0, 2)
-
-# print(c, c.numel())
-# print(d, d.numel())
-
-# a = torch.tensor([[1,2,5,9,10], [1,3, 8, 15, 20]], dtype=torch.float32)
-# standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
-# b = a ** 2
-# c = standarlization(a)
-# d = standarlization(b)
-# e = 5
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-
-
-import torch
-import psutil
-import os
-
-def memory_usage_in_MB():
-    process = psutil.Process(os.getpid())
-    return process.memory_info().rss / (1024 * 1024)  # Memory in MB
-
-# Memory usage before the operation
-
-
-# Your PyTorch code
-# a = torch.randn(40, 1100)
-# b = torch.randn(1100, 40)
-
-# temp_a = copy.deepcopy(a)
-# temp_b = copy.deepcopy(b)
-# memory_before = memory_usage_in_MB()
-# c = torch.matmul(a, b)
-
-# # Memory usage after the operation
-# memory_after = memory_usage_in_MB()
-
-# # Calculate the difference
-# memory_consumed = memory_after - memory_before
-# print(f"Memory consumed: {memory_consumed:.2f} MB")
-
-
-# memory_before = memory_usage_in_MB()
-# a = a.unsqueeze(-1)
-# b = b.unsqueeze(0)
-# result = a * b
-# print('result', result.shape)
-# memory_after = memory_usage_in_MB()
-
-# # Calculate the difference
-# memory_consumed = memory_after - memory_before
-# print(f"Memory consumed broadcast: {memory_consumed:.2f} MB")
-
-
-# memory_before = memory_usage_in_MB()
-# result = (a * b).sum(dim=(0,2))
-# print('result', result.shape)
-
-# # result2 = a.sum(dim=0) * b.sum(dim=1)
-# # print('result2', result2.shape)
-
-# result3 = temp_a.sum(0) * temp_b.sum(1)
-# print('result3', result3.shape)
-# dd = result == result3
-
-# result4 = (temp_a * temp_b.sum(1)).sum(0)
-# ddd = result == result4
-# memory_after = memory_usage_in_MB()
-
-# # Calculate the difference
-# memory_consumed = memory_after - memory_before
-# print(f"Memory consumed 2: {memory_consumed:.2f} MB")
-
-
-# b = torch.randn(256, 128)
-# c = a * b
-# d = 6
-# Settings for the network
-# layer_sizes = [5, 8, 8, 5]  # Example layer sizes
-# n_layers = len(layer_sizes)
-# layer_positions = range(n_layers)
-# node_radius = 0.05
-
-# # Create the plot
-# fig, ax = plt.subplots()
-
-# # Function to draw nodes
-# def draw_layer(y, size, label):
-#     x_values = [x * 0.2 for x in range(size)]
-#     for x in x_values:
-#         circle = plt.Circle((x, y), node_radius, color='blue', fill=True)
-#         ax.add_artist(circle)
-#     # Optionally add a label for the layer
-#     ax.text(x_values[-1] + 0.15, y, label, fontsize=12)
-
-# # Draw the layers
-# for i, size in enumerate(layer_sizes):
-#     draw_layer(layer_positions[i], size, f'Layer {i+1}')
-
-# # Highlight the middle layer
-# middle_layer_index = n_layers // 2 - 1
-# highlight_rect = patches.Rectangle((-0.1, middle_layer_index - 0.1), 
-#                                    layer_sizes[middle_layer_index] * 0.2, 
-#                                    0.3, linewidth=2, edgecolor='r', facecolor='none')
-# ax.add_patch(highlight_rect)
-
-# # Annotate
-# ax.annotate('Our theory-guided adaptive pruning', 
-#             xy=(layer_sizes[middle_layer_index] * 0.1, middle_layer_index), 
-#             xytext=(layer_sizes[middle_layer_index] * 0.5, middle_layer_index + 1),
-#             arrowprops=dict(facecolor='black', shrink=0.05))
-
-# # Set the limits and labels
-# ax.set_xlim(-0.2, max(layer_sizes) * 0.2)
-# ax.set_ylim(-1, n_layers)
-# ax.set_aspect('equal', adjustable='datalim')
-# ax.axis('off')
-a = torch.tensor([[0.6815, 0.7796, 0.9360, 0.5866, 1.8860],
- [0.1141, 0.1273, 0.4898, 1.0005, 0.2570],
- [0.2012, 0.2757, 0.2001, 1.2834, 0.4445]])
-b = a / torch.sum(a, axis=-1, keepdim=True)
-print('a', a, 'b', b)
-# class Fulei:
-#     def __init__(self):
-#         pass
-
-#     def fuleicall(self):
-#         print(self.weight)
-
-# class zilei(Fulei):
-#     def __init__(self):
-#         super().__init__()
-#         self.weight = 16
-
-#     def zileicall(self):
-#         self.fuleicall()
-
-
-# a = zilei()
-# a.zileicall()
-# b = 5
-
-# a = torch.tensor([[1, 2, 3, 4, 5], [6,7,8,9,10]])
-
-# b = torch.tensor([[11, 12, 13], [16,17,18]])
-
-# a[..., [1,2,3]] = b
-
-# print(a[0], a[1])
-# c = 5
-# plt.show()
-
-# import torch
-
-# # Define dimensions
-# C_out = 3  # Number of output channels
-# C_in = 4   # Number of input channels
-# N = 2      # Number of samples
-# L = 1      # Additional factor (for simplicity, we keep it 1)
-
-# # Define desired sparsity
-# s = 0.5  # 50% sparsity
-
-# # Create a random weight matrix W and input matrix X
-# W = torch.randn(C_out, C_in)
-# X = torch.randn(N * L, C_in)
-
-# # Define the pruning function with the correction
-# def prune(W, X, s):
-#     temp = X.norm(p=2, dim=0)
-#     print('temp', temp)
-#     metric = W.abs() * X.norm(p=2, dim=0)
-#     print('metric', metric)
-#     _, sorted_idx = torch.sort(metric, dim=1)
-#     print('sorted_idx', sorted_idx)
-#     pruned_idx = sorted_idx[:, :int(C_in * s)]
-#     print('pruned_idx', pruned_idx)
-#     # Create a tensor of zeros with the same shape as the pruned indices
-#     zeros = torch.zeros_like(W[:, :int(C_in * s)])
-#     W.scatter_(dim=1, index=pruned_idx, src=zeros)
-#     return W
-
-# # Apply the pruning function
-# W_pruned = prune(W, X, s)
-
+# import matplotlib.pyplot as plt
 # import numpy as np
 
-# # Define custom bin edges
-# bin_edges = [
-#     -1000, -900, -800, -700, -600, -500, -400, -300, -200, -100, # -1000 to -100
-#     -50, 0, 50, 100,  # -100 to 100
-#     200, 300, 400, 500, 600, 700, 800, 900, 1000  # 100 to 1000
-# ]
+# # Define the function f(x)
+# def f(x):
+#     return x / (631.25 + x) * 0.25 + 0.001 * x**2 / (3360 + 0.001 * x**2) * 0.6
 
-# # Fine bins around -10 to 10
-# fine_bins = np.arange(-10, 10, 0.1).tolist()
-# bin_edges = bin_edges + fine_bins + [1e-3]
+# # Generate x values from 0 to 1000
+# x = np.linspace(0, 7000, 7000)
 
-# # Sort the bin edges
-# bin_edges = sorted(set(bin_edges))
-# print(bin_edges)
-# # Example data from a batch
-# batch_data = np.random.uniform(-1000, 1000, 1000)  # Replace with your actual batch data
+# # Calculate y values using the defined function
+# y = f(x)
 
-# # Bin the data
-# hist, _ = np.histogram(batch_data, bins=bin_edges)
-
-# # hist now contains the count of data points in each bin
-# print(hist)
-
-
-# import matplotlib.pyplot as plt
-
-# # Example histogram data
-# hist_data = [10, 15, 7, 12, 5]  # Frequency counts for each bin
-
-# # Corresponding bin edges
-# bin_edges = [0, 1, 2, 3, 4, 5]  # Define the range of each bin
-
-# # Calculate the width for each bin
-# bin_widths = [bin_edges[i+1] - bin_edges[i] for i in range(len(bin_edges)-1)]
-
-# print(bin_edges[:-1])
-# # Create the bar plot
-# plt.bar(bin_edges[:-1], hist_data, width=bin_widths, align='edge')
-
-# # Labeling
-# plt.xlabel('Value Range')
-# plt.ylabel('Frequency')
-# plt.title('Histogram')
+# # Create the plot
+# plt.figure(figsize=(10, 6))
+# plt.plot(x, y, label='f(x) = x/(631.25+x) * 0.25 + 0.001 * x^2 / (3360+0.001*x^2) * 0.6')
+# plt.xlabel('x')
+# plt.ylabel('f(x)')
+# plt.title('Plot of the function f(x)')
+# plt.grid(True)
+# plt.legend()
 
 # # Show the plot
 # plt.show()
 
 
+# # for i in range(173):
+# #     cur_number = i * 64
+# #     ratio = cur_number / 11008
+# #     print(ratio)
 
+
+# # a = np.std([5], axis=0).item()
+
+
+# # # Load a pre-trained tokenizer
+# # tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+
+# # # List of strings
+# # texts = ["Hello, world!", "Transformers are great for NLP tasks."]
+
+# # # Tokenize the list of strings
+# # tokenized_outputs = tokenizer(texts, padding=True, return_tensors="pt")
+
+# # print(tokenized_outputs)
+# # a = np.array([-5, -4])
+# # c = np.argmax(a)
+# # # Define CrossEntropyLoss with no reduction
+# # loss_fn = nn.CrossEntropyLoss(reduction='none')
+
+# # # Example input logits (batch size of 3, 4 classes)
+# # logits = torch.tensor([[2.0, 0.5, 1.0, 0.2],
+# #                        [0.5, 2.0, 1.0, 0.2],
+# #                        [0.2, 0.5, 2.0, 1.0]])
+
+# # # Corresponding labels (batch size of 3)
+# # labels = torch.tensor([0, 1, 2])
+
+# # # Calculate loss
+# # loss = loss_fn(logits, labels)
+
+# # print(loss)
+
+# # modified_logs = F.log_softmax(logits, dim=-1)
+# # print(modified_logs)
+
+# # a = []
+# # # a.extend(6)
+# # a.extend([6])
+# # a.extend([7])
+# # print(a)
+# # # Sample input
+# # bsz = 4  # Example batch size
+# # h = torch.randn(bsz, 10)  # Example tensor with shape [batch_size, features]
+
+# # # Simulated layer weights
+# # layer_info = {'weight': torch.randn(10)}
+
+# # # First piece
+# # sum_squared_norms = torch.sum(torch.norm(h, p=2, dim=1) ** 2, dim=0)
+# # average_squared_norm = sum_squared_norms / torch.tensor(bsz, device=h.device, dtype=torch.float)
+# # norm_across_other_dims_first = (torch.sqrt(average_squared_norm.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
+
+# # # Second piece
+# # scaler_inp = torch.zeros_like(sum_squared_norms)
+# # nsamples = 0
+# # for i in range(bsz):
+# #     scaler_inp *= nsamples / (nsamples + 1)
+# #     temp = torch.norm(h[i], p=2, dim=0) ** 2
+# #     scaler_inp +=  temp / (nsamples + 1)
+# #     nsamples += 1
+# # norm_across_other_dims_second = (torch.sqrt(scaler_inp.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
+
+# # # Compare the results
+# # are_equivalent = torch.isclose(norm_across_other_dims_first, norm_across_other_dims_second, atol=1e-6)
+
+# # print(f"Are the computations equivalent? {are_equivalent}")
+
+
+# # a = torch.randn(1, 2, 3)
+# # b = torch.linalg.vector_norm(a, ord=2, dim=1)
+# # c = torch.linalg.vector_norm(a, ord=2, dim=(0, 1)).reshape(1,-1)
+# # d = 5
+
+# # # Create two tensors with different data types
+# # tensor1 = torch.randn(5, dtype=torch.float32)
+# # tensor2 = torch.randn(5, dtype=torch.float16)
+
+# # # Attempt to add them
+# # result = tensor1 * tensor2
+# # b = result.dtype
+# # a = 5
+
+# a = torch.randn(4, 5, 5)
+# b = torch.tensor([[0, 1],[0, 1]])
+
+# # a = a[]
+# # a = torch.randn(4, 5, 5)
+# # a_mean = a.mean(axis=0)
+# # print('a_mean', a_mean.shape)
+# # print('a', a.shape)
+# # b = torch.randn(4, 5)
+# # e = torch.randn(4, 5)
+# # c = torch.matmul(a, b.T)
+# # # print(c)
+# # c = nn.functional.softmax(c, dim=-1)
+# # print('original after softmax', c)
+# # c = torch.matmul(c, e)
+# # print('new after v', c)
+
+# # a[:, 0] = 0
+# # b[:, 0] = 0
+# # e[:, 0] = 0
+# # d = torch.matmul(a, b.T)
+# # # print(d)
+# # d = nn.functional.softmax(d, dim=-1)
+# # print('new after softmax', d)
+# # d = torch.matmul(d, e)
+# # print('new after v', d)
+# # 假设 a 和 b 是两个三维张量
+# # a = torch.rand(2, 3)
+# # b = torch.rand(3, 4)
+
+# # c = F.linear(a, b.T)
+# # d = torch.tensordot(a, b, dims=[[1]])
+# # dd = c == d
+# # ddd = d.shape
+# # # 在 a 的最后一个维度和 b 的第一个维度上进行点积
+# # e = 5
+# import torch
+# import torch.nn as nn
+
+
+# import torch
+
+# # Example tensor initialization
+# # cos = torch.randn(32, 128, 128)
+# # probe_out_dim_indices_for_rope = torch.randint(0, 128, (32, 122))  # Example indices
+
+# # # Create a grid of indices for the batch dimension
+# # batch_dim_indices = torch.arange(32).view(-1, 1).expand(-1, 122).to(cos.device)
+
+# # # Use advanced indexing to extract the values
+# # extracted_values = cos[batch_dim_indices, :, probe_out_dim_indices_for_rope]
+
+# # # Check the shape of the extracted values
+# # print(extracted_values.shape)  # Should be [32, 128, 122]
+
+# import torch
+
+# # Example tensors
+# # cos = torch.randn(32, 128, 128)
+
+# # # Assuming position_ids contains indices for the second dimension of cos
+# # # and we use every index from 0 to 127 (which is the size of the second dimension of cos)
+# # position_ids = torch.arange(128).unsqueeze(0)  # Shape [1, 128]
+
+# # # Perform the indexing operation
+# # result = cos[position_ids]
+
+# # # Print the output shape
+# # print(result.shape)
+
+
+# # cos = torch.randn(128, 128)
+
+# # # Assuming position_ids contains indices for the second dimension of cos
+# # # and we use every index from 0 to 127 (which is the size of the second dimension of cos)
+# # position_ids = torch.arange(128).unsqueeze(0)  # Shape [1, 128]
+
+# # # Perform the indexing operation
+# # result = cos[position_ids]
+
+# # # Print the output shape
+# # print(result.shape)
+
+# # a = 6
+
+# import torch
+# import time
+
+# # Initialize the tensors
+# # cos = torch.randn(10, 32, 128, 128)
+# # probe_out_dim_indices_for_rope = torch.randint(0, 127, (32, 122))  # Example indices
+
+# # # Operation 1: Loop-based extraction
+# # def loop_based_extraction(cos, probe_out_dim_indices_for_rope):
+# #     res = cos[:, 0, :, probe_out_dim_indices_for_rope[0]].unsqueeze(1)
+# #     for i in range(1, 32):
+# #         new = cos[:, i, :, probe_out_dim_indices_for_rope[i]].unsqueeze(1)
+# #         res = torch.cat((res, new), dim=1)
+# #     return res
+
+# # # Operation 2: torch.gather method
+# # def gather_method(cos, probe_out_dim_indices_for_rope):
+# #     # Creating index tensor for gather
+# #     indices = probe_out_dim_indices_for_rope.unsqueeze(0).unsqueeze(2).expand(10, -1, 128, -1)
+# #     # Using torch.gather
+# #     gathered = torch.gather(cos, 3, indices)
+# #     return gathered
+
+
+
+# # # Measure time for loop-based extraction
+# # start_time = time.time()
+# # result_loop = loop_based_extraction(cos, probe_out_dim_indices_for_rope)
+# # end_time = time.time()
+# # time_loop = end_time - start_time
+# # print(f"Time taken by loop-based extraction: {time_loop} seconds")
+
+# # # Measure time for torch.gather method
+# # start_time = time.time()
+# # result_gather = gather_method(cos, probe_out_dim_indices_for_rope)
+# # end_time = time.time()
+# # time_gather = end_time - start_time
+# # print(f"Time taken by torch.gather method: {time_gather} seconds")
+
+# # a = 5
+
+
+# # class SimpleModel(nn.Module):
+# #     def __init__(self):
+# #         super(SimpleModel, self).__init__()
+# #         # self.fc1 = nn.Linear(100, 200)
+# #         # self.relu = nn.ReLU()
+# #         # self.fc2 = nn.Linear(200, 10)
+
+# #     def forward(self, x):
+# #         return torch.matmul(x[0], x[1])
+# #         # return x[0] * x[1]
+
+# # # Instantiate the model
+# # model = SimpleModel()
+
+
+# # from deepspeed.profiling.flops_profiler import get_model_profile
+
+# # # Define a batch size and input tensor
+# # # batch_size = 32
+# # # input_tensor = torch.randn(batch_size, 100)
+# # x = torch.randn(2, 100)
+# # # y = torch.randn(100)
+# # # Use the profiler to get FLOPs and parameter counts
+# # flops, macs, params = get_model_profile(model=model, 
+# #                                  input_shape=(2,100))
+                                
+
+# # print(f"MACs: {macs}")
+# # print(f"Parameters: {params}")
+# # c = 6
+# # # Example instances
+# # embedding_layer = nn.Embedding(num_embeddings=10, embedding_dim=3)
+# # linear_layer = nn.Linear(in_features=10, out_features=5)
+
+# # # Check if each instance is an instance of Embedding or Linear
+# # print(isinstance(embedding_layer, nn.Embedding))  # True
+# # print(isinstance(embedding_layer, nn.Linear))     # False
+
+# # print(isinstance(linear_layer, nn.Embedding))     # False
+# # print(isinstance(linear_layer, nn.Linear))        # True
+# # self.exclude_dim_to_aggregate = None
+# # self.sort_norm_dim = 0
+# # a = torch.tensor([5])
+
+# # # Add an extra dimension
+# # # To add it at the 0th dimension (making it 1x1)
+# # a = a.unsqueeze(0)
+
+# # # Now a is a 2D tensor with shape (1, 1)
+# # print(a)  # Outputs tensor([[5]])
+# # print(a.shape)  # Outputs torch.Size([1, 1])
+# # a = 'lora'
+
+# # b = a.split('-')
+
+# # print(b)
+# # sub_dense_info = ['', 0, 3.74174427986145, 124647170, 0,'zzzz']
+# # NUM_PARAMETER_UNIT = (1000000, 'Million')
+# # FLOPS_UNIT = (1000000, 'Million')
+# # # already in seconds unit
+# # TIME_UNIT = (1, 's')
+# # print(FLOPS_UNIT[0])
+# # print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/FLOPS_UNIT[0]:.2f}" , flush=True)
+
+# # print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/{FLOPS_UNIT[0]}:.2f} {FLOPS_UNIT[1]}Flops - {sub_dense_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} \
+# #               - {sub_dense_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_dense_info[4]}", flush=True)
+
+# # a = torch.tensor([1,2,3,4])
+
+# # print(a.numel())
+
+# # b = a[0:0]
+# # print(b)
+# # print(b.numel())
+# import copy
 # import numpy as np
 # import matplotlib.pyplot as plt
+# from mpl_toolkits.mplot3d import Axes3D
 
-# # Generate sample data
-# data = np.random.normal(0, 1, 1000)
+# # input_data = np.array([0.1 for i in range(100053)])
 
-# # Compute histogram
-# counts, bins = np.histogram(data, bins=30)
-# counts = [100, 100, 100]
-# bins = [-0.1, 0, 0.1, 0.2]
-# a = (sum(counts) * np.diff(bins))
-# print('a', a)
-# print('counts', counts)
-# print('sum(counts)', sum(counts))
-# print('bins', bins),
-# print('np.diff(bins)', np.diff(bins)),
+# # # input_data_length = len(input_data)
+# # compress_ratio = 1000
+# # pace = int(len(input_data) // compress_ratio)
+# # simplified_input_data = np.array([input_data[i] for i in range(0, len(input_data), pace)])
+# # x = np.array(list(range(len(simplified_input_data)+1)))
+# # y = np.array(list(range(len(simplified_input_data)+1)))
+# # x, y = np.meshgrid(x, y)
+# # eta = np.full(x.shape, np.nan)
+# # # eta = np.full(x.shape, 6, dtype=float)
+# # # mask = y < x
+# # print('eta', eta.shape)
+# # mask = y < x
 
-# # Calculate density
-# density = counts / (sum(counts) * np.diff(bins))
-# print('density', density)
-# # Plotting the histogram as a density
-# # plt.bar(bins[:-1], density, width=np.diff(bins), edgecolor='black')
-# plt.hist(data, bins, density=True, edgecolor='black')
+# # # Applying the mask
+# # x = np.where(mask, x, np.nan)  # Replace values not in the upper triangle with NaN
+# # y = np.where(mask, y, np.nan)
 
-# plt.title('Density Histogram')
-# plt.xlabel('Value')
-# plt.ylabel('Density')
+# # pq_p = 1
+# # pq_q = 2
 
-# plt.show()
+# import torchvision.models as models
+# import torch
 
-import copy
-from datasets import load_dataset
-from transformers import AutoTokenizer
 
-# for x in range(2, 30, 10):
-#     print(x)
-# eta = 0
-# pq_p = 1
-# pq_q = 2
-# prune_norm = 2
-# beta = 0.9
-# gamma = 1
-import time
-# class YourClass:
-#     # Other methods...
-#     def __init__(self):
-#         self.logger_info_time_used = 0
+# # def new_forward(self, x):
+# #     x = self.conv1(x)
+# #     x = self.bn1(x)
+# #     x = self.relu(x)
+# #     x = self.maxpool(x)
 
-#     def monitor_time(func):
-#         def wrapper(*args, **kwargs):
-#             print('wrapper', args, kwargs)
-#             start_time = time.time()
-#             result = func(*args, **kwargs)
-#             args[0].logger_info_time_used += time.time() - start_time
-#             return result
-#         return wrapper
-    
-#     @monitor_time
-#     def update_pruning_info(self, info):
-#         a = 5
+# #     x = self.layer1(x)
+# #     x = self.layer2(x)
+# #     x = self.layer3(x)
+# #     x = self.layer4(x)
+# #     return x
 
-# a = YourClass()
-# a.update_pruning_info(1)
-# def calculate_entropy(probabilities):
-#     """
-#     Calculate the entropy of a probability distribution.
-#     :param probabilities: list of probabilities for each event
-#     :return: entropy of the distribution
-#     """
-#     entropy = 0
-#     for p in probabilities:
-#         if p > 0:  # To avoid math domain error for log(0)
-#             entropy -= p * math.log(p, 2)  # Log base 2 for entropy in bits
-#     return entropy
 
-# def pq_struct(w, key, prune_dim):
+# # # define a resnet instance
+# # resnet = models.resnet18()
 
-#     calc_dim = 1
-#     # i != prune_dim and 
-#     # dims_to_aggregate = tuple(i for i in range(w.dim()) if i != 0)
-#     # norm_across_other_dims = torch.linalg.vector_norm(w, ord=prune_norm, dim=dims_to_aggregate)     
-#     print(w)
-#     norm_p = torch.linalg.vector_norm(w, ord=pq_p, dim=calc_dim)
-#     norm_q = torch.linalg.vector_norm(w, ord=pq_p, dim=calc_dim) + 1e-10
-    
-#     dimension = w.shape[prune_dim]
-#     pq_indices = (1 - dimension ** (1/pq_q - 1/pq_p) * norm_p / norm_q)
-
-#     # add additional dimension if dimension is 0
-#     if pq_indices.dim() == 0:
-#         pq_indices = pq_indices.unsqueeze(0)
-
-#     if torch.isnan(pq_indices).any():
-#         raise ValueError('pq_indices contains nan values')
-
-#     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
-#     beta_tensor = torch.full_like(lower_bound, beta)
-#     prune_channels_count = torch.floor(dimension * torch.min(gamma * (1 - lower_bound / dimension), beta_tensor))
-
-#     _, sorted_channels = torch.sort(norm_across_other_dims, dim=calc_dim)
-#     prune_channels = sorted_channels[:int(prune_channels_count.item())]
-#     # info = {
-#     #     f"{key}_norm_across_other_dims": norm_across_other_dims.mean(dim=0).squeeze(0).tolist(),
-#     #     f"{key}_pq_indices": pq_indices.mean(dim=0).squeeze(0).tolist(),
-#     # }
-#     # self.update_pruning_info(info)
-#     return prune_channels
-
-# tensor1 = torch.tensor([1, 1, 1, 1, 1, 10, 10, 10, 10, 10])
-# tensor2 = torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1, 1, 1, 1, 1, 100])
-# # sum_tensor2 = tensor1.sum()
-# import math
-
-# # Now you can use log from the math module
-# print(-math.log(0.1))
-
-# Normalize tensor2 by dividing each element by the sum
-# normalized_tensor2 = tensor1 / sum_tensor2
-# Stack the tensors to create a batched tensor
-# The resulting tensor will have shape [2, 10]
-# batched_tensor = torch.stack([tensor1, tensor2])
-# batched_tensor = torch.stack([tensor1, normalized_tensor2])
-# pq_struct(batched_tensor, 'w', 1)
-
-import numpy as np
-
-save_format = 'png'
-fig_name = 'zz'
-# Define the base directory for visualization
-vis_path = './output/vis/{}'.format(save_format)
-
-# Construct the full path for the figure
-fig_path = '{}/{}.{}'.format(vis_path, fig_name, save_format)
-print(vis_path, fig_path)
-# Create a sample matrix X (e.g., 4 samples, 3 features)
-# X = np.array([[1, 2, 3],
-#               [4, 5, 7],
-#               [7, 9, 9],
-#               [10, 16, 12]])
-
-# # Compute X^T X
-# XTX = np.dot(X.T, X)
-
-# # Approach 1: Full matrix inversion of X^T X, then extract diagonal
-# inv_XTX = np.linalg.inv(XTX)
-# diag_inv_XTX = np.diag(inv_XTX)
-
-# # Approach 2: Extract the diagonal of X^T X, then invert each element
-# diag_XTX = np.diag(XTX)
-# inv_diag_XTX = 1 / diag_XTX
-
-# # Display the results
-# print("Diagonal of (X^T X)^-1:\n", diag_inv_XTX)
-# print("Inverse of the diagonal elements of X^T X:\n", inv_diag_XTX)
-
-a = 5
+# # # add new_forward function to the resnet instance as a class method
+# # bound_method = new_forward.__get__(resnet, resnet.__class__)
+# # setattr(resnet, 'forward', bound_method)
+# # aa = resnet.forward
 # a = 5
-# def preprocess_function_test(dataset):
-#     all_text = "\n\n".join(dataset['text'])
-#     model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
+# # # print(len(x), len(x[0]))
+# # for d in range(1, len(x)):
+# #     # m at most equals to d-1
+# #     cur_dimension = d * pace
+# #     pq_index = simplified_input_data[d-1]
+# #     for m in range(1, d):
+# #     # for m in range(1, len(x[0])):
+# #         cur_rest_dimension = m * pace
 
-#     max_length = 512  # Set your desired max length
-#     input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
-#     attention_mask = model_inputs['attention_mask'][0]
+# #         sub_eta = ((cur_rest_dimension / (((1 - pq_index) ** (pq_q * pq_p / (pq_q - pq_p))) * cur_dimension)) ** (-(pq_q - pq_p) / pq_q)) - 1
+# #         # print('sub_eta', sub_eta)
+# #         # print(d, m, sub_eta)
+# #         if sub_eta < -1:
+# #             sub_eta = -1
+# #         elif sub_eta > 2:
+# #             sub_eta = 2
+# #         # print(type(sub_eta))
 
-#     input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
-#     mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+# #         # print('d', d, 'm', m, 'sub_eta', sub_eta, type(d), type(m))
+# #         eta[m][d] = sub_eta
 
-#     final_inputs = []
-#     for chunk in input_chunks:
-#         final_inputs.append({
-#             'input_ids': torch.tensor(chunk, dtype=torch.long),
-#             'attention_mask': torch.tensor(mask_chunks[final_inputs.index(chunk)], dtype=torch.long)
-#         })
+# # # for i in range(1, len(x[0])):
+# # #     # fix = i
+# # #     # for j in range(1, fix):
+# # #     for j in range(1, len(x[0])):
+# # #         eta[i][j] = 3
 
-#     # Add labels if required
-#     for item in final_inputs:
-#         item['labels'] = item['input_ids'].clone()
+# # z = np.sin(np.sqrt(x**2 + y**2))
+# # print('z', z.shape)
+# # # Create a figure and a 3D axis
+# # fig = plt.figure()
+# # ax = fig.add_subplot(111, projection='3d')
+# # print('eta', eta)
+# # # Plot a 3D surface
+# # surf = ax.plot_surface(x, y, eta, cmap='viridis')
+# # # surf = ax.plot_surface(x, y, z, cmap='viridis')
+# # # Add a color bar which maps values to colors
+# # fig.colorbar(surf, shrink=0.5, aspect=5)
 
-#     return final_inputs
+# # ax.set_title('3D Heatmap')
+# # ax.set_xlabel('d dimension')
+# # ax.set_ylabel('m dimension')
+# # ax.set_zlabel('eta')
+# # plt.show()
 
-# def load_and_tokenize_dataset(model_checkpoint, dataset_name='wikitext', dataset_version='wikitext-2-v1', max_length=512):
-#     # count = 0
-#     # Load the dataset
-#     dataset = load_dataset(dataset_name, dataset_version, split='test')
+# a = 5
+# # a = [[0.40625],
+# #  [0.4375 ]]
 
-#     a = dataset['text']
-#     # Load the tokenizer    
-#     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-#     if tokenizer.pad_token_id is None:
-#         tokenizer.pad_token_id = tokenizer.eos_token_id
-    # Tokenization function
-    # def preprocess_function_test(examples):
-    #     max_length = 120
-    #     text_column = ['text']
-    #     batch_size = len(examples[text_column[0]])
+# # b = np.std(a, axis=1)
+# # c = np.std(a, axis=0)
+# # d = 5
+# # c = torch.empty(0)
+# # d = torch.empty(3, 0, 2)
+
+# # print(c, c.numel())
+# # print(d, d.numel())
+
+# # a = torch.tensor([[1,2,5,9,10], [1,3, 8, 15, 20]], dtype=torch.float32)
+# # standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
+# # b = a ** 2
+# # c = standarlization(a)
+# # d = standarlization(b)
+# # e = 5
+# import matplotlib.pyplot as plt
+# import matplotlib.patches as patches
+
+
+# import torch
+# import psutil
+# import os
+
+# def memory_usage_in_MB():
+#     process = psutil.Process(os.getpid())
+#     return process.memory_info().rss / (1024 * 1024)  # Memory in MB
+
+# # Memory usage before the operation
+
+
+# # Your PyTorch code
+# # a = torch.randn(40, 1100)
+# # b = torch.randn(1100, 40)
+
+# # temp_a = copy.deepcopy(a)
+# # temp_b = copy.deepcopy(b)
+# # memory_before = memory_usage_in_MB()
+# # c = torch.matmul(a, b)
+
+# # # Memory usage after the operation
+# # memory_after = memory_usage_in_MB()
+
+# # # Calculate the difference
+# # memory_consumed = memory_after - memory_before
+# # print(f"Memory consumed: {memory_consumed:.2f} MB")
+
+
+# # memory_before = memory_usage_in_MB()
+# # a = a.unsqueeze(-1)
+# # b = b.unsqueeze(0)
+# # result = a * b
+# # print('result', result.shape)
+# # memory_after = memory_usage_in_MB()
+
+# # # Calculate the difference
+# # memory_consumed = memory_after - memory_before
+# # print(f"Memory consumed broadcast: {memory_consumed:.2f} MB")
+
+
+# # memory_before = memory_usage_in_MB()
+# # result = (a * b).sum(dim=(0,2))
+# # print('result', result.shape)
+
+# # # result2 = a.sum(dim=0) * b.sum(dim=1)
+# # # print('result2', result2.shape)
+
+# # result3 = temp_a.sum(0) * temp_b.sum(1)
+# # print('result3', result3.shape)
+# # dd = result == result3
+
+# # result4 = (temp_a * temp_b.sum(1)).sum(0)
+# # ddd = result == result4
+# # memory_after = memory_usage_in_MB()
+
+# # # Calculate the difference
+# # memory_consumed = memory_after - memory_before
+# # print(f"Memory consumed 2: {memory_consumed:.2f} MB")
+
+
+# # b = torch.randn(256, 128)
+# # c = a * b
+# # d = 6
+# # Settings for the network
+# # layer_sizes = [5, 8, 8, 5]  # Example layer sizes
+# # n_layers = len(layer_sizes)
+# # layer_positions = range(n_layers)
+# # node_radius = 0.05
+
+# # # Create the plot
+# # fig, ax = plt.subplots()
+
+# # # Function to draw nodes
+# # def draw_layer(y, size, label):
+# #     x_values = [x * 0.2 for x in range(size)]
+# #     for x in x_values:
+# #         circle = plt.Circle((x, y), node_radius, color='blue', fill=True)
+# #         ax.add_artist(circle)
+# #     # Optionally add a label for the layer
+# #     ax.text(x_values[-1] + 0.15, y, label, fontsize=12)
+
+# # # Draw the layers
+# # for i, size in enumerate(layer_sizes):
+# #     draw_layer(layer_positions[i], size, f'Layer {i+1}')
+
+# # # Highlight the middle layer
+# # middle_layer_index = n_layers // 2 - 1
+# # highlight_rect = patches.Rectangle((-0.1, middle_layer_index - 0.1), 
+# #                                    layer_sizes[middle_layer_index] * 0.2, 
+# #                                    0.3, linewidth=2, edgecolor='r', facecolor='none')
+# # ax.add_patch(highlight_rect)
+
+# # # Annotate
+# # ax.annotate('Our theory-guided adaptive pruning', 
+# #             xy=(layer_sizes[middle_layer_index] * 0.1, middle_layer_index), 
+# #             xytext=(layer_sizes[middle_layer_index] * 0.5, middle_layer_index + 1),
+# #             arrowprops=dict(facecolor='black', shrink=0.05))
+
+# # # Set the limits and labels
+# # ax.set_xlim(-0.2, max(layer_sizes) * 0.2)
+# # ax.set_ylim(-1, n_layers)
+# # ax.set_aspect('equal', adjustable='datalim')
+# # ax.axis('off')
+# a = torch.tensor([[0.6815, 0.7796, 0.9360, 0.5866, 1.8860],
+#  [0.1141, 0.1273, 0.4898, 1.0005, 0.2570],
+#  [0.2012, 0.2757, 0.2001, 1.2834, 0.4445]])
+# b = a / torch.sum(a, axis=-1, keepdim=True)
+# print('a', a, 'b', b)
+# # class Fulei:
+# #     def __init__(self):
+# #         pass
+
+# #     def fuleicall(self):
+# #         print(self.weight)
+
+# # class zilei(Fulei):
+# #     def __init__(self):
+# #         super().__init__()
+# #         self.weight = 16
+
+# #     def zileicall(self):
+# #         self.fuleicall()
+
+
+# # a = zilei()
+# # a.zileicall()
+# # b = 5
+
+# # a = torch.tensor([[1, 2, 3, 4, 5], [6,7,8,9,10]])
+
+# # b = torch.tensor([[11, 12, 13], [16,17,18]])
+
+# # a[..., [1,2,3]] = b
+
+# # print(a[0], a[1])
+# # c = 5
+# # plt.show()
+
+# # import torch
+
+# # # Define dimensions
+# # C_out = 3  # Number of output channels
+# # C_in = 4   # Number of input channels
+# # N = 2      # Number of samples
+# # L = 1      # Additional factor (for simplicity, we keep it 1)
+
+# # # Define desired sparsity
+# # s = 0.5  # 50% sparsity
+
+# # # Create a random weight matrix W and input matrix X
+# # W = torch.randn(C_out, C_in)
+# # X = torch.randn(N * L, C_in)
+
+# # # Define the pruning function with the correction
+# # def prune(W, X, s):
+# #     temp = X.norm(p=2, dim=0)
+# #     print('temp', temp)
+# #     metric = W.abs() * X.norm(p=2, dim=0)
+# #     print('metric', metric)
+# #     _, sorted_idx = torch.sort(metric, dim=1)
+# #     print('sorted_idx', sorted_idx)
+# #     pruned_idx = sorted_idx[:, :int(C_in * s)]
+# #     print('pruned_idx', pruned_idx)
+# #     # Create a tensor of zeros with the same shape as the pruned indices
+# #     zeros = torch.zeros_like(W[:, :int(C_in * s)])
+# #     W.scatter_(dim=1, index=pruned_idx, src=zeros)
+# #     return W
+
+# # # Apply the pruning function
+# # W_pruned = prune(W, X, s)
+
+# # import numpy as np
+
+# # # Define custom bin edges
+# # bin_edges = [
+# #     -1000, -900, -800, -700, -600, -500, -400, -300, -200, -100, # -1000 to -100
+# #     -50, 0, 50, 100,  # -100 to 100
+# #     200, 300, 400, 500, 600, 700, 800, 900, 1000  # 100 to 1000
+# # ]
+
+# # # Fine bins around -10 to 10
+# # fine_bins = np.arange(-10, 10, 0.1).tolist()
+# # bin_edges = bin_edges + fine_bins + [1e-3]
+
+# # # Sort the bin edges
+# # bin_edges = sorted(set(bin_edges))
+# # print(bin_edges)
+# # # Example data from a batch
+# # batch_data = np.random.uniform(-1000, 1000, 1000)  # Replace with your actual batch data
+
+# # # Bin the data
+# # hist, _ = np.histogram(batch_data, bins=bin_edges)
+
+# # # hist now contains the count of data points in each bin
+# # print(hist)
+
+
+# # import matplotlib.pyplot as plt
+
+# # # Example histogram data
+# # hist_data = [10, 15, 7, 12, 5]  # Frequency counts for each bin
+
+# # # Corresponding bin edges
+# # bin_edges = [0, 1, 2, 3, 4, 5]  # Define the range of each bin
+
+# # # Calculate the width for each bin
+# # bin_widths = [bin_edges[i+1] - bin_edges[i] for i in range(len(bin_edges)-1)]
+
+# # print(bin_edges[:-1])
+# # # Create the bar plot
+# # plt.bar(bin_edges[:-1], hist_data, width=bin_widths, align='edge')
+
+# # # Labeling
+# # plt.xlabel('Value Range')
+# # plt.ylabel('Frequency')
+# # plt.title('Histogram')
+
+# # # Show the plot
+# # plt.show()
+
+
+
+# # import numpy as np
+# # import matplotlib.pyplot as plt
+
+# # # Generate sample data
+# # data = np.random.normal(0, 1, 1000)
+
+# # # Compute histogram
+# # counts, bins = np.histogram(data, bins=30)
+# # counts = [100, 100, 100]
+# # bins = [-0.1, 0, 0.1, 0.2]
+# # a = (sum(counts) * np.diff(bins))
+# # print('a', a)
+# # print('counts', counts)
+# # print('sum(counts)', sum(counts))
+# # print('bins', bins),
+# # print('np.diff(bins)', np.diff(bins)),
+
+# # # Calculate density
+# # density = counts / (sum(counts) * np.diff(bins))
+# # print('density', density)
+# # # Plotting the histogram as a density
+# # # plt.bar(bins[:-1], density, width=np.diff(bins), edgecolor='black')
+# # plt.hist(data, bins, density=True, edgecolor='black')
+
+# # plt.title('Density Histogram')
+# # plt.xlabel('Value')
+# # plt.ylabel('Density')
+
+# # plt.show()
+
+# import copy
+# from datasets import load_dataset
+# from transformers import AutoTokenizer
+
+# # for x in range(2, 30, 10):
+# #     print(x)
+# # eta = 0
+# # pq_p = 1
+# # pq_q = 2
+# # prune_norm = 2
+# # beta = 0.9
+# # gamma = 1
+# import time
+# # class YourClass:
+# #     # Other methods...
+# #     def __init__(self):
+# #         self.logger_info_time_used = 0
+
+# #     def monitor_time(func):
+# #         def wrapper(*args, **kwargs):
+# #             print('wrapper', args, kwargs)
+# #             start_time = time.time()
+# #             result = func(*args, **kwargs)
+# #             args[0].logger_info_time_used += time.time() - start_time
+# #             return result
+# #         return wrapper
+    
+# #     @monitor_time
+# #     def update_pruning_info(self, info):
+# #         a = 5
+
+# # a = YourClass()
+# # a.update_pruning_info(1)
+# # def calculate_entropy(probabilities):
+# #     """
+# #     Calculate the entropy of a probability distribution.
+# #     :param probabilities: list of probabilities for each event
+# #     :return: entropy of the distribution
+# #     """
+# #     entropy = 0
+# #     for p in probabilities:
+# #         if p > 0:  # To avoid math domain error for log(0)
+# #             entropy -= p * math.log(p, 2)  # Log base 2 for entropy in bits
+# #     return entropy
+
+# # def pq_struct(w, key, prune_dim):
+
+# #     calc_dim = 1
+# #     # i != prune_dim and 
+# #     # dims_to_aggregate = tuple(i for i in range(w.dim()) if i != 0)
+# #     # norm_across_other_dims = torch.linalg.vector_norm(w, ord=prune_norm, dim=dims_to_aggregate)     
+# #     print(w)
+# #     norm_p = torch.linalg.vector_norm(w, ord=pq_p, dim=calc_dim)
+# #     norm_q = torch.linalg.vector_norm(w, ord=pq_p, dim=calc_dim) + 1e-10
+    
+# #     dimension = w.shape[prune_dim]
+# #     pq_indices = (1 - dimension ** (1/pq_q - 1/pq_p) * norm_p / norm_q)
+
+# #     # add additional dimension if dimension is 0
+# #     if pq_indices.dim() == 0:
+# #         pq_indices = pq_indices.unsqueeze(0)
+
+# #     if torch.isnan(pq_indices).any():
+# #         raise ValueError('pq_indices contains nan values')
+
+# #     lower_bound = dimension * (1 + eta) ** (-pq_q / (pq_q - pq_p)) * (1 - pq_indices) ** (pq_q * pq_p / (pq_q - pq_p))
+# #     beta_tensor = torch.full_like(lower_bound, beta)
+# #     prune_channels_count = torch.floor(dimension * torch.min(gamma * (1 - lower_bound / dimension), beta_tensor))
+
+# #     _, sorted_channels = torch.sort(norm_across_other_dims, dim=calc_dim)
+# #     prune_channels = sorted_channels[:int(prune_channels_count.item())]
+# #     # info = {
+# #     #     f"{key}_norm_across_other_dims": norm_across_other_dims.mean(dim=0).squeeze(0).tolist(),
+# #     #     f"{key}_pq_indices": pq_indices.mean(dim=0).squeeze(0).tolist(),
+# #     # }
+# #     # self.update_pruning_info(info)
+# #     return prune_channels
+
+# # tensor1 = torch.tensor([1, 1, 1, 1, 1, 10, 10, 10, 10, 10])
+# # tensor2 = torch.tensor([0.1, 0.1, 0.1, 0.1, 0.1, 1, 1, 1, 1, 100])
+# # # sum_tensor2 = tensor1.sum()
+# # import math
+
+# # # Now you can use log from the math module
+# # print(-math.log(0.1))
+
+# # Normalize tensor2 by dividing each element by the sum
+# # normalized_tensor2 = tensor1 / sum_tensor2
+# # Stack the tensors to create a batched tensor
+# # The resulting tensor will have shape [2, 10]
+# # batched_tensor = torch.stack([tensor1, tensor2])
+# # batched_tensor = torch.stack([tensor1, normalized_tensor2])
+# # pq_struct(batched_tensor, 'w', 1)
+
+# import numpy as np
+
+# save_format = 'png'
+# fig_name = 'zz'
+# # Define the base directory for visualization
+# vis_path = './output/vis/{}'.format(save_format)
+
+# # Construct the full path for the figure
+# fig_path = '{}/{}.{}'.format(vis_path, fig_name, save_format)
+# print(vis_path, fig_path)
+# # Create a sample matrix X (e.g., 4 samples, 3 features)
+# # X = np.array([[1, 2, 3],
+# #               [4, 5, 7],
+# #               [7, 9, 9],
+# #               [10, 16, 12]])
+
+# # # Compute X^T X
+# # XTX = np.dot(X.T, X)
+
+# # # Approach 1: Full matrix inversion of X^T X, then extract diagonal
+# # inv_XTX = np.linalg.inv(XTX)
+# # diag_inv_XTX = np.diag(inv_XTX)
+
+# # # Approach 2: Extract the diagonal of X^T X, then invert each element
+# # diag_XTX = np.diag(XTX)
+# # inv_diag_XTX = 1 / diag_XTX
+
+# # # Display the results
+# # print("Diagonal of (X^T X)^-1:\n", diag_inv_XTX)
+# # print("Inverse of the diagonal elements of X^T X:\n", inv_diag_XTX)
+
+# a = 5
+# # a = 5
+# # def preprocess_function_test(dataset):
+# #     all_text = "\n\n".join(dataset['text'])
+# #     model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
+
+# #     max_length = 512  # Set your desired max length
+# #     input_ids = model_inputs['input_ids'][0]  # Assuming a single concatenated string
+# #     attention_mask = model_inputs['attention_mask'][0]
+
+# #     input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+# #     mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+
+# #     final_inputs = []
+# #     for chunk in input_chunks:
+# #         final_inputs.append({
+# #             'input_ids': torch.tensor(chunk, dtype=torch.long),
+# #             'attention_mask': torch.tensor(mask_chunks[final_inputs.index(chunk)], dtype=torch.long)
+# #         })
+
+# #     # Add labels if required
+# #     for item in final_inputs:
+# #         item['labels'] = item['input_ids'].clone()
+
+# #     return final_inputs
+
+# # def load_and_tokenize_dataset(model_checkpoint, dataset_name='wikitext', dataset_version='wikitext-2-v1', max_length=512):
+# #     # count = 0
+# #     # Load the dataset
+# #     dataset = load_dataset(dataset_name, dataset_version, split='test')
+
+# #     a = dataset['text']
+# #     # Load the tokenizer    
+# #     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
+# #     if tokenizer.pad_token_id is None:
+# #         tokenizer.pad_token_id = tokenizer.eos_token_id
+#     # Tokenization function
+#     # def preprocess_function_test(examples):
+#     #     max_length = 120
+#     #     text_column = ['text']
+#     #     batch_size = len(examples[text_column[0]])
         
-    #     model_inputs = tokenizer("\n\n".join(examples['text']), return_tensors='pt')
-    #     labels = tokenizer("\n\n".join(examples['text']), return_tensors='pt')
-    #     nsamples = model_inputs["input_ids"].numel() // max_length
+#     #     model_inputs = tokenizer("\n\n".join(examples['text']), return_tensors='pt')
+#     #     labels = tokenizer("\n\n".join(examples['text']), return_tensors='pt')
+#     #     nsamples = model_inputs["input_ids"].numel() // max_length
 
-    #     for i in range(nsamples):
-    #         start = i * max_length
-    #         end = start + max_length
-    #         sample_input_ids = model_inputs["input_ids"][:, start:end]
-    #         sample_attention_mask = model_inputs["attention_mask"][:, start:end]
-    #         # label_input_ids = labels[i]
-    #         sample_input_ids.reshape(1, max_length)
-    #         sample_attention_mask.reshape(1, max_length)
-    #         model_inputs["input_ids"][i] = sample_input_ids
-    #         model_inputs["attention_mask"][i] = sample_attention_mask
-    #         # labels["input_ids"][i] = label_input_ids
-    #         # model_inputs["split"].append(cfg['task_label'][examples['category'][i]])
-    #         # model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
-    #         # model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
-    #         labels["input_ids"][i] = sample_input_ids
-    #         labels["attention_mask"][i] = sample_attention_mask
-    #     model_inputs["labels"] = labels["input_ids"]
+#     #     for i in range(nsamples):
+#     #         start = i * max_length
+#     #         end = start + max_length
+#     #         sample_input_ids = model_inputs["input_ids"][:, start:end]
+#     #         sample_attention_mask = model_inputs["attention_mask"][:, start:end]
+#     #         # label_input_ids = labels[i]
+#     #         sample_input_ids.reshape(1, max_length)
+#     #         sample_attention_mask.reshape(1, max_length)
+#     #         model_inputs["input_ids"][i] = sample_input_ids
+#     #         model_inputs["attention_mask"][i] = sample_attention_mask
+#     #         # labels["input_ids"][i] = label_input_ids
+#     #         # model_inputs["split"].append(cfg['task_label'][examples['category'][i]])
+#     #         # model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+#     #         # model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+#     #         labels["input_ids"][i] = sample_input_ids
+#     #         labels["attention_mask"][i] = sample_attention_mask
+#     #     model_inputs["labels"] = labels["input_ids"]
 
 
-    #         # Tokenize all examples
-    #     model_inputs = tokenizer("\n\n".join(examples['text']), max_length=max_length, padding='max_length', truncation=True, return_tensors='pt')
-    #     a = model_inputs["input_ids"].numel()
-    #     # In this example, labels are the same as the input. Modify as needed.
-    #     labels = tokenizer("\n\n".join(examples['text']), max_length=max_length, padding='max_length', truncation=True, return_tensors='pt')
+#     #         # Tokenize all examples
+#     #     model_inputs = tokenizer("\n\n".join(examples['text']), max_length=max_length, padding='max_length', truncation=True, return_tensors='pt')
+#     #     a = model_inputs["input_ids"].numel()
+#     #     # In this example, labels are the same as the input. Modify as needed.
+#     #     labels = tokenizer("\n\n".join(examples['text']), max_length=max_length, padding='max_length', truncation=True, return_tensors='pt')
 
-    #     # The input_ids and attention_mask are already in the desired format
-    #     model_inputs["labels"] = labels["input_ids"]
+#     #     # The input_ids and attention_mask are already in the desired format
+#     #     model_inputs["labels"] = labels["input_ids"]
 
-    #     return model_inputs
+#     #     return model_inputs
 
-    # def remove_empty_examples(example):
-    #     return example["text"].strip() != ""
+#     # def remove_empty_examples(example):
+#     #     return example["text"].strip() != ""
 
-    # model_inputs = tokenizer("\n\n".join(dataset['text']), return_tensors='pt')
-    # labels = tokenizer("\n\n".join(dataset['text']), return_tensors='pt')
-    # nsamples = model_inputs["input_ids"].numel() // max_length
-    # for i in range(nsamples):
-    #     start = i * max_length
-    #     end = start + max_length
-    #     sample_input_ids = model_inputs["input_ids"][:, start:end]
-    #     sample_attention_mask = model_inputs["attention_mask"][:, start:end]
+#     # model_inputs = tokenizer("\n\n".join(dataset['text']), return_tensors='pt')
+#     # labels = tokenizer("\n\n".join(dataset['text']), return_tensors='pt')
+#     # nsamples = model_inputs["input_ids"].numel() // max_length
+#     # for i in range(nsamples):
+#     #     start = i * max_length
+#     #     end = start + max_length
+#     #     sample_input_ids = model_inputs["input_ids"][:, start:end]
+#     #     sample_attention_mask = model_inputs["attention_mask"][:, start:end]
     #     # label_input_ids = labels[i]
     #     sample_input_ids.reshape(1, max_length)
     #     sample_attention_mask.reshape(1, max_length)

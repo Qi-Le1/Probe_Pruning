@@ -16,6 +16,7 @@
 from typing import List, Optional, Tuple, Union
 
 import time
+import copy
 import torch
 import torch.utils.checkpoint
 from torch import nn
@@ -39,7 +40,8 @@ from transformers.utils import (
 )
 from transformers import OPTConfig
 from config import cfg
-from ..pruning_module import HiddenRepresentationPruning, cal_prune_metric, cal_running_mean_prune_metric
+from ..pruning_module import HiddenRepresentationPruning, cal_prune_metric, cal_calib_prune_metric
+from .utils import nml_process, max_process
 
 logger = logging.get_logger(__name__)
 
@@ -68,13 +70,6 @@ OPT_PRETRAINED_MODEL_ARCHIVE_LIST = [
 Note: transformers 4.35.0 version
 '''
 
-def check_multiple_for_tensor_cores(data_type):
-    if data_type == torch.float16:
-        if cfg['cudatoolkit_version'] >= 11 and cfg['cudnn_version'] >= 7630:
-            if cfg['gpu_type'] == 'A100':
-                return 64
-            else:
-                return 8
 
 class OPTLearnedPositionalEmbedding(nn.Embedding):
     """
@@ -312,7 +307,7 @@ class OPTDecoderLayer(nn.Module):
         """
 
         residual = hidden_states
-
+        temp_attn_residual = copy.deepcopy(residual)
         # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
         if self.do_layer_norm_before:
             hidden_states = self.self_attn_layer_norm(hidden_states)
@@ -341,43 +336,82 @@ class OPTDecoderLayer(nn.Module):
         # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
         if self.do_layer_norm_before:
             hidden_states = self.final_layer_norm(hidden_states)
+            temp_attn_residual = self.final_layer_norm(temp_attn_residual)
+
+        # flattened_hidden_states = hidden_states.flatten()
+        # num_elements_to_select = max(1, int(0.10 * flattened_hidden_states.numel()))  # Top 10% of elements
+        # # Select the top 10% elements based on their absolute value
+        # abs_flattened_hidden_states = flattened_hidden_states.abs()
+        # values, indices = torch.topk(abs_flattened_hidden_states, num_elements_to_select)
+
+        # ## Retrieve the actual values from the original tensor using these indices
+        # selected_values = flattened_hidden_states[indices].to(torch.float32)
+
+        # # Calculate the L1 norm (sum of absolute values) and L2 norm (square root of sum of squares) of these values
+        # l1_norm = selected_values.abs().sum()
+        # l2_norm = torch.sqrt((selected_values ** 2).sum())
+
+        # flattened_post_temp_attn_residual = post_temp_attn_residual.flatten()
+        # post_temp_attn_residual_values = flattened_post_temp_attn_residual[indices].to(torch.float32)
+
+
+        # l1_diff_norm = (selected_values - post_temp_attn_residual_values).abs().sum()
+        # l2_diff_norm = torch.sqrt(((selected_values - post_temp_attn_residual_values) ** 2).sum())
+
+        # sign_matches = torch.sign(selected_values) == torch.sign(post_temp_attn_residual_values)
+        # sign_match_ratio = torch.sum(sign_matches).item() / num_elements_to_select    
+
+        # cosine_similarity = torch.nn.functional.cosine_similarity(
+        #     selected_values.float(),  # Ensure the data type is float for cosine similarity computation
+        #     post_temp_attn_residual_values.float(),
+        #     dim=0  # Compute the cosine similarity across the dimension 0 (element-wise for vectors)
+        # )
+
+        # print('l1_norm', l1_norm, flush=True)
+        # print('l2_norm', l2_norm, flush=True)
+        # print('l1_diff_norm', l1_diff_norm, flush=True)
+        # print('l2_diff_norm', l2_diff_norm, flush=True)
+        # print('sign_match_ratio', sign_match_ratio, flush=True)
+        # print('cosine_similarity', cosine_similarity, flush=True)
+        # print('selected_values', selected_values, flush=True)
+        # print('post_temp_attn_residual_values', post_temp_attn_residual_values, flush=True)
+
+
         
-        if cfg['calibration_stage'] == True:
-            if ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']):
+        if ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip']:
+            if cfg['calibration_stage'] == True:
+                
                 hidden_states = self.fc1(hidden_states)
                 hidden_states = self.activation_fn(hidden_states)
 
                 hidden_states = self.fc2(hidden_states)
-        elif cfg['calibration_stage'] == False and self.layer_order > cfg['skip']:
-            if 'probe' in cfg['prune_name'] and ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']):
+        elif cfg['calibration_stage'] == False:
+            if 'probe' in cfg['prune_method']:
                 time_start = time.time()
-                multiple = check_multiple_for_tensor_cores(self.fc2.weight.dtype)
-                x = hidden_states
                 if 'nml' in cfg['prune_method']:
                     # abs_x = torch.abs(x).to(torch.float32)
                     # porportion = abs_x / abs_x.sum(dim=0, keepdim=True)
                     # print('porportion', porportion, porportion.dtype, porportion.shape, flush=True)
                     # comp_across_bsz = ((x.to(torch.float32) * porportion).sum(dim=0)).to(x.dtype)
-                    abs_x = torch.abs(x).to(torch.float32)
-                    sum_across_bsz = abs_x.sum(dim=0, keepdim=True)
-                    # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
-                    proportion = (abs_x / (sum_across_bsz + 1e-10)).to(x.dtype)
-                    # proportion = 10
-                    # print('proportion ', proportion, flush=True)
-                    comp_across_bsz = torch.sum(x * proportion, dim=0)
-                    comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                    # comp_across_bsz = nml_process(kwargs['temp_attn_residual'], cfg['probe_num'], cfg['probe_size'])
+                    comp_across_bsz = nml_process(hidden_states, cfg['probe_num'], cfg['probe_size'])
+
 
                 probe_out = self.activation_fn(self.fc1(comp_across_bsz, cal_mlp_probe_out_dim_metric=True))
                 
-                if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
-                    if 'saveseqdim' in cfg['prune_method']:
-                        probe_out_dim_metric = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], global_input_distribution=self.fc2.get_global_input_distribution()[0])
-                    else:
-                        probe_out_dim_metric = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.fc2.get_global_metric_score_distribution())
-                else:
-                    probe_out_dim_metric = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'])
-                probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
 
+                if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
+                    # if 'saveseqdim' in cfg['prune_method']:
+                    #     probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
+                    # else:
+                    probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.fc2.get_global_metric_score_distribution())
+                else:
+                    probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'])
+
+                if 'globalratio' in cfg['prune_method']:
+                    probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
+                else:
+                    probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
 
                 # if self.probe_out_dim_indices is None:
                 #     self.probe_out_dim_indices = probe_out_dim_indices
@@ -403,28 +437,28 @@ class OPTDecoderLayer(nn.Module):
                 #     down_proj = down_proj + restore
                 custom_duration = time.time() - time_start
                 print('fll_batch_duration', custom_duration, flush=True)
-            elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) and self.layer_order >= cfg['skip']:
+            elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']):
                 bsz, _, _ = x.shape
                 time_start = time.time()
                 if torch.all(self.fc2.get_global_metric_score_distribution() == 0):
-                    probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
+                    probe_out_dim_indices = torch.arange(self.ffn_dim, dtype=torch.long).to(device=x.device)
                     # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
                     # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
                 else:
-                    if 'meanglobalinput' in cfg['prune_method']:
-                        probe_out_dim_metric = cal_running_mean_prune_metric(self.fc2.get_global_input_distribution()[0], self.fc2.weight.data, cfg['prune_metric'])
+                    probe_out_dim_metric = cal_calib_prune_metric(self.fc2.get_global_metric_score_distribution(), self.fc2.weight.data, cfg['prune_metric'])
+
+                    if 'globalratio' in cfg['prune_method']:
+                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
                     else:
-                        probe_out_dim_metric = cal_running_mean_prune_metric(self.fc2.get_global_metric_score_distribution(), self.fc2.weight.data, cfg['prune_metric'])
-                    probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
 
                 hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states, probe_out_dim_indices=probe_out_dim_indices)))
         else:
             hidden_states = self.fc1(hidden_states)
             hidden_states = self.activation_fn(hidden_states)
-
             hidden_states = self.fc2(hidden_states)
-        hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
 
+        hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = (residual + hidden_states).view(hidden_states_shape)
 
         # 350m applies layer norm AFTER attention

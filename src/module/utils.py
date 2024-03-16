@@ -18,6 +18,19 @@ FLOPS_UNIT = (1000000, 'Million')
 # already in seconds unit
 TIME_UNIT = (1, 's')
 
+def nearest_multiple(num_prune, total, multiple, multiple2=1):
+    lcm = np.lcm(multiple, multiple2)
+    
+    # Adjust num_prune to make (total - num_prune) a multiple of the LCM
+    remain = (total - num_prune) % lcm
+    if remain == 0:
+        # If already a multiple of LCM, no adjustment needed
+        return num_prune
+    else:
+        # Adjust num_prune to the nearest value where (total - num_prune) is a multiple of LCM
+        adjusted_prune = num_prune + remain
+        return adjusted_prune
+
 def nearest_even_number(value):
     rounded_value = round(value)
     # If it's odd, adjust by 1 to make it even

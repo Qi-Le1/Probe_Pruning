@@ -117,8 +117,18 @@ def cal_prune_metric(x, weight, metric_type):
 def global_determine_ratio(model, if_log=False):
     attn_metric_list, mlp_metric_list = [], []
     if 'llama' in cfg['model_name']:
-        for name, module in model.named_modules():
-            if 'down_proj' not in name:
+        for name, module in model.named_modules():   
+            if 'down_proj' not in name and 'o_proj' not in name:
+                continue
+
+            if 'down_proj' in name and 'down_proj' not in cfg['cust_tgt_modules']:
+                continue
+            elif 'o_proj' in name and 'o_proj' not in cfg['cust_tgt_modules']:
+                continue
+
+            numbers = int(''.join(filter(str.isdigit, name)))
+            print('numebres', numbers)
+            if numbers <= cfg['skip']:
                 continue
             x = copy.deepcopy(module.get_global_metric_score_distribution())
             x = cal_prune_metric(x, module.weight.data, cfg['prune_metric'])
@@ -127,19 +137,48 @@ def global_determine_ratio(model, if_log=False):
             # if 'savemetricseq' in cfg['prune_method']:
             #     x = torch.clamp(torch.sum(x, dim=0), min=None, max=65504)
             if 'globalratiostd' in cfg['prune_method']:
-                x = (x - torch.mean(x, axis=-1, keepdim=True)) / torch.std(x, axis=-1, keepdim=True)
-                mlp_metric_list.append(x)
+                if 'down_proj' in name:
+                    x = (x - torch.mean(x, axis=-1, keepdim=True)) / torch.std(x, axis=-1, keepdim=True)
+                    mlp_metric_list.append(x)
+                elif 'o_proj' in name:
+                    if 'each' in cfg['vo_prune_way']:
+                        num_heads = model.config.num_attention_heads
+                        head_dim = model.config.hidden_size // num_heads
+                        x_reshaped = x.view(num_heads, head_dim)
+                        mean = torch.mean(x_reshaped, axis=-1, keepdim=True)
+                        std = torch.std(x_reshaped, axis=-1, keepdim=True)
+                        x_normalized = (x_reshaped - mean) / std
+                        x = x_normalized.view(1, model.config.hidden_size)
+                    else:
+                        x = (x - torch.mean(x, axis=-1, keepdim=True)) / torch.std(x, axis=-1, keepdim=True)
+                    attn_metric_list.append(x)
             # Print the module name and attribute name
             print('name', name)
-        mlp_metric = torch.stack(mlp_metric_list)
-        sorted_prune, indices = torch.sort(mlp_metric.view(-1))
-        threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
+        
+        if len(attn_metric_list) > 0:
+            attn_metric = torch.stack(attn_metric_list)
+            sorted_prune, indices = torch.sort(attn_metric.view(-1))
+            attn_threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
+        if len(mlp_metric_list) > 0:
+            mlp_metric = torch.stack(mlp_metric_list)
+            sorted_prune, indices = torch.sort(mlp_metric.view(-1))
+            mlp_threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
 
         output_dir = "output/vis"
         os.makedirs(output_dir, exist_ok=True)
 
         for name, module in model.named_modules():
-            if 'down_proj' not in name:
+            if 'down_proj' not in name and 'o_proj' not in name:
+                continue
+            
+            if 'down_proj' in name and 'down_proj' not in cfg['cust_tgt_modules']:
+                continue
+            elif 'o_proj' in name and 'o_proj' not in cfg['cust_tgt_modules']:
+                continue
+
+            numbers = int(''.join(filter(str.isdigit, name)))
+            print('numebres', numbers)
+            if numbers <= cfg['skip']:
                 continue
             x = copy.deepcopy(module.get_global_metric_score_distribution())
             x = cal_prune_metric(x, module.weight.data, cfg['prune_metric'])
@@ -187,11 +226,16 @@ def global_determine_ratio(model, if_log=False):
             # # # Print statement for the new PDF plot
             # # print(f"PDF plot saved to {os.path.join(output_dir, pdf_filename)}")
             
-
-            module.pruning_ratio = sorted_metric[sorted_metric < threshold].numel() / sorted_metric.numel()
+            if 'down_proj' in name and len(mlp_metric_list) > 0:
+                module.pruning_ratio = sorted_metric[sorted_metric < mlp_threshold].numel() / sorted_metric.numel()
+                print('threshold', mlp_threshold, 'module.sorted_metric', sorted_metric)
+                print('name', name, 'module.pruning_ratio', module.pruning_ratio)
+            elif 'o_proj' in name and len(attn_metric_list) > 0:
+                module.pruning_ratio = sorted_metric[sorted_metric < attn_threshold].numel() / sorted_metric.numel()
+            # module.pruning_ratio = sorted_metric[sorted_metric < threshold].numel() / sorted_metric.numel()
             
-            print('threshold', threshold, 'module.sorted_metric', sorted_metric)
-            print('name', name, 'module.pruning_ratio', module.pruning_ratio)
+                print('threshold', attn_threshold, 'module.sorted_metric', sorted_metric)
+                print('name', name, 'module.pruning_ratio', module.pruning_ratio)
         
     elif 'opt' in cfg['model_name']:
         pass
@@ -242,6 +286,7 @@ def run_calibration(model, data_loader):
             #                                             max_new_tokens=cfg['max_new_tokens'],
             #                                             eos_token_id=cfg['pad_token_id'],
             #                                             no_repeat_ngram_size=2)
+            # break
             if iterate_small_samples:
                 if i == 100:
                     break

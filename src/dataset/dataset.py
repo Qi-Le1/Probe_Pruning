@@ -522,6 +522,7 @@ def process_dataset(dataset, tokenizer):
                     label_ignore_pos = [tokenizer.pad_token_id] * len(sample_input_ids) + [-900] * len(label_input_ids)
                     len_temp_input = len(temp_input)
 
+                    #开头不能是Padtoken
                     if len_temp_input >= max_length:
                         temp_input = temp_input[-max_length:]
                         temp_attention_mask = temp_attention_mask[-max_length:]

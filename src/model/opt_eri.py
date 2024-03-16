@@ -120,12 +120,12 @@ class OPTEriModel(torch.nn.Module):
         new_module.weight.requires_grad = False
         new_module.device = old_module.weight.device
         new_module.is_pruned = True
-        # if hasattr(old_module, "bias"):
-        #     # old_module might not have bias, bias=None
-        #     # need to write into new_module, otherwise
-        #     # the parent class will assign bias
-        #     print('old_module.bias', old_module.bias)
-        #     new_module.bias = old_module.bias
+        if hasattr(old_module, "bias"):
+            # old_module might not have bias, bias=None
+            # need to write into new_module, otherwise
+            # the parent class will assign bias
+            print('old_module.bias', old_module.bias)
+            new_module.bias = old_module.bias
 
     def __getattr__(self, name: str):
         """Forward missing attributes to the wrapped module."""
@@ -248,9 +248,20 @@ class Linear(nn.Linear, EriLayer):
         else:
             raise ValueError(f"Unknown pruning method {self.prune_name}")
         self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
-
+        
         if 'savemetricseq' in cfg['prune_method']:
-            self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+            self.baseline_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+                self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+            elif self.prune_metric == "flap":
+                self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+            else:
+                raise ValueError(f"Unknown pruning method {self.prune_name}")
+        self.position_distribution_1 = []
+        self.position_distribution_2 = []
+        self.position_distribution_3 = []
+        self.position_distribution_4 = []
+        self.position_distribution_5 = []
 
     def update_global_input_distribution(self, inp, update_indices):
         if len(inp.shape) == 2:
@@ -279,13 +290,13 @@ class Linear(nn.Linear, EriLayer):
             delta2 = new_sample - self.mean_for_all_batches[:, update_indices]  # Recalculate delta after updating the mean
             self.variance_for_all_batches[:, update_indices] += delta * delta2
             # print('new_sample', new_sample.shape, flush=True)
-            # if 'up_proj' in self.key:
-            #     # print('self.key', self.key, flush=True)
-            #     self.position_1.append(new_sample[0][0].item())
-            #     self.position_2.append(new_sample[1][20].item())
-            #     self.position_3.append(new_sample[2][400].item())
-            #     self.position_4.append(new_sample[3][600].item())
-            #     self.position_5.append(new_sample[4][800].item())
+            if 'up_proj' in self.key:
+                # print('self.key', self.key, flush=True)
+                self.position_distribution_1.append(new_sample[0][0].item())
+                self.position_distribution_2.append(new_sample[1][20].item())
+                self.position_distribution_3.append(new_sample[2][400].item())
+                self.position_distribution_4.append(new_sample[3][600].item())
+                self.position_distribution_5.append(new_sample[4][800].item())
         # print('self.position_1', len(self.position_1), flush=True)
         # running_variance_increment = torch.zeros((inp.shape[1]), device=inp.device, dtype=torch.float32)
         # self.mean_for_all_batches = self.mean_for_all_batches.to(cur_device)
@@ -299,7 +310,51 @@ class Linear(nn.Linear, EriLayer):
         # self.variance_for_all_batches[update_indices] +=
 
 
+    def update_global_metric_score_distribution_ema(self, inp, update_indices, is_probe=False):
+        if len(inp.shape) == 2:
+            inp = inp.unsqueeze(0)
+        # batch_size = inp.shape[0] if batch_size is None else batch_size
+        batch_size = inp.shape[0]
+        default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
+        if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
+            raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
+        cur_device = inp.device
 
+        momentum = cfg['ema_momentum']
+        if is_probe and 'compressfillpbmetric' in cfg['prune_method']:
+            momentum = 1 - ((1 - momentum) / (default_batch_size))
+        if 'savemetricseq' in cfg['prune_method']:
+            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+                self.scaler_inp = self.scaler_inp.to(cur_device)
+                self.nsamples = self.nsamples.to(cur_device)
+                update_indices = update_indices.to(cur_device)
+                self.scaler_inp[:, update_indices] *= momentum
+                if cfg['calibration_stage'] == True:
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+                elif cfg['calibration_stage'] == False:
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+                # denominator = (self.nsamples[update_indices] + )
+                self.scaler_inp[:, update_indices] += (1 - momentum) * norm_squared / batch_size
+        else:
+            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+                self.scaler_inp = self.scaler_inp.to(cur_device)
+                self.nsamples = self.nsamples.to(cur_device)
+                update_indices = update_indices.to(cur_device)
+
+                self.scaler_inp[update_indices] *= momentum
+                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=None, max=65504)
+                # print(f'{self.key}_norm_squared', norm_squared, flush=True)
+                # print('update_indices', update_indices.shape, flush=True)
+                # print('norm_squared', norm_squared.shape, flush=True)
+                # denominator = (self.nsamples[update_indices] + batch_size)
+                # print('self.scaler_inp', self.scaler_inp.shape, flush=True)
+                # print('norm_squared', norm_squared.shape, flush=True)
+                # print('update_indices', update_indices.shape, flush=True)
+                self.scaler_inp[update_indices] += (1 - momentum) * norm_squared / batch_size
+                # print('self.scaler_inp', self.scaler_inp, flush=True)
+            elif self.prune_metric == "flap":
+               pass
+        self.nsamples[update_indices] += batch_size
 
     # def update_global_metric_score_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
     def update_global_metric_score_distribution(self, inp, update_indices):
@@ -319,7 +374,55 @@ class Linear(nn.Linear, EriLayer):
                 update_indices = update_indices.to(cur_device)
 
                 self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+                if cfg['calibration_stage'] == True:
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+                elif cfg['calibration_stage'] == False:
+                    # if 'coeff' in cfg['prune_method']:
+                    #     # Assuming inp is your input tensor
+                    #     # inp_square = torch.clamp(inp ** 2, min=None, max=65504)
+
+                    #     # # Directly compute the sum of squares once and reuse it
+                    #     # sum_inp_square = torch.sum(inp_square, dim=0, keepdim=True) + 1e-10
+                    #     # sum_inp_square_clamped = torch.clamp(sum_inp_square, min=None, max=65504)
+
+                    #     # # Calculate ratio, notice that clamping sum_inp_square_clamped again is unnecessary
+                    #     # # ratio = inp_square / sum_inp_square_clamped
+                    #     # ratio = inp_square / inp_square
+                    #     # # print('ratio', ratio.shape, flush=True)
+
+                    #     # # Calculate norm_squared without redundant clamping of sum_inp_square
+                    #     # norm_squared = torch.clamp(torch.sum(ratio * inp_square, dim=0), min=None, max=65504)
+
+                    #     square_x = torch.clamp(torch.square(inp).to(torch.float32), min=None, max=65504)
+                    #     sum_across_bsz = torch.clamp(square_x.sum(dim=0, keepdim=True), min=None, max=65504)
+                    #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
+                    #     proportion = (square_x / (sum_across_bsz + 1e-10)).to(inp.dtype)
+                    #     # Check for NaN values
+                    #     has_nan = torch.isnan(proportion).any()
+
+                    #     # Check for infinite values
+                    #     has_inf = torch.isinf(proportion).any()
+
+                    #     if has_nan or has_inf:
+                    #         print("proportion contains NaN or infinite values.")
+                    #         # print(torch.sort(proportion)[0])
+                    #         nan_indices = torch.where(torch.isnan(proportion))
+
+                    #         # Print the indices of NaN values
+                    #         print("Indices of NaN values:", nan_indices)
+
+                    #         # Print the NaN values using the indices (optional, as they are known to be NaN)
+                    #         print("NaN values at these indices:", square_x[nan_indices],  proportion[nan_indices])
+                    #     else:
+                    #         # print("proportion does not contain NaN or infinite values.")
+                    #         pass
+                    #     # print('proportion ', proportion, flush=True)
+                    #     # proportion = 10
+                    #     # print('proportion ', proportion, flush=True)
+                    #     norm_squared = torch.sum(square_x * proportion, dim=0)
+                    # else:
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+                # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0), min=None, max=65504)
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 denominator = (self.nsamples[update_indices] + batch_size)
                 self.scaler_inp[:, update_indices] += norm_squared / denominator
@@ -329,9 +432,16 @@ class Linear(nn.Linear, EriLayer):
                 self.scaler_inp = self.scaler_inp.to(cur_device)
                 self.nsamples = self.nsamples.to(cur_device)
                 update_indices = update_indices.to(cur_device)
+                # print('self.key', self.key, flush=True)
+                # print('shape', self.scaler_inp.shape)
+                # print("self.scaler_inp[update_indices].shape:", self.scaler_inp[update_indices].shape)
+                # print("self.nsamples[update_indices].shape:", self.nsamples[update_indices].shape)
+                # print("batch_size:", batch_size)
                 self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
                 norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=None, max=65504)
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
+                # print('update_indices', update_indices.shape, flush=True)
+                # print('norm_squared', norm_squared.shape, flush=True)
                 denominator = (self.nsamples[update_indices] + batch_size)
                 self.scaler_inp[update_indices] += norm_squared / denominator
                 # print('self.scaler_inp', self.scaler_inp, flush=True)
@@ -374,9 +484,13 @@ class Linear(nn.Linear, EriLayer):
         torch.cuda.empty_cache()  
 
     def check_fill_case(self):
-        if cfg['qk_proj_prune'] == 'fill' and ('q_proj' in self.key or 'k_proj' in self.key):
+        qk_prune_way = cfg['qk_prune_way']
+        vo_prune_way = cfg['vo_prune_way']
+        if qk_prune_way is None:
+            qk_prune_way = vo_prune_way
+        if qk_prune_way == 'fill' and ('q_proj' in self.key or 'k_proj' in self.key):
             return True
-        elif cfg['vo_proj_prune'] == 'fill' and ('v_proj' in self.key or 'o_proj' in self.key):
+        elif vo_prune_way == 'fill' and ('v_proj' in self.key or 'o_proj' in self.key):
             return True
         return False
 
@@ -387,102 +501,117 @@ class Linear(nn.Linear, EriLayer):
             if cfg['calibration_stage'] == True:
                 # print('calibration_stage', flush=True)
                 self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
-                if 'meanglobalinput' in cfg['prune_method']:
-                    self.update_global_input_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
+                result = F.linear(x, self.weight, bias=None)
+                    # print('calibrateresult', result.dtype, result.shape, result, flush=True)
+                result = result.to(previous_dtype)
+                return result
+                # if 'meanglobalinput' in cfg['prune_method']:
+                #     self.update_global_input_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
 
                 # metric_score = self.get_global_metric_score_distribution()
                 # mean_for_all_batches, std_for_all_batches = self.get_global_input_distribution()
-
-
-            elif 'runningmean' in cfg['prune_method']:
+            elif cfg['calibration_stage'] == False:
                 if 'probe_in_dim_indices' in kwargs:
-                    self.update_global_metric_score_distribution(x, kwargs['probe_in_dim_indices'])
-                else:
-                    self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
+                    if 'attn' in self.key:
+                        if self.check_fill_case():
+                            x = x[..., kwargs['probe_in_dim_indices'].to(self.weight.device)]
 
-            if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
-                # print('probeinput', x.dtype, x.shape, x, flush=True)
-                # print('probeweight', self.weight.dtype, self.weight.shape, self.weight, flush=True)
-                # x = x.to(torch.float32)
-                # weight = self.weight.to(torch.float32)
-                # print('probeinput 2 ', x.dtype, x.shape, x, flush=True)
-                # for i in range(x.shape[-2]):
-                #     print('\n\n', i)
-                #     for j in range(x.shape[-1]):
-                #         print(x[:, i, j])
-                # print('probeweight2 ', weight.dtype, weight.shape, weight, flush=True)
-                # if 'square' in cfg['prune_method']:
-                #     result = torch.clamp(F.linear(x, self.weight ** 2, bias=None), min=None, max=65504)
-                #     print('probesquareresult', result.dtype, result.shape, result, flush=True)
-                # else:
-                result = F.linear(x, self.weight, bias=None)
-                # print('proberesult', result.dtype, result.shape, result, flush=True)
+                if 'runningmean' in cfg['prune_method']:
+                    if 'probe_in_dim_indices' in kwargs:
+                        # print('self.key', self.key, flush=True)
+                        self.update_global_metric_score_distribution(x, kwargs['probe_in_dim_indices'])
+                    else:
+                        self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
+                elif 'ema' in cfg['prune_method']:
+                    if 'probe_in_dim_indices' in kwargs:
+                        self.update_global_metric_score_distribution_ema(x, kwargs['probe_in_dim_indices'])
+                    else:
+                        self.update_global_metric_score_distribution_ema(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
+
+                if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
+                    # print('probeinput', x.dtype, x.shape, x, flush=True)
+                    # print('probeweight', self.weight.dtype, self.weight.shape, self.weight, flush=True)
+                    # x = x.to(torch.float32)
+                    # weight = self.weight.to(torch.float32)
+                    # print('probeinput 2 ', x.dtype, x.shape, x, flush=True)
+                    # for i in range(x.shape[-2]):
+                    #     print('\n\n', i)
+                    #     for j in range(x.shape[-1]):
+                    #         print(x[:, i, j])
+                    # print('probeweight2 ', weight.dtype, weight.shape, weight, flush=True)
+                    # if 'square' in cfg['prune_method']:
+                    #     result = torch.clamp(F.linear(x, self.weight ** 2, bias=None), min=None, max=65504)
+                    #     print('probesquareresult', result.dtype, result.shape, result, flush=True)
+                    # else:
+                    result = F.linear(x, self.weight, bias=None)
+                    # print('proberesult', result.dtype, result.shape, result, flush=True)
+                    result = result.to(previous_dtype)
+                    return result
+                elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:                 
+                    result = F.linear(x, self.weight, bias=None)
+                    result = result.to(previous_dtype)
+                    return result
+
+                input_dim = x.dim()
+                batch_size = x.size(0)
+                seq_len = x.size(1)
+
+                linear_layer_info = {
+                    'weight': self.weight.data,
+                }
+
+                if 'probe_out_dim_indices' in kwargs:
+                    if 'attn' in self.key:
+                        weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
+                        if self.check_fill_case():
+                            # print('fill', flush=True)
+                            self.out_selected_dim = kwargs['probe_out_dim_indices']
+                    else:
+                        weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
+                    result = F.linear(x, weight, bias=None)
+                    if 'attn' in self.key:
+                        if self.check_fill_case():
+                            # print('fill', flush=True)
+                            refilling_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
+                            refilling_output[..., self.out_selected_dim] = result
+                            result = refilling_output
+                    result = result.to(previous_dtype)
+                    return result
+                elif 'probe_in_dim_indices' in kwargs:
+                    if 'attn' in self.key:
+                        weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
+                    else:
+                        weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
+                    result = F.linear(x, weight, bias=None)
+                    result = result.to(previous_dtype)
+                    return result
+                else:
+                    # only prune input in each layer
+                    if 'traditional' in cfg['prune_method']:
+                        x, pruned_dim, preserve_channels = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.is_prune_out_dim)
+                        weight = self.extract_in_weight(input_dim, pruned_dim, preserve_channels, self.layer_type)
+                    else:
+                        weight = self.weight
+                    
+                if 'flap' in cfg['prune_metric']:
+                    # all_channels = torch.arange(self.in_features, dtype=preserve_channels.dtype, device=preserve_channels.device)
+                    # mask = all_channels[preserve_channels]
+                    # mean_x = torch.mean(x, dim=1)
+                    # flap = (x - mean_x) * 
+                    # output_bias = ((mean_inp * ~mask.to(self.weight.data.device)) @ self.weight.data.T)
+                    # result = F.linear(x, weight, bias=output_bias)
+                    pass
+                else:
+                    # print('calibrateinput', x.dtype, x.shape, x, flush=True)
+                    # print('calibrateweight', weight.dtype, weight.shape, weight, flush=True)
+                    # for i in range(x.shape[-2]):
+                    #     print(x[:, i, :])
+                    # x = x.to(torch.float32)
+                    # weight = weight.to(torch.float32)
+                    # print('calibrateinput 2', x.dtype, x.shape, x, flush=True)
+                    # print('calibrateweight 2', weight.dtype, weight.shape, weight, flush=True)
+                    # print('here')
+                    result = F.linear(x, weight, bias=None)
+                    # print('calibrateresult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)
                 return result
-            elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:                 
-                result = F.linear(x, self.weight, bias=None)
-                result = result.to(previous_dtype)
-                return result
-
-            input_dim = x.dim()
-            batch_size = x.size(0)
-            seq_len = x.size(1)
-
-            linear_layer_info = {
-                'weight': self.weight.data,
-            }
-
-            if 'probe_out_dim_indices' in kwargs:
-                if 'attn' in self.key:
-                    weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
-                    if self.check_fill_case():
-                        self.out_selected_dim = kwargs['probe_out_dim_indices']
-                else:
-                    weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
-                result = F.linear(x, weight, bias=None)
-                if 'attn' in self.key:
-                    if self.check_fill_case():
-                        refilling_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
-                        refilling_output[..., self.out_selected_dim] = result
-                        result = refilling_output
-                result = result.to(previous_dtype)
-                return result
-            elif 'probe_in_dim_indices' in kwargs:
-                if 'attn' in self.key:
-                    if self.check_fill_case():
-                        x = x[..., kwargs['probe_in_dim_indices'].to(self.weight.device)]
-                    weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
-                else:
-                    weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
-                result = F.linear(x, weight, bias=None)
-                result = result.to(previous_dtype)
-                return result
-            else:
-                # only prune input in each layer
-                if 'traditional' in cfg['prune_method']:
-                    x, pruned_dim, preserve_channels = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.is_prune_out_dim)
-                    weight = self.extract_in_weight(input_dim, pruned_dim, preserve_channels, self.layer_type)
-                else:
-                    weight = self.weight
-                
-            if 'flap' in cfg['prune_metric']:
-                # all_channels = torch.arange(self.in_features, dtype=preserve_channels.dtype, device=preserve_channels.device)
-                # mask = all_channels[preserve_channels]
-                # mean_x = torch.mean(x, dim=1)
-                # flap = (x - mean_x) * 
-                # output_bias = ((mean_inp * ~mask.to(self.weight.data.device)) @ self.weight.data.T)
-                # result = F.linear(x, weight, bias=output_bias)
-                pass
-            else:
-                # print('calibrateinput', x.dtype, x.shape, x, flush=True)
-                # print('calibrateweight', weight.dtype, weight.shape, weight, flush=True)
-                # for i in range(x.shape[-2]):
-                #     print(x[:, i, :])
-                # x = x.to(torch.float32)
-                # weight = weight.to(torch.float32)
-                # print('calibrateinput 2', x.dtype, x.shape, x, flush=True)
-                # print('calibrateweight 2', weight.dtype, weight.shape, weight, flush=True)
-                result = F.linear(x, weight, bias=None)
-                # print('calibrateresult', result.dtype, result.shape, result, flush=True)
-            result = result.to(previous_dtype)
-        return result

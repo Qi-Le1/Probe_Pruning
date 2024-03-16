@@ -12,6 +12,17 @@ def process_control():
     cfg['cudatoolkit_version'] = float(torch.version.cuda)
     cfg['cudnn_version'] = float(torch.backends.cudnn.version())
     cfg['gpu_type'] = 'A100'
+    cfg['data_type'] = torch.float16
+    # This can be implemented dynamically in each layer
+    if cfg['data_type'] == torch.float16:
+        if cfg['cudatoolkit_version'] >= 11 and cfg['cudnn_version'] >= 7630:
+            if cfg['gpu_type'] == 'A100':
+                cfg['tc_multiple'] = 64
+            else:
+                cfg['tc_multiple'] = 8
+
+
+
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
@@ -30,11 +41,13 @@ def process_control():
     if len(prune_name_sub_list) > 1:
         cfg['prune_method'] = prune_name_sub_list[1]
         cfg['prune_metric'] = prune_name_sub_list[2]
-        if 'probe' in cfg['prune_method']:
-            cfg['qk_proj_prune'] = prune_name_sub_list[3]  
-            # fill or each
-            cfg['vo_proj_prune'] = prune_name_sub_list[4]
-        
+        # if 'probe' in cfg['prune_method']:
+        # cfg['q_prune'] = prune_name_sub_list[3]  
+        # # fill or each
+        # cfg['k_prune'] = prune_name_sub_list[4]  
+        # cfg['v_prune'] = prune_name_sub_list[5]
+
+
         if 'svd' in cfg['prune_method']:
             match = re.search(r'svd(\d+\.\d+)', cfg['prune_metric'])
             if match:
@@ -159,6 +172,33 @@ def process_control():
     if cfg[model_name]['batch_size']['test'] % cfg['probe_num'] != 0:
         raise ValueError('probe_num needs to be divisible by batch size')
     
+    if len(prune_name_sub_list) > 1:
+        prune_keys = ['q', 'k', 'v']
+        for key in prune_keys:
+            cfg[f'{key}_prune'] = prune_name_sub_list[3 + prune_keys.index(key)]
+            cfg[f'{key}_probe_num'] = 1
+            cfg[f'{key}_probe_size'] = int(cfg[model_name]['batch_size']['test'] // 1)
+
+            match = re.search(r'probe(\d+)', cfg[f'{key}_prune'])
+            if match:
+                int_value = int(match.group(1))
+            else:
+                int_value = None
+
+            cfg[f'{key}_probe_num'] = int_value
+            if int_value:  # Ensure int_value is not None to avoid division by zero
+                probe_size = int(cfg[model_name]['batch_size']['test'] // int_value)
+                if cfg[model_name]['batch_size']['test'] % int_value != 0:
+                    raise ValueError(f'probe_num needs to be divisible by batch size for {key}')
+                cfg[f'{key}_probe_size'] = probe_size
+
+        prune_keywords = ['each', 'fill', 'whole']
+        cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), None)
+        cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), None)
+
+    # def check_multiple_for_tensor_cores(data_type):
+        
+            
     cfg['logger_detailed_info'] = False
     print(cfg['prune_hyper'] == 9999)
     print('cfg: ', cfg)

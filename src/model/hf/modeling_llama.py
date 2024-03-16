@@ -46,9 +46,10 @@ from transformers.utils.import_utils import is_torch_fx_available
 from transformers import LlamaConfig
 
 from config import cfg
-from ..pruning_module import HiddenRepresentationPruning, cal_intersection_ratio, cal_prune_metric, cal_running_mean_prune_metric
+from ..pruning_module import HiddenRepresentationPruning, cal_intersection_ratio, cal_prune_metric, cal_calib_prune_metric
 from module import nearest_even_number
 from torch.nn.functional import cosine_similarity
+from .utils import nml_process, max_process
 '''
 Note: transformers 4.35.0 version
 '''
@@ -68,6 +69,15 @@ logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "LlamaConfig"
 
+
+# def median_process(x, probe_num, probe_size):
+#     # Apply absolute value to x
+#     abs_x = torch.abs(x)
+#     # Adjust the view to organize the data by probe_num and probe_size
+#     reorganized_abs_x = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
+#     # Use torch.median to get the median value across the probe_size dimension
+#     median_across_bsz = reorganized_abs_x.median(dim=1, keepdim=False).values
+#     return median_across_bsz
 
 def _get_unpad_data(attention_mask):
     seqlens_in_batch = attention_mask.sum(dim=-1, dtype=torch.int32)
@@ -297,13 +307,7 @@ def apply_rotary_pos_emb_for_prune_each_head(q, k, cos, sin, position_ids, probe
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
 
-def check_multiple_for_tensor_cores(data_type):
-    if data_type == torch.float16:
-        if cfg['cudatoolkit_version'] >= 11 and cfg['cudnn_version'] >= 7630:
-            if cfg['gpu_type'] == 'A100':
-                return 64
-            else:
-                return 8
+
 
 
 
@@ -336,6 +340,9 @@ class LlamaMLP(nn.Module):
         self.intersected_prune_indices = None
         # self.last_batch_probe_out = torch.zeros((cfg['probe_num'], cfg['seq_len'], self.intermediate_size), device=self.gate_proj.weight.device)
         self.last_batch_probe_out = None
+
+        self.cur_batch = 0
+        self.prev = None
     def forward(self, x, **kwargs):
         if self.config.pretraining_tp > 1:
             slice = self.intermediate_size // self.config.pretraining_tp
@@ -354,18 +361,18 @@ class LlamaMLP(nn.Module):
             ]
             down_proj = sum(down_proj)
         else:
-            multiple = check_multiple_for_tensor_cores(self.gate_proj.weight.dtype)
             bsz, _, _ = x.shape
-            if cfg['calibration_stage'] == True:
-                if ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']) and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
-                    # bsz, _, _ = x.shape
-                    # time_start = time.time()
-                    # probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
-                    # temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
-                    # kwargs['probe_in_dim_indices'] = probe_out_dim_indices
-                    # down_proj = self.down_proj(temp, **kwargs)
-                    # custom_duration = time.time() - time_start
-                    # return down_proj
+            if ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip']:
+                if cfg['calibration_stage'] == True:
+                    # if 'calib' in cfg['prune_method'] :
+                        # bsz, _, _ = x.shape
+                        # time_start = time.time()
+                        # probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
+                        # temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
+                        # kwargs['probe_in_dim_indices'] = probe_out_dim_indices
+                        # down_proj = self.down_proj(temp, **kwargs)
+                        # custom_duration = time.time() - time_start
+                        # return down_proj
 
                     mlp_duration_start = time.time()
                     time_start = time.time()
@@ -386,635 +393,645 @@ class LlamaMLP(nn.Module):
                     # print('mlp_duration', mlp_duration, flush=True)
                     del temp_gate, temp_up
                     return down_proj
-                # and self.layer_order >= 5
-            # elif cfg['calibration_stage'] == False and self.layer_order >= 5:
-            elif cfg['calibration_stage'] == False and self.layer_order > cfg['skip']:
-                print('zzz', self.layer_order, flush=True)
-                if 'probe' in cfg['prune_method'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
-                    time_start = time.time()
-                    print('xshape', x.shape, flush=True)
-                    if 'similarityprobe' in cfg['prune_method']:
-                        start_time = time.time()
-                        
-                        if self.input_norm_gate_weight is None:
-                            self.input_norm_gate_weight = torch.norm(self.gate_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
-                        if self.input_norm_up_weight is None:
-                            self.input_norm_up_weight = torch.norm(self.up_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
-
-                        # def cal_sign_agreement_metrix(x_flattened):
-                        #     strength = torch.norm(x_flattened, p=2, dim=0)
-                        #     # Calculate the number of positions to select (top 10%)
-                        #     top_k = max(int(0.03 * strength.numel()), 1)  # Ensure at least one position is selected
-                        #     # print('top_k', top_k, strength.numel(), strength.shape, flush=True)
-                        #     # Use torch.topk to find the top k positions. 
-                        #     # torch.topk returns values and their corresponding indices.
-                        #     top_values, top_indices = torch.topk(strength, k=top_k)
-
-                        #     top_positions_flat = x_flattened[:, top_indices]  # [bsz, top_k]
-                        #     print('top_positions_flat', top_positions_flat, flush=True)
-                        #     signs_top_positions_flat = torch.sign(top_positions_flat)
-                        #     # print('signs_top_positions_flat', signs_top_positions_flat, flush=True)
-                        #     # sign_similarity = signs_top_positions_flat * signs_top_positions_flat.transpose(0, 1)
-                        #     # Expand dimensions for broadcasting
-                        #     expanded_signs = signs_top_positions_flat.unsqueeze(1)  # Shape: [bsz, 1, top_k]
-                        #     # Repeat signs for comparison across all pairs
-                        #     repeated_signs = signs_top_positions_flat.unsqueeze(0)  # Shape: [1, bsz, top_k]
-
-                        #     # Element-wise multiplication to check sign agreement (-1 * -1 = 1, 1 * 1 = 1, else = -1 or 0)
-                        #     sign_agreement = expanded_signs * repeated_signs  # Shape: [bsz, bsz, top_k]
-
-                        #     # Sum over the top_k dimension to count the number of agreements per pair
-                        #     sign_agreement_matrix = sign_agreement.sum(dim=-1)  # Shape: [bsz, bsz]
-                        #     # print('sign_agreement_matrix v1', sign_agreement_matrix, flush=True)
-                        #     sign_agreement_matrix = sign_agreement_matrix / top_k
-                        #     torch.set_printoptions(threshold=5000)  # Adjust the number as needed
-                        #     print('sign_agreement_matrix', sign_agreement_matrix, flush=True)
-                        # #     print('top_positions_flat', top_positions_flat, flush=True)
-                        # #     # Normalize
-                        # #     norm_signs_top_positions_flat = signs_top_positions_flat / (torch.norm(signs_top_positions_flat, p=2, dim=-1, keepdim=True) + 1e-9)
-                        # #    # Assuming norm_top_positions_flat is [bsz, top_k]
-                        # #     similarity_matrix = torch.matmul(norm_signs_top_positions_flat, norm_signs_top_positions_flat.transpose(0, 1))
-                        
-                        # x_temp_gate = x * self.input_norm_gate_weight
-                        # x_temp_up = x * self.input_norm_up_weight
-                        # print('\nx_temp_gate')
-                        # cal_sign_agreement_metrix(x_temp_gate.view(x_temp_gate.size(0), -1))
-                        # print('\nx_temp_up')
-                        # cal_sign_agreement_metrix(x_temp_up.view(x_temp_up.size(0), -1))
-                        # x_flattened = x.view(x.size(0), -1) 
-                        def cal_dot_product_matrix(x_flattened):
-                            strength = torch.norm(x_flattened, p=2, dim=0)
-                            # Calculate the number of positions to select (top 3% here as per your code)
-                            top_k = max(int(0.03 * strength.numel()), 1)  # Ensure at least one position is selected
-                            top_values, top_indices = torch.topk(strength, k=top_k)
-
-                            top_positions_flat = x_flattened[:, top_indices]  # [bsz, top_k]
+                    # and self.layer_order >= 5
+                # elif cfg['calibration_stage'] == False and self.layer_order >= 5:
+                elif cfg['calibration_stage'] == False:
+                    print('zzz', self.layer_order, flush=True)
+                    if 'probe' in cfg['prune_method']:
+                        time_start = time.time()
+                        print('xshape', x.shape, flush=True)
+                        if 'similarityprobe' in cfg['prune_method']:
+                            start_time = time.time()
                             
-                            # Calculate dot product matrix
-                            # Normalize the vectors to only measure directionality
-                            # norm_top_positions_flat = top_positions_flat / (torch.norm(top_positions_flat, p=2, dim=-1, keepdim=True) + 1e-9)
+                            if self.input_norm_gate_weight is None:
+                                self.input_norm_gate_weight = torch.norm(self.gate_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
+                            if self.input_norm_up_weight is None:
+                                self.input_norm_up_weight = torch.norm(self.up_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
+
+                            # def cal_sign_agreement_metrix(x_flattened):
+                            #     strength = torch.norm(x_flattened, p=2, dim=0)
+                            #     # Calculate the number of positions to select (top 10%)
+                            #     top_k = max(int(0.03 * strength.numel()), 1)  # Ensure at least one position is selected
+                            #     # print('top_k', top_k, strength.numel(), strength.shape, flush=True)
+                            #     # Use torch.topk to find the top k positions. 
+                            #     # torch.topk returns values and their corresponding indices.
+                            #     top_values, top_indices = torch.topk(strength, k=top_k)
+
+                            #     top_positions_flat = x_flattened[:, top_indices]  # [bsz, top_k]
+                            #     print('top_positions_flat', top_positions_flat, flush=True)
+                            #     signs_top_positions_flat = torch.sign(top_positions_flat)
+                            #     # print('signs_top_positions_flat', signs_top_positions_flat, flush=True)
+                            #     # sign_similarity = signs_top_positions_flat * signs_top_positions_flat.transpose(0, 1)
+                            #     # Expand dimensions for broadcasting
+                            #     expanded_signs = signs_top_positions_flat.unsqueeze(1)  # Shape: [bsz, 1, top_k]
+                            #     # Repeat signs for comparison across all pairs
+                            #     repeated_signs = signs_top_positions_flat.unsqueeze(0)  # Shape: [1, bsz, top_k]
+
+                            #     # Element-wise multiplication to check sign agreement (-1 * -1 = 1, 1 * 1 = 1, else = -1 or 0)
+                            #     sign_agreement = expanded_signs * repeated_signs  # Shape: [bsz, bsz, top_k]
+
+                            #     # Sum over the top_k dimension to count the number of agreements per pair
+                            #     sign_agreement_matrix = sign_agreement.sum(dim=-1)  # Shape: [bsz, bsz]
+                            #     # print('sign_agreement_matrix v1', sign_agreement_matrix, flush=True)
+                            #     sign_agreement_matrix = sign_agreement_matrix / top_k
+                            #     torch.set_printoptions(threshold=5000)  # Adjust the number as needed
+                            #     print('sign_agreement_matrix', sign_agreement_matrix, flush=True)
+                            # #     print('top_positions_flat', top_positions_flat, flush=True)
+                            # #     # Normalize
+                            # #     norm_signs_top_positions_flat = signs_top_positions_flat / (torch.norm(signs_top_positions_flat, p=2, dim=-1, keepdim=True) + 1e-9)
+                            # #    # Assuming norm_top_positions_flat is [bsz, top_k]
+                            # #     similarity_matrix = torch.matmul(norm_signs_top_positions_flat, norm_signs_top_positions_flat.transpose(0, 1))
                             
-                            # Dot product similarity (using matrix multiplication for efficiency)
-                            # Here, we're effectively doing dot product because the vectors are normalized
-                            dot_product_matrix = torch.matmul(top_positions_flat, top_positions_flat.transpose(0, 1))  # Shape: [bsz, bsz]
-                            
-                            # Optionally, normalize the dot product matrix to scale the values between -1 and 1
-                            # This step may not be necessary since we're already working with normalized vectors
-                            # dot_product_matrix = dot_product_matrix / top_k  # Normalize if needed
-                            
-                            torch.set_printoptions(threshold=5000)  # Adjust the number as needed
-                            print('dot_product_matrix', dot_product_matrix, flush=True)
+                            # x_temp_gate = x * self.input_norm_gate_weight
+                            # x_temp_up = x * self.input_norm_up_weight
+                            # print('\nx_temp_gate')
+                            # cal_sign_agreement_metrix(x_temp_gate.view(x_temp_gate.size(0), -1))
+                            # print('\nx_temp_up')
+                            # cal_sign_agreement_metrix(x_temp_up.view(x_temp_up.size(0), -1))
+                            # x_flattened = x.view(x.size(0), -1) 
+                            def cal_dot_product_matrix(x_flattened):
+                                strength = torch.norm(x_flattened, p=2, dim=0)
+                                # Calculate the number of positions to select (top 3% here as per your code)
+                                top_k = max(int(0.03 * strength.numel()), 1)  # Ensure at least one position is selected
+                                top_values, top_indices = torch.topk(strength, k=top_k)
 
-                        # Example of how to call the function
-                        # Assuming x is your input tensor
-                        x_temp_gate = x * self.input_norm_gate_weight
-                        x_temp_up = x * self.input_norm_up_weight
-                        # Flatten x as needed and pass to the function
-                        cal_dot_product_matrix(x_temp_gate.view(x_temp_gate.size(0), -1))
-                        cal_dot_product_matrix(x_temp_up.view(x_temp_up.size(0), -1))
+                                top_positions_flat = x_flattened[:, top_indices]  # [bsz, top_k]
+                                
+                                # Calculate dot product matrix
+                                # Normalize the vectors to only measure directionality
+                                # norm_top_positions_flat = top_positions_flat / (torch.norm(top_positions_flat, p=2, dim=-1, keepdim=True) + 1e-9)
+                                
+                                # Dot product similarity (using matrix multiplication for efficiency)
+                                # Here, we're effectively doing dot product because the vectors are normalized
+                                dot_product_matrix = torch.matmul(top_positions_flat, top_positions_flat.transpose(0, 1))  # Shape: [bsz, bsz]
+                                
+                                # Optionally, normalize the dot product matrix to scale the values between -1 and 1
+                                # This step may not be necessary since we're already working with normalized vectors
+                                # dot_product_matrix = dot_product_matrix / top_k  # Normalize if needed
+                                
+                                torch.set_printoptions(threshold=5000)  # Adjust the number as needed
+                                print('dot_product_matrix', dot_product_matrix, flush=True)
 
-                        end_time = time.time()
-                        print('similarity_duration', self.layer_order, end_time - start_time, flush=True)
+                            # Example of how to call the function
+                            # Assuming x is your input tensor
+                            x_temp_gate = x * self.input_norm_gate_weight
+                            x_temp_up = x * self.input_norm_up_weight
+                            # Flatten x as needed and pass to the function
+                            cal_dot_product_matrix(x_temp_gate.view(x_temp_gate.size(0), -1))
+                            cal_dot_product_matrix(x_temp_up.view(x_temp_up.size(0), -1))
 
-                        # similarity_matrix = similarity_matrix.mean(dim=-1)
-                        # print('similarity_matrix', similarity_matrix, flush=True)
+                            end_time = time.time()
+                            print('similarity_duration', self.layer_order, end_time - start_time, flush=True)
 
-                        # gate_weight_flatten = self.gate_proj.weight.data.view(-1)
-                        # down_weight_flatten = self.down_proj.weight.data.view(-1)
-                        # up_weight_flatten = self.up_proj.weight.data.view(-1)
+                            # similarity_matrix = similarity_matrix.mean(dim=-1)
+                            # print('similarity_matrix', similarity_matrix, flush=True)
 
-                        # top_k_gate_weight, top_k_gate_indices = torch.topk(gate_weight_flatten, k=top_k)
-                        # top_k_down_weight, top_k_down_indices = torch.topk(down_weight_flatten, k=top_k)
-                        # top_k_up_weight, top_k_up_indices = torch.topk(up_weight_flatten, k=top_k)
-                        # print('top_k_gate_weight', top_k_gate_weight, top_k_gate_indices, flush=True)
-                        # print('top_k_down_weight', top_k_down_weight, top_k_down_indices, flush=True)
-                        # print('top_k_up_weight', top_k_up_weight, top_k_up_indices, flush=True)
-                        abs_x = torch.abs(x).to(torch.float32)
-                        sum_across_bsz = abs_x.sum(dim=0, keepdim=True)
-                        # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
-                        proportion = (abs_x / (sum_across_bsz + 1e-10)).to(x.dtype)
-                        # proportion = 10
-                        # print('proportion ', proportion, flush=True)
-                        comp_across_bsz = torch.sum(x * proportion, dim=0)
-                        comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                    # if 'gauexp' in cfg['prune_method']:
-                    #     # mean_for_all_batches = self.gate_proj.mean_for_all_batches
-                    #     # std_for_all_batches = self.gate_proj.std_for_all_batches
-                    #     mean_for_all_batches, std_for_all_batches = self.gate_proj.get_global_input_distribution()
-                    #     torch.set_printoptions(threshold=2000)
-                    #     # print('mean_for_all_batches', mean_for_all_batches, flush=True)
-                    #     # print('std_for_all_batches', std_for_all_batches, flush=True)
-                    #     # Compute z-scores
-                    #     # print('x', x, flush=True)
-                    #     # z_scores = (x - mean_for_all_batches) / std_for_all_batches
-                    #     delta = x - mean_for_all_batches
-                    #     weights = torch.abs(delta) ** 2
-                    #     # print('z_scores', z_scores, flush=True)
+                            # gate_weight_flatten = self.gate_proj.weight.data.view(-1)
+                            # down_weight_flatten = self.down_proj.weight.data.view(-1)
+                            # up_weight_flatten = self.up_proj.weight.data.view(-1)
 
-                    #     # Calculate exponential weights
-                    #     # weights = torch.exp(torch.abs(z_scores))
-                    #     # print('weights', weights, flush=True)
-                    #     weights = weights / (weights.sum(dim=0, keepdim=True) + 1e-10)
-                    #     # print('weights after nml', weights, flush=True)
-                    #     # Apply weights and sum across the batch dimension
-                    #     comp_across_bsz = torch.sum(weights * delta + mean_for_all_batches, dim=0)
-                    # elif 'l2nml' in cfg['prune_method']:
-                    #     abs_x = torch.abs(x).to(torch.float32)
-                    #     norm_across_bsz = torch.norm(x, p=2, dim=0, keepdim=True)
-                    #     proportion = (abs_x / (norm_across_bsz + 1e-10)).to(x.dtype)
-                    #     comp_across_bsz = torch.sum(x * proportion, dim=0)
-                    #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                    # elif 'deltaplusmeannml' in cfg['prune_method']:
-                    #     mean_for_batch = x.mean(dim=0, keepdim=True)
-                    #     abs_delta = torch.abs(x - mean_for_batch).to(torch.float32)
-                    #     abs_sum = abs_delta.sum(dim=0, keepdim=True) + torch.abs(mean_for_batch)
-                    #     porportion = (torch.abs(mean_for_batch) + abs_delta) / (abs_sum + 1e-10) / torch.sum((torch.abs(mean_for_batch) + abs_delta) / (abs_sum + 1e-10), dim=0, keepdim=True)
-                    #     comp_across_bsz = (porportion * x).to(x.dtype)
-                    #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                    # elif 'deltanml' in cfg['prune_method']:
-                    #     # mean_for_all_batches, std_for_all_batches = self.gate_proj.get_global_input_distribution()
-                    #     mean_for_batch = x.mean(dim=0, keepdim=True)
-                    #     delta = (x - mean_for_batch).to(torch.float32)
-                    #     abs_delta = torch.abs(delta)
-                    #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
-                    #     proportion = (abs_delta / (abs_delta.sum(dim=0, keepdim=True) + 1e-10)).to(x.dtype)
-                    #     # proportion = 10
-                    #     # print('proportion ', proportion, flush=True)
-                    #     comp_across_bsz = torch.sum(delta * proportion + mean_for_batch, dim=0).to(x.dtype)
-                    #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                    elif 'nml' in cfg['prune_method']:
-                        # abs_x = torch.abs(x).to(torch.float32)
-                        # porportion = abs_x / abs_x.sum(dim=0, keepdim=True)
-                        # print('porportion', porportion, porportion.dtype, porportion.shape, flush=True)
-                        # comp_across_bsz = ((x.to(torch.float32) * porportion).sum(dim=0)).to(x.dtype)
+                            # top_k_gate_weight, top_k_gate_indices = torch.topk(gate_weight_flatten, k=top_k)
+                            # top_k_down_weight, top_k_down_indices = torch.topk(down_weight_flatten, k=top_k)
+                            # top_k_up_weight, top_k_up_indices = torch.topk(up_weight_flatten, k=top_k)
+                            # print('top_k_gate_weight', top_k_gate_weight, top_k_gate_indices, flush=True)
+                            # print('top_k_down_weight', top_k_down_weight, top_k_down_indices, flush=True)
+                            # print('top_k_up_weight', top_k_up_weight, top_k_up_indices, flush=True)
+                            abs_x = torch.abs(x).to(torch.float32)
+                            sum_across_bsz = abs_x.sum(dim=0, keepdim=True)
+                            # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
+                            proportion = (abs_x / (sum_across_bsz + 1e-10)).to(x.dtype)
+                            # proportion = 10
+                            # print('proportion ', proportion, flush=True)
+                            comp_across_bsz = torch.sum(x * proportion, dim=0)
+                            comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                        # if 'gauexp' in cfg['prune_method']:
+                        #     # mean_for_all_batches = self.gate_proj.mean_for_all_batches
+                        #     # std_for_all_batches = self.gate_proj.std_for_all_batches
+                        #     mean_for_all_batches, std_for_all_batches = self.gate_proj.get_global_input_distribution()
+                        #     torch.set_printoptions(threshold=2000)
+                        #     # print('mean_for_all_batches', mean_for_all_batches, flush=True)
+                        #     # print('std_for_all_batches', std_for_all_batches, flush=True)
+                        #     # Compute z-scores
+                        #     # print('x', x, flush=True)
+                        #     # z_scores = (x - mean_for_all_batches) / std_for_all_batches
+                        #     delta = x - mean_for_all_batches
+                        #     weights = torch.abs(delta) ** 2
+                        #     # print('z_scores', z_scores, flush=True)
 
-                        # parts = torch.split(x, bsz / cfg['probe_num'])
-                        start_time = time.time()
-                        abs_x = torch.abs(x)
-                        sum_across_bsz = abs_x.sum(dim=0, keepdim=True)
-                        # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
-                        proportion = (abs_x / (sum_across_bsz + 1e-10)).to(x.dtype)
-                        # proportion = 10
-                        # print('proportion ', proportion, flush=True)
-                        comp_across_bsz = torch.sum(x * proportion, dim=0)
-                        comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                        end_time = time.time()
-                        print('nml_duration', end_time - start_time, flush=True)
+                        #     # Calculate exponential weights
+                        #     # weights = torch.exp(torch.abs(z_scores))
+                        #     # print('weights', weights, flush=True)
+                        #     weights = weights / (weights.sum(dim=0, keepdim=True) + 1e-10)
+                        #     # print('weights after nml', weights, flush=True)
+                        #     # Apply weights and sum across the batch dimension
+                        #     comp_across_bsz = torch.sum(weights * delta + mean_for_all_batches, dim=0)
+                        # elif 'l2nml' in cfg['prune_method']:
+                        #     abs_x = torch.abs(x).to(torch.float32)
+                        #     norm_across_bsz = torch.norm(x, p=2, dim=0, keepdim=True)
+                        #     proportion = (abs_x / (norm_across_bsz + 1e-10)).to(x.dtype)
+                        #     comp_across_bsz = torch.sum(x * proportion, dim=0)
+                        #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                        # elif 'deltaplusmeannml' in cfg['prune_method']:
+                        #     mean_for_batch = x.mean(dim=0, keepdim=True)
+                        #     abs_delta = torch.abs(x - mean_for_batch).to(torch.float32)
+                        #     abs_sum = abs_delta.sum(dim=0, keepdim=True) + torch.abs(mean_for_batch)
+                        #     porportion = (torch.abs(mean_for_batch) + abs_delta) / (abs_sum + 1e-10) / torch.sum((torch.abs(mean_for_batch) + abs_delta) / (abs_sum + 1e-10), dim=0, keepdim=True)
+                        #     comp_across_bsz = (porportion * x).to(x.dtype)
+                        #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                        # elif 'deltanml' in cfg['prune_method']:
+                        #     # mean_for_all_batches, std_for_all_batches = self.gate_proj.get_global_input_distribution()
+                        #     mean_for_batch = x.mean(dim=0, keepdim=True)
+                        #     delta = (x - mean_for_batch).to(torch.float32)
+                        #     abs_delta = torch.abs(delta)
+                        #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
+                        #     proportion = (abs_delta / (abs_delta.sum(dim=0, keepdim=True) + 1e-10)).to(x.dtype)
+                        #     # proportion = 10
+                        #     # print('proportion ', proportion, flush=True)
+                        #     comp_across_bsz = torch.sum(delta * proportion + mean_for_batch, dim=0).to(x.dtype)
+                        #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                        elif 'nml' in cfg['prune_method']:
+                            # abs_x = torch.abs(x).to(torch.float32)
+                            # porportion = abs_x / abs_x.sum(dim=0, keepdim=True)
+                            # print('porportion', porportion, porportion.dtype, porportion.shape, flush=True)
+                            # comp_across_bsz = ((x.to(torch.float32) * porportion).sum(dim=0)).to(x.dtype)
 
-                        start_time = time.time()
-                        if cfg['probe_size'] == 1:
+                            # parts = torch.split(x, bsz / cfg['probe_num'])
+
+
+                            start_time = time.time()
+                            comp_across_bsz = nml_process(kwargs['post_attn_residual'], cfg['probe_num'], cfg['probe_size'])
+                            # comp_across_bsz = nml_process(x, cfg['probe_num'], cfg['probe_size'])
+                            # abs_x = torch.clamp(torch.abs(x), min=1e-6)
+                            # sum_across_bsz = abs_x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)).sum(dim=1, keepdim=True)
+                            # proportion = abs_x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)) / sum_across_bsz
+                            # comp_across_bsz = (x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)) * proportion).sum(dim=1)
+
+                            end_time = time.time()
+                            has_nan = torch.isnan(comp_across_bsz).any()
+                            if has_nan:
+                                print(f"Does 'comp_across_bsz' contain NaN values? {has_nan}")
+                            # print(f"Does 'comp_across_bsz' contain NaN values? {has_nan}")
+                            print('nml_duration2', end_time - start_time, comp_across_bsz.shape, flush=True)
+                        elif 'max' in cfg['prune_method']:
+                            comp_across_bsz = max_process(x, cfg['probe_num'], cfg['probe_size'])
+                        elif 'median' in cfg['prune_method']:
+                            comp_across_bsz = median_process(x, cfg['probe_num'], cfg['probe_size'])
+                        # elif 'std' in cfg['prune_method']:
+                        #     abs_x = torch.abs(x)
+                        #     # Calculate mean and std deviation across the batch dimension
+                        #     mean_x = abs_x.mean(dim=0, keepdim=True)
+                        #     std_x = abs_x.std(dim=0, keepdim=True)
+                        #     # Normalize using mean and standard deviation
+                        #     normalized_x = (abs_x - mean_x) / (std_x + 1e-6)
+                        #     proportion = normalized_x / normalized_x.sum(dim=0, keepdim=True)
+                        #     comp_across_bsz = (x * proportion).sum(dim=0)
+                        #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                        # elif 'log' in cfg['prune_method']:
+                        #     abs_x = torch.abs(x)
+                        #     log_abs_x = torch.log1p(abs_x)  # log1p for log(x+1) to handle zeros
+                        #     sum_log_abs_x = log_abs_x.sum(dim=0, keepdim=True)
+                        #     proportion = log_abs_x / (sum_log_abs_x + 1e-6)
+                        #     comp_across_bsz = (x * proportion).sum(dim=0)
+                        #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                        elif 'fullinf' in cfg['prune_method']:
                             comp_across_bsz = x
+                        # elif 'pcabszseq' in cfg['prune_method']:
+                        #     start_time = time.time()
+                        #     inp = x.reshape(-1, x.shape[-1]).to(torch.float32).t()
+                        #     # This V is the transpose of the V in the SVD
+                        #     U, S, V = torch.svd(inp)
+                        #     extract_element = int(round(1/bsz * inp.shape[-1]))
+                        #     print('extract_element', extract_element, flush=True)
+                        #     comp_across_bsz = torch.matmul(inp, V.T[:, :extract_element]).to(x.dtype)
+                        #     comp_across_bsz = comp_across_bsz.t()
+                        #     end_time = time.time()
+                        #     print('svd_duration', end_time - start_time, flush=True)
+                        # elif 'twoprobe' in cfg['prune_method']:
+                        #     probe_one = x.mean(axis=0)
+                        #     probe_two = x.mean(axis=1)
+                        #     comp_across_bsz = torch.cat((probe_one, probe_two), dim=0)
+                        # elif 'normbsz' in cfg['prune_method']:
+                        #     comp_across_bsz = torch.norm(x, p=2, dim=0)
+                        #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
                         else:
-                            abs_x = torch.clamp(torch.abs(x), min=1e-6)
-                            sum_across_bsz = abs_x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)).sum(dim=1, keepdim=True)
-                            proportion = abs_x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)) / sum_across_bsz
-                            comp_across_bsz = (x.view(cfg['probe_num'], cfg['probe_size'], x.size(-2), x.size(-1)) * proportion).sum(dim=1)
-
-                        end_time = time.time()
-                        has_nan = torch.isnan(comp_across_bsz).any()
-                        if has_nan:
-                            print(f"Does 'comp_across_bsz' contain NaN values? {has_nan}")
-                        # print(f"Does 'comp_across_bsz' contain NaN values? {has_nan}")
-                        print('nml_duration2', end_time - start_time, comp_across_bsz.shape, flush=True)
-
-                    # elif 'std' in cfg['prune_method']:
-                    #     abs_x = torch.abs(x)
-                    #     # Calculate mean and std deviation across the batch dimension
-                    #     mean_x = abs_x.mean(dim=0, keepdim=True)
-                    #     std_x = abs_x.std(dim=0, keepdim=True)
-                    #     # Normalize using mean and standard deviation
-                    #     normalized_x = (abs_x - mean_x) / (std_x + 1e-6)
-                    #     proportion = normalized_x / normalized_x.sum(dim=0, keepdim=True)
-                    #     comp_across_bsz = (x * proportion).sum(dim=0)
-                    #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                    # elif 'log' in cfg['prune_method']:
-                    #     abs_x = torch.abs(x)
-                    #     log_abs_x = torch.log1p(abs_x)  # log1p for log(x+1) to handle zeros
-                    #     sum_log_abs_x = log_abs_x.sum(dim=0, keepdim=True)
-                    #     proportion = log_abs_x / (sum_log_abs_x + 1e-6)
-                    #     comp_across_bsz = (x * proportion).sum(dim=0)
-                    #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                    elif 'fullinf' in cfg['prune_method']:
-                        comp_across_bsz = x
-                    # elif 'pcabszseq' in cfg['prune_method']:
-                    #     start_time = time.time()
-                    #     inp = x.reshape(-1, x.shape[-1]).to(torch.float32).t()
-                    #     # This V is the transpose of the V in the SVD
-                    #     U, S, V = torch.svd(inp)
-                    #     extract_element = int(round(1/bsz * inp.shape[-1]))
-                    #     print('extract_element', extract_element, flush=True)
-                    #     comp_across_bsz = torch.matmul(inp, V.T[:, :extract_element]).to(x.dtype)
-                    #     comp_across_bsz = comp_across_bsz.t()
-                    #     end_time = time.time()
-                    #     print('svd_duration', end_time - start_time, flush=True)
-                    # elif 'twoprobe' in cfg['prune_method']:
-                    #     probe_one = x.mean(axis=0)
-                    #     probe_two = x.mean(axis=1)
-                    #     comp_across_bsz = torch.cat((probe_one, probe_two), dim=0)
-                    # elif 'normbsz' in cfg['prune_method']:
-                    #     comp_across_bsz = torch.norm(x, p=2, dim=0)
-                    #     comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                    else:
-                        comp_across_bsz = x.mean(axis=0)
-                        comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                    
-                    # print('isequal', comp_across_bsz == x, comp_across_bsz, x)
-                    # comp_across_bsz = x
-                    gate_out = None
-                    up_out = None
-                    if 'gate_proj' in cfg['cust_tgt_modules']:
-                        if 'svd' in cfg['prune_method']:
-                            print('svd')
-                            gate_out = self.act_fn(x @ self.gate_proj_svd_V.T @ self.gate_proj_svd_S.T @ self.gate_proj_svd_U.T)
-                        else:
-                            gate_out = self.act_fn(self.gate_proj(comp_across_bsz, cal_mlp_probe_out_dim_metric=True))
-                    else:
-                        gate_out = self.act_fn(self.gate_proj(x))
-                    
-                    if 'up_proj' in cfg['cust_tgt_modules']:
-                        if 'svd' in cfg['prune_method']:
-                            print('svd')
-                            up_out = x @ self.up_proj_svd_V.T @ self.up_proj_svd_S.T @ self.up_proj_svd_U.T
-                        else:
-                            # print('cal_mlp_probe_out_dim_metric')
-                            up_out = self.up_proj(comp_across_bsz, cal_mlp_probe_out_dim_metric=True)
-                    else:
-                        up_out = self.up_proj(x)
-
-                    probe_out = gate_out * up_out
-                    if 'twoprobe' in cfg['prune_method']:
-                        probe_one = probe_out[:x.shape[1], :].unsqueeze(0)
-                        print('probe_one twoprobe', probe_one.shape, flush=True)
-                        probe_two = probe_out[x.shape[1]:, :].unsqueeze(1)
-                        print('probe_two twoprobe', probe_two.shape, flush=True)
-                        probe_out = probe_one * probe_two
-                        print('probe_out twoprobe', probe_out.shape, flush=True)
-
-                    # if 'asyncfullinf' in cfg['prune_method']:
-                    # print('probe_out gateup', probe_out, flush=True)
-
-                    # incorporate the global distribution
-                    # if 'intersect' in cfg['prune_method']:
-                    # record intersection ratio
-                    # full_gate_out = self.act_fn(self.gate_proj(x))
-                    # full_up_out = self.up_proj(x)
-                    # self.fullinf_vs_optimal_select_mean_intersection_ratio, self.probe_vs_optimal_select_mean_intersection_ratio, self.probe_vs_fullinf_select_mean_intersection_ratio, \
-                    # self.fullinf_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_fullinf_prune_mean_intersection_ratio = \
-                    #     cal_intersection_ratio(full_gate_out * full_up_out, probe_out, self.down_proj.weight.data, self.pruning_module, multiple)
-                    if self.intersected_prune_indices is not None:
-                        probe_out[..., self.intersected_prune_indices] = 0
-
-                    if 'async' in cfg['prune_method'] and 'savemetricseq' in cfg['prune_method']:
-                        # temp = probe_out
-                        # probe_out = self.last_batch_probe_out
-                        # self.last_batch_probe_out = temp
-
-                        if 'squareasync' in cfg['prune_method']:
-                            if self.last_batch_probe_out is None:
-                                norm_probe_out_square = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2, min=None, max=65504) / cfg['probe_num']
-                                self.last_batch_probe_out = norm_probe_out_square.detach()
-                                probe_out = torch.zeros(1, probe_out.size(-2), probe_out.size(-1), device=probe_out.device, dtype=probe_out.dtype)
+                            comp_across_bsz = x.mean(axis=0)
+                            comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                        
+                        # print('isequal', comp_across_bsz == x, comp_across_bsz, x)
+                        # comp_across_bsz = x
+                        gate_out = None
+                        up_out = None
+                        if 'gate_proj' in cfg['cust_tgt_modules']:
+                            if 'svd' in cfg['prune_method']:
+                                print('svd')
+                                gate_out = self.act_fn(x @ self.gate_proj_svd_V.T @ self.gate_proj_svd_S.T @ self.gate_proj_svd_U.T)
                             else:
-                            # self.last_batch_probe_out = self.last_batch_probe_out.to(probe_out.device)    
-                                # if 'squareasyncabs' in cfg['prune_method']:
-                                #     probe_out = torch.norm(probe_out, p=2, dim=0) ** 2
-                                #     abs_probe = torch.abs(probe_out).to(torch.float32)
-                                #     abs_last_batch_probe = torch.abs(self.last_batch_probe_out).to(torch.float32)
-                                #     sum_across_two_terms = abs_probe + abs_last_batch_probe
-                                #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
-                                #     proportion = (abs_probe / (sum_across_two_terms + 1e-10)).to(abs_probe.dtype)
-                                #     combined_probe = (probe_out * proportion + self.last_batch_probe_out * (1 - proportion)).to(probe_out.dtype)
-                                #     probe_out, self.last_batch_probe_out = torch.sqrt(self.last_batch_probe_out).unsqueeze(0), combined_probe
-                                # if 'squareasync' in cfg['prune_method']:
-                                proportion = cfg['asyncratio']
-                                probe_out = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2, min=None, max=65504) / cfg['probe_num']
-                                combined_probe = (self.last_batch_probe_out * proportion + probe_out * (1 - proportion)).to(probe_out.dtype)
-                                # combined_probe = probe_out
-                                probe_out, self.last_batch_probe_out = torch.sqrt(self.last_batch_probe_out).unsqueeze(0), combined_probe
-                                # proportion = 10
-                                # print('proportion ', proportion, flush=True)
-                                # comp_across_bsz = torch.sum(x * proportion, dim=0)
-                                # comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                                
-                                # combined_probe = (probe_out * 0.5 + self.last_batch_probe_out * (1 - 0.5)).to(probe_out.dtype)
-                                print('combined_probe', combined_probe.shape, flush=True)
-                                
-                                print('probe_out shape', probe_out.shape, flush=True)
+                                gate_out = self.act_fn(self.gate_proj(comp_across_bsz, cal_mlp_probe_out_dim_metric=True))
                         else:
-                            if self.last_batch_probe_out is None:
-                                self.last_batch_probe_out = probe_out
-                                probe_out = torch.zeros_like(probe_out)
+                            gate_out = self.act_fn(self.gate_proj(x))
+                        
+                        if 'up_proj' in cfg['cust_tgt_modules']:
+                            if 'svd' in cfg['prune_method']:
+                                print('svd')
+                                up_out = x @ self.up_proj_svd_V.T @ self.up_proj_svd_S.T @ self.up_proj_svd_U.T
                             else:
-                            # self.last_batch_probe_out = self.last_batch_probe_out.to(probe_out.device)
-                                # if 'asyncabs' in cfg['prune_method']:
-                                #     abs_probe = torch.abs(probe_out).to(torch.float32)
-                                #     abs_last_batch_probe = torch.abs(self.last_batch_probe_out).to(torch.float32)
-                                #     sum_across_two_terms = abs_probe + abs_last_batch_probe
-                                #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
-                                #     proportion = (abs_probe / (sum_across_two_terms + 1e-10)).to(abs_probe.dtype)
-                                #     combined_probe = (probe_out * proportion + self.last_batch_probe_out * (1 - proportion)).to(probe_out.dtype)
-                                #     probe_out, self.last_batch_probe_out = self.last_batch_probe_out, combined_probe
-                                # else:
-                                proportion = cfg['asyncratio']
-                                combined_probe = (self.last_batch_probe_out * proportion + probe_out * (1 - proportion)).to(probe_out.dtype)
-                                probe_out, self.last_batch_probe_out = self.last_batch_probe_out, combined_probe
+                                # print('cal_mlp_probe_out_dim_metric')
+                                up_out = self.up_proj(comp_across_bsz, cal_mlp_probe_out_dim_metric=True)
+                        else:
+                            up_out = self.up_proj(x)
+
+                        probe_out = gate_out * up_out
+                        if 'twoprobe' in cfg['prune_method']:
+                            probe_one = probe_out[:x.shape[1], :].unsqueeze(0)
+                            print('probe_one twoprobe', probe_one.shape, flush=True)
+                            probe_two = probe_out[x.shape[1]:, :].unsqueeze(1)
+                            print('probe_two twoprobe', probe_two.shape, flush=True)
+                            probe_out = probe_one * probe_two
+                            print('probe_out twoprobe', probe_out.shape, flush=True)
+
+                        # if 'asyncfullinf' in cfg['prune_method']:
+                        # print('probe_out gateup', probe_out, flush=True)
+
+                        # incorporate the global distribution
+                        # if 'intersect' in cfg['prune_method']:
+                        # record intersection ratio
+                        # full_gate_out = self.act_fn(self.gate_proj(x))
+                        # full_up_out = self.up_proj(x)
+                        # self.fullinf_vs_optimal_select_mean_intersection_ratio, self.probe_vs_optimal_select_mean_intersection_ratio, self.probe_vs_fullinf_select_mean_intersection_ratio, \
+                        # self.fullinf_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_optimal_prune_mean_intersection_ratio, self.probe_vs_fullinf_prune_mean_intersection_ratio = \
+                        #     cal_intersection_ratio(full_gate_out * full_up_out, probe_out, self.down_proj.weight.data, self.pruning_module, multiple)
+                        if self.intersected_prune_indices is not None:
+                            probe_out[..., self.intersected_prune_indices] = 0
+
+                        if 'async' in cfg['prune_method'] and 'savemetricseq' in cfg['prune_method']:
+                            # temp = probe_out
+                            # probe_out = self.last_batch_probe_out
+                            # self.last_batch_probe_out = temp
+
+                            if 'squareasync' in cfg['prune_method']:
+                                if self.last_batch_probe_out is None:
+                                    norm_probe_out_square = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2, min=None, max=65504) / cfg['probe_num']
+                                    self.last_batch_probe_out = norm_probe_out_square.detach()
+                                    probe_out = torch.zeros(1, probe_out.size(-2), probe_out.size(-1), device=probe_out.device, dtype=probe_out.dtype)
+                                else:
+                                # self.last_batch_probe_out = self.last_batch_probe_out.to(probe_out.device)    
+                                    # if 'squareasyncabs' in cfg['prune_method']:
+                                    #     probe_out = torch.norm(probe_out, p=2, dim=0) ** 2
+                                    #     abs_probe = torch.abs(probe_out).to(torch.float32)
+                                    #     abs_last_batch_probe = torch.abs(self.last_batch_probe_out).to(torch.float32)
+                                    #     sum_across_two_terms = abs_probe + abs_last_batch_probe
+                                    #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
+                                    #     proportion = (abs_probe / (sum_across_two_terms + 1e-10)).to(abs_probe.dtype)
+                                    #     combined_probe = (probe_out * proportion + self.last_batch_probe_out * (1 - proportion)).to(probe_out.dtype)
+                                    #     probe_out, self.last_batch_probe_out = torch.sqrt(self.last_batch_probe_out).unsqueeze(0), combined_probe
+                                    # if 'squareasync' in cfg['prune_method']:
+                                    proportion = cfg['asyncratio']
+                                    probe_out = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2, min=None, max=65504) / cfg['probe_num']
+                                    combined_probe = (self.last_batch_probe_out * proportion + probe_out * (1 - proportion)).to(probe_out.dtype)
+                                    # combined_probe = probe_out
+                                    probe_out, self.last_batch_probe_out = torch.sqrt(self.last_batch_probe_out).unsqueeze(0), combined_probe
                                     # proportion = 10
-                                # print('proportion ', proportion, flush=True)
-                                # comp_across_bsz = torch.sum(x * proportion, dim=0)
-                                # comp_across_bsz = comp_across_bsz.unsqueeze(0)
-                                # combined_probe = (probe_out * proportion + self.last_batch_probe_out * (1 - proportion)).to(probe_out.dtype)
-                                # probe_out, self.last_batch_probe_out = self.last_batch_probe_out, combined_probe
-
-                    if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
-                        # if 'saveseqdim' in cfg['prune_method']:
-                        #     probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
-                        # else:
-                        probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution())
-                    else:
-                        probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
-
-                    if 'globalratio' in cfg['prune_method']:
-                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple, pruning_ratio=self.down_proj.pruning_ratio)
-                    else:
-                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
-
-                    # if 'dynaprobe' in cfg['prune_method']:
-                    #     global_score = copy.deepcopy(self.down_proj.get_global_metric_score_distribution())
-                    #     if global_score.dim() == 1:
-                    #         global_score = global_score.unsqueeze(0).unsqueeze(0)
-                    #     elif global_score.dim() == 2:
-                    #         global_score = global_score.unsqueeze(0)
-
-                    #     raw_calib_out_dim_metric, _ = cal_prune_metric(global_score, self.down_proj.weight.data, cfg['prune_metric'])
-                    #     raw_calib_out_dim_indices, raw_calib_prune_dim_indices = self.pruning_module.sort_probe_mlp_metric(raw_calib_out_dim_metric, multiple)
-
-                    #     raw_calib_set = set(raw_calib_out_dim_indices.tolist())
-                    #     probe_out_set = set(probe_out_dim_indices.tolist())
-
-                    #     intersection_ratio = len(raw_calib_set & probe_out_set) / len(probe_out_set)
-                    #     print('calib_and_plus_calib_intersection_ratio', intersection_ratio, flush=True)
-
-                    #     # Find elements in probe_out_dim_indices that are missing in raw_calib_out_dim_indices
-                    #     missing_elements = probe_out_set - raw_calib_set
-
-                    #     # To find the original positions of the missing elements in probe_out_dim_indices
-                    #     missing_positions = [i for i, element in enumerate(probe_out_dim_indices.tolist()) if element in missing_elements]
-
-                    #     print('Positions of elements in probe_out_dim_indices missing in raw_calib_out_dim_indices:', missing_positions)
-
-                    #     raw_prune_calib_set = set(raw_calib_prune_dim_indices.tolist())
-                    #     probe_prune_set = set(prune_out_dim_indices.tolist())
-
-                    #     intersected_prune_indices_list = list(raw_prune_calib_set & probe_prune_set)
-
-                    #     # Convert the list to a PyTorch tensor
-                    #     self.intersected_prune_indices = torch.tensor(intersected_prune_indices_list, dtype=torch.long, device=probe_out.device)
-                    #     intersection_ratio = len(raw_prune_calib_set & probe_prune_set) / len(probe_prune_set)
-                    #     print('pruned calib_and_plus_calib_intersection_ratio', intersection_ratio, flush=True)
-
-
-                    #     sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
-                    #     # torch.set_printoptions(threshold=5000)
-                        # torch.set_printoptions(threshold=5000, edgeitems=2000)
-                        # print('sorted_value', sorted_value, flush=True)
-                    # if self.probe_out_dim_indices is None:
-                    #     self.probe_out_dim_indices = probe_out_dim_indices
-                    # else:
-                    #     # Convert lists to sets
-                    #     set_self = set(self.probe_out_dim_indices.tolist())
-                    #     set_probe = set(probe_out_dim_indices.tolist())
-
-                    #     # Find the intersection
-                    #     intersection = set_self & set_probe
-
-                    #     # Count the number of elements in the intersection
-                    #     intersection_count = len(intersection)
-                    #     intersection_ratio = intersection_count / len(set_self)
-                    #     print('intersection_ratio', intersection_ratio, flush=True)
-                    #     self.probe_out_dim_indices = probe_out_dim_indices
-
-                    
-                    custom_duration = time.time() - time_start
-                    # print('probe_duration', custom_duration, flush=True)
-                    time_start = time.time()
-                    if 'gate_proj' in cfg['cust_tgt_modules']:
-                        gate_out = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices))
-                    else:
-                        # gate_out = self.act_fn(self.gate_proj(x))
-                        gate_out = gate_out[..., probe_out_dim_indices]
-
-                    if 'up_proj' in cfg['cust_tgt_modules']:
-                        up_out = self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
-                    else:
-                        # up_out = self.up_proj(x)
-                        up_out = up_out[..., probe_out_dim_indices]
-
-                    # intermediate_output = 
-                    
-                        # self.down_proj.update_global_metric_score_distribution(intermediate_output[..., probe_out_dim_indices], probe_out_dim_indices)
-                        # fill the probe predict for prune_out_dim_indices
-                    if 'fillpbmetric' in cfg['prune_method']:
-                            # self.down_proj.update_global_metric_score_distribution(probe_out[..., prune_out_dim_indices], prune_out_dim_indices, batch_size=bsz, is_probe=True)
-                            # Selecting specific dimensions
-                        # .expand(bsz, -1, -1)
-                        if 'runningmean' in cfg['prune_method']:
-                            self.down_proj.update_global_metric_score_distribution(probe_out[..., prune_out_dim_indices], prune_out_dim_indices)
-                        elif 'ema' in cfg['prune_method']:
-                            if 'fillpbmetricoriginal' in cfg['prune_method']:
-                                self.down_proj.update_global_metric_score_distribution_ema(probe_out[..., prune_out_dim_indices], prune_out_dim_indices, is_probe=True)
-
-                                # bsz_tensor = torch.tensor(bsz, dtype=torch.float16, device=gate_out.device)
-                                # # real_out_channel = torch.clamp(torch.norm(gate_out * up_out, p=2, dim=0) ** 2, min=None, max=65504) / torch.sqrt(bsz_tensor)
-                                # probe_select = torch.clamp(torch.norm(probe_out[..., probe_out_dim_indices], p=2, dim=0) ** 2, min=None, max=65504)
-                                # prune_prune = torch.clamp(torch.norm(probe_out[..., prune_out_dim_indices], p=2, dim=0) ** 2, min=None, max=65504)
-                                # full_inference = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
-                                # full_inference = torch.clamp(torch.norm(full_inference, p=2, dim=0) ** 2, min=None, max=65504) / bsz_tensor
-                                # full_selected = full_inference[..., probe_out_dim_indices]
-                                # full_pruned = full_inference[..., prune_out_dim_indices]
-
-                                # print('\nself.layer_order', self.layer_order)
-                                # gap_between_real_probe = full_selected - probe_select
-                                # print('gap_between_real_probe', gap_between_real_probe, flush=True)
-                                # gap_between_real_probe_mean = gap_between_real_probe.mean()
-                                # print('gap_between_real_probe_mean', gap_between_real_probe_mean, flush=True)
-                                # gap_between_real_probe_std = gap_between_real_probe.std()
-                                # print('gap_between_real_probe_std', gap_between_real_probe_std, flush=True)
-
-                                # gap_norm_over_seq = torch.norm(gap_between_real_probe, p=2, dim=0)
-                                # sorted_gap_norm_over_seq, sorted_indices = torch.sort(gap_norm_over_seq)
-
-                                # gap_norm_over_dim = torch.norm(gap_between_real_probe, p=2, dim=1)
-                                # sorted_gap_norm_over_dim, sorted_indices_over_dim = torch.sort(gap_norm_over_dim)
-                                # print('sorted_gap_norm_over_seq', sorted_gap_norm_over_seq, flush=True)
-                                # print('sorted_gap_norm_over_dim', sorted_gap_norm_over_dim, flush=True)
-                                # print('sorted_indices_over_dim', sorted_indices_over_dim, flush=True)
-
-                                # print('prune---------')
-                                # gap_between_real_probe = full_pruned - prune_prune
-                                # print('gap_between_real_probe', gap_between_real_probe, flush=True)
-                                # gap_between_real_probe_mean = gap_between_real_probe.mean()
-                                # print('gap_between_real_probe_mean', gap_between_real_probe_mean, flush=True)
-                                # gap_between_real_probe_std = gap_between_real_probe.std()
-
-                                # gap_norm_over_seq = torch.norm(gap_between_real_probe, p=2, dim=0)
-                                # sorted_gap_norm_over_seq, sorted_indices = torch.sort(gap_norm_over_seq)
-
-                                # gap_norm_over_dim = torch.norm(gap_between_real_probe, p=2, dim=1)
-                                # sorted_gap_norm_over_dim_prune, sorted_indices_over_dim_prune = torch.sort(gap_norm_over_dim)
-                                # print('sorted_gap_norm_over_dim_prune', sorted_gap_norm_over_dim_prune, flush=True)
-                                # print('sorted_indices_over_dim_prune', sorted_indices_over_dim_prune, flush=True)
-
-                                # def compare_accumulated_deciles_set_match(indices1, indices2):
-                                #     assert len(indices1) == len(indices2), "Indices must be of the same length"
+                                    # print('proportion ', proportion, flush=True)
+                                    # comp_across_bsz = torch.sum(x * proportion, dim=0)
+                                    # comp_across_bsz = comp_across_bsz.unsqueeze(0)
                                     
-                                #     decile_size = len(indices1) // 10
-                                #     match_ratios = []
-
-                                #     for i in range(10):
-                                #         end_idx = (i + 1) * decile_size if i < 9 else len(indices1)
-                                        
-                                #         # Extract the accumulated segments as Python sets
-                                #         decile1_set = set(indices1[:end_idx].tolist())
-                                #         decile2_set = set(indices2[:end_idx].tolist())
-                                        
-                                #         # Count set matches
-                                #         matches = len(decile1_set.intersection(decile2_set))
-                                        
-                                #         # Calculate the match ratio based on the number of unique elements in decile1
-                                #         match_ratio = matches / len(decile1_set)
-                                #         match_ratios.append(match_ratio)
+                                    # combined_probe = (probe_out * 0.5 + self.last_batch_probe_out * (1 - 0.5)).to(probe_out.dtype)
+                                    print('combined_probe', combined_probe.shape, flush=True)
                                     
-                                #     return match_ratios
+                                    print('probe_out shape', probe_out.shape, flush=True)
+                            else:
+                                if self.last_batch_probe_out is None:
+                                    self.last_batch_probe_out = probe_out
+                                    probe_out = torch.zeros_like(probe_out)
+                                else:
+                                # self.last_batch_probe_out = self.last_batch_probe_out.to(probe_out.device)
+                                    # if 'asyncabs' in cfg['prune_method']:
+                                    #     abs_probe = torch.abs(probe_out).to(torch.float32)
+                                    #     abs_last_batch_probe = torch.abs(self.last_batch_probe_out).to(torch.float32)
+                                    #     sum_across_two_terms = abs_probe + abs_last_batch_probe
+                                    #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
+                                    #     proportion = (abs_probe / (sum_across_two_terms + 1e-10)).to(abs_probe.dtype)
+                                    #     combined_probe = (probe_out * proportion + self.last_batch_probe_out * (1 - proportion)).to(probe_out.dtype)
+                                    #     probe_out, self.last_batch_probe_out = self.last_batch_probe_out, combined_probe
+                                    # else:
+                                    proportion = cfg['asyncratio']
+                                    combined_probe = (self.last_batch_probe_out * proportion + probe_out * (1 - proportion)).to(probe_out.dtype)
+                                    probe_out, self.last_batch_probe_out = self.last_batch_probe_out, combined_probe
+                                        # proportion = 10
+                                    # print('proportion ', proportion, flush=True)
+                                    # comp_across_bsz = torch.sum(x * proportion, dim=0)
+                                    # comp_across_bsz = comp_across_bsz.unsqueeze(0)
+                                    # combined_probe = (probe_out * proportion + self.last_batch_probe_out * (1 - proportion)).to(probe_out.dtype)
+                                    # probe_out, self.last_batch_probe_out = self.last_batch_probe_out, combined_probe
 
-                                # match_ratios = compare_accumulated_deciles_set_match(sorted_indices_over_dim, sorted_indices_over_dim_prune)
-
-                                # for i, ratio in enumerate(match_ratios, start=1):
-                                #     print(f"Accumulated Decile {i*10}%: {ratio*100:.2f}% match")
-
-                                # full_inference_pruned = full_inference[..., prune_out_dim_indices]
-                                # gap_between_real_probe_norm = gap_between_real_probe.max()
-                            elif 'fillpbmetriccombine' in cfg['prune_method']:
-                                self.down_proj.update_global_metric_score_distribution_ema(comined_probe_out[..., prune_out_dim_indices], prune_out_dim_indices, is_probe=True)
-                            elif 'fillpbmetricub' in cfg['prune_method']:
-                                full_inference = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
-                                # full_inference = torch.clamp(torch.norm(full_inference, p=2, dim=0) ** 2, min=None, max=65504) / bsz_tensor
-                                # full_selected = full_inference[..., probe_out_dim_indices]
-                                full_pruned = full_inference[..., prune_out_dim_indices]
-                                self.down_proj.update_global_metric_score_distribution_ema(full_pruned, prune_out_dim_indices)
-
-                    if 'halfsquareasync' in cfg['prune_method'] and 'savemetricseq' in cfg['prune_method']:
-                        temp_norm_square = torch.clamp(torch.norm(gate_out * up_out, p=2, dim=0) ** 2, min=None, max=65504) / bsz
-                        self.last_batch_probe_out[..., probe_out_dim_indices] = temp_norm_square
-
-                    kwargs['probe_in_dim_indices'] = probe_out_dim_indices
-                    down_proj = self.down_proj(gate_out * up_out, **kwargs)
-                    custom_duration = time.time() - time_start
-                    # print('fll_batch_duration', custom_duration, flush=True)
-                    return down_proj
-                elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']) and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order >= cfg['skip']:
-                    bsz, _, _ = x.shape
-                    time_start = time.time()
-                    if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
-                        probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
-                        # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
-                        # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
-                    else:
-                        # if 'meanglobalinput' in cfg['prune_method']:
-                        #     probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_input_distribution()[0], self.down_proj.weight.data, cfg['prune_metric'])
-                        # else:
-                        probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                        if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
+                            # if 'saveseqdim' in cfg['prune_method']:
+                            #     probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
+                            # else:
+                            probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution())
+                        else:
+                            probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
 
                         if 'globalratio' in cfg['prune_method']:
-                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple, pruning_ratio=self.down_proj.pruning_ratio)
+                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                         else:
-                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
 
-                    temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
-                    # if 'runningmean' in cfg['prune_method']:
-                        # print('runningmean', flush=True)
-                        # print('probe_out_dim_indices', probe_out_dim_indices, flush=True)
-                        # print('temp', temp, flush=True)
-                        # self.down_proj.update_global_metric_score_distribution(temp, probe_out_dim_indices)
-                        # Update the running_mean and running_mean_counter here
-                        # self.running_mean[probe_out_dim_indices] *= self.running_mean_counter[probe_out_dim_indices] / (self.running_mean_counter[probe_out_dim_indices] + bsz)
-                        # # Ensure the denominator is broadcastable; might need to unsqueeze to add a dimension for correct broadcasting
-                        # norm_squared = torch.clamp(torch.norm(temp, p=2, dim=1) ** 2, min=None, max=65504)
-                        # denominator = (self.running_mean_counter[probe_out_dim_indices].unsqueeze(0) + bsz)
-                        # # Update running mean
-                        # self.running_mean[probe_out_dim_indices] += torch.sum(norm_squared / denominator, dim=0)
-                        # self.running_mean_counter[probe_out_dim_indices] += bsz
-                    kwargs['probe_in_dim_indices'] = probe_out_dim_indices
-                    down_proj = self.down_proj(temp, **kwargs)
-                    custom_duration = time.time() - time_start
-                    # print('fll_batch_duration', custom_duration, flush=True)
-                    return down_proj
-                # elif 'runningmean' in cfg['prune_method'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
-                #     bsz, _, _ = x.shape
-                #     time_start = time.time()
-                #     if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
-                #         probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
-                #         # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
-                #         # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
-                #     else:
-                #         probe_out_dim_metric = cal_running_mean_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
-                #         probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+                        # if 'dynaprobe' in cfg['prune_method']:
+                        #     global_score = copy.deepcopy(self.down_proj.get_global_metric_score_distribution())
+                        #     if global_score.dim() == 1:
+                        #         global_score = global_score.unsqueeze(0).unsqueeze(0)
+                        #     elif global_score.dim() == 2:
+                        #         global_score = global_score.unsqueeze(0)
 
-                #     temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
-                #     # if 'runningmean' in cfg['prune_method']:
-                #         # print('runningmean', flush=True)
-                #         # print('probe_out_dim_indices', probe_out_dim_indices, flush=True)
-                #         # print('temp', temp, flush=True)
-                #         # self.down_proj.update_global_metric_score_distribution(temp, probe_out_dim_indices)
-                #         # Update the running_mean and running_mean_counter here
-                #         # self.running_mean[probe_out_dim_indices] *= self.running_mean_counter[probe_out_dim_indices] / (self.running_mean_counter[probe_out_dim_indices] + bsz)
-                #         # # Ensure the denominator is broadcastable; might need to unsqueeze to add a dimension for correct broadcasting
-                #         # norm_squared = torch.clamp(torch.norm(temp, p=2, dim=1) ** 2, min=None, max=65504)
-                #         # denominator = (self.running_mean_counter[probe_out_dim_indices].unsqueeze(0) + bsz)
-                #         # # Update running mean
-                #         # self.running_mean[probe_out_dim_indices] += torch.sum(norm_squared / denominator, dim=0)
-                #         # self.running_mean_counter[probe_out_dim_indices] += bsz
-                #     kwargs['probe_in_dim_indices'] = probe_out_dim_indices
-                #     down_proj = self.down_proj(temp, **kwargs)
-                #     custom_duration = time.time() - time_start
-                #     print('fll_batch_duration', custom_duration, flush=True)
-                #     return down_proj
-                
-                else:
-                    mlp_duration_start = time.time()
-                    time_start = time.time()
-                    temp_gate = self.act_fn(self.gate_proj(x))
-                    custom_duration = time.time() - time_start
-                    print('custom_duration gate', custom_duration, flush=True)
+                        #     raw_calib_out_dim_metric, _ = cal_prune_metric(global_score, self.down_proj.weight.data, cfg['prune_metric'])
+                        #     raw_calib_out_dim_indices, raw_calib_prune_dim_indices = self.pruning_module.sort_probe_mlp_metric(raw_calib_out_dim_metric, multiple)
 
-                    time_start = time.time()
-                    temp_up = self.up_proj(x)
-                    custom_duration = time.time() - time_start
-                    print('custom_duration up', custom_duration, flush=True)
-                    time_start = time.time()
-                    down_proj = self.down_proj(temp_gate * temp_up)
-                    custom_duration = time.time() - time_start
-                    print('custom_duration down', custom_duration, flush=True)
-                    mlp_duration = time.time() - mlp_duration_start
-                    print('mlp_duration', mlp_duration, flush=True)
-                    del temp_gate, temp_up
-                    return down_proj
+                        #     raw_calib_set = set(raw_calib_out_dim_indices.tolist())
+                        #     probe_out_set = set(probe_out_dim_indices.tolist())
+
+                        #     intersection_ratio = len(raw_calib_set & probe_out_set) / len(probe_out_set)
+                        #     print('calib_and_plus_calib_intersection_ratio', intersection_ratio, flush=True)
+
+                        #     # Find elements in probe_out_dim_indices that are missing in raw_calib_out_dim_indices
+                        #     missing_elements = probe_out_set - raw_calib_set
+
+                        #     # To find the original positions of the missing elements in probe_out_dim_indices
+                        #     missing_positions = [i for i, element in enumerate(probe_out_dim_indices.tolist()) if element in missing_elements]
+
+                        #     print('Positions of elements in probe_out_dim_indices missing in raw_calib_out_dim_indices:', missing_positions)
+
+                        #     raw_prune_calib_set = set(raw_calib_prune_dim_indices.tolist())
+                        #     probe_prune_set = set(prune_out_dim_indices.tolist())
+
+                        #     intersected_prune_indices_list = list(raw_prune_calib_set & probe_prune_set)
+
+                        #     # Convert the list to a PyTorch tensor
+                        #     self.intersected_prune_indices = torch.tensor(intersected_prune_indices_list, dtype=torch.long, device=probe_out.device)
+                        #     intersection_ratio = len(raw_prune_calib_set & probe_prune_set) / len(probe_prune_set)
+                        #     print('pruned calib_and_plus_calib_intersection_ratio', intersection_ratio, flush=True)
+
+
+                        #     sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
+                        #     # torch.set_printoptions(threshold=5000)
+                            # torch.set_printoptions(threshold=5000, edgeitems=2000)
+                            # print('sorted_value', sorted_value, flush=True)
+                        # if self.probe_out_dim_indices is None:
+                        #     self.probe_out_dim_indices = probe_out_dim_indices
+                        # else:
+                        #     # Convert lists to sets
+                        #     set_self = set(self.probe_out_dim_indices.tolist())
+                        #     set_probe = set(probe_out_dim_indices.tolist())
+
+                        #     # Find the intersection
+                        #     intersection = set_self & set_probe
+
+                        #     # Count the number of elements in the intersection
+                        #     intersection_count = len(intersection)
+                        #     intersection_ratio = intersection_count / len(set_self)
+                        #     print('intersection_ratio', intersection_ratio, flush=True)
+                        #     self.probe_out_dim_indices = probe_out_dim_indices
+
+                        
+                        custom_duration = time.time() - time_start
+                        # print('probe_duration', custom_duration, flush=True)
+                        time_start = time.time()
+                        if 'gate_proj' in cfg['cust_tgt_modules']:
+                            gate_out = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices))
+                        else:
+                            # gate_out = self.act_fn(self.gate_proj(x))
+                            gate_out = gate_out[..., probe_out_dim_indices]
+
+                        if 'up_proj' in cfg['cust_tgt_modules']:
+                            up_out = self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
+                        else:
+                            # up_out = self.up_proj(x)
+                            up_out = up_out[..., probe_out_dim_indices]
+
+                        # intermediate_output = 
+                        
+                            # self.down_proj.update_global_metric_score_distribution(intermediate_output[..., probe_out_dim_indices], probe_out_dim_indices)
+                            # fill the probe predict for prune_out_dim_indices
+                        if 'fillpbmetric' in cfg['prune_method']:
+                                # self.down_proj.update_global_metric_score_distribution(probe_out[..., prune_out_dim_indices], prune_out_dim_indices, batch_size=bsz, is_probe=True)
+                                # Selecting specific dimensions
+                            # .expand(bsz, -1, -1)
+                            if 'runningmean' in cfg['prune_method']:
+                                self.down_proj.update_global_metric_score_distribution(probe_out[..., prune_out_dim_indices], prune_out_dim_indices)
+                            elif 'ema' in cfg['prune_method']:
+                                if 'fillpbmetricoriginal' in cfg['prune_method']:
+                                    self.down_proj.update_global_metric_score_distribution_ema(probe_out[..., prune_out_dim_indices], prune_out_dim_indices, is_probe=True)
+
+                                    # bsz_tensor = torch.tensor(bsz, dtype=torch.float16, device=gate_out.device)
+                                    # # real_out_channel = torch.clamp(torch.norm(gate_out * up_out, p=2, dim=0) ** 2, min=None, max=65504) / torch.sqrt(bsz_tensor)
+                                    # probe_select = torch.clamp(torch.norm(probe_out[..., probe_out_dim_indices], p=2, dim=0) ** 2, min=None, max=65504)
+                                    # prune_prune = torch.clamp(torch.norm(probe_out[..., prune_out_dim_indices], p=2, dim=0) ** 2, min=None, max=65504)
+                                    # full_inference = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
+                                    # full_inference = torch.clamp(torch.norm(full_inference, p=2, dim=0) ** 2, min=None, max=65504) / bsz_tensor
+                                    # full_selected = full_inference[..., probe_out_dim_indices]
+                                    # full_pruned = full_inference[..., prune_out_dim_indices]
+
+                                    # print('\nself.layer_order', self.layer_order)
+                                    # gap_between_real_probe = full_selected - probe_select
+                                    # print('gap_between_real_probe', gap_between_real_probe, flush=True)
+                                    # gap_between_real_probe_mean = gap_between_real_probe.mean()
+                                    # print('gap_between_real_probe_mean', gap_between_real_probe_mean, flush=True)
+                                    # gap_between_real_probe_std = gap_between_real_probe.std()
+                                    # print('gap_between_real_probe_std', gap_between_real_probe_std, flush=True)
+
+                                    # gap_norm_over_seq = torch.norm(gap_between_real_probe, p=2, dim=0)
+                                    # sorted_gap_norm_over_seq, sorted_indices = torch.sort(gap_norm_over_seq)
+
+                                    # gap_norm_over_dim = torch.norm(gap_between_real_probe, p=2, dim=1)
+                                    # sorted_gap_norm_over_dim, sorted_indices_over_dim = torch.sort(gap_norm_over_dim)
+                                    # print('sorted_gap_norm_over_seq', sorted_gap_norm_over_seq, flush=True)
+                                    # print('sorted_gap_norm_over_dim', sorted_gap_norm_over_dim, flush=True)
+                                    # print('sorted_indices_over_dim', sorted_indices_over_dim, flush=True)
+
+                                    # print('prune---------')
+                                    # gap_between_real_probe = full_pruned - prune_prune
+                                    # print('gap_between_real_probe', gap_between_real_probe, flush=True)
+                                    # gap_between_real_probe_mean = gap_between_real_probe.mean()
+                                    # print('gap_between_real_probe_mean', gap_between_real_probe_mean, flush=True)
+                                    # gap_between_real_probe_std = gap_between_real_probe.std()
+
+                                    # gap_norm_over_seq = torch.norm(gap_between_real_probe, p=2, dim=0)
+                                    # sorted_gap_norm_over_seq, sorted_indices = torch.sort(gap_norm_over_seq)
+
+                                    # gap_norm_over_dim = torch.norm(gap_between_real_probe, p=2, dim=1)
+                                    # sorted_gap_norm_over_dim_prune, sorted_indices_over_dim_prune = torch.sort(gap_norm_over_dim)
+                                    # print('sorted_gap_norm_over_dim_prune', sorted_gap_norm_over_dim_prune, flush=True)
+                                    # print('sorted_indices_over_dim_prune', sorted_indices_over_dim_prune, flush=True)
+
+                                    # def compare_accumulated_deciles_set_match(indices1, indices2):
+                                    #     assert len(indices1) == len(indices2), "Indices must be of the same length"
+                                        
+                                    #     decile_size = len(indices1) // 10
+                                    #     match_ratios = []
+
+                                    #     for i in range(10):
+                                    #         end_idx = (i + 1) * decile_size if i < 9 else len(indices1)
+                                            
+                                    #         # Extract the accumulated segments as Python sets
+                                    #         decile1_set = set(indices1[:end_idx].tolist())
+                                    #         decile2_set = set(indices2[:end_idx].tolist())
+                                            
+                                    #         # Count set matches
+                                    #         matches = len(decile1_set.intersection(decile2_set))
+                                            
+                                    #         # Calculate the match ratio based on the number of unique elements in decile1
+                                    #         match_ratio = matches / len(decile1_set)
+                                    #         match_ratios.append(match_ratio)
+                                        
+                                    #     return match_ratios
+
+                                    # match_ratios = compare_accumulated_deciles_set_match(sorted_indices_over_dim, sorted_indices_over_dim_prune)
+
+                                    # for i, ratio in enumerate(match_ratios, start=1):
+                                    #     print(f"Accumulated Decile {i*10}%: {ratio*100:.2f}% match")
+
+                                    # full_inference_pruned = full_inference[..., prune_out_dim_indices]
+                                    # gap_between_real_probe_norm = gap_between_real_probe.max()
+                                elif 'fillpbmetriccombine' in cfg['prune_method']:
+                                    self.down_proj.update_global_metric_score_distribution_ema(comined_probe_out[..., prune_out_dim_indices], prune_out_dim_indices, is_probe=True)
+                                elif 'fillpbmetricub' in cfg['prune_method']:
+                                    full_inference = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
+                                    # full_inference = torch.clamp(torch.norm(full_inference, p=2, dim=0) ** 2, min=None, max=65504) / bsz_tensor
+                                    # full_selected = full_inference[..., probe_out_dim_indices]
+                                    full_pruned = full_inference[..., prune_out_dim_indices]
+                                    self.down_proj.update_global_metric_score_distribution_ema(full_pruned, prune_out_dim_indices)
+
+                        if 'halfsquareasync' in cfg['prune_method'] and 'savemetricseq' in cfg['prune_method']:
+                            temp_norm_square = torch.clamp(torch.norm(gate_out * up_out, p=2, dim=0) ** 2, min=None, max=65504) / bsz
+                            self.last_batch_probe_out[..., probe_out_dim_indices] = temp_norm_square
+
+                        kwargs['probe_in_dim_indices'] = probe_out_dim_indices
+                        down_proj = self.down_proj(gate_out * up_out, **kwargs)
+                        custom_duration = time.time() - time_start
+                        # print('fll_batch_duration', custom_duration, flush=True)
+                        return down_proj
+                    elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']):
+                        bsz, _, _ = x.shape
+                        time_start = time.time()
+                        if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
+                            probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
+                            # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
+                            # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
+                        else:
+                            # if 'meanglobalinput' in cfg['prune_method']:
+                            #     probe_out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_input_distribution()[0], self.down_proj.weight.data, cfg['prune_metric'])
+                            # else:
+                            probe_out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+
+                            if 'globalratio' in cfg['prune_method']:
+                                probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
+                            else:
+                                probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
+
+                        temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
+                        # if 'runningmean' in cfg['prune_method']:
+                            # print('runningmean', flush=True)
+                            # print('probe_out_dim_indices', probe_out_dim_indices, flush=True)
+                            # print('temp', temp, flush=True)
+                            # self.down_proj.update_global_metric_score_distribution(temp, probe_out_dim_indices)
+                            # Update the running_mean and running_mean_counter here
+                            # self.running_mean[probe_out_dim_indices] *= self.running_mean_counter[probe_out_dim_indices] / (self.running_mean_counter[probe_out_dim_indices] + bsz)
+                            # # Ensure the denominator is broadcastable; might need to unsqueeze to add a dimension for correct broadcasting
+                            # norm_squared = torch.clamp(torch.norm(temp, p=2, dim=1) ** 2, min=None, max=65504)
+                            # denominator = (self.running_mean_counter[probe_out_dim_indices].unsqueeze(0) + bsz)
+                            # # Update running mean
+                            # self.running_mean[probe_out_dim_indices] += torch.sum(norm_squared / denominator, dim=0)
+                            # self.running_mean_counter[probe_out_dim_indices] += bsz
+                        kwargs['probe_in_dim_indices'] = probe_out_dim_indices
+                        down_proj = self.down_proj(temp, **kwargs)
+                        # probe_out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                        # if 'globalratio' in cfg['prune_method']:
+                        #     probe_out_dim_indices_after, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple, pruning_ratio=self.down_proj.pruning_ratio)
+                        # else:
+                        #     probe_out_dim_indices_after, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+
+                        if self.cur_batch % 5 == 0:
+                            if self.cur_batch == 0:
+                                self.prev = probe_out_dim_indices
+                            else:
+                                set_first = set(self.prev.cpu().numpy())
+                                set_second = set(probe_out_dim_indices.cpu().numpy())
+                                intersection = set_first.intersection(set_second)
+                                intersection_ratio = len(intersection) / len(set_first)
+                                print(self.layer_order, 'intersection_ratio', intersection_ratio, flush=True)
+                                self.prev = probe_out_dim_indices
+                        self.cur_batch += 1
+                        custom_duration = time.time() - time_start
+                        # print('fll_batch_duration', custom_duration, flush=True)
+                        return down_proj
+                    # elif 'runningmean' in cfg['prune_method'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
+                    #     bsz, _, _ = x.shape
+                    #     time_start = time.time()
+                    #     if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
+                    #         probe_out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
+                    #         # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
+                    #         # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
+                    #     else:
+                    #         probe_out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                    #         probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+
+                    #     temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
+                    #     # if 'runningmean' in cfg['prune_method']:
+                    #         # print('runningmean', flush=True)
+                    #         # print('probe_out_dim_indices', probe_out_dim_indices, flush=True)
+                    #         # print('temp', temp, flush=True)
+                    #         # self.down_proj.update_global_metric_score_distribution(temp, probe_out_dim_indices)
+                    #         # Update the running_mean and running_mean_counter here
+                    #         # self.running_mean[probe_out_dim_indices] *= self.running_mean_counter[probe_out_dim_indices] / (self.running_mean_counter[probe_out_dim_indices] + bsz)
+                    #         # # Ensure the denominator is broadcastable; might need to unsqueeze to add a dimension for correct broadcasting
+                    #         # norm_squared = torch.clamp(torch.norm(temp, p=2, dim=1) ** 2, min=None, max=65504)
+                    #         # denominator = (self.running_mean_counter[probe_out_dim_indices].unsqueeze(0) + bsz)
+                    #         # # Update running mean
+                    #         # self.running_mean[probe_out_dim_indices] += torch.sum(norm_squared / denominator, dim=0)
+                    #         # self.running_mean_counter[probe_out_dim_indices] += bsz
+                    #     kwargs['probe_in_dim_indices'] = probe_out_dim_indices
+                    #     down_proj = self.down_proj(temp, **kwargs)
+                    #     custom_duration = time.time() - time_start
+                    #     print('fll_batch_duration', custom_duration, flush=True)
+                    #     return down_proj
+                    # else:
+                    #     print('here')
+                    #     mlp_duration_start = time.time()
+                    #     time_start = time.time()
+                    #     temp_gate = self.act_fn(self.gate_proj(x))
+                    #     custom_duration = time.time() - time_start
+                    #     print('custom_duration gate', custom_duration, flush=True)
+
+                    #     time_start = time.time()
+                    #     temp_up = self.up_proj(x)
+                    #     custom_duration = time.time() - time_start
+                    #     print('custom_duration up', custom_duration, flush=True)
+                    #     time_start = time.time()
+                    #     down_proj = self.down_proj(temp_gate * temp_up)
+                    #     custom_duration = time.time() - time_start
+                    #     print('custom_duration down', custom_duration, flush=True)
+                    #     mlp_duration = time.time() - mlp_duration_start
+                    #     print('mlp_duration', mlp_duration, flush=True)
+                    #     del temp_gate, temp_up
+                    #     return down_proj
             else:
+                # print('here')
                 mlp_duration_start = time.time()
                 time_start = time.time()
                 temp_gate = self.act_fn(self.gate_proj(x))
                 custom_duration = time.time() - time_start
-                print('custom_duration gate', custom_duration, flush=True)
+                # print('custom_duration gate', custom_duration, flush=True)
 
                 time_start = time.time()
                 temp_up = self.up_proj(x)
                 custom_duration = time.time() - time_start
-                print('custom_duration up', custom_duration, flush=True)
+                # print('custom_duration up', custom_duration, flush=True)
                 time_start = time.time()
                 down_proj = self.down_proj(temp_gate * temp_up)
                 custom_duration = time.time() - time_start
-                print('custom_duration down', custom_duration, flush=True)
+                # print('custom_duration down', custom_duration, flush=True)
                 mlp_duration = time.time() - mlp_duration_start
-                print('mlp_duration', mlp_duration, flush=True)
+                # print('mlp_duration', mlp_duration, flush=True)
                 del temp_gate, temp_up
                 return down_proj
 
@@ -1153,363 +1170,554 @@ class LlamaAttention(nn.Module):
         #     self.num_key_value_heads = self.num_heads
         #     self.num_key_value_groups = 1
         #     self.modify_kv_for_llama_2_70b = False
+        if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip']:
+            if cfg['calibration_stage'] == True:
+                # if 'calib' in cfg['prune_method'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
+                time_start = time.time()
+                # full inference
+                bsz, q_len, _ = hidden_states.size()
 
-        if 'probe' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
-            multiple = check_multiple_for_tensor_cores(self.q_proj.weight.dtype)
-            # if 'onlyvo' in cfg['prune_name']:
-            #     if 'mbsz' in cfg['prune_metric']:
-            #         comp_across_bsz_vo = hidden_states.mean(axis=0).unsqueeze_(0)
-            #         comp_across_bsz_qk = comp_across_bsz_vo
-                # elif 'optim' in cfg['prune_metric']:
-                #     comp_across_bsz_vo = torch.linalg.vector_norm(hidden_states, ord=2, dim=0).unsqueeze_(0)
-                #     comp_across_bsz_qk = hidden_states.mean(axis=0).unsqueeze_(0)
-            # else:
-            if 'nmlmbsz' in cfg['prune_metric']:
-                abs_x = torch.abs(hidden_states)
-                porportion = abs_x / abs_x.sum(dim=0, keepdim=True)
-                comp_across_bsz_qk = (hidden_states * porportion).sum(dim=0).unsqueeze_(0)
-            elif 'stdmbsz' in cfg['prune_metric']:
-                abs_x = torch.abs(hidden_states)
+                query_states = self.q_proj(hidden_states)
+                key_states = self.k_proj(hidden_states)
+                value_states = self.v_proj(hidden_states)
 
-                # Calculate mean and std deviation across the batch dimension
-                mean_x = abs_x.mean(dim=0, keepdim=True)
-                std_x = abs_x.std(dim=0, keepdim=True)
-
-                # Normalize using mean and standard deviation
-                normalized_x = (abs_x - mean_x) / (std_x + 1e-6)
-                proportion = normalized_x / normalized_x.sum(dim=0, keepdim=True)
-                comp_across_bsz_qk = (hidden_states * proportion).sum(dim=0).unsqueeze_(0)
-            elif 'logmbsz' in cfg['prune_metric']:
-                abs_x = torch.abs(hidden_states)
-                log_abs_x = torch.log1p(abs_x)  # log1p for log(x+1) to handle zeros
-                sum_log_abs_x = log_abs_x.sum(dim=0, keepdim=True)
-
-                proportion = log_abs_x / (sum_log_abs_x + 1e-6)
-                comp_across_bsz_qk = (hidden_states * proportion).sum(dim=0).unsqueeze_(0)
-            elif 'mbsz' in cfg['prune_metric']:
-                comp_across_bsz_qk = hidden_states.mean(axis=0).unsqueeze_(0)
-                # comp_across_bsz = torch.linalg.vector_norm(hidden_states_mean_bsz, ord=2, dim=0).unsqueeze_(0)
-            elif 'optim' in cfg['prune_metric']:
-                comp_across_bsz_qk = hidden_states.mean(axis=0).unsqueeze_(0)
-            else:
-                comp_across_bsz_qk = torch.linalg.vector_norm(hidden_states, ord=2, dim=0).unsqueeze_(0)
-                
-            comp_across_bsz_vo = comp_across_bsz_qk
-
-            q_num_heads, k_num_heads, v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
-            q_head_dim, k_head_dim, v_head_dim = self.head_dim, self.head_dim, self.head_dim
-            # print('hidden_states', hidden_states)
-            # print('comp_across_bsz', comp_across_bsz, flush=True)
-            # if 'para' in cfg['prune_name']:
-            # copy orignal code and modify a little bit for probe pruning
-            # currently does not implement for group attention, but it should work too
-            bsz, q_len, _ = comp_across_bsz_qk.size()
-            
-            query_states = self.q_proj(comp_across_bsz_qk, cal_attn_probe_out_dim_metric='q_proj' in cfg['cust_tgt_modules'])
-            key_states = self.k_proj(comp_across_bsz_qk, cal_attn_probe_out_dim_metric='k_proj' in cfg['cust_tgt_modules'])
-            value_states = self.v_proj(comp_across_bsz_vo, cal_attn_probe_out_dim_metric='v_proj' in cfg['cust_tgt_modules'])
-
-            # key_states = repeat_kv(key_states, self.num_key_value_groups)
-            # value_states = repeat_kv(value_states, self.num_key_value_groups)
-
-            # only consider qk effect, v and o remain the same
-            # if 'onlyqk' in cfg['prune_name']:
-            if 'compressseq' in cfg['prune_metric']:
-                if 'mbsz' in cfg['prune_metric']:
-                    temp_comp_across_bsz_qk = hidden_states.mean(axis=0)
-                    temp_comp_across_bsz_qk = torch.linalg.vector_norm(temp_comp_across_bsz_qk, ord=2, dim=0).unsqueeze_(0)
-                elif 'mbszmseq' in cfg['prune_metric']:
-                    temp_comp_across_bsz_qk = hidden_states.mean(axis=(0,1)).unsqueeze_(0)
-                else:
-                    temp_comp_across_bsz_qk = torch.linalg.vector_norm(hidden_states, ord=2, dim=(0,1)).unsqueeze_(0)
-
-                temp_query_states = self.q_proj(temp_comp_across_bsz_qk, cal_attn_probe_out_dim_metric_compressseq='q_proj' in cfg['cust_tgt_modules'])
-                temp_key_states = self.k_proj(temp_comp_across_bsz_qk, cal_attn_probe_out_dim_metric_compressseq='k_proj' in cfg['cust_tgt_modules'])
-
-                if 'wandasp' in cfg['prune_metric']:
-                    probe_qk_out_dim_metric = (torch.linalg.vector_norm(temp_query_states, ord=2, dim=(0, 1)).reshape((1, 1, -1)) * torch.abs(temp_query_states)).sum(axis=(0, 1))
-                elif 'flap' in cfg['prune_metric']:
-                    pass
-                elif 'probe' in cfg['prune_metric']:
-                    temp_query_states = temp_query_states.to(torch.float32)
-                    temp_key_states = temp_key_states.to(torch.float32)
-                    # probe_out_dim_metric = torch.sqrt((torch.sum(torch.pow(probe_out, 2), dim=1).reshape((1, -1)) * torch.pow(self.down_proj.weight.data, 2)).sum(axis=0))
-                    probe_qk_out_dim_metric = torch.sqrt((torch.sum(torch.pow(temp_query_states, 2), dim=1).reshape((-1, 1)) * torch.pow(temp_key_states, 2)).sum(axis=1))
-                    # query_states = query_states.to(hidden_states.dtype)
-                    # key_states = key_states.to(hidden_states.dtype)
-
-            else:
-                if 'wandasp' in cfg['prune_metric']:
-                    probe_qk_out_dim_metric = (torch.linalg.vector_norm(query_states, ord=2, dim=(0, 1)).reshape((1, 1, -1)) * torch.abs(key_states)).sum(axis=(0, 1))
-                elif 'flap' in cfg['prune_metric']:
-                    pass
-                elif 'probe' in cfg['prune_metric']:
-                    query_states = query_states.to(torch.float32)
-                    key_states = key_states.to(torch.float32)
-                    probe_qk_out_dim_metric = torch.sqrt((torch.sum(torch.pow(query_states, 2), dim=(0, 1)).reshape((1, 1, -1)) * torch.pow(key_states, 2)).sum(axis=(0, 1)))
-                    query_states = query_states.to(hidden_states.dtype)
-                    key_states = key_states.to(hidden_states.dtype)
-
-            probe_qk_out_dim_indices, probe_qk_out_dim_indices_for_rope, qk_num_heads, qk_head_dim = self.pruning_module.cal_probe_attn_metric(probe_qk_out_dim_metric, self.num_heads, self.head_dim, cfg['qk_proj_prune'], 'qk', multiple)
-            q_num_heads, k_num_heads = qk_num_heads, qk_num_heads
-            q_head_dim, k_head_dim = qk_head_dim, qk_head_dim
-
-            if 'conditionqk' in cfg['prune_name']:
-                # query_states = self.q_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
-                # key_states = self.k_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
-                if 'fill' in cfg['qk_proj_prune']:
-                    mask = torch.zeros(query_states.shape[-1], dtype=torch.bool, device=query_states.device)
-                    mask[~probe_qk_out_dim_indices] = True
-                    query_states[..., mask] = 0
-                    key_states[..., mask] = 0
-                else:
-                    query_states = torch.index_select(query_states, -1, probe_qk_out_dim_indices)
-                    key_states = torch.index_select(key_states, -1, probe_qk_out_dim_indices)
-                    
-                query_states = query_states.view(bsz, q_len, q_num_heads, q_head_dim).transpose(1, 2)
-                key_states = key_states.view(bsz, q_len, k_num_heads, k_head_dim).transpose(1, 2)
-            else:
                 query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-                key_states = key_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-            
-            value_states = value_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+                key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+                value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
-            kv_seq_len = key_states.shape[-2]
-            # if past_key_value is not None:
-            #     kv_seq_len += past_key_value[0].shape[-2]
-            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-
-            if 'each' in cfg['qk_proj_prune']:
-                query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, probe_qk_out_dim_indices_for_rope)
-            else:
+                kv_seq_len = key_states.shape[-2]
+                if past_key_value is not None:
+                    kv_seq_len += past_key_value[0].shape[-2]
+                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+                # print('query_states key_states after rotary', query_states, key_states, flush=True)
+                if past_key_value is not None:
+                    # reuse k, v, self_attention
+                    key_states = torch.cat([past_key_value[0], key_states], dim=2)
+                    value_states = torch.cat([past_key_value[1], value_states], dim=2)
 
-            # key_states = repeat_kv(key_states, self.num_key_value_groups)
-            # value_states = repeat_kv(value_states, self.num_key_value_groups)
+                past_key_value = (key_states, value_states) if use_cache else None
 
-            # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
-            if 'conditionqk' in cfg['prune_name']:
-                attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(k_head_dim)
-            else:
+                key_states = repeat_kv(key_states, self.num_key_value_groups)
+                value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+                # query: bsz, self.num_heads, 1, self.head_dim
+                # key_states: bsz, self.num_key_value_heads, q_len+1, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len+1
                 attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-            # print('attn_weights', attn_weights.shape, query_states.shape,flush=True)
-            if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
-                raise ValueError(
-                    f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
-                    f" {attn_weights.size()}"
-                )
 
-            probe_attn_mask = attention_mask[0].unsqueeze_(0)
-            # print('probe_attn_mask', probe_attn_mask, flush=True)
-            
-            # if 'beforedeleteseq' in cfg['prune_name']:
-            #     zero_attn_mask = (probe_attn_mask >= 0)
-            #     # print('zero_attn_mask', zero_attn_mask, flush=True)
-            #     attn_weights = attn_weights * zero_attn_mask
-            #     # print('attn_weightsaftermask', attn_weights, attn_weights.shape, flush=True)
-            #     if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbWOF2N':
-            #         # becomes self.num_heads, q_len
-            #         attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.abs(value_states)).sum(axis=(0, -1))
-            #     elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
-            #         # becomes self.num_heads, q_len
-            #         attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, -1)))
-
-                # attn_weights_indices = self.pruning_module.cal_probe_attn_weights_metric(attn_weights_metric)
-            if probe_attn_mask is not None:
-                if probe_attn_mask.size() != (bsz, 1, q_len, kv_seq_len):
+                if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
                     raise ValueError(
-                        f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {probe_attn_mask.size()}"
+                        f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+                        f" {attn_weights.size()}"
                     )
-                attn_weights = attn_weights + probe_attn_mask
-                attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
-                # print('attnweightsaftermask', attn_weights, attn_weights.shape, flush=True)
 
-            # upcast attention to fp32
-            # attn_weights: bsz, self.num_heads, q_len, q_len
-            # attn_weights: 1, self.num_heads, q_len, q_len
-            # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
-            
-            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-            if 'delseq' in cfg['prune_name']:
-                print('delseq 1', flush=True)
-                if 'wandasp' in cfg['prune_metric']:
-                    # becomes self.num_heads, q_len
-                    attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.abs(value_states)).sum(axis=(0, -1))
-                elif 'flap' in cfg['prune_metric']:
-                    pass
-                elif 'probe' in cfg['prune_metric']:
-                    # becomes self.num_heads, q_len
-                    # reshape to do element-wise multiplication
-                    attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, -1)))
+                if attention_mask is not None:
+                    if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+                        raise ValueError(
+                            f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+                        )
+                    attn_weights = attn_weights + attention_mask
+                    attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
+                # upcast attention to fp32
+                # attn_weights: bsz, self.num_heads, q_len, q_len
+                # attn_weights: 1, self.num_heads, q_len, q_len
+                attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+                # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
+                # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
+                attn_output = torch.matmul(attn_weights, value_states)
+                # print('attn_output after value', attn_output)
 
-                # dont customize the metric for each head
-                # if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbWOF2N':
-                #     # becomes self.num_heads, q_len
-                #     attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 1, 2)).reshape((1, 1, -1, 1)) * torch.abs(value_states)).sum(axis=(0, 1, 3))
-                # elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
-                #     # becomes self.num_heads, q_len
-                #     attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 1, 2)).reshape((1, 1, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, 1, 3)))
-                _, attn_weights_indices, _, _ = self.pruning_module.cal_probe_attn_metric(attn_weights_metric, attn_weights.shape[1], 1, cfg['vo_proj_prune'], 'delseq', multiple)
-
-            # print('attn_weightsafter softmax', attn_weights, attn_weights.shape, flush=True)
-            # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
-            # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
-            attn_output = torch.matmul(attn_weights, value_states)
-            
-            # print('attn_output00', attn_output[0][0], attn_output[0][0].shape, flush=True)
-            if attn_output.size() != (bsz, v_num_heads, q_len, v_head_dim):
-                raise ValueError(
-                    f"`attn_output` should be of size {(bsz, v_num_heads, q_len, v_head_dim)}, but is"
-                    f" {attn_output.size()}"
-                )
-
-            # attn_output: bsz, self.num_heads, q_len, self.head_dim -> bsz, q_len, self.num_heads, self.head_dim
-            attn_output = attn_output.transpose(1, 2).contiguous()
-            attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
-            
-            if 'wandasp' in cfg['prune_metric']:
-                probe_out_dim_metric = (torch.linalg.vector_norm(attn_output, ord=2, dim=(0, 1)).reshape((1, -1)) * torch.abs(self.o_proj.weight.data)).sum(axis=0)
-            elif 'flap' in cfg['prune_metric']:
-                pass
-            elif 'probe' in cfg['prune_metric']:
-                prev_attn_output_type = attn_output.dtype
-                prev_weight_type = self.o_proj.weight.dtype
-                print('attn_output.dtype', attn_output.dtype, flush=True)
-                print('self.o_proj.weight.dtype', self.o_proj.weight.dtype, flush=True)
-                attn_output = attn_output.to(torch.float32)
-                self.o_proj.weight.data = self.o_proj.weight.data.to(torch.float32)
-                probe_out_dim_metric = torch.sqrt((torch.sum(torch.pow(attn_output, 2), dim=(0, 1)).reshape((1, -1)) * torch.pow(self.o_proj.weight.data, 2)).sum(axis=0))
-                attn_output = attn_output.to(prev_attn_output_type)
-                self.o_proj.weight.data = self.o_proj.weight.data.to(prev_weight_type)
-            probe_out_dim_indices, _, v_num_heads, v_head_dim = self.pruning_module.cal_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, cfg['vo_proj_prune'], 'vo', multiple)
-
-            if 'restore' in cfg['prune_name']:
-                temp = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
-                prune_out_dim_indices = temp[~probe_out_dim_indices]
-                restore = F.linear(attn_output[..., prune_out_dim_indices], torch.index_select(self.o_proj.weight, 1, prune_out_dim_indices))
-            if not output_attentions:
-                attn_weights = None
-            
-            # --------------------------------------
-            #full inference with adding some info to layer input
-            bsz, q_len, _ = hidden_states.size()
-
-            # print('probe_out_dim_indices', probe_out_dim_indices)
-            # temp = torch.arange(4096).dtype(probe_out_dim_indices.dtype).to(probe_out_dim_indices.device)
-            # temp = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
-            if 'onlyqk' in cfg['prune_name']:
-                probe_out_dim_indices = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
-                v_num_heads, v_head_dim = self.num_heads, self.head_dim
-            if 'onlyvo' in cfg['prune_name']:
-                probe_qk_out_dim_indices = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
-                q_num_heads, k_num_heads = self.num_heads, self.num_key_value_heads
-                q_head_dim, k_head_dim = self.head_dim, self.head_dim
-            # elif 'conditionqk' in cfg['prune_name']:
-            #     temp = probe_qk_out_dim_indices
-                # probe_out_dim_indices = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
-                # v_num_heads, v_head_dim = qk_num_heads, qk_head_dim
-            query_states = self.q_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
-            key_states = self.k_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
-            value_states = self.v_proj(hidden_states, probe_out_dim_indices=probe_out_dim_indices)
-            # print('query_states shape', query_states.shape, flush=True)
-            # print('key_states shape', key_states.shape, flush=True)
-            # print('value_states shape', value_states.shape, flush=True)
-            # query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-            # key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-            # value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-
-            query_states = query_states.view(bsz, q_len, q_num_heads, q_head_dim).transpose(1, 2)
-            key_states = key_states.view(bsz, q_len, k_num_heads, k_head_dim).transpose(1, 2)
-            value_states = value_states.view(bsz, q_len, v_num_heads, v_head_dim).transpose(1, 2)
-            # print('query_states shape 2', query_states.shape, flush=True)
-            # print('key_states shape 2', key_states.shape, flush=True)
-            # print('value_states shape 2', value_states.shape, flush=True)
-            kv_seq_len = key_states.shape[-2]
-            # print('past_key_value', past_key_value, flush=True)
-            if past_key_value is not None:
-                kv_seq_len += past_key_value[0].shape[-2]
-            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-
-            if 'each' in cfg['qk_proj_prune']:
-                query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, probe_qk_out_dim_indices_for_rope)
-            else:
-                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
-
-            # print('query_states key_states after rotary', query_states, key_states, flush=True)
-            if past_key_value is not None:
-                # reuse k, v, self_attention
-                key_states = torch.cat([past_key_value[0], key_states], dim=2)
-                value_states = torch.cat([past_key_value[1], value_states], dim=2)
-
-            past_key_value = (key_states, value_states) if use_cache else None
-
-            key_states = repeat_kv(key_states, self.num_key_value_groups)
-            value_states = repeat_kv(value_states, self.num_key_value_groups)
-
-            # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
-            # attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-            attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(k_head_dim)
-
-            if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
-                raise ValueError(
-                    f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
-                    f" {attn_weights.size()}"
-                )
-
-            if attention_mask is not None:
-                if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+                if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
                     raise ValueError(
-                        f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+                        f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
+                        f" {attn_output.size()}"
                     )
-                attn_weights = attn_weights + attention_mask
-                attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
-            # upcast attention to fp32
-            # attn_weights: bsz, self.num_heads, q_len, q_len
-            # attn_weights: 1, self.num_heads, q_len, q_len
-            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-            if 'delseq' in cfg['prune_name']:
-                print('delseq 2', flush=True)
-                # attn_weights = torch.index_select(attn_weights, -1, attn_weights_indices)
-                # value_states = torch.index_select(value_states, -2, attn_weights_indices)
-                # torch.cuda.reset_peak_memory_stats(device="cuda")  # Reset peak memory statistics
-                # before_op_memory_allocated = torch.cuda.memory_allocated("cuda")
-                # start_time = time.time()
 
-                attn_weights_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(2).expand(bsz, k_num_heads, q_len, -1)
-                attn_weights = torch.gather(attn_weights, -1, attn_weights_indices_expand)
-                value_states_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(3).expand(bsz, v_num_heads, -1, v_head_dim)
-                value_states = torch.gather(value_states, -2, value_states_indices_expand)
+                attn_output = attn_output.transpose(1, 2).contiguous()
 
-                # end_time = time.time()
-                # elapsed_time = end_time - start_time
-                # print(f"Elapsed time: {elapsed_time} seconds")  
-                # after_op_memory_allocated = torch.cuda.memory_allocated("cuda")
-                # memory_used = after_op_memory_allocated - before_op_memory_allocated
-                # print(f"Memory used for the operation: {memory_used} bytes")
+                # attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+                attn_output = attn_output.reshape(bsz, q_len, self.num_heads * self.head_dim)
+                attn_output = self.o_proj(attn_output)
 
-            # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
-            # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
-            attn_output = torch.matmul(attn_weights, value_states)
-            # print('attn_output after value', attn_output, attn_output.shape, flush=True)
-            if attn_output.size() != (bsz, v_num_heads, q_len, v_head_dim):
-                raise ValueError(
-                    f"`attn_output` should be of size {(bsz, v_num_heads, q_len, v_head_dim)}, but is"
-                    f" {attn_output.size()}"
-                )
+                if not output_attentions:
+                    attn_weights = None
 
-            attn_output = attn_output.transpose(1, 2).contiguous()
+                custom_duration = time.time() - time_start
+                return attn_output, attn_weights, past_key_value
+            elif cfg['calibration_stage'] == False :
+                bsz, q_len, _ = hidden_states.size()
+                if 'probe' in cfg['prune_method']:
+                    if 'nml' in cfg['prune_method']:
 
-            # attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
-            attn_output = attn_output.reshape(bsz, q_len, v_num_heads * v_head_dim)
-            # print('final attn input', attn_output, attn_output.shape, flush=True)
-            attn_output = self.o_proj(attn_output, probe_out_dim_indices=probe_out_dim_indices)
-            if 'restore' in cfg['prune_name']:
-                print('restore', flush=True)
-                restore = restore.expand(bsz, q_len, self.hidden_size)
-                attn_output = attn_output + restore
-            # print('attn_output_final', attn_output, attn_output.shape, flush=True)
-            if not output_attentions:
-                attn_weights = None
+                        # comp_across_bsz_q = nml_process(hidden_states, cfg['q_probe_num'], cfg['q_probe_size'])
+                        # comp_across_bsz_k = nml_process(hidden_states, cfg['k_probe_num'], cfg['k_probe_size'])
+                        # comp_across_bsz_v = nml_process(hidden_states, cfg['v_probe_num'], cfg['v_probe_size'])
+                        comp_across_bsz_q = nml_process(kwargs['temp_mlp_residual'], cfg['q_probe_num'], cfg['q_probe_size'])
+                        comp_across_bsz_k = nml_process(kwargs['temp_mlp_residual'], cfg['k_probe_num'], cfg['k_probe_size'])
+                        comp_across_bsz_v = nml_process(kwargs['temp_mlp_residual'], cfg['v_probe_num'], cfg['v_probe_size'])
+                    else:
+                        comp_across_bsz_q = hidden_states.mean(axis=0).unsqueeze_(0)
+                        comp_across_bsz_k = hidden_states.mean(axis=0).unsqueeze_(0)
+                        comp_across_bsz_v = hidden_states.mean(axis=0).unsqueeze_(0)
+
+                    print('comp_across_bsz_v', comp_across_bsz_v.shape, flush=True)
+                    q_num_heads, k_num_heads, v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
+                    q_head_dim, k_head_dim, v_head_dim = self.head_dim, self.head_dim, self.head_dim
+
+                    # copy orignal code and modify a little bit for probe pruning
+                    # currently does not implement for group attention, but it should work too
+                    # bsz, q_len, _ = comp_across_bsz_qk.size()
+                    query_states = self.q_proj(comp_across_bsz_q, cal_attn_probe_out_dim_metric=True)   
+                    key_states = self.k_proj(comp_across_bsz_k, cal_attn_probe_out_dim_metric=True)
+                    value_states = self.v_proj(comp_across_bsz_v, cal_attn_probe_out_dim_metric=True)
+                    
+                    # key_states = repeat_kv(key_states, self.num_key_value_groups)
+                    # value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+                    # only consider qk effect, v and o remain the same
+                    # if 'onlyqk' in cfg['prune_name']:
+                    # if 'compressseq' in cfg['prune_metric']:
+                    #     if 'mbsz' in cfg['prune_metric']:
+                    #         temp_comp_across_bsz_qk = hidden_states.mean(axis=0)
+                    #         temp_comp_across_bsz_qk = torch.linalg.vector_norm(temp_comp_across_bsz_qk, ord=2, dim=0).unsqueeze_(0)
+                    #     elif 'mbszmseq' in cfg['prune_metric']:
+                    #         temp_comp_across_bsz_qk = hidden_states.mean(axis=(0,1)).unsqueeze_(0)
+                    #     else:
+                    #         temp_comp_across_bsz_qk = torch.linalg.vector_norm(hidden_states, ord=2, dim=(0,1)).unsqueeze_(0)
+
+                    #     temp_query_states = self.q_proj(temp_comp_across_bsz_qk, cal_attn_probe_out_dim_metric_compressseq='q_proj' in cfg['cust_tgt_modules'])
+                    #     temp_key_states = self.k_proj(temp_comp_across_bsz_qk, cal_attn_probe_out_dim_metric_compressseq='k_proj' in cfg['cust_tgt_modules'])
+
+                    #     if 'wandasp' in cfg['prune_metric']:
+                    #         probe_qk_out_dim_metric = (torch.linalg.vector_norm(temp_query_states, ord=2, dim=(0, 1)).reshape((1, 1, -1)) * torch.abs(temp_query_states)).sum(axis=(0, 1))
+                    #     elif 'flap' in cfg['prune_metric']:
+                    #         pass
+                    #     elif 'probe' in cfg['prune_metric']:
+                    #         temp_query_states = temp_query_states.to(torch.float32)
+                    #         temp_key_states = temp_key_states.to(torch.float32)
+                    #         # probe_out_dim_metric = torch.sqrt((torch.sum(torch.pow(probe_out, 2), dim=1).reshape((1, -1)) * torch.pow(self.down_proj.weight.data, 2)).sum(axis=0))
+                    #         probe_qk_out_dim_metric = torch.sqrt((torch.sum(torch.pow(temp_query_states, 2), dim=1).reshape((-1, 1)) * torch.pow(temp_key_states, 2)).sum(axis=1))
+                    #         # query_states = query_states.to(hidden_states.dtype)
+                    #         # key_states = key_states.to(hidden_states.dtype)
+
+                    # else:
+                    qk_prune_way = cfg['qk_prune_way']
+                    vo_prune_way = cfg['vo_prune_way']
+
+                    # TODO: sep prune
+                    # if qk_prune_way is not None:
+                    #     if 'wandasp' in cfg['prune_metric']:
+                    #         probe_qk_out_dim_metric = (torch.linalg.vector_norm(query_states, ord=2, dim=(0, 1)).reshape((1, 1, -1)) * torch.abs(key_states)).sum(axis=(0, 1))
+                    #     elif 'flap' in cfg['prune_metric']:
+                    #         pass
+                    #     elif 'probe' in cfg['prune_metric']:
+                    #         query_states = query_states.to(torch.float32)
+                    #         key_states = key_states.to(torch.float32)
+                    #         probe_qk_out_dim_metric = torch.sqrt((torch.sum(torch.pow(query_states, 2), dim=(0, 1)).reshape((1, 1, -1)) * torch.pow(key_states, 2)).sum(axis=(0, 1)))
+                    #         query_states = query_states.to(hidden_states.dtype)
+                    #         key_states = key_states.to(hidden_states.dtype)
+
+                    #     probe_qk_out_dim_indices, probe_qk_out_dim_indices_for_rope, qk_num_heads, qk_head_dim = self.pruning_module.sort_probe_attn_metric(probe_qk_out_dim_metric, self.num_heads, self.head_dim, qk_prune_way, 'qk', multiple)
+                    #     q_num_heads, k_num_heads = qk_num_heads, qk_num_heads
+                    #     q_head_dim, k_head_dim = qk_head_dim, qk_head_dim
+
+                    # if 'conditionqk' in cfg['prune_name']:
+                    #     # query_states = self.q_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+                    #     # key_states = self.k_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+                    #     if 'fill' in cfg['qk_proj_prune']:
+                    #         mask = torch.zeros(query_states.shape[-1], dtype=torch.bool, device=query_states.device)
+                    #         mask[~probe_qk_out_dim_indices] = True
+                    #         query_states[..., mask] = 0
+                    #         key_states[..., mask] = 0
+                    #     else:
+                    #         query_states = torch.index_select(query_states, -1, probe_qk_out_dim_indices)
+                    #         key_states = torch.index_select(key_states, -1, probe_qk_out_dim_indices)
+                            
+                    #     query_states = query_states.view(bsz, q_len, q_num_heads, q_head_dim).transpose(1, 2)
+                    #     key_states = key_states.view(bsz, q_len, k_num_heads, k_head_dim).transpose(1, 2)
+                    # else:
+                    query_states = query_states.view(query_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
+                    key_states = key_states.view(key_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
+                    value_states = value_states.view(value_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
+
+                    kv_seq_len = key_states.shape[-2]
+                    # if past_key_value is not None:
+                    #     kv_seq_len += past_key_value[0].shape[-2]
+                    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
+                    # if 'each' in qk_prune_way:
+                    #     query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, probe_qk_out_dim_indices_for_rope)
+                    # else:
+                    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+
+                    # key_states = repeat_kv(key_states, self.num_key_value_groups)
+                    # value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+                    # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
+                    # if 'conditionqk' in cfg['prune_method']:
+                    #     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(k_head_dim)
+                    # else:
+                    
+                    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+                    print('query_states', query_states.shape, flush=True)
+                    print('key_states', key_states.shape, flush=True)
+                    print('attn_weights', attn_weights.shape, flush=True)
+                    # print('attn_weights', attn_weights.shape, query_states.shape,flush=True)
+                    if attn_weights.size() != (cfg['k_probe_num'], self.num_heads, q_len, kv_seq_len):
+                        raise ValueError(
+                            f"Attention weights should be of size {(cfg['k_probe_num'], self.num_heads, q_len, kv_seq_len)}, but is"
+                            f" {attn_weights.size()}"
+                        )
+
+                    # .expand(cfg['k_probe_num'], -1, -1, -1)
+                    print('attention_mask', attention_mask.shape, flush=True)
+                    probe_attn_mask = attention_mask[:cfg['k_probe_num'], ...]
+                    print('probe_attn_mask', probe_attn_mask.shape, flush=True)
+                    # print('probe_attn_mask', probe_attn_mask, flush=True)
+                    
+                    # if 'beforedeleteseq' in cfg['prune_name']:
+                    #     zero_attn_mask = (probe_attn_mask >= 0)
+                    #     # print('zero_attn_mask', zero_attn_mask, flush=True)
+                    #     attn_weights = attn_weights * zero_attn_mask
+                    #     # print('attn_weightsaftermask', attn_weights, attn_weights.shape, flush=True)
+                    #     if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbWOF2N':
+                    #         # becomes self.num_heads, q_len
+                    #         attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.abs(value_states)).sum(axis=(0, -1))
+                    #     elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
+                    #         # becomes self.num_heads, q_len
+                    #         attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, -1)))
+
+                        # attn_weights_indices = self.pruning_module.cal_probe_attn_weights_metric(attn_weights_metric)
+                    if probe_attn_mask is not None:
+                        if probe_attn_mask.size() != (cfg['k_probe_num'], 1, q_len, kv_seq_len):
+                            raise ValueError(
+                                f"Attention mask should be of size {(cfg['k_probe_num'], 1, q_len, kv_seq_len)}, but is {probe_attn_mask.size()}"
+                            )
+                        attn_weights = attn_weights + probe_attn_mask
+                        attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
+                        # print('attnweightsaftermask', attn_weights, attn_weights.shape, flush=True)
+
+                    # upcast attention to fp32
+                    # attn_weights: bsz, self.num_heads, q_len, q_len
+                    # attn_weights: 1, self.num_heads, q_len, q_len
+                    # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
+                    
+                    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+                    # TODO: fix later
+                    if 'delseq' in cfg['prune_method']:
+                        if 'wandasp' in cfg['prune_metric']:
+                            # becomes self.num_heads, q_len
+                            attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.abs(value_states)).sum(axis=(0, -1))
+                        elif 'flap' in cfg['prune_metric']:
+                            pass
+                        elif 'probe' in cfg['prune_metric']:
+                            # becomes self.num_heads, q_len
+                            # reshape to do element-wise multiplication
+                            attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, -1)))
+
+                        # dont customize the metric for each head
+                        # if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbWOF2N':
+                        #     # becomes self.num_heads, q_len
+                        #     attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 1, 2)).reshape((1, 1, -1, 1)) * torch.abs(value_states)).sum(axis=(0, 1, 3))
+                        # elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
+                        #     # becomes self.num_heads, q_len
+                        #     attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 1, 2)).reshape((1, 1, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, 1, 3)))
+                        _, attn_weights_indices, _, _ = self.pruning_module.sort_probe_attn_metric(attn_weights_metric, attn_weights.shape[1], 1, cfg['vo_proj_prune'], 'delseq', cfg['tc_multiple'])
+
+                    # print('attn_weightsafter softmax', attn_weights, attn_weights.shape, flush=True)
+                    # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
+                    # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
+                    print('attn_weights_shape', attn_weights.shape, flush=True)
+                    print('value_states_shape', value_states.shape, flush=True)
+                    if cfg['k_probe_num'] > cfg['v_probe_num']:
+                        value_states = value_states.repeat_interleave(cfg['k_probe_num']// cfg['v_probe_num'], dim=0)
+                    else:
+                        attn_weights = attn_weights.repeat_interleave(cfg['v_probe_num']// cfg['k_probe_num'], dim=0)
+                    print('value_states_shape', value_states.shape, flush=True)
+                    attn_output = torch.matmul(attn_weights, value_states)
+                    print('attn_output_shape', attn_output.shape, flush=True)
+                    
+                    # print('attn_output00', attn_output[0][0], attn_output[0][0].shape, flush=True)
+                    if attn_output.size() != (max(cfg['k_probe_num'], cfg['v_probe_num']), v_num_heads, q_len, v_head_dim):
+                        raise ValueError(
+                            f"`attn_output` should be of size {(max(cfg['k_probe_num'], cfg['v_probe_num']), v_num_heads, q_len, v_head_dim)}, but is"
+                            f" {attn_output.size()}"
+                        )
+
+                    # attn_output: bsz, self.num_heads, q_len, self.head_dim -> bsz, q_len, self.num_heads, self.head_dim
+                    attn_output = attn_output.transpose(1, 2).contiguous()
+                    attn_output = attn_output.reshape(max(cfg['k_probe_num'], cfg['v_probe_num']), q_len, self.hidden_size)
+                    
+                    if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
+                            # if 'saveseqdim' in cfg['prune_method']:
+                            #     probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
+                            # else:
+                        probe_out_dim_metric, comined_probe_out = cal_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution())
+                    else:
+                        probe_out_dim_metric, comined_probe_out = cal_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
+
+                    if 'globalratio' in cfg['prune_method']:
+                        probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+                    else:
+                        # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+                        probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                    
+                    if 'whole' in vo_prune_way:
+                        probe_qk_out_dim_indices = probe_vo_out_dim_indices
+                        qk_prune_way = vo_prune_way
+                        q_num_heads, k_num_heads = v_num_heads, v_num_heads
+                        q_head_dim, k_head_dim = v_head_dim, v_head_dim
+                        # probe_out_dim_indices, _, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', multiple)
+
+                    # if 'restore' in cfg['prune_name']:
+                    #     temp = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
+                    #     prune_out_dim_indices = temp[~probe_out_dim_indices]
+                    #     restore = F.linear(attn_output[..., prune_out_dim_indices], torch.index_select(self.o_proj.weight, 1, prune_out_dim_indices))
+                    if not output_attentions:
+                        attn_weights = None
+                    
+                    # --------------------------------------
+                    #full inference with adding some info to layer input
+                    bsz, q_len, _ = hidden_states.size()
+
+                    # print('probe_out_dim_indices', probe_out_dim_indices)
+                    # temp = torch.arange(4096).dtype(probe_out_dim_indices.dtype).to(probe_out_dim_indices.device)
+                    # temp = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
+                    if qk_prune_way is None:
+                        probe_qk_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                        q_num_heads, k_num_heads = self.num_heads, self.num_key_value_heads
+                        q_head_dim, k_head_dim = self.head_dim, self.head_dim
+                    if vo_prune_way is None:
+                        probe_vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                        v_num_heads, v_head_dim = self.num_heads, self.head_dim
+                    # elif 'conditionqk' in cfg['prune_name']:
+                    #     temp = probe_qk_out_dim_indices
+                        # probe_out_dim_indices = torch.arange(4096).to(dtype=probe_out_dim_indices.dtype, device=probe_out_dim_indices.device)
+                        # v_num_heads, v_head_dim = qk_num_heads, qk_head_dim
+                    query_states = self.q_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+                    key_states = self.k_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+                    value_states = self.v_proj(hidden_states, probe_out_dim_indices=probe_vo_out_dim_indices)
+                    # print('query_states shape', query_states.shape, flush=True)
+                    # print('key_states shape', key_states.shape, flush=True)
+                    # print('value_states shape', value_states.shape, flush=True)
+                    # query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+                    # key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+                    # value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+                    query_states = query_states.view(bsz, q_len, q_num_heads, q_head_dim).transpose(1, 2)
+                    key_states = key_states.view(bsz, q_len, k_num_heads, k_head_dim).transpose(1, 2)
+                    value_states = value_states.view(bsz, q_len, v_num_heads, v_head_dim).transpose(1, 2)
+                    # print('query_states shape 2', query_states.shape, flush=True)
+                    # print('key_states shape 2', key_states.shape, flush=True)
+                    # print('value_states shape 2', value_states.shape, flush=True)
+                    kv_seq_len = key_states.shape[-2]
+                    # print('past_key_value', past_key_value, flush=True)
+                    if past_key_value is not None:
+                        kv_seq_len += past_key_value[0].shape[-2]
+                    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
+                    if qk_prune_way is not None and 'each' in qk_prune_way:
+                        query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, probe_qk_out_dim_indices_for_rope)
+                    else:
+                        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+
+                    # print('query_states key_states after rotary', query_states, key_states, flush=True)
+                    if past_key_value is not None:
+                        # reuse k, v, self_attention
+                        key_states = torch.cat([past_key_value[0], key_states], dim=2)
+                        value_states = torch.cat([past_key_value[1], value_states], dim=2)
+
+                    past_key_value = (key_states, value_states) if use_cache else None
+
+                    key_states = repeat_kv(key_states, self.num_key_value_groups)
+                    value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+                    # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
+                    # attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+                    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(k_head_dim)
+                    print('query_states_fullinf', query_states.shape, flush=True)
+                    print('attn_weights_fullinf', attn_weights.shape, flush=True)
+                    if attn_weights.size() != (bsz, k_num_heads, q_len, kv_seq_len):
+                        raise ValueError(
+                            f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+                            f" {attn_weights.size()}"
+                        )
+
+                    if attention_mask is not None:
+                        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+                            raise ValueError(
+                                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+                            )
+                        attn_weights = attn_weights + attention_mask
+                        attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
+                    # upcast attention to fp32
+                    # attn_weights: bsz, self.num_heads, q_len, q_len
+                    # attn_weights: 1, self.num_heads, q_len, q_len
+                    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+                    if 'delseq' in cfg['prune_method']:
+                        print('delseq 2', flush=True)
+                        # attn_weights = torch.index_select(attn_weights, -1, attn_weights_indices)
+                        # value_states = torch.index_select(value_states, -2, attn_weights_indices)
+                        # torch.cuda.reset_peak_memory_stats(device="cuda")  # Reset peak memory statistics
+                        # before_op_memory_allocated = torch.cuda.memory_allocated("cuda")
+                        # start_time = time.time()
+
+                        attn_weights_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(2).expand(bsz, k_num_heads, q_len, -1)
+                        attn_weights = torch.gather(attn_weights, -1, attn_weights_indices_expand)
+                        value_states_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(3).expand(bsz, v_num_heads, -1, v_head_dim)
+                        value_states = torch.gather(value_states, -2, value_states_indices_expand)
+
+                        # end_time = time.time()
+                        # elapsed_time = end_time - start_time
+                        # print(f"Elapsed time: {elapsed_time} seconds")  
+                        # after_op_memory_allocated = torch.cuda.memory_allocated("cuda")
+                        # memory_used = after_op_memory_allocated - before_op_memory_allocated
+                        # print(f"Memory used for the operation: {memory_used} bytes")
+
+                    # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
+                    # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
+                    attn_output = torch.matmul(attn_weights, value_states)
+                    # print('attn_output after value', attn_output, attn_output.shape, flush=True)
+                    if attn_output.size() != (bsz, v_num_heads, q_len, v_head_dim):
+                        raise ValueError(
+                            f"`attn_output` should be of size {(bsz, v_num_heads, q_len, v_head_dim)}, but is"
+                            f" {attn_output.size()}"
+                        )
+                    attn_output = attn_output.transpose(1, 2).contiguous()
+                    # attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+                    attn_output = attn_output.reshape(bsz, q_len, v_num_heads * v_head_dim)
+                    # print('final attn input', attn_output, attn_output.shape, flush=True)
+                    attn_output = self.o_proj(attn_output, probe_in_dim_indices=probe_vo_out_dim_indices)
+                    # if 'restore' in cfg['prune_name']:
+                    #     print('restore', flush=True)
+                    #     restore = restore.expand(bsz, q_len, self.hidden_size)
+                    #     attn_output = attn_output + restore
+                    # print('attn_output_final', attn_output, attn_output.shape, flush=True)
+                    if not output_attentions:
+                        attn_weights = None
+                    
+                    return attn_output, attn_weights, past_key_value
+                elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']):
+                    time_start = time.time()
+                    bsz, q_len, _ = hidden_states.size()
+
+                    q_num_heads, k_num_heads, v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
+                    q_head_dim, k_head_dim, v_head_dim = self.head_dim, self.head_dim, self.head_dim
+
+                    qk_prune_way = cfg['qk_prune_way']
+                    vo_prune_way = cfg['vo_prune_way']
+                    
+                    if vo_prune_way is None:
+                        probe_vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                    else:
+                        if torch.all(self.o_proj.get_global_metric_score_distribution() == 0):
+                            probe_vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                        else:
+                            probe_out_dim_metric = cal_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
+                            if 'globalratio' in cfg['prune_method']:
+                                probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+                            else:
+                                # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+                                probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                    
+                    if qk_prune_way is None:
+                        probe_qk_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                        probe_qk_out_dim_indices_for_rope = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                        # print('probe_qk_out_dim_indices', probe_qk_out_dim_indices, flush=True)
+                    else:
+                        if 'bv' in qk_prune_way:
+                            qk_prune_way = vo_prune_way
+                            q_num_heads, k_num_heads = v_num_heads, v_num_heads
+                            q_head_dim, k_head_dim = v_head_dim, v_head_dim
+                            probe_qk_out_dim_indices = probe_vo_out_dim_indices
+                            probe_qk_out_dim_indices_for_rope = probe_vo_out_dim_indices_for_rope
+                        
+                        # print('qk_prune_way', qk_prune_way, flush=True)
+                        # print('num_heads', q_num_heads, k_num_heads, flush=True)
+                        # print('head_dim', q_head_dim, k_head_dim, flush=True)
+
+                        # whole will prune neuron, no effect
+                        # if 'noqk' in cfg['prune_method'] and qk_prune_way != 'whole':
+                        #     qk_prune_way = None
+                        #     q_num_heads, k_num_heads = self.num_heads, self.num_heads
+                        #     q_head_dim, k_head_dim = self.head_dim, self.head_dim
+                        #     probe_qk_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                        #     probe_qk_out_dim_indices_for_rope = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                        
+                        
+                    query_states = self.q_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+                    key_states = self.k_proj(hidden_states, probe_out_dim_indices=probe_qk_out_dim_indices)
+                    value_states = self.v_proj(hidden_states, probe_out_dim_indices=probe_vo_out_dim_indices)
+
+                    print('query_states shape', query_states.shape, flush=True)
+                    query_states = query_states.view(bsz, q_len, q_num_heads, q_head_dim).transpose(1, 2)
+                    key_states = key_states.view(bsz, q_len, k_num_heads, k_head_dim).transpose(1, 2)
+                    value_states = value_states.view(bsz, q_len, v_num_heads, v_head_dim).transpose(1, 2)
+
+                    kv_seq_len = key_states.shape[-2]
+                    if past_key_value is not None:
+                        kv_seq_len += past_key_value[0].shape[-2]
+                    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                    
+                    if qk_prune_way is not None and 'each' in qk_prune_way:
+                        query_states, key_states = apply_rotary_pos_emb_for_prune_each_head(query_states, key_states, cos, sin, position_ids, probe_qk_out_dim_indices_for_rope)
+                    else:
+                        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+                    # print('query_states key_states after rotary', query_states, key_states, flush=True)
+                    if past_key_value is not None:
+                        # reuse k, v, self_attention
+                        key_states = torch.cat([past_key_value[0], key_states], dim=2)
+                        value_states = torch.cat([past_key_value[1], value_states], dim=2)
+
+                    past_key_value = (key_states, value_states) if use_cache else None
+                    key_states = repeat_kv(key_states, self.num_key_value_groups)
+                    value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+                    # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
+                    attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+
+                    if attn_weights.size() != (bsz, k_num_heads, q_len, kv_seq_len):
+                        raise ValueError(
+                            f"Attention weights should be of size {(bsz, k_num_heads, q_len, kv_seq_len)}, but is"
+                            f" {attn_weights.size()}"
+                        )
+
+                    if attention_mask is not None:
+                        if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+                            raise ValueError(
+                                f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+                            )
+                        attn_weights = attn_weights + attention_mask
+                        attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
+                    # upcast attention to fp32
+                    # attn_weights: bsz, self.num_heads, q_len, q_len
+                    # attn_weights: 1, self.num_heads, q_len, q_len
+                    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+                    # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
+                    # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
+                    print('attn_weights', attn_weights.shape, flush=True)
+                    print('value_states', value_states.shape, flush=True)
+                    attn_output = torch.matmul(attn_weights, value_states)
+                    # print('attn_output after value', attn_output)
+
+                    if attn_output.size() != (bsz, v_num_heads, q_len, v_head_dim):
+                        raise ValueError(
+                            f"`attn_output` should be of size {(bsz, v_num_heads, q_len, v_head_dim)}, but is"
+                            f" {attn_output.size()}"
+                        )
+
+                    attn_output = attn_output.transpose(1, 2).contiguous()
+
+                    # attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+                    attn_output = attn_output.reshape(bsz, q_len, v_num_heads * v_head_dim)
+
+                    attn_output = self.o_proj(attn_output, probe_in_dim_indices=probe_vo_out_dim_indices)
+                    if not output_attentions:
+                        attn_weights = None
+
+                    custom_duration = time.time() - time_start
+                    # print('custom_duration llama attention', custom_duration, flush=True)
+                    return attn_output, attn_weights, past_key_value
         else:
             time_start = time.time()
             # full inference
@@ -1605,7 +1813,7 @@ class LlamaAttention(nn.Module):
 
             custom_duration = time.time() - time_start
             # print('custom_duration llama attention', custom_duration, flush=True)
-        return attn_output, attn_weights, past_key_value
+            return attn_output, attn_weights, past_key_value
 
 
 
@@ -1654,9 +1862,11 @@ class LlamaDecoderLayer(nn.Module):
 
         start_time = time.time()
         residual = hidden_states
+        temp_attn_residual = copy.deepcopy(residual)
 
         hidden_states = self.input_layernorm(hidden_states)
 
+        kwargs['temp_mlp_residual'] = self.input_layernorm(kwargs['temp_mlp_residual'])
         # Self Attention
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
             hidden_states=hidden_states,
@@ -1668,14 +1878,154 @@ class LlamaDecoderLayer(nn.Module):
             **kwargs,
         )
 
+        prev_hidden_states = copy.deepcopy(hidden_states).to(torch.float32)
+        # print('prev_hidden_states', prev_hidden_states, prev_hidden_states.abs().sum(), flush=True)
+        # print('prev residual', temp_attn_residual, temp_attn_residual.to(torch.float32).abs().sum(), flush=True)
         hidden_states = residual + hidden_states
-
+        
         # Fully Connected
         residual = hidden_states
-        hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states, residual=residual)
+        temp_mlp_residual = copy.deepcopy(residual)
+        
 
+        # import numpy as np
+
+        def calculate_sign_match_and_difference_percentage(hidden_states, temp):
+            # Ensure hidden_states and temp are PyTorch tensors
+            hidden_states = torch.tensor(hidden_states)
+            temp = torch.tensor(temp)
+            
+            # Check if the signs match (True where signs match, False otherwise)
+            sign_matches = torch.sign(hidden_states) == torch.sign(temp)
+            
+            # Count the number of sign matches
+            sign_match_count = torch.sum(sign_matches).item()
+            
+            # Calculate the ratio of sign matches
+            total_elements = hidden_states.numel()
+            sign_match_ratio = sign_match_count / total_elements
+            
+            # Calculate the difference percentage for each position
+            # Use torch.clamp to avoid division by zero, setting a minimum value
+            hidden_states_nonzero = torch.clamp(hidden_states, min=1e-6, max=65504)
+            temp_nonzero = torch.clamp(temp, min=1e-6, max=65504)
+            difference_percentage = (torch.abs(temp_nonzero) / torch.abs(hidden_states_nonzero)) * 100
+            
+            # difference_sum = torch.sum(torch.abs(hidden_states - temp)) / hidden_states.numel()
+            return sign_match_count, sign_match_ratio, difference_percentage
+
+        flattened_hidden_states = hidden_states.flatten()
+        num_elements_to_select = max(1, int(0.10 * flattened_hidden_states.numel()))  # Top 10% of elements
+        # Select the top 10% elements based on their absolute value
+        abs_flattened_hidden_states = flattened_hidden_states.abs()
+        values, indices = torch.topk(abs_flattened_hidden_states, num_elements_to_select)
+
+        ## Retrieve the actual values from the original tensor using these indices
+        selected_values = flattened_hidden_states[indices].to(torch.float32)
+
+        # Calculate the L1 norm (sum of absolute values) and L2 norm (square root of sum of squares) of these values
+        l1_norm = selected_values.abs().sum()
+        l2_norm = torch.sqrt((selected_values ** 2).sum())
+
+        flattened_post_temp_attn_residual = temp_attn_residual.flatten()
+        post_temp_attn_residual_values = flattened_post_temp_attn_residual[indices].to(torch.float32)
+
+
+        l1_diff_norm = (selected_values - post_temp_attn_residual_values).abs().sum()
+        l2_diff_norm = torch.sqrt(((selected_values - post_temp_attn_residual_values) ** 2).sum())
+
+        sign_matches = torch.sign(selected_values) == torch.sign(post_temp_attn_residual_values)
+        sign_match_ratio = torch.sum(sign_matches).item() / num_elements_to_select    
+
+        cosine_similarity = torch.nn.functional.cosine_similarity(
+            selected_values.float(),  # Ensure the data type is float for cosine similarity computation
+            post_temp_attn_residual_values.float(),
+            dim=0  # Compute the cosine similarity across the dimension 0 (element-wise for vectors)
+        )
+
+
+        # print('before l1_norm', l1_norm, flush=True)
+        # print('before l2_norm', l2_norm, flush=True)
+        # print('before l1_diff_norm', l1_diff_norm, flush=True)
+        # print('before l2_diff_norm', l2_diff_norm, flush=True)
+        # print('before sign_match_ratio', sign_match_ratio, flush=True)
+        # print('before cosine_similarity', cosine_similarity, flush=True)
+
+
+        hidden_states = self.post_attention_layernorm(hidden_states)
+        post_temp_attn_residual = self.post_attention_layernorm(temp_attn_residual)
+
+        flattened_hidden_states = hidden_states.flatten()
+        num_elements_to_select = max(1, int(0.10 * flattened_hidden_states.numel()))  # Top 10% of elements
+        # Select the top 10% elements based on their absolute value
+        abs_flattened_hidden_states = flattened_hidden_states.abs()
+        values, indices = torch.topk(abs_flattened_hidden_states, num_elements_to_select)
+
+        ## Retrieve the actual values from the original tensor using these indices
+        selected_values = flattened_hidden_states[indices].to(torch.float32)
+
+        # Calculate the L1 norm (sum of absolute values) and L2 norm (square root of sum of squares) of these values
+        l1_norm = selected_values.abs().sum()
+        l2_norm = torch.sqrt((selected_values ** 2).sum())
+
+        flattened_post_temp_attn_residual = post_temp_attn_residual.flatten()
+        post_temp_attn_residual_values = flattened_post_temp_attn_residual[indices].to(torch.float32)
+
+
+        l1_diff_norm = (selected_values - post_temp_attn_residual_values).abs().sum()
+        l2_diff_norm = torch.sqrt(((selected_values - post_temp_attn_residual_values) ** 2).sum())
+
+        sign_matches = torch.sign(selected_values) == torch.sign(post_temp_attn_residual_values)
+        sign_match_ratio = torch.sum(sign_matches).item() / num_elements_to_select    
+
+        cosine_similarity = torch.nn.functional.cosine_similarity(
+            selected_values.float(),  # Ensure the data type is float for cosine similarity computation
+            post_temp_attn_residual_values.float(),
+            dim=0  # Compute the cosine similarity across the dimension 0 (element-wise for vectors)
+        )
+
+        # print('l1_norm', l1_norm, flush=True)
+        # print('l2_norm', l2_norm, flush=True)
+        # print('l1_diff_norm', l1_diff_norm, flush=True)
+        # print('l2_diff_norm', l2_diff_norm, flush=True)
+        # print('sign_match_ratio', sign_match_ratio, flush=True)
+        # print('cosine_similarity', cosine_similarity, flush=True)
+        # print('selected_values', selected_values, flush=True)
+        # print('post_temp_attn_residual_values', post_temp_attn_residual_values, flush=True)
+
+
+
+        # sign_match_count, sign_match_ratio, difference_percentage = calculate_sign_match_and_difference_percentage(hidden_states, post_residual)
+
+        # print("Number of Sign Matches:", sign_match_count)
+        # print("Ratio of Sign Matches:", sign_match_ratio)
+        # print("difference_percentage for Each Position:\n", difference_percentage)
+
+        # print('residual', residual)
+        # print('hidden_states', hidden_states)
+        # sorted_residual_values, _ = torch.sort(post_residual, dim=-1)
+        # sorted_hidden_states_values, _ = torch.sort(hidden_states, dim=-1)
+
+        # Set print options to ensure all values are printed if the tensors are not too large
+        # torch.set_printoptions(threshold=5000)
+
+        # # Print sorted values
+        # print('Sorted post residual:', sorted_residual_values)
+        # print('Sorted post hidden_states:', sorted_hidden_states_values)
+        hidden_states = self.mlp(hidden_states, post_attn_residual=post_temp_attn_residual)
+
+        
         hidden_states = residual + hidden_states
+        # sorted_residual_values, _ = torch.sort(temp_mlp_residual, dim=-1)
+        # sorted_hidden_states_values, _ = torch.sort(hidden_states, dim=-1)
+        # print('Sorted post residual:', sorted_residual_values)
+        # print('Sorted post hidden_states:', sorted_hidden_states_values)
+        # sign_match_count, sign_match_ratio, difference_percentage = calculate_sign_match_and_difference_percentage(hidden_states, temp)
+
+        # print("after mlp Number of Sign Matches:", sign_match_count)
+        # print("after mlp Ratio of Sign Matches:", sign_match_ratio)
+        # print("after mlp difference_percentage for Each Position:\n", difference_percentage)
+
 
         outputs = (hidden_states,)
 
@@ -1686,7 +2036,7 @@ class LlamaDecoderLayer(nn.Module):
             outputs += (present_key_value,)
         custom_duration = time.time() - start_time
         # print('custom_duration decoder layer', custom_duration, flush=True)
-        return outputs
+        return outputs, temp_mlp_residual
 
 
 LLAMA_START_DOCSTRING = r"""
@@ -1882,6 +2232,7 @@ class LlamaModel(LlamaPreTrainedModel):
 
         # embed positions
         hidden_states = inputs_embeds
+        temp_mlp_residual = inputs_embeds
 
         if self.gradient_checkpointing and self.training:
             if use_cache:
@@ -1912,13 +2263,14 @@ class LlamaModel(LlamaPreTrainedModel):
                     use_cache,
                 )
             else:
-                layer_outputs = decoder_layer(
+                layer_outputs, temp_mlp_residual = decoder_layer(
                     hidden_states,
                     attention_mask=attention_mask,
                     position_ids=position_ids,
                     past_key_value=past_key_value,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
+                    temp_mlp_residual=temp_mlp_residual
                 )
             # print('layer_outputs', layer_outputs, flush=True)
             hidden_states = layer_outputs[0]

@@ -120,6 +120,8 @@ class CsrAccuracy:
     def __init__(self):
         self.output_for_one_question = defaultdict(list)
         self.correct_labels_for_one_question = defaultdict(list)
+
+        self.average = []
         pass
     
     def add(self, input, output):
@@ -142,10 +144,14 @@ class CsrAccuracy:
         # non_pad_mask = target != cfg['pad_token_id']
         lm_logits = output['target']
         labels = input['target']
+
         bsz = lm_logits.size(0)
         
         shift_logits = lm_logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
+
+        label_length_per_sample = torch.sum(shift_labels != -100, dim=1)
+
         seq_len = shift_logits.size(1)
         # print('shift_logits', shift_logits)
         # print('shift_labels', shift_labels)
@@ -164,16 +170,21 @@ class CsrAccuracy:
         loss_per_sample = loss.sum(dim=1)
         # print('loss_per_sample', loss_per_sample)
 
-
-        # print('loss persample', loss_per_sample)
+        loss_fct = torch.nn.CrossEntropyLoss(reduction='mean')
+        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        self.average.append(loss.item())
+        print('loss persample', loss.item())
         # print('CsrAccuracy', loss_per_sample)
 
+        # completion_len = np.array([float(len(i)) for i in doc["choices"]])
+        # acc_norm = 1.0 if np.argmax(results / completion_len) == gold else 0.0
+
         for i in range(input['input_indices'].shape[0]):
-            self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item())
+            self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item()/label_length_per_sample[i].item())
             self.correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
 
         # a = 5
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs):    
         # print('self.output_for_one_question', self.output_for_one_question)
         # print('self.correct_labels_for_one_question', self.correct_labels_for_one_question)
         total_acc = 0
@@ -181,6 +192,10 @@ class CsrAccuracy:
             # argmin for positive loss
             acc = 1 if np.argmin(self.output_for_one_question[key]) == self.correct_labels_for_one_question[key][0] else 0
             total_acc += acc
+
+        
+        ppl = np.exp(np.mean(self.average))
+        print('pplforcsr', ppl)
 
         return (total_acc / len(self.output_for_one_question)) * 100
 
