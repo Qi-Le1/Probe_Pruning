@@ -124,7 +124,7 @@ class OPTEriModel(torch.nn.Module):
             # old_module might not have bias, bias=None
             # need to write into new_module, otherwise
             # the parent class will assign bias
-            print('old_module.bias', old_module.bias)
+            print('old_module has bias')
             new_module.bias = old_module.bias
 
     def __getattr__(self, name: str):
@@ -501,7 +501,7 @@ class Linear(nn.Linear, EriLayer):
             if cfg['calibration_stage'] == True:
                 # print('calibration_stage', flush=True)
                 self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
-                result = F.linear(x, self.weight, bias=None)
+                result = F.linear(x, self.weight, bias=self.bias)
                     # print('calibrateresult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)
                 return result
@@ -543,12 +543,12 @@ class Linear(nn.Linear, EriLayer):
                     #     result = torch.clamp(F.linear(x, self.weight ** 2, bias=None), min=None, max=65504)
                     #     print('probesquareresult', result.dtype, result.shape, result, flush=True)
                     # else:
-                    result = F.linear(x, self.weight, bias=None)
+                    result = F.linear(x, self.weight, bias=self.bias)
                     # print('proberesult', result.dtype, result.shape, result, flush=True)
                     result = result.to(previous_dtype)
                     return result
                 elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:                 
-                    result = F.linear(x, self.weight, bias=None)
+                    result = F.linear(x, self.weight, bias=self.bias)
                     result = result.to(previous_dtype)
                     return result
 
@@ -563,12 +563,14 @@ class Linear(nn.Linear, EriLayer):
                 if 'probe_out_dim_indices' in kwargs:
                     if 'attn' in self.key:
                         weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
+                        bias = self.bias[kwargs['probe_out_dim_indices'].to(self.weight.device)]
                         if self.check_fill_case():
                             # print('fill', flush=True)
                             self.out_selected_dim = kwargs['probe_out_dim_indices']
                     else:
                         weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
-                    result = F.linear(x, weight, bias=None)
+                        bias = self.bias[kwargs['probe_out_dim_indices'].to(self.weight.device)]
+                    result = F.linear(x, weight, bias=bias)
                     if 'attn' in self.key:
                         if self.check_fill_case():
                             # print('fill', flush=True)
@@ -582,11 +584,12 @@ class Linear(nn.Linear, EriLayer):
                         weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
                     else:
                         weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
-                    result = F.linear(x, weight, bias=None)
+                    result = F.linear(x, weight, bias=self.bias)
                     result = result.to(previous_dtype)
                     return result
                 else:
                     # only prune input in each layer
+                    # TODO: fix later
                     if 'traditional' in cfg['prune_method']:
                         x, pruned_dim, preserve_channels = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.is_prune_out_dim)
                         weight = self.extract_in_weight(input_dim, pruned_dim, preserve_channels, self.layer_type)
@@ -611,7 +614,7 @@ class Linear(nn.Linear, EriLayer):
                     # print('calibrateinput 2', x.dtype, x.shape, x, flush=True)
                     # print('calibrateweight 2', weight.dtype, weight.shape, weight, flush=True)
                     # print('here')
-                    result = F.linear(x, weight, bias=None)
+                    result = F.linear(x, weight, bias=self.bias)
                     # print('calibrateresult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)
                 return result

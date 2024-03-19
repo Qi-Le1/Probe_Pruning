@@ -10,7 +10,7 @@ from diffusers import (
     UNet2DConditionModel,
 )
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification, \
-    AutoTokenizer, LlamaTokenizer, AutoModelForMultipleChoice, AutoModel
+    AutoTokenizer, LlamaTokenizer, AutoModelForMultipleChoice, AutoModel, AutoConfig
 # from transformers import LlamaForCausalLM
 from .hf.modeling_llama import LlamaForCausalLM
 from .hf.modeling_opt import OPTForCausalLM
@@ -79,8 +79,14 @@ def make_hf_model(model_name, sub_model_name=None):
         # if '1.3b' in model_name:
         #     cfg['model_name_or_path'] = 'facebook/opt-1.3b'
         #     cfg['tokenizer_name_or_path'] = 'facebook/opt-1.3b'
-        cfg['model_name_or_path'] = f"facebook/{cfg['model_name']}"
-        cfg['tokenizer_name_or_path'] = f"facebook/{cfg['model_name']}"
+
+        # cant load it from hf online, has config file issue
+        if model_name == 'opt-6.7b':
+            cfg['model_name_or_path'] = f"output/{cfg['model_name']}"
+            cfg['tokenizer_name_or_path'] = f"output/{cfg['model_name']}"
+        else:
+            cfg['model_name_or_path'] = f"facebook/{cfg['model_name']}"
+            cfg['tokenizer_name_or_path'] = f"facebook/{cfg['model_name']}"
     elif 'llama-2' in model_name:
         # https://huggingface.co/docs/transformers/main/model_doc/llama2
         # FOLLOW the instruction to run the script: python convert_llama_weights_to_hf.py --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir output/llama-2-7b
@@ -100,6 +106,7 @@ def make_hf_model(model_name, sub_model_name=None):
             # model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], torch_dtype=torch.float16,
             #                                         device_map=device_map, low_cpu_mem_usage=low_cpu_mem_usage)
         elif 'opt' in model_name:
+            # Load the model configuration
             model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map=device_map)
         else:
             model = AutoModelForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'],

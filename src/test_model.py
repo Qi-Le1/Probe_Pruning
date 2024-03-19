@@ -86,6 +86,8 @@ def runExperiment():
         print('Calibration Done...')
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
+
+    # return
     test(data_loader['test'], model, model_prof, metric, test_logger)
     pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
     

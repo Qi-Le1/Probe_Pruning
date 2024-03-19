@@ -581,7 +581,8 @@ def main():
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['10'], ['128'], ['0.0', '0.2', '0.3', '0.7', '0.8'], 
+
+            control_name = [[['wikitext-2v1'], ['opt-6.7b'], ['clm'], ['10'], ['128'], ['0.0', '0.2', '0.3', '0.7', '0.8'], 
                              [
                                 #  'mag-calib-probe-None-None+c4-2000',
                             #   'mag-calibrunningmean-probe-None-None+c4-2000',
@@ -589,10 +590,10 @@ def main():
                             'mag-calibema0.99-probe-None-None-None+c4-2000',
                             # 'mag-similarityprobedynaratiosavemetricseqema0.99calib-probe-None-None-None+c4-2000',
 
-                            'mag-nmlsquareasync0.0multiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None-None+c4-2000',
-                            'mag-maxmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None-None+c4-2000',
+                            # 'mag-nmlsquareasync0.0multiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None-None+c4-2000',
+                            # 'mag-maxmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None-None+c4-2000',
 
-                            'mag-maxmultiprobe1probemaxsavemetricseqema0.99calib-probe-None-None-None+c4-2000',
+                            # 'mag-maxmultiprobe1probemaxsavemetricseqema0.99calib-probe-None-None-None+c4-2000',
 
                             'mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None-None+c4-2000',
                             # 'mag-calibema0.99noqk-probe-None-None-fill+c4-2000',
@@ -607,9 +608,10 @@ def main():
                             
                             ],
         
-                            ['gate-proj+up-proj+down-proj']]]
+                            ['fc1+fc2']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+
 
             
 

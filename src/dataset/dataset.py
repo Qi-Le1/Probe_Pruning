@@ -312,7 +312,8 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     return model_inputs
                 for _ in range(cfg['calibration_nsamples']):
                     while True:
-                        i = random.randint(0, len(inputs) - 1)
+                        # i = random.randint(0, len(inputs) - 1)
+                        i = torch.randint(0, len(inputs), (1,)).item()
                         # i = 1
                         trainenc = tokenizer(inputs[i], return_tensors='pt')
                         # print('trainenc.input_ids.shape[1]', trainenc.input_ids.shape[1])
@@ -322,13 +323,16 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     if processed_calibrate_sample_num > cfg['calibration_nsamples']:
                         return model_inputs
                     # i = 1
-                    i = random.randint(0, trainenc.input_ids.shape[1] - max_length - 1)
+                    # i = random.randint(0, trainenc.input_ids.shape[1] - max_length - 1)
+                    i = torch.randint(0, trainenc.input_ids.shape[1] - max_length, (1,)).item()
+                    print('icalib', i)
                     j = i + max_length
                     inp = trainenc.input_ids[0][i:j]
                     tar = inp.clone()
                     tar[:-1] = -100
                     model_inputs['input_ids'].append(inp)
-                    model_inputs['attention_mask'].append(trainenc.attention_mask[:, i:j])
+                    model_inputs['attention_mask'].append(trainenc.attention_mask[0][i:j])
+                    # print('trainenc.attention_mask[0][i:j]shapoe', trainenc.attention_mask[0][i:j].shape)
                     model_inputs['labels'].append(tar)
                 return model_inputs
 
@@ -361,7 +365,8 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                 input_chunks = []
                 mask_chunks = []
                 for i in range(cfg['calibration_nsamples']):
-                    i = random.randint(0, len(input_ids) - max_length - 1)
+                    # i = random.randint(0, len(input_ids) - max_length - 1)
+                    i = torch.randint(0, len(input_ids) - max_length, (1,)).item()
                     j = i + max_length
                     input_chunks.append(input_ids[i: j])
                     mask_chunks.append(attention_mask[i: j])
@@ -433,7 +438,10 @@ def process_dataset(dataset, tokenizer):
                 input_chunks = []
                 mask_chunks = []
                 for i in range(num_samples):
-                    i = random.randint(0, len(input_ids) - max_length - 1)
+                    print('ibefore', i)
+                    # i = random.randint(0, len(input_ids) - max_length - 1)
+                    i = torch.randint(0, len(input_ids) - max_length, (1,)).item()
+                    print('iafter', i)
                     j = i + max_length
                     input_chunks.append(input_ids[i: j])
                     mask_chunks.append(attention_mask[i: j])
