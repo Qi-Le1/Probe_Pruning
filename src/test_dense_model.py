@@ -14,13 +14,14 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix
+    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, update_model_prof, model_forward
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 from lm_eval import tasks
 from lm_eval import evaluator
 
 
-cudnn.benchmark = True
+
+cudnn.benchmark = False
 parser = argparse.ArgumentParser(description='cfg')
 for k in cfg:
     exec('parser.add_argument(\'--{0}\', default=cfg[\'{0}\'], type=type(cfg[\'{0}\']))'.format(k))
@@ -104,28 +105,31 @@ def runExperiment():
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
+    model = make_prune_model(model)
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    test(data_loader['test'], model, model_prof, metric, test_logger)
-    dense_info_list, dense_duration = get_model_profile('dense', model_prof)
+    inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
+    dense_info_list = get_model_profile('dense', model_prof)
     print('dense_info_list', dense_info_list)
-    print('dense_duration', dense_duration)
+    print('inference_duration', inference_duration)
     # thread lock bug
     test_logger.writer = None
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
-              'dense_info_list': dense_info_list, 'dense_duration': dense_duration}
+              'dense_info_list': dense_info_list, 'dense_duration': inference_duration}
 
     save(result, os.path.join(result_path, cfg['model_tag']))
     return
 
 
-def test(data_loader, model, model_prof, metric, logger):
-    print("Debug 12.01: Test logger created", flush=True)
-    start_time = time.time()
+
+
+def test(data_loader, model, model_prof, metric, logger):   
     with torch.no_grad():
         model_prof.start_profile()
+        update_model_prof(model_prof)
         model.train(False)
-        print("Debug 12.011: Test logger created", flush=True)
+        start_time = time.time()
+        inference_duration = 0
         for i, input in enumerate(data_loader):
             print("Debug 12.1: Test logger created", flush=True)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
@@ -133,7 +137,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output = model(**input)
+                output, inference_duration = model_forward(model, input, inference_duration)
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             elif cfg['task_name'] in ['csr']:
@@ -146,7 +150,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output = model(**input)
+                output, inference_duration = model_forward(model, input, inference_duration)
                 input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
                 # print('outputloss', output['loss'])
@@ -158,16 +162,6 @@ def test(data_loader, model, model_prof, metric, logger):
                 output = model(**input)
                 input_ = {'target': input['target']}
                 output_ = {'target': output['target'], 'loss': output['loss']}
-            if cfg['task_name'] == 's2s':
-                output_['generate'] = model.generate(input_ids=input["input_ids"],
-                                                    max_new_tokens=cfg['max_new_tokens'])
-            elif cfg['task_name'] == 'clm':
-                if cfg['data_name'] in ['dolly']:
-                    output_['generate'] = model.generate(input_ids=input["input_ids"],
-                                                        attention_mask=input["attention_mask"],
-                                                        max_new_tokens=cfg['max_new_tokens'],
-                                                        eos_token_id=cfg['pad_token_id'],
-                                                        no_repeat_ngram_size=2)
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
             print('evaluation_for_batch', evaluation)
@@ -180,6 +174,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
+        print('inference_duration', inference_duration)
         evaluation = metric.evaluate('test', 'full')
         print('evaluation_for_full', evaluation)
         logger.append(evaluation, 'test')
@@ -188,7 +183,7 @@ def test(data_loader, model, model_prof, metric, logger):
         print(logger.write('test', metric.metric_name['test']), flush=True)
         model_prof.stop_profile()
         print("Debug 12.2: Test logger created", flush=True)
-    return
+    return inference_duration
 
 
 if __name__ == "__main__":

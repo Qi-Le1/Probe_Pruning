@@ -378,19 +378,19 @@ class LlamaMLP(nn.Module):
                     time_start = time.time()
                     temp_gate = self.act_fn(self.gate_proj(x))
                     custom_duration = time.time() - time_start
-                    # print('custom_duration gate', custom_duration, flush=True)
+                    print('custom_duration gate', custom_duration, flush=True)
 
                     time_start = time.time()
                     temp_up = self.up_proj(x)
                     custom_duration = time.time() - time_start
-                    # print('custom_duration up', custom_duration, flush=True)
+                    print('custom_duration up', custom_duration, flush=True)
                     time_start = time.time()
                     # print('original gateup', temp_gate * temp_up, flush=True)
                     down_proj = self.down_proj(temp_gate * temp_up)
                     custom_duration = time.time() - time_start
-                    # print('custom_duration down', custom_duration, flush=True)
+                    print('custom_duration down', custom_duration, flush=True)
                     mlp_duration = time.time() - mlp_duration_start
-                    # print('mlp_duration', mlp_duration, flush=True)
+                    print('mlp_duration', mlp_duration, flush=True)
                     del temp_gate, temp_up
                     return down_proj
                     # and self.layer_order >= 5

@@ -13,14 +13,16 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load
+    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 iterate_small_samples = False
 # iterate_small_samples = True
-cudnn.benchmark = True
+
+cudnn.benchmark = False
+# torch.use_deterministic_algorithms(True)
 parser = argparse.ArgumentParser(description='cfg')
 for k in cfg:
     exec('parser.add_argument(\'--{0}\', default=cfg[\'{0}\'], type=type(cfg[\'{0}\']))'.format(k))
@@ -86,20 +88,19 @@ def runExperiment():
         print('Calibration Done...')
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-
     # return
-    test(data_loader['test'], model, model_prof, metric, test_logger)
-    pruned_info_list, pruned_duration = get_model_profile('pruned', model_prof)
+    inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
+    pruned_info_list = get_model_profile('pruned', model_prof)
     
     # print('dense_info_list', dense_info_list[0], dense_info_list[1])
-    summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, test_logger)
+    summarize_info_list(dense_info_list, pruned_info_list, dense_duration, inference_duration, test_logger)
     evaluation = metric.evaluate('test', 'full')
     print('evaluation_for_full', evaluation)
     # thread lock bug
     test_logger.writer = None
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
               'dense_info_list': dense_info_list, 'pruned_info_list': pruned_info_list, \
-              'dense_duration': dense_duration, 'pruned_duration': pruned_duration, 'dataset_size': cfg['dataset_size']['test']}
+              'dense_duration': dense_duration, 'pruned_duration': inference_duration, 'dataset_size': cfg['dataset_size']['test']}
     save(result, os.path.join(result_path, cfg['model_tag']))
     return
 
@@ -292,7 +293,7 @@ def run_calibration(model, data_loader):
             if iterate_small_samples:
                 if i == 100:
                     break
-            # break
+            break
         if 'globalratio' in cfg['prune_method']:
             global_determine_ratio(model)
             # global_determine_ratio(model, if_log=True)
@@ -303,20 +304,20 @@ def run_calibration(model, data_loader):
 
 
 def test(data_loader, model, model_prof, metric, logger):
-    # print("Debug 12.01: Test logger created", flush=True)
     start_time = time.time()
     with torch.no_grad():
         model_prof.start_profile()
-        model.eval()
-        # print("Debug 12.011: Test logger created", flush=True)
+        update_model_prof(model_prof)
+        model.train(False)
+        start_time = time.time()
+        inference_duration = 0
         for i, input in enumerate(data_loader):
-            # print("Debug 12.1: Test logger created", flush=True)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output = model(**input)
+                output, inference_duration = model_forward(model, input, inference_duration)
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             elif cfg['task_name'] in ['csr']:
@@ -327,10 +328,9 @@ def test(data_loader, model, model_prof, metric, logger):
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output = model(**input)
+                output, inference_duration = model_forward(model, input, inference_duration)
                 input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
-                # print('outputloss', output['loss'])
             else:
                 input = collate(input)
                 input_size = input['data'].size(0)
@@ -338,22 +338,12 @@ def test(data_loader, model, model_prof, metric, logger):
                 output = model(**input)
                 input_ = {'target': input['target']}
                 output_ = {'target': output['target'], 'loss': output['loss']}
-            if cfg['task_name'] == 's2s':
-                output_['generate'] = model.generate(input_ids=input["input_ids"],
-                                                    max_new_tokens=cfg['max_new_tokens'])
-            elif cfg['task_name'] == 'clm':
-                if cfg['data_name'] in ['dolly']:
-                    output_['generate'] = model.generate(input_ids=input["input_ids"],
-                                                        attention_mask=input["attention_mask"],
-                                                        max_new_tokens=cfg['max_new_tokens'],
-                                                        eos_token_id=cfg['pad_token_id'],
-                                                        no_repeat_ngram_size=2)
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
             print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
-            # break
+            break
             if iterate_small_samples:
                 if i == 100:
                     break
@@ -399,7 +389,7 @@ def test(data_loader, model, model_prof, metric, logger):
                         logger.append({f'{name}_{attr_name}': attr_value}, 'test')
 
         print("Debug 12.2: Test logger created", flush=True)
-    return
+    return inference_duration
 
 
 if __name__ == "__main__":

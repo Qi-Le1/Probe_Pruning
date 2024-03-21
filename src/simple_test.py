@@ -40,6 +40,7 @@ import time
 
 import torch
 import torch.nn as nn
+torch.backends.cudnn.benchmark = False
 
 class CustomModel(nn.Module):
     def __init__(self, in_shape=4096, out_shape=11008, device='cuda:0'):
@@ -65,65 +66,114 @@ class CustomModel(nn.Module):
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = CustomModel(device=device)
 model.to(device)  # Move model to the appropriate device
+x = torch.randn(10, 128, 4096).to(device)
+x_sample = torch.randn(1, 128, 4096).to(device)
 
 # Function to measure extraction time
-def measure_extraction_time(indices):
+def matrix_multiplication(x):
     start = time.time()
     # Ensure the operation is performed on the GPU
-    _ = model.linear1.weight[indices, :].to(device)
-    torch.cuda.synchronize()  # Wait for GPU operations to complete
+    _ = model.linear1.weight.to(device)
+    _ = F.linear(x, model.linear1.weight)
+    # torch.cuda.synchronize()  # Wait for GPU operations to complete
     return time.time() - start
 
 def measure_row_extraction_time(indices):
     start = time.time()
     # Ensure the operation is performed on the GPU
     _ = model.linear1.weight[:, indices].to(device)
-    torch.cuda.synchronize()  # Wait for GPU operations to complete
-    return time.time() - start
+    # torch.cuda.synchronize()  # Wait for GPU operations to complete
+    # return time.time() - start
 
 # Extraction sizes and their corresponding times
 extraction_sizes = [640, 1280, 2560, 4096]
 sorted_times = []
 unsorted_times = []
+stream1 = torch.cuda.Stream()
+stream2 = torch.cuda.Stream()
+
+    # start_time = time.time()
+    # with torch.cuda.stream(stream1):
+    #     time_sorted = measure_extraction_time(sorted_indices)
+ 
+    # with torch.cuda.stream(stream2):
+    #     time_unsorted = measure_extraction_time(unsorted_indices)
+    
+    # # 等待两个流上的操作完成
+    # # torch.cuda.synchronize(stream1)
+    # # torch.cuda.synchronize(stream2)
+    # end_time_1 = time.time() - start_time
 
 for size in extraction_sizes:
     # Sorted indices
+
+
     sorted_indices = torch.arange(size, device=device)
     
     # Unsorted indices: Shuffle the sorted indices
     unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
-    print('sorted_indices', sorted_indices)
-    print('unsorted_indices', unsorted_indices)
+    # print('sorted_indices', sorted_indices)
+    # print('unsorted_indices', unsorted_indices)
     # Measure time for sorted indices
-    time_sorted = measure_extraction_time(sorted_indices)
-    sorted_times.append(time_sorted)
+    time_sorted = matrix_multiplication(x)
+
+    start_time = time.time()
+    time_sorted = matrix_multiplication(x)
+    time_sorted = matrix_multiplication(x)
+    time_sorted = matrix_multiplication(x)
+    measure_row_extraction_time(unsorted_indices)
+    measure_row_extraction_time(unsorted_indices)
+    # sorted_times.append(time_sorted)
     
     # Measure time for unsorted indices
-    time_unsorted = measure_extraction_time(unsorted_indices)
-    unsorted_times.append(time_unsorted)
+    # time_unsorted = matrix_multiplication(unsorted_indices)
+    # time_sorted = matrix_multiplication(sorted_indices)
+    # time_sorted = matrix_multiplication(sorted_indices)
+    # unsorted_times.append(time_unsorted)
+    torch.cuda.synchronize()
+    end_time = time.time() - start_time
 
-    print(f"Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds, Time (unsorted): {time_unsorted:.6f} seconds")
-
-extraction_sizes = [640, 1280, 2560, 4096]
-sorted_times = []
-unsorted_times = []
-
-for size in extraction_sizes:
-    # Sorted indices
-    sorted_indices = torch.arange(size, device=device)
+    # stream2 = torch.cuda.Stream()
+    start_time = time.time()
+    # with torch.cuda.stream(stream1):
+    with torch.cuda.stream(stream1):
+        time_sorted = matrix_multiplication(x_sample)
+        time_sorted = matrix_multiplication(x_sample)
+        time_sorted = matrix_multiplication(x_sample)
+        measure_row_extraction_time(unsorted_indices)
+        measure_row_extraction_time(unsorted_indices)
     
-    # Unsorted indices: Shuffle the sorted indices
-    unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
-    
-    # Measure time for sorted indices
-    time_sorted = measure_row_extraction_time(sorted_indices)
-    sorted_times.append(time_sorted)
-    
-    # Measure time for unsorted indices
-    time_unsorted = measure_row_extraction_time(unsorted_indices)
-    unsorted_times.append(time_unsorted)
+    time_unsorted = matrix_multiplication(x)
+    time_sorted = matrix_multiplication(x)
+    time_sorted = matrix_multiplication(x)
+    torch.cuda.synchronize(stream1)
+    torch.cuda.synchronize()
+    end_time_2 = time.time() - start_time
 
-    print(f"Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds, Time (unsorted): {time_unsorted:.6f} seconds")
+    # total time with stream: {end_time_1:.6f} seconds,
+    print(f"Extraction size: {size}, total time: {end_time:.6f} seconds,  total time with one stream: {end_time_2:.6f} seconds")
+    # print(f"Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds, Time (unsorted): {time_unsorted:.6f} seconds")
+
+# extraction_sizes = [640, 1280, 2560, 4096]
+# sorted_times = []
+# unsorted_times = []
+
+# for size in extraction_sizes:
+#     # Sorted indices
+#     sorted_indices = torch.arange(size, device=device)
+    
+#     # Unsorted indices: Shuffle the sorted indices
+#     unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
+    
+#     # Measure time for sorted indices
+#     time_sorted = measure_row_extraction_time(sorted_indices)
+#     sorted_times.append(time_sorted)
+    
+#     # Measure time for unsorted indices
+#     time_unsorted = measure_row_extraction_time(unsorted_indices)
+#     unsorted_times.append(time_unsorted)
+
+#     print(f"Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds, Time (unsorted): {time_unsorted:.6f} seconds")
 
 # input = torch.randn(2, 3, 4)
 # weight = torch.randn(4, 5)

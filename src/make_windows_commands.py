@@ -544,6 +544,43 @@ def main():
 
 
 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.0', '0.3', '0.6', '0.8'], 
+                             [
+                                #  'mag-calib-probe-None-None+c4-2000',
+                            #   'mag-calibrunningmean-probe-None-None+c4-2000',
+                            # 'mag-calibnoqkema0.99-probe-None-None-fill+c4-2000',
+                            'mag-calibnoqkema0.99-probe-None-None-each+c4-2000',
+
+                            'mag-calibema0.99-probe-None-None-fill+c4-2000',
+                            'mag-nmlprobedynaratiosavemetricseqcalibema0.99-probe-probe10None-probe10None-probe1each+c4-2000',
+
+                            'mag-nmlprobedynaratiosavemetricseqcalibema0.99-probe-probe10None-probe10None-probe1fill+c4-2000',
+                            'mag-nmlprobedynaratiosavemetricseqcalibema0.99-probe-probe10None-probe10None-probe5each+c4-2000',
+                            'mag-nmlprobedynaratiosavemetricseqcalibema0.99-probe-probe1None-probe1None-probe1each+c4-2000',
+
+                            'mag-nmlprobedynaratiosavemetricseqcalibema0.99-probe-probe10None-probe10None-probe10each+c4-2000',
+
+                            'mag-nmlprobedynaratiosavemetricseqcalibema0.99-probe-probe1None-probe1None-probe10each+c4-2000',
+
+                            'mag-nmlprobedynaratiosavemetricseqcalibema0.99-probe-probe10whole-probe10whole-probe1whole+c4-2000',
+                            # 'mag-calibema0.99-probe-None-None-whole+c4-2000',
+
+                            # 'mag-calibema0.99noqk-probe-None-None-fill+c4-2000',
+                            # 'mag-calibnoqk-probe-None-None-fill+c4-2000',
+                            # 'mag-calibnoqk-probe-None-None-each+c4-2000',
+
+                            # 'mag-globalratiostdcalibema0.99noqk-probe-None-None-fill+c4-2000',
+                            # 'mag-calibema0.99noqk-probe-None-None-each+c4-2000',
+                            # 'mag-calibema0.99noqk-probe-None-None-whole+c4-2000',
+                            # 'mag-savemetricseqcalibema0.99-probe-None-None+c4-2000',
+                            # 'mag-globalratiostdcalibema0.99-probe-None-None+c4-2000',
+                            
+                            ],
+        
+                            ['gate-proj+up-proj+down-proj']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
             control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.3', '0.6', '0.8'], 
                              [
                                 #  'mag-calib-probe-None-None+c4-2000',
@@ -580,7 +617,6 @@ def main():
                             ['q-proj+k-proj+v-proj+o-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
-
 
             control_name = [[['wikitext-2v1'], ['opt-6.7b'], ['clm'], ['10'], ['128'], ['0.0', '0.2', '0.3', '0.7', '0.8'], 
                              [
@@ -873,7 +909,7 @@ def main():
         controls = []
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0'], ['dense'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0'], ['dense'],
                     ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)

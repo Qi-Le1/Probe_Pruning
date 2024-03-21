@@ -22,7 +22,7 @@ def process_control():
                 cfg['tc_multiple'] = 8
 
 
-
+    cfg['async_way'] = None
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
