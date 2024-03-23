@@ -18,10 +18,8 @@ import os
 
 class BasePruning:
     def __init__(self, cfg):
-        self.prune_name = cfg['prune_name']
         self.prune_metric = cfg['prune_metric']
         self.prune_hyper = cfg['prune_hyper'] 
-        self.prune_dim = cfg['prune_dim'] 
         self.logger_detailed_info = cfg['logger_detailed_info']
 
         self.pq_p = cfg['pq_p']
@@ -188,7 +186,7 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     # # Compute slope
     # slopes = dy / dx
     
-    # if 'low' in cfg['prune_name']:
+    # if 'low' in cfg['prune_method']:
     #     # avoid edge case of slope
     #     window_size = 21  # 10 neighbors on each side + the element itself
 
@@ -210,7 +208,7 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     # Compute slope
     slopes = dy / dx
 
-    if 'low' in cfg['prune_name']:
+    if 'low' in cfg['prune_method']:
         # Avoid edge case of slope, just randomly pick this number
         window_size = 20  # 10 neighbors on each side + the element itself
 
@@ -259,7 +257,7 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
         dimension = dimension[first_phase_transition]
 
         print("Index of negative value closest to zero low:", first_phase_transition, sorted_tensor.shape[0], lower_bound, dimension)
-    elif 'high' in cfg['prune_name']:
+    elif 'high' in cfg['prune_method']:
         slopes = torch.abs(dy / dx)
         threshold = 0.05 * slopes.shape[0]
         indices = torch.where(slopes > threshold)[0]
@@ -525,7 +523,7 @@ class HiddenRepresentationPruning(BasePruning):
         if out_dim:
             self.scaler_in = torch.zeros((in_dim), device=self.device)
         self.nsamples = 0
-        if 'pq' in cfg['prune_name']:
+        if 'pq' in cfg['prune_method']:
             self.pq_p = cfg['pq_p']
             self.pq_q = cfg['pq_q']
             self.eta = cfg['prune_hyper']
@@ -544,12 +542,12 @@ class HiddenRepresentationPruning(BasePruning):
         
     def sort_probe_mlp_metric(self, probe_out_dim_metric, multiple, pruning_ratio=None):
         self.prune_hyper = pruning_ratio if pruning_ratio is not None else self.prune_hyper
-        probe_out_dim_metric.abs_()
+        # probe_out_dim_metric.abs_()
         # probe_out_dim_metric = probe_out_dim_metric.to(torch.float32)
         # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
         sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
-        print(f'{self.key} sorted_value', sorted_value)
-        print(f'{self.key} pruning ratio', self.prune_hyper)
+        # print(f'{self.key} sorted_value', sorted_value)
+        # print(f'{self.key} pruning ratio', self.prune_hyper)
         # normalized_sorted_value = sorted_value / sorted_value.sum()
         # print(f'{self.key} normalized_sorted_value', normalized_sorted_value)
         # mean = torch.mean(sorted_value)
@@ -559,9 +557,9 @@ class HiddenRepresentationPruning(BasePruning):
         # standardlized_value = (sorted_value - mean) / std
         # print(f'{self.key} standardlized_value', standardlized_value)
         # num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
-        if 'mag' in cfg['prune_name']:
+        if 'mag' in cfg['prune_method']:
             num_prune = int(self.prune_hyper * probe_out_dim_metric.shape[0])
-        elif 'pq' in cfg['prune_name']:
+        elif 'pq' in cfg['prune_method']:
             print('mean', torch.mean(sorted_value), 'std', torch.std(sorted_value))
 
             # mean = torch.mean(sorted_value)
@@ -612,134 +610,7 @@ class HiddenRepresentationPruning(BasePruning):
                 # adjusted_sorted_value = sorted_value
             num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
 
-#             data = sorted_value.cpu().numpy()
-#             stat, p = shapiro(data)
-#             print('Shapiro-Wilk Test: Statistics=%.3f, p=%.3f' % (stat, p))
 
-#             # Interpret
-#             alpha = 0.05
-#             if p > alpha:
-#                 print('Sample looks Gaussian (fail to reject H0)')
-#             else:
-#                 print('Sample does not look Gaussian (reject H0)')
-
-
-#             from scipy.stats import kstest, norm, laplace
-
-# # Assuming 'data' is your raw data
-#             # Note: No pre-normalization before these tests
-#             # You can estimate the parameters (mean and std for Gaussian, location and scale for Laplace) from your data if needed.
-
-#             # KS test against Gaussian distribution, using data as-is or with estimated parameters
-#             stat, p = kstest(data, 'norm', args=(data.mean(), data.std()))
-#             print(f'KS Test against Gaussian: stat={stat:.3f}, p={p:.3f}')
-
-#             # KS test against Laplace distribution, using data as-is or with estimated parameters
-#             # For Laplace, parameters are location (median) and scale (diversity, which can be estimated)
-#             location, scale = laplace.fit(data)  # Fit might be used to estimate parameters based on your data
-#             stat_laplace, p_laplace = kstest(data, 'laplace', args=(location, scale))
-#             print(f'KS Test against Laplace: stat={stat_laplace:.3f}, p={p_laplace:.3f}')
-
-#             from scipy.stats import kstest, gamma
-#             a, loc, scale = gamma.fit(data)
-#             print(f'Gamma distribution fit: a={a:.3f}, loc={loc:.3f}, scale={scale:.3f}')
-#             # Perform the KS test against the Gamma distribution
-#             stat, p = kstest(data, 'gamma', args=(a, loc, scale))
-
-#             print(f'KS Test against Gamma: stat={stat:.3f}, p={p:.3f}')
-
-
-#             from scipy.stats import kstest, lognorm
-
-#             # Fit parameters from data
-#             shape, loc, scale = lognorm.fit(data, floc=0)  # Force location parameter to zero for fitting
-
-#             # Perform KS test against fitted log-normal distribution
-#             stat, p = kstest(data, 'lognorm', args=(shape, loc, scale))
-#             print(f'KS Test against Log-Normal: stat={stat:.3f}, p-value={p:.3f}')
-#                         # print('\nstdddddddd')
-#             import scipy.stats as stats
-
-#             # Assuming 'data' is your layer's data
-#             skewness = stats.skew(data)
-#             kurtosis = stats.kurtosis(data, fisher=False)  # Set fisher=False to get kurtosis in comparison to normal distribution (which is 3)
-
-#             print(f"Skewness: {skewness}")
-#             print(f"Kurtosis: {kurtosis}")
-#             # sorted_value = (sorted_value - torch.mean(sorted_value)) / torch.std(sorted_value) 
-#             # print(f'{self.key} standardlized_value', sorted_value)
-#             # # ensure value > 0
-#             # sorted_value = (sorted_value - torch.min(sorted_value))
-     
-#             # # sorted_value, best_lambda = stats.boxcox(sorted_value)
-#             # # print(f'{self.key} box_cox_transformation', sorted_value)
-#             # # if high_outliers_num > 0:  # Check to ensure we have outliers to exclude
-#             # #     sorted_value = sorted_value[: -high_outliers_num]
-#             # # else:
-#             # #     adjusted_sorted_value = sorted_value
-#             # num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
-#             # nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_value, 1, 0.5)
-#             # # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm)
-#             # # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm)
-#             # ratio = (nominator_varying_vector_norm / denominator_varying_vector_norm)
-#             # print(f'{self.key}_ratio', ratio)
-#                # print(f'{self.key} standardlized_value after adding', sorted_value)
-#             # Choose a lambda for the Box-Cox transformation
-#             # lam = 0.5  # Example lambda value, you might need to adjust this based on your data
-#             # total_sum = sorted_value.sum()
-#             # sorted_value = sorted_value / total_sum
-#             # # Apply the Box-Cox transformation
-#             # sorted_value = self.box_cox_transformation(sorted_value, -2)
-#             # sorted_value_np = sorted_value.cpu().numpy()
-
-#             # # Apply the Box-Cox transformation
-#             # transformed_value, best_lambda = stats.boxcox(sorted_value_np)
-
-#             # # Optionally, convert the transformed data back to a PyTorch tensor
-#             # sorted_value = torch.from_numpy(transformed_value).to(probe_out_dim_metric.device)
-
-#             import numpy as np
-#             import matplotlib.pyplot as plt
-#             from scipy.signal import find_peaks
-#             from scipy.interpolate import interp1d
-
-#             def calculate_FWHM(data, bins=100, plot=False):
-#                 # Create a histogram of the data
-#                 counts, bin_edges = np.histogram(data, bins=bins, density=True)
-#                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-                
-#                 # Find the peak of the histogram
-#                 peak_idx = np.argmax(counts)
-#                 peak_value = bin_centers[peak_idx]
-#                 half_max = counts[peak_idx] / 2
-                
-#                 # Interpolate to find the FWHM
-#                 interp = interp1d(bin_centers, counts - half_max, kind='cubic')
-#                 roots = interp1d(bin_centers, counts - half_max, kind='cubic').roots()
-                
-#                 # Find the roots closest to the peak to define the FWHM
-#                 valid_roots = roots[(roots > bin_centers[0]) & (roots < bin_centers[-1])]
-#                 left_root = valid_roots[valid_roots < peak_value][-1]
-#                 right_root = valid_roots[valid_roots > peak_value][0]
-                
-#                 fwhm = right_root - left_root
-                
-#                 if plot:
-#                     plt.plot(bin_centers, counts, label='Data Histogram')
-#                     plt.plot([left_root, right_root], [half_max, half_max], 'ro-')
-#                     plt.title('Histogram and FWHM')
-#                     plt.legend()
-#                     plt.show()
-                
-#                 return fwhm
-
-#             # Assuming 'data' is your dataset
-#             data = sorted_value.cpu().numpy()  # Example: Converting from PyTorch tensor to NumPy array
-#             fwhm = calculate_FWHM(data, plot=False)
-
-            # print(f"FWHM: {fwhm}")
-            # print(f'{self.key} box_cox_transformation', transformed_value_tensor)
-        # let the remaining element be the multiple of multiple to fit tensor cores
 
         num_prune = nearest_multiple(num_prune, probe_out_dim_metric.shape[0], multiple)
         return sorted_indices[num_prune:], sorted_indices[:num_prune]
@@ -758,9 +629,9 @@ class HiddenRepresentationPruning(BasePruning):
         # # Then, normalize the tensor: (sorted_value - mean) / std
         # standardlized_value = (sorted_value - mean) / std
         # print(f'{self.key} standardlized_value', standardlized_value)
-        if 'mag' in cfg['prune_name']:
+        if 'mag' in cfg['prune_method']:
             num_prune = int(self.prune_hyper * probe_out_dim_metric.shape[-1])
-        elif 'pq' in cfg['prune_name']:
+        elif 'pq' in cfg['prune_method']:
             num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
 
         # let the remaining element be the multiple of multiple to fit tensor cores
@@ -771,7 +642,7 @@ class HiddenRepresentationPruning(BasePruning):
         
     #     attn_weights_metric = attn_weights_metric.to(torch.float32)
     #     sorted_value, sorted_indices = torch.sort(attn_weights_metric, dim=1)
-    #     if 'mag' in cfg['prune_name']:
+    #     if 'mag' in cfg['prune_method']:
     #         num_prune = int(self.prune_hyper * attn_weights_metric.shape[1])
     #     # Select indices to prune for each head
     #     indices_to_preserve = sorted_indices[:, num_prune:]
@@ -782,9 +653,9 @@ class HiddenRepresentationPruning(BasePruning):
         # attn_weights_metric = attn_weights_metric.to(torch.float32)
         # # mask = torch.ones(probe.shape[-1], dtype=torch.bool, device=probe.device)
         # sorted_value, sorted_indices = torch.sort(attn_weights_metric, dim=0)
-        # if 'mag' in cfg['prune_name']:
+        # if 'mag' in cfg['prune_method']:
         #     num_prune = int(self.prune_hyper * attn_weights_metric.shape[0])
-        # elif 'pq' in cfg['prune_name']:
+        # elif 'pq' in cfg['prune_method']:
         #     num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma)[0]
         #     # print('num_prune', num_prune)
         # # print('prune_channels_count', prune_channels_count, norm_across_other_dims[0].shape[0], self.prune_hyper)
@@ -853,10 +724,10 @@ class HiddenRepresentationPruning(BasePruning):
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
             # print('summed_metricssorted_value', sorted_value)
             # Determine the number of heads to prune
-            if 'mag' in cfg['prune_name']:
+            if 'mag' in cfg['prune_method']:
                 num_prune_heads = int(self.prune_hyper * num_heads)
                 num_prune_heads = nearest_multiple(head_dim * num_prune_heads, probe_out_dim_metric.numel(), multiple, head_dim) // head_dim
-            elif 'pq' in cfg['prune_name']:
+            elif 'pq' in cfg['prune_method']:
                 num_prune_heads = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, f'{self.key}_{prune_module}')[0]
             # Select the heads to prune
             heads_to_preserve = sorted_indices[num_prune_heads:]
@@ -869,7 +740,7 @@ class HiddenRepresentationPruning(BasePruning):
             sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=1)
 
             # Select indices to prune for each head
-            if 'mag' in cfg['prune_name']:
+            if 'mag' in cfg['prune_method']:
                 # Determine the number of elements to prune in each head
                 # handling the edge case for RoPE if prune each head for qk
                 num_prune_head_dim = int(self.prune_hyper * head_dim)
@@ -885,7 +756,7 @@ class HiddenRepresentationPruning(BasePruning):
                 #     print('Index:', index)
                 # else:
                 #     print('Value not found in tensor')
-            elif 'pq' in cfg['prune_name']:
+            elif 'pq' in cfg['prune_method']:
                 num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, f'{self.key}_{prune_module}')[0]
 
             # Generate a range tensor for head indices
@@ -909,7 +780,7 @@ class HiddenRepresentationPruning(BasePruning):
             # standardlized_value = (sorted_value - mean) / std
             # print(f'{self.key}_{prune_module} standardlized_value', standardlized_value)
             # print('sorted_value', sorted_value)
-            if 'mag' in cfg['prune_name']:
+            if 'mag' in cfg['prune_method']:
                 num_prune = int(probe_out_dim_metric.shape[0] * self.prune_hyper)
                 num_prune = nearest_multiple(num_prune, probe_out_dim_metric.shape[0], multiple)
                 print(f'{self.key}_{prune_module} num_prune', num_prune)
@@ -933,7 +804,7 @@ class HiddenRepresentationPruning(BasePruning):
                 print(f'Number of rows with elements <= threshold: {num_rows_with_le_threshold.sum().item()}')
                 print(f'Number of columns with elements <= threshold: {num_columns_with_le_threshold.sum().item()}')
 
-            elif 'pq' in cfg['prune_name']:
+            elif 'pq' in cfg['prune_method']:
                 num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, f'{self.key}_{prune_module}')[0]
                 
             
@@ -1245,7 +1116,7 @@ class HiddenRepresentationPruning(BasePruning):
     #         torch.cuda.empty_cache()
 
     # def prune_h(self, h, prune_dim, prune_channels):
-    #     # if 'probe' in cfg['prune_name']:
+    #     # if 'probe' in cfg['prune_method']:
     #     #     return h
     #     if 'WOF1N' in cfg['prune_metric'] or 'WOF2N' in cfg['prune_metric']:
     #         return h
@@ -1332,7 +1203,7 @@ class HiddenRepresentationPruning(BasePruning):
     #             info[f"{key}_weight_norm_across_channel_dims"] = self.weight_norm_across_channel_dims.tolist()
     #             self.logger_info_time_used += time.time() - start_time
     #         norm_across_other_dims = norm_across_other_dims * self.weight_norm_across_channel_dims
-    #     # elif 'probe' in cfg['prune_name'] and cfg['prune_metric'] == 'WIFN':
+    #     # elif 'probe' in cfg['prune_method'] and cfg['prune_metric'] == 'WIFN':
     #     #     batch_size = h.shape[0]
     #     #     # self.scaler_in *= self.nsamples / (self.nsamples + batch_size)
     #     #     # self.scaler_in += torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate) ** 2 / (self.nsamples + batch_size)
@@ -1490,7 +1361,7 @@ class HiddenRepresentationPruning(BasePruning):
     #         # self.logger_info_time_used += time.time() - start_time
 
     #     # print('sorted_channels', sorted_channels.shape, sorted_channels, prune_channels_count)
-    #     # if 'probe' in cfg['prune_name']:
+    #     # if 'probe' in cfg['prune_method']:
     #     #     prune_channels = []
     #     # else:
     #     # print('sorted_channels', sorted_channels.shape, sorted_channels, prune_channels_count)
@@ -1927,3 +1798,131 @@ class WeightPruning(BasePruning):
         prune_channels_count = int(self.prune_hyper * w.shape[prune_dim])
         prune_channels = sorted_channels[:int(prune_channels_count)]
         return prune_channels
+#             data = sorted_value.cpu().numpy()
+#             stat, p = shapiro(data)
+#             print('Shapiro-Wilk Test: Statistics=%.3f, p=%.3f' % (stat, p))
+
+#             # Interpret
+#             alpha = 0.05
+#             if p > alpha:
+#                 print('Sample looks Gaussian (fail to reject H0)')
+#             else:
+#                 print('Sample does not look Gaussian (reject H0)')
+
+
+#             from scipy.stats import kstest, norm, laplace
+
+# # Assuming 'data' is your raw data
+#             # Note: No pre-normalization before these tests
+#             # You can estimate the parameters (mean and std for Gaussian, location and scale for Laplace) from your data if needed.
+
+#             # KS test against Gaussian distribution, using data as-is or with estimated parameters
+#             stat, p = kstest(data, 'norm', args=(data.mean(), data.std()))
+#             print(f'KS Test against Gaussian: stat={stat:.3f}, p={p:.3f}')
+
+#             # KS test against Laplace distribution, using data as-is or with estimated parameters
+#             # For Laplace, parameters are location (median) and scale (diversity, which can be estimated)
+#             location, scale = laplace.fit(data)  # Fit might be used to estimate parameters based on your data
+#             stat_laplace, p_laplace = kstest(data, 'laplace', args=(location, scale))
+#             print(f'KS Test against Laplace: stat={stat_laplace:.3f}, p={p_laplace:.3f}')
+
+#             from scipy.stats import kstest, gamma
+#             a, loc, scale = gamma.fit(data)
+#             print(f'Gamma distribution fit: a={a:.3f}, loc={loc:.3f}, scale={scale:.3f}')
+#             # Perform the KS test against the Gamma distribution
+#             stat, p = kstest(data, 'gamma', args=(a, loc, scale))
+
+#             print(f'KS Test against Gamma: stat={stat:.3f}, p={p:.3f}')
+
+
+#             from scipy.stats import kstest, lognorm
+
+#             # Fit parameters from data
+#             shape, loc, scale = lognorm.fit(data, floc=0)  # Force location parameter to zero for fitting
+
+#             # Perform KS test against fitted log-normal distribution
+#             stat, p = kstest(data, 'lognorm', args=(shape, loc, scale))
+#             print(f'KS Test against Log-Normal: stat={stat:.3f}, p-value={p:.3f}')
+#                         # print('\nstdddddddd')
+#             import scipy.stats as stats
+
+#             # Assuming 'data' is your layer's data
+#             skewness = stats.skew(data)
+#             kurtosis = stats.kurtosis(data, fisher=False)  # Set fisher=False to get kurtosis in comparison to normal distribution (which is 3)
+
+#             print(f"Skewness: {skewness}")
+#             print(f"Kurtosis: {kurtosis}")
+#             # sorted_value = (sorted_value - torch.mean(sorted_value)) / torch.std(sorted_value) 
+#             # print(f'{self.key} standardlized_value', sorted_value)
+#             # # ensure value > 0
+#             # sorted_value = (sorted_value - torch.min(sorted_value))
+     
+#             # # sorted_value, best_lambda = stats.boxcox(sorted_value)
+#             # # print(f'{self.key} box_cox_transformation', sorted_value)
+#             # # if high_outliers_num > 0:  # Check to ensure we have outliers to exclude
+#             # #     sorted_value = sorted_value[: -high_outliers_num]
+#             # # else:
+#             # #     adjusted_sorted_value = sorted_value
+#             # num_prune = cal_prune_count_base_on_pq(sorted_value, self.pq_p, self.pq_q, self.eta, self.pq_beta, self.pq_gamma, self.key)[0]
+#             # nominator_varying_vector_norm, denominator_varying_vector_norm, dimension = parallel_cal_varying_length_info(sorted_value, 1, 0.5)
+#             # # print('nominator_varying_vector_norm', nominator_varying_vector_norm.shape, nominator_varying_vector_norm)
+#             # # print('denominator_varying_vector_norm', denominator_varying_vector_norm.shape, denominator_varying_vector_norm)
+#             # ratio = (nominator_varying_vector_norm / denominator_varying_vector_norm)
+#             # print(f'{self.key}_ratio', ratio)
+#                # print(f'{self.key} standardlized_value after adding', sorted_value)
+#             # Choose a lambda for the Box-Cox transformation
+#             # lam = 0.5  # Example lambda value, you might need to adjust this based on your data
+#             # total_sum = sorted_value.sum()
+#             # sorted_value = sorted_value / total_sum
+#             # # Apply the Box-Cox transformation
+#             # sorted_value = self.box_cox_transformation(sorted_value, -2)
+#             # sorted_value_np = sorted_value.cpu().numpy()
+
+#             # # Apply the Box-Cox transformation
+#             # transformed_value, best_lambda = stats.boxcox(sorted_value_np)
+
+#             # # Optionally, convert the transformed data back to a PyTorch tensor
+#             # sorted_value = torch.from_numpy(transformed_value).to(probe_out_dim_metric.device)
+
+#             import numpy as np
+#             import matplotlib.pyplot as plt
+#             from scipy.signal import find_peaks
+#             from scipy.interpolate import interp1d
+
+#             def calculate_FWHM(data, bins=100, plot=False):
+#                 # Create a histogram of the data
+#                 counts, bin_edges = np.histogram(data, bins=bins, density=True)
+#                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                
+#                 # Find the peak of the histogram
+#                 peak_idx = np.argmax(counts)
+#                 peak_value = bin_centers[peak_idx]
+#                 half_max = counts[peak_idx] / 2
+                
+#                 # Interpolate to find the FWHM
+#                 interp = interp1d(bin_centers, counts - half_max, kind='cubic')
+#                 roots = interp1d(bin_centers, counts - half_max, kind='cubic').roots()
+                
+#                 # Find the roots closest to the peak to define the FWHM
+#                 valid_roots = roots[(roots > bin_centers[0]) & (roots < bin_centers[-1])]
+#                 left_root = valid_roots[valid_roots < peak_value][-1]
+#                 right_root = valid_roots[valid_roots > peak_value][0]
+                
+#                 fwhm = right_root - left_root
+                
+#                 if plot:
+#                     plt.plot(bin_centers, counts, label='Data Histogram')
+#                     plt.plot([left_root, right_root], [half_max, half_max], 'ro-')
+#                     plt.title('Histogram and FWHM')
+#                     plt.legend()
+#                     plt.show()
+                
+#                 return fwhm
+
+#             # Assuming 'data' is your dataset
+#             data = sorted_value.cpu().numpy()  # Example: Converting from PyTorch tensor to NumPy array
+#             fwhm = calculate_FWHM(data, plot=False)
+
+            # print(f"FWHM: {fwhm}")
+            # print(f'{self.key} box_cox_transformation', transformed_value_tensor)
+        # let the remaining element be the multiple of multiple to fit tensor cores

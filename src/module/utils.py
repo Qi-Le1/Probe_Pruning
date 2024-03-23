@@ -20,12 +20,15 @@ TIME_UNIT = (1, 's')
 
 
 
-def model_forward(model, input, inference_duration):
+def model_forward(model, input, inference_duration, index):
     torch.cuda.synchronize()
     start_time = time.time()
     output = model(**input)
     torch.cuda.synchronize()
     inference_duration += time.time() - start_time
+    # not considering edge case for time cost
+    if index == 0:
+        return output, 0
     return output, inference_duration
 
 

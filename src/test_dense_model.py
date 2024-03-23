@@ -114,6 +114,7 @@ def runExperiment():
     print('inference_duration', inference_duration)
     # thread lock bug
     test_logger.writer = None
+    cfg.pop('cuda_stream1', None)
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
               'dense_info_list': dense_info_list, 'dense_duration': inference_duration}
 
@@ -137,7 +138,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output, inference_duration = model_forward(model, input, inference_duration)
+                output, inference_duration = model_forward(model, input, inference_duration, i)
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             elif cfg['task_name'] in ['csr']:
@@ -150,7 +151,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output, inference_duration = model_forward(model, input, inference_duration)
+                output, inference_duration = model_forward(model, input, inference_duration, i)
                 input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
                 # print('outputloss', output['loss'])
@@ -159,9 +160,11 @@ def test(data_loader, model, model_prof, metric, logger):
                 input = collate(input)
                 input_size = input['data'].size(0)
                 input = to_device(input, cfg['device'])
-                output = model(**input)
+                output, inference_duration = model_forward(model, input, inference_duration, i)
                 input_ = {'target': input['target']}
                 output_ = {'target': output['target'], 'loss': output['loss']}
+            if i == 0:
+                continue
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
             print('evaluation_for_batch', evaluation)

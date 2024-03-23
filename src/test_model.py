@@ -56,14 +56,23 @@ def runExperiment():
 
     cfg['epoch'] = 0 
     dense_name_list = cfg['model_tag'].split('_')
-    # batch size
-    dense_name_list[4] = '10'
-    # metric
+    # batch_size
+    dense_name_list[4] = cfg[cfg['model_name']]['batch_size']['test']
+    # prune_hyper
     dense_name_list[6] = '0'
-    # prune_name
-    dense_name_list[7] = 'dense'
+    # prune_metric
+    dense_name_list[7] = 'None'
+    # prune_method
+    dense_name_list[8] = 'dense'
+    # mode
+    dense_name_list[9] = 'sync'
+    # calib_info
+    dense_name_list[10] = 'None'
+    # probe_type
+    dense_name_list[11] = 'None'
     # cust_tgt_modules
-    dense_name_list[8] = 'None'
+    dense_name_list[12] = 'None'
+
     dense_model_path = os.path.join(result_path, '_'.join(dense_name_list))
     if not os.path.exists(dense_model_path):
         dense_model_path = os.path.join(result_path, 'dense', '_'.join(dense_name_list))
@@ -98,6 +107,7 @@ def runExperiment():
     print('evaluation_for_full', evaluation)
     # thread lock bug
     test_logger.writer = None
+    cfg.pop('cuda_stream1', None)
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
               'dense_info_list': dense_info_list, 'pruned_info_list': pruned_info_list, \
               'dense_duration': dense_duration, 'pruned_duration': inference_duration, 'dataset_size': cfg['dataset_size']['test']}
@@ -312,12 +322,13 @@ def test(data_loader, model, model_prof, metric, logger):
         start_time = time.time()
         inference_duration = 0
         for i, input in enumerate(data_loader):
+            cfg['cur_batch_index'] += 1
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output, inference_duration = model_forward(model, input, inference_duration)
+                output, inference_duration = model_forward(model, input, inference_duration, i)
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             elif cfg['task_name'] in ['csr']:
@@ -328,22 +339,24 @@ def test(data_loader, model, model_prof, metric, logger):
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output, inference_duration = model_forward(model, input, inference_duration)
+                output, inference_duration = model_forward(model, input, inference_duration, i)
                 input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             else:
                 input = collate(input)
                 input_size = input['data'].size(0)
                 input = to_device(input, cfg['device'])
-                output = model(**input)
+                output, inference_duration = model_forward(model, input, inference_duration, i)
                 input_ = {'target': input['target']}
                 output_ = {'target': output['target'], 'loss': output['loss']}
+            if i == 0:
+                continue
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
             print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
-            break
+            # break
             if iterate_small_samples:
                 if i == 100:
                     break

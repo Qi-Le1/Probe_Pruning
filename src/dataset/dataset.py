@@ -325,7 +325,7 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     # i = 1
                     # i = random.randint(0, trainenc.input_ids.shape[1] - max_length - 1)
                     i = torch.randint(0, trainenc.input_ids.shape[1] - max_length, (1,)).item()
-                    print('icalib', i)
+                    # print('icalib', i)
                     j = i + max_length
                     inp = trainenc.input_ids[0][i:j]
                     tar = inp.clone()
@@ -438,10 +438,10 @@ def process_dataset(dataset, tokenizer):
                 input_chunks = []
                 mask_chunks = []
                 for i in range(num_samples):
-                    print('ibefore', i)
+                    # print('ibefore', i)
                     # i = random.randint(0, len(input_ids) - max_length - 1)
                     i = torch.randint(0, len(input_ids) - max_length, (1,)).item()
-                    print('iafter', i)
+                    # print('iafter', i)
                     j = i + max_length
                     input_chunks.append(input_ids[i: j])
                     mask_chunks.append(attention_mask[i: j])

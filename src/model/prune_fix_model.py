@@ -28,51 +28,51 @@ metrics = {
 }
 
 def if_add_bias():
-    if 'flap' in cfg['prune_name']:
+    if 'flap' in cfg['prune_method']:
         return True
     return False
 
 def if_standardize():
-    if 'flap' in cfg['prune_name']:
+    if 'flap' in cfg['prune_method']:
         return True
     return False
 
 def if_global_prune():
-    if 'flap' in cfg['prune_name']:
+    if 'flap' in cfg['prune_method']:
         return True
     return False
 
 # def if_add_bias():
-#     if 'bias' in cfg['prune_name']:
+#     if 'bias' in cfg['prune_method']:
 #         return True
 #     return False
 
 # def if_standardize():
-#     if 'std' in cfg['prune_name']:
+#     if 'std' in cfg['prune_method']:
 #         return True
 #     return False
 
 def if_normalize():
-    # if 'nml' in cfg['prune_name']:
+    # if 'nml' in cfg['prune_method']:
     #     return True
     return False
 
 # def if_finallocal():
-#     if 'finallocal' in cfg['prune_name']:
+#     if 'finallocal' in cfg['prune_method']:
 #         return True
 #     return False
 
 def if_maintain():
-    if 'maintain' in cfg['prune_name']:
+    if 'maintain' in cfg['prune_method']:
         return True
     return False
 
 def if_cascadeattn():
-    if 'cascadeattn' in cfg['prune_name']:
+    if 'cascadeattn' in cfg['prune_method']:
         return True
     return False
 # def if_global_prune():
-#     if 'global' in cfg['prune_name']:
+#     if 'global' in cfg['prune_method']:
 #         return True
 #     return False
 
@@ -142,15 +142,15 @@ def find_layers(module, layers=[nn.Linear, Linear], name=''):
 def calibrate_model(model, tokenizer, dataloader, device):
     logger_info = {}
     if 'llama' in cfg['model_name']:
-        if 'probe' in cfg['prune_name']:
+        if 'probe' in cfg['prune_method']:
             prune_probe_llama(model, tokenizer, dataloader, logger_info, device)
-        elif 'flap' in cfg['prune_name']: 
+        elif 'flap' in cfg['prune_method']: 
             prune_flap_llama(model, tokenizer, dataloader, logger_info, device)
-        elif "wandasp" in cfg['prune_name']:
+        elif "wandasp" in cfg['prune_method']:
             prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device)
-        # elif "magsp" in cfg['prune_name']:
+        # elif "magsp" in cfg['prune_method']:
         #     prune_magnitude_sp_llama(model, tokenizer, dataloader, logger_info, device)
-        # elif "pq" in cfg['prune_name']:
+        # elif "pq" in cfg['prune_method']:
         #     prune_pq_llama(model, tokenizer, dataloader, logger_info, device)
         else:
             raise ValueError('Not valid prune_name')
@@ -525,7 +525,7 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
         device (torch.device, optional): Device to move tensors to. Defaults to CUDA device 0.
     """
     mysetting = MySettings()
-    # if 'global' in cfg['prune_name']:
+    # if 'global' in cfg['prune_method']:
     hardcode_struct = 'AL-AM'
     use_cache = model.config.use_cache 
     model.config.use_cache = False 
@@ -585,7 +585,7 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
             if name == 'self_attn.o_proj':
                 W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
                 # flap's manual trick, attention square the metric, we comment this part due to the inconsistency with the paper
-                if 'square' in cfg['prune_name']:
+                if 'square' in cfg['prune_method']:
                     W_metric = W_metric ** 2
                 W_metric = metric_process(mysetting, W_metric)
                 if hardcode_struct == "UL-UM":
@@ -777,7 +777,7 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     # # Compute slope
     # slopes = dy / dx
     
-    # if 'low' in cfg['prune_name']:
+    # if 'low' in cfg['prune_method']:
     #     # avoid edge case of slope
     #     window_size = 21  # 10 neighbors on each side + the element itself
 
@@ -799,7 +799,7 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
     # Compute slope
     slopes = dy / dx
 
-    if 'low' in cfg['prune_name']:
+    if 'low' in cfg['prune_method']:
         # Avoid edge case of slope, just randomly pick this number
         window_size = 20  # 10 neighbors on each side + the element itself
 
@@ -833,7 +833,7 @@ def cal_prune_count_base_on_pq(sorted_tensor, pq_p, pq_q, eta, pq_beta, pq_gamma
         pq_indices = pq_indices_varying_length[first_phase_transition]
         lower_bound = lower_bound[first_phase_transition]
         dimension = dimension[first_phase_transition]
-    elif 'high' in cfg['prune_name']:
+    elif 'high' in cfg['prune_method']:
         slopes = torch.abs(dy / dx)
         threshold = 0.05 * slopes.shape[0]
         indices = torch.where(slopes > threshold)[0]
@@ -939,7 +939,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
                 if mysetting.global_prune:
                     attn_metric_list.append(W_metric.cpu())
                 else:
-                    if 'normhead' in cfg['prune_name']:
+                    if 'normhead' in cfg['prune_method']:
                         reshaped_W_metric = W_metric.reshape(-1, 128)
                         # Calculate the L2 norm for each 128-element vector
                         W_metric = torch.norm(reshaped_W_metric, p=2, dim=1)
@@ -1009,7 +1009,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
         if len(attn_metric_list) > 0:
             attn_metric = torch.stack(attn_metric_list)
             attn_metric = metric_process(mysetting, attn_metric)
-            if 'normhead' in cfg['prune_name']:
+            if 'normhead' in cfg['prune_method']:
                 attn_metric = attn_metric.reshape(len(layers), -1, 128)
                 attn_metric = torch.norm(attn_metric, p=2, dim=2)
             else:
@@ -1434,7 +1434,7 @@ def prune_magnitude_sp_llama(model, tokenizer, dataloader, device=torch.device("
         for name in subset:
             print(f"pruning layer {i} name {name}")
             W_metric = torch.norm(subset[name].weight.data, dim=0)
-            if 'std' in cfg['prune_name']:
+            if 'std' in cfg['prune_method']:
                 W_metric = standarlization(W_metric)
             if name == 'self_attn.o_proj':
                 W_metric = W_metric.reshape(-1, 128).sum(dim=1) # importance score of each head

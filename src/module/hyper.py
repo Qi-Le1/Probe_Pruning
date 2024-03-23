@@ -1,5 +1,6 @@
-import torch
 import re
+import torch
+import subprocess
 from config import cfg
 
 MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70b']
@@ -8,111 +9,144 @@ def process_control():
     print('torch version: ', torch.__version__)
     print('cuda version: ', torch.version.cuda)
     print('cudnn version: ', torch.backends.cudnn.version())
-
     cfg['cudatoolkit_version'] = float(torch.version.cuda)
     cfg['cudnn_version'] = float(torch.backends.cudnn.version())
-    cfg['gpu_type'] = 'A100'
+
+    try:
+        result = subprocess.run(['nvidia-smi', '--query-gpu=gpu_name', '--format=csv,noheader'], capture_output=True, text=True)
+        gpu_name = result.stdout.strip()
+        print(f"GPU Name: {gpu_name}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
     cfg['data_type'] = torch.float16
     # This can be implemented dynamically in each layer
+    # tc stands for tensor core
     if cfg['data_type'] == torch.float16:
         if cfg['cudatoolkit_version'] >= 11 and cfg['cudnn_version'] >= 7630:
-            if cfg['gpu_type'] == 'A100':
+            if gpu_name == 'A100':
                 cfg['tc_multiple'] = 64
-            else:
+            elif gpu_name == 'NVIDIA GeForce RTX 4090':
                 cfg['tc_multiple'] = 8
 
-
-    cfg['async_way'] = None
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
     cfg['seq_len'] = int(cfg['control']['seq_len'])
     cfg['prune_hyper'] = float(cfg['control']['prune_hyper'])
-    cfg['calibration_stage'] = False
-    # no skip
-    cfg['skip'] = 2
+    cfg['prune_metric'] = cfg['control']['prune_metric']
+    cfg['prune_method'] = cfg['control']['prune_method']
+    if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['prune_method']:
+        match = re.search(r'probefixratio(\d+\.\d+)', cfg['prune_method'])
+        if match:
+            # Convert the matched string to a float
+            float_value = float(match.group(1))
+        else:
+            float_value = None
+        cfg['probefixratio'] = float_value   
     
-    prune_name_list = cfg['control']['prune_name'].split('+')
+    cfg['ema_momentum'] = 0.99
+    if 'ema' in cfg['prune_method']:
+        match = re.search(r'ema(\d+\.\d+)', cfg['prune_method'])
+        if match:
+            # Convert the matched string to a float
+            float_value = float(match.group(1))
+        else:
+            float_value = None
+        cfg['ema_momentum'] = float_value  
 
-    cfg['prune_name'] = prune_name_list[0]
-    cfg['prune_metric'] = None
-    cfg['probe_num'] = 1
-    prune_name_sub_list = cfg['prune_name'].split('-')
-    if len(prune_name_sub_list) > 1:
-        cfg['prune_method'] = prune_name_sub_list[1]
-        cfg['prune_metric'] = prune_name_sub_list[2]
-        # if 'probe' in cfg['prune_method']:
-        # cfg['q_prune'] = prune_name_sub_list[3]  
-        # # fill or each
-        # cfg['k_prune'] = prune_name_sub_list[4]  
-        # cfg['v_prune'] = prune_name_sub_list[5]
+    cfg['mode'] = cfg['control']['mode']
+    if cfg['mode'] not in ['sync', 'asyncinter', 'asyncintra']:
+        raise ValueError('Not valid mode')
+    if cfg['mode'] in ['asyncinter', 'asyncintra']:
+        if torch.cuda.is_available():
+            cfg['cuda_stream1'] = torch.cuda.Stream()
+        else:
+            raise ValueError('No cuda device available')
 
+    cfg['calib_info'] = cfg['control']['calib_info']
+    if cfg['calib_info'] != 'None':
+        calib_info_list = cfg['calib_info'].split('-')
+        cfg['calibration_dataset'] = calib_info_list[0]
+        cfg['calibration_nsamples'] = calib_info_list[1]
+        # set all to all samples in the calibration dataset
+        if cfg['calibration_nsamples'] != 'all':
+            cfg['calibration_nsamples'] = int(cfg['calibration_nsamples']) 
 
-        if 'svd' in cfg['prune_method']:
-            match = re.search(r'svd(\d+\.\d+)', cfg['prune_metric'])
+    cfg['probe_type'] = cfg['control']['probe_type']
+    if 'probe' not in cfg['prune_method'] and cfg['probe_type'] != 'None':
+        raise ValueError('probe_type is only valid with probe pruning')
+    if cfg['probe_type'] != 'None':
+        probe_type_list = cfg['probe_type'].split('-')
+        if 'llama' in cfg['model_name']:
+            prune_keys = ['q', 'k', 'v', 'gate', 'up']
+        elif 'opt' in cfg['model_name']:
+            prune_keys = ['q', 'k', 'v', 'fc1']
+        for key in prune_keys:
+            # default
+            cfg[f'{key}_prune'] = probe_type_list[prune_keys.index(key)]
+            cfg[f'{key}_probe_num'] = 1
+            cfg[f'{key}_probe_size'] = int(cfg[model_name]['batch_size']['test'] // 1)
+
+            match = re.search(r'\d+', cfg[f'{key}_prune'])
             if match:
-                # Convert the matched string to a float
-                float_value = float(match.group(1))
-            else:
-                float_value = None  # Or some default value or error handling
-            cfg['svd_ratio'] = float_value
-
-        # if 'skip' in cfg['prune_method']:
-        #     match = re.search(r'skip(\d+)', cfg['prune_method'])
-        #     if match:
-        #         # Convert the matched string to a float
-        #         int_value = int(match.group(1))
-        #     cfg['skip'] = int_value
-
-        if 'calib' in cfg['prune_method']:
-            calib_info_list = prune_name_list[1].split('-')
-            cfg['calibration_dataset'] = calib_info_list[0]
-            cfg['calibration_nsamples'] = calib_info_list[1]
-            # set all to all samples in the calibration dataset
-            if cfg['calibration_nsamples'] != 'all':
-                cfg['calibration_nsamples'] = int(cfg['calibration_nsamples'])  
-
-        if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['prune_method']:
-            match = re.search(r'probefixratio(\d+\.\d+)', cfg['prune_method'])
-            if match:
-                # Convert the matched string to a float
-                float_value = float(match.group(1))
-            else:
-                float_value = None
-            
-            cfg['probefixratio'] = float_value   
-
-        if 'multiprobe' in cfg['prune_method']:
-            match = re.search(r'multiprobe(\d+)', cfg['prune_method'])
-            if match:
-                # Convert the matched string to a float
                 int_value = int(match.group(1))
             else:
                 int_value = None
+
+            cfg[f'{key}_probe_num'] = int_value
+            if int_value:  # Ensure int_value is not None to avoid division by zero
+                probe_size = int(cfg[model_name]['batch_size']['test'] // int_value)
+                if cfg[model_name]['batch_size']['test'] % int_value != 0:
+                    raise ValueError(f'probe_num needs to be divisible by batch size for {key}')
+                cfg[f'{key}_probe_size'] = probe_size
+
+        prune_keywords = ['each', 'fill', 'whole']
+        cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), None)
+        cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), None)
+    # prune_name_list = cfg['control']['prune_name'].split('+')
+
+    # cfg['prune_name'] = prune_name_list[0]
+    # cfg['prune_metric'] = None
+    # cfg['probe_num'] = 1
+    # prune_name_sub_list = cfg['prune_name'].split('-')
+    # if len(prune_name_sub_list) > 1:
+    #     cfg['prune_method'] = prune_name_sub_list[1]
+    #     cfg['prune_metric'] = prune_name_sub_list[2]
+
+    #     if 'svd' in cfg['prune_method']:
+    #         match = re.search(r'svd(\d+\.\d+)', cfg['prune_metric'])
+    #         if match:
+    #             # Convert the matched string to a float
+    #             float_value = float(match.group(1))
+    #         else:
+    #             float_value = None  # Or some default value or error handling
+    #         cfg['svd_ratio'] = float_value
+
+        
+
+    #     if 'multiprobe' in cfg['prune_method']:
+    #         match = re.search(r'multiprobe(\d+)', cfg['prune_method'])
+    #         if match:
+    #             # Convert the matched string to a float
+    #             int_value = int(match.group(1))
+    #         else:
+    #             int_value = None
             
-            cfg['probe_num'] = int_value   
+    #         cfg['probe_num'] = int_value   
             # cfg['probe_size'] = 
 
-        if 'async' in cfg['prune_method']:
-            match = re.search(r'async(\d+\.\d+)', cfg['prune_method'])
-            if match:
-                # Convert the matched string to a float
-                float_value = float(match.group(1))
-            else:
-                float_value = None
+        # if 'async' in cfg['prune_method']:
+        #     match = re.search(r'async(\d+\.\d+)', cfg['prune_method'])
+        #     if match:
+        #         # Convert the matched string to a float
+        #         float_value = float(match.group(1))
+        #     else:
+        #         float_value = None
             
-            cfg['asyncratio'] = float_value   
+        #     cfg['asyncratio'] = float_value   
 
-        if 'ema' in cfg['prune_method']:
-            match = re.search(r'ema(\d+\.\d+)', cfg['prune_method'])
-            if match:
-                # Convert the matched string to a float
-                float_value = float(match.group(1))
-            else:
-                float_value = None  # Or some default value or error handling
-            cfg['ema_momentum'] = float_value
-    else:
-        cfg['prune_method'] = ''
+    # else:
+    #     cfg['prune_method'] = ''
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
@@ -123,13 +157,27 @@ def process_control():
         else:
             cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
 
+    
+    cfg['calibration_stage'] = False
+    # default skip 3 layers
+    cfg['skip_layers'] = 2
+    if 'skip' in cfg['prune_method']:
+        match = re.search(r'skip(\d+)', cfg['prune_method'])
+        if match:
+            # Convert the matched string to a float
+            int_value = int(match.group(1))
+        else:
+            int_value = None
+        cfg['skip_layers'] = int_value   
+
+    cfg['cur_batch_index'] = -1
     cfg['prune_dim'] = -1
     cfg['pq_p'] = 1
     cfg['pq_q'] = 2
     cfg['pq_beta'] = 0.9
     cfg['pq_gamma'] = 1
     make_data_name()
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 't2i', 'csr']:
+    if cfg['task_name'] in ['clm', 'csr']:
         cfg['collate_mode'] = 'transformer'
         cfg['gpt2'] = {'max_length': 512}
         if 'llama' in cfg['model_name']:
@@ -168,39 +216,11 @@ def process_control():
     else:
         raise ValueError('Not valid task name')
 
-    cfg['probe_size'] = int(cfg[model_name]['batch_size']['test'] / cfg['probe_num'])
-    if cfg[model_name]['batch_size']['test'] % cfg['probe_num'] != 0:
-        raise ValueError('probe_num needs to be divisible by batch size')
-    
-    if len(prune_name_sub_list) > 1:
-        prune_keys = ['q', 'k', 'v']
-        for key in prune_keys:
-            cfg[f'{key}_prune'] = prune_name_sub_list[3 + prune_keys.index(key)]
-            cfg[f'{key}_probe_num'] = 1
-            cfg[f'{key}_probe_size'] = int(cfg[model_name]['batch_size']['test'] // 1)
+    # cfg['probe_size'] = int(cfg[model_name]['batch_size']['test'] / cfg['probe_num'])
+    # if cfg[model_name]['batch_size']['test'] % cfg['probe_num'] != 0:
+    #     raise ValueError('probe_num needs to be divisible by batch size')
 
-            match = re.search(r'probe(\d+)', cfg[f'{key}_prune'])
-            if match:
-                int_value = int(match.group(1))
-            else:
-                int_value = None
-
-            cfg[f'{key}_probe_num'] = int_value
-            if int_value:  # Ensure int_value is not None to avoid division by zero
-                probe_size = int(cfg[model_name]['batch_size']['test'] // int_value)
-                if cfg[model_name]['batch_size']['test'] % int_value != 0:
-                    raise ValueError(f'probe_num needs to be divisible by batch size for {key}')
-                cfg[f'{key}_probe_size'] = probe_size
-
-        prune_keywords = ['each', 'fill', 'whole']
-        cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), None)
-        cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), None)
-
-    # def check_multiple_for_tensor_cores(data_type):
-        
-            
     cfg['logger_detailed_info'] = False
-    print(cfg['prune_hyper'] == 9999)
     print('cfg: ', cfg)
     return
 
