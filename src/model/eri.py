@@ -513,7 +513,7 @@ class BasePruning:
         self.prune_tgt = cfg['prune_tgt']
         self.prune_metric = cfg['prune_metric']
         self.prune_hyper = cfg['prune_hyper'] 
-        self.prune_dim = cfg['prune_dim'] 
+        # self.prune_dim = cfg['prune_dim'] 
         self.prune_dim_select_mode = cfg['prune_dim_select_mode'] 
         self.batch_integ = cfg['batch_integ']   
         self.logger_detailed_info = cfg['logger_detailed_info']

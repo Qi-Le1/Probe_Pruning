@@ -18,6 +18,20 @@ FLOPS_UNIT = (1000000, 'Million')
 # already in seconds unit
 TIME_UNIT = (1, 's')
 
+
+
+def model_forward(model, input, inference_duration, index):
+    torch.cuda.synchronize(cfg['cuda_default_stream'])
+    start_time = time.time()
+    output = model(**input)
+    torch.cuda.synchronize(cfg['cuda_default_stream'])
+    inference_duration += time.time() - start_time
+    # not considering edge case for time cost
+    if index == 0:
+        return output, 0
+    return output, inference_duration
+
+
 def nearest_multiple(num_prune, total, multiple, multiple2=1):
     lcm = np.lcm(multiple, multiple2)
     
@@ -55,11 +69,26 @@ def record_pruing_info(model, logger):
             module.pruning_module.reset_pruning_info()
     return
 
+
+def update_model_prof(model_prof):
+    # dont need time_hook attacted on every module
+    # cause it sync the default stream every time
+    for name, module in model_prof.model.named_modules():
+        if hasattr(module, "__start_time_hook_handle__"):
+            module.__start_time_hook_handle__.remove()
+            del module.__start_time__
+            
+        if hasattr(module, "__end_time_hook_handle__"):
+            module.__end_time_hook_handle__.remove()
+            del module.__duration__
+    return 
+
+
 def get_model_profile(tag, model_prof):
     info_list = []
     total_flops = 0
-    for name, module in model_prof.model.named_modules():
-        temp = [name, module.__flops__, module.__duration__, module.__params__, module.__macs__, type(module)]
+    for name, module in model_prof.model.model.named_modules():
+        temp = [name, module.__flops__, module.__params__, module.__macs__, type(module)]
         # print('temp', temp)
         if hasattr(module, 'is_pruned') and module.is_pruned == True:
             print('module.key', module.key)
@@ -72,20 +101,7 @@ def get_model_profile(tag, model_prof):
             temp[1] = 0
         info_list.append(temp)
         
-    def get_module_duration(module):
-        # just return the duration of the whole model
-        duration = module.__duration__
-        # if hasattr(module, 'pruning_module'):
-        #     duration -= module.pruning_module.logger_info_time_used
-        if duration == 0:  # e.g. ModuleList
-            for name, child in module.named_children():
-                cur_duration = get_module_duration(child)
-                duration += cur_duration
-        return duration
-
-    duration = get_module_duration(model_prof.model)
-    # print('duration', duration, type(duration))
-    return copy.deepcopy(info_list), duration
+    return copy.deepcopy(info_list)
 
 
 def summarize_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, logger):
@@ -115,7 +131,7 @@ def summarize_info_list(dense_info_list, pruned_info_list, dense_duration, prune
     pruned_layer_pruned_total_flops = 0
     for i in range(len(dense_info_list)):
         sub_dense_info = dense_info_list[i]
-        sub_pruned_info = pruned_info_list[i+1]
+        sub_pruned_info = pruned_info_list[i]
         if sub_pruned_info[-1] == True:
             info[f"{sub_pruned_info[-2]}_pruned_FLOPs_ratio"] = sub_pruned_info[1]/(sub_dense_info[1] + 1e-6)
             # [name, module.__flops__, module.__duration__, module.__params__, module.__macs__, type(module)]
@@ -126,8 +142,8 @@ def summarize_info_list(dense_info_list, pruned_info_list, dense_duration, prune
             pruned_layer_dense_total_flops += sub_dense_info[1]
             pruned_layer_pruned_total_flops += sub_pruned_info[1]
         print('----\n')
-        print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_dense_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_dense_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_dense_info[4]}", flush=True)
-        print(f"PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_pruned_info[4]}", flush=True)
+        print(f"dense: {sub_dense_info[0]} - {sub_dense_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_dense_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_dense_info[4]}", flush=True)
+        print(f"PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_pruned_info[4]}", flush=True)
     
     # if 'unstruct' in cfg['prune_name']:
     #     info['FLOPs_for_pruned_layers'] = cfg['prune_hyper']

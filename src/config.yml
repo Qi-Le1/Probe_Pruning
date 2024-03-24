@@ -7,10 +7,16 @@ control:
   batch_size: 8
   seq_len: 128
   prune_hyper: 0.1
-  prune_name: mag-probe
+  prune_metric: probe/flap/wanda
+  prune_method: wanda/flap/calib/probe
+  mode: sync/asyncinter/asyncintra
+  calib_info: None/ds-numsamples
+  probe_type: q-k-v-gate-up
+  # prune_name: mag-probe
   cust_tgt_modules: None
-  # batch_integ: inter
-  # multibatch_integ: somemethods-3
+
+
+
 # experiment
 pin_memory: True
 num_workers: 0

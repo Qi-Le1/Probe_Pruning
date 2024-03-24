@@ -124,7 +124,7 @@ class OPTEriModel(torch.nn.Module):
             # old_module might not have bias, bias=None
             # need to write into new_module, otherwise
             # the parent class will assign bias
-            print('old_module.bias', old_module.bias)
+            print('old_module has bias')
             new_module.bias = old_module.bias
 
     def __getattr__(self, name: str):
@@ -303,7 +303,7 @@ class Linear(nn.Linear, EriLayer):
         # self.samples_num = self.samples_num.to(cur_device)
         # update_indices = update_indices.to(cur_device)
         # self.mean_for_all_batches[update_indices] *= self.samples_num[update_indices] / (self.samples_num[update_indices] + batch_size)
-        # inp = torch.clamp(inp, min=None, max=65504)
+        # inp = torch.clamp(inp, min=cfg['data_type_min'], max=cfg['data_type_max'])
         # denominator = (self.samples_num[update_indices] + batch_size)
         # self.mean_for_all_batches[update_indices] += inp / denominator
 
@@ -330,9 +330,9 @@ class Linear(nn.Linear, EriLayer):
                 update_indices = update_indices.to(cur_device)
                 self.scaler_inp[:, update_indices] *= momentum
                 if cfg['calibration_stage'] == True:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
                 elif cfg['calibration_stage'] == False:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
                 # denominator = (self.nsamples[update_indices] + )
                 self.scaler_inp[:, update_indices] += (1 - momentum) * norm_squared / batch_size
         else:
@@ -342,7 +342,7 @@ class Linear(nn.Linear, EriLayer):
                 update_indices = update_indices.to(cur_device)
 
                 self.scaler_inp[update_indices] *= momentum
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=None, max=65504)
+                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 # print('update_indices', update_indices.shape, flush=True)
                 # print('norm_squared', norm_squared.shape, flush=True)
@@ -375,15 +375,15 @@ class Linear(nn.Linear, EriLayer):
 
                 self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
                 if cfg['calibration_stage'] == True:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
                 elif cfg['calibration_stage'] == False:
                     # if 'coeff' in cfg['prune_method']:
                     #     # Assuming inp is your input tensor
-                    #     # inp_square = torch.clamp(inp ** 2, min=None, max=65504)
+                    #     # inp_square = torch.clamp(inp ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
 
                     #     # # Directly compute the sum of squares once and reuse it
                     #     # sum_inp_square = torch.sum(inp_square, dim=0, keepdim=True) + 1e-10
-                    #     # sum_inp_square_clamped = torch.clamp(sum_inp_square, min=None, max=65504)
+                    #     # sum_inp_square_clamped = torch.clamp(sum_inp_square, min=cfg['data_type_min'], max=cfg['data_type_max'])
 
                     #     # # Calculate ratio, notice that clamping sum_inp_square_clamped again is unnecessary
                     #     # # ratio = inp_square / sum_inp_square_clamped
@@ -391,10 +391,10 @@ class Linear(nn.Linear, EriLayer):
                     #     # # print('ratio', ratio.shape, flush=True)
 
                     #     # # Calculate norm_squared without redundant clamping of sum_inp_square
-                    #     # norm_squared = torch.clamp(torch.sum(ratio * inp_square, dim=0), min=None, max=65504)
+                    #     # norm_squared = torch.clamp(torch.sum(ratio * inp_square, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
 
-                    #     square_x = torch.clamp(torch.square(inp).to(torch.float32), min=None, max=65504)
-                    #     sum_across_bsz = torch.clamp(square_x.sum(dim=0, keepdim=True), min=None, max=65504)
+                    #     square_x = torch.clamp(torch.square(inp).to(torch.float32), min=cfg['data_type_min'], max=cfg['data_type_max'])
+                    #     sum_across_bsz = torch.clamp(square_x.sum(dim=0, keepdim=True), min=cfg['data_type_min'], max=cfg['data_type_max'])
                     #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
                     #     proportion = (square_x / (sum_across_bsz + 1e-10)).to(inp.dtype)
                     #     # Check for NaN values
@@ -421,8 +421,8 @@ class Linear(nn.Linear, EriLayer):
                     #     # print('proportion ', proportion, flush=True)
                     #     norm_squared = torch.sum(square_x * proportion, dim=0)
                     # else:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
-                # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0), min=None, max=65504)
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 denominator = (self.nsamples[update_indices] + batch_size)
                 self.scaler_inp[:, update_indices] += norm_squared / denominator
@@ -438,7 +438,7 @@ class Linear(nn.Linear, EriLayer):
                 # print("self.nsamples[update_indices].shape:", self.nsamples[update_indices].shape)
                 # print("batch_size:", batch_size)
                 self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=None, max=65504)
+                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 # print('update_indices', update_indices.shape, flush=True)
                 # print('norm_squared', norm_squared.shape, flush=True)
@@ -501,7 +501,7 @@ class Linear(nn.Linear, EriLayer):
             if cfg['calibration_stage'] == True:
                 # print('calibration_stage', flush=True)
                 self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
-                result = F.linear(x, self.weight, bias=None)
+                result = F.linear(x, self.weight, bias=self.bias)
                     # print('calibrateresult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)
                 return result
@@ -540,15 +540,15 @@ class Linear(nn.Linear, EriLayer):
                     #         print(x[:, i, j])
                     # print('probeweight2 ', weight.dtype, weight.shape, weight, flush=True)
                     # if 'square' in cfg['prune_method']:
-                    #     result = torch.clamp(F.linear(x, self.weight ** 2, bias=None), min=None, max=65504)
+                    #     result = torch.clamp(F.linear(x, self.weight ** 2, bias=None), min=cfg['data_type_min'], max=cfg['data_type_max'])
                     #     print('probesquareresult', result.dtype, result.shape, result, flush=True)
                     # else:
-                    result = F.linear(x, self.weight, bias=None)
+                    result = F.linear(x, self.weight, bias=self.bias)
                     # print('proberesult', result.dtype, result.shape, result, flush=True)
                     result = result.to(previous_dtype)
                     return result
                 elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:                 
-                    result = F.linear(x, self.weight, bias=None)
+                    result = F.linear(x, self.weight, bias=self.bias)
                     result = result.to(previous_dtype)
                     return result
 
@@ -563,12 +563,14 @@ class Linear(nn.Linear, EriLayer):
                 if 'probe_out_dim_indices' in kwargs:
                     if 'attn' in self.key:
                         weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
+                        bias = self.bias[kwargs['probe_out_dim_indices'].to(self.weight.device)]
                         if self.check_fill_case():
                             # print('fill', flush=True)
                             self.out_selected_dim = kwargs['probe_out_dim_indices']
                     else:
                         weight = self.weight[kwargs['probe_out_dim_indices'].to(self.weight.device), :]
-                    result = F.linear(x, weight, bias=None)
+                        bias = self.bias[kwargs['probe_out_dim_indices'].to(self.weight.device)]
+                    result = F.linear(x, weight, bias=bias)
                     if 'attn' in self.key:
                         if self.check_fill_case():
                             # print('fill', flush=True)
@@ -582,11 +584,12 @@ class Linear(nn.Linear, EriLayer):
                         weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
                     else:
                         weight = self.weight[:, kwargs['probe_in_dim_indices'].to(self.weight.device)]
-                    result = F.linear(x, weight, bias=None)
+                    result = F.linear(x, weight, bias=self.bias)
                     result = result.to(previous_dtype)
                     return result
                 else:
                     # only prune input in each layer
+                    # TODO: fix later
                     if 'traditional' in cfg['prune_method']:
                         x, pruned_dim, preserve_channels = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.is_prune_out_dim)
                         weight = self.extract_in_weight(input_dim, pruned_dim, preserve_channels, self.layer_type)
@@ -611,7 +614,7 @@ class Linear(nn.Linear, EriLayer):
                     # print('calibrateinput 2', x.dtype, x.shape, x, flush=True)
                     # print('calibrateweight 2', weight.dtype, weight.shape, weight, flush=True)
                     # print('here')
-                    result = F.linear(x, weight, bias=None)
+                    result = F.linear(x, weight, bias=self.bias)
                     # print('calibrateresult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)
                 return result
