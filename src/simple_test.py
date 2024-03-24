@@ -46,7 +46,8 @@ torch.backends.cudnn.benchmark = False
 
 
 import torch
-
+lowest_priority, highest_priority = torch.cuda.get_device_properties(0).priority_range
+print(f"Priority range: {lowest_priority} (highest priority) to {highest_priority} (lowest priority)")
 start_event = torch.cuda.Event(enable_timing=True)
 end_event = torch.cuda.Event(interprocess=True) # what I want to share between the streams by ipc_handle
 # end_event_ipc_handle = end_event.ipc_handle()

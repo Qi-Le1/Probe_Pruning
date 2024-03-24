@@ -18,6 +18,7 @@ def process_control():
         print(f"GPU Name: {gpu_name}")
     except Exception as e:
         print(f"An error occurred: {e}")
+    cfg['gpu_name'] = gpu_name
     cfg['data_type'] = torch.float16
     cfg['data_type_max'] = torch.finfo(cfg['data_type']).max
     cfg['data_type_min'] = torch.finfo(cfg['data_type']).min
@@ -66,7 +67,7 @@ def process_control():
     
     if torch.cuda.is_available():
         cfg['cuda_default_stream'] = torch.cuda.default_stream()
-        cfg['cuda_stream1'] = torch.cuda.Stream()
+        cfg['cuda_stream1'] = torch.cuda.Stream(priority=1)
     else:
         raise ValueError('No cuda device available')
 

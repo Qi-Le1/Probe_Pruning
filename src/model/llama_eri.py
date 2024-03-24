@@ -250,7 +250,9 @@ class Linear(nn.Linear, EriLayer):
         self.async_interbatch_weight = None
         self.async_intrabatch_weight = None
 
-        self.async_interbatch_index = -1
+        self.async_interbatch_weight_index = -1
+        self.async_interbatch_metric_index = -1
+
         if 'o_proj' in self.key or 'down_proj' in self.key:
             self.async_interbatch_in_dim_indices = torch.arange((in_features), device=self.weight.data.device, dtype=torch.int32)
 
@@ -333,18 +335,18 @@ class Linear(nn.Linear, EriLayer):
             inp = inp.unsqueeze(0)
         # batch_size = inp.shape[0] if batch_size is None else batch_size
         batch_size = inp.shape[0]
-        default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
-        if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
-            raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
+        # default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
+        # if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
+        #     raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
         cur_device = inp.device
 
         momentum = cfg['ema_momentum']
-        if is_probe and 'compressfillpbmetric' in cfg['prune_method']:
-            momentum = 1 - ((1 - momentum) / (default_batch_size))
+        # if is_probe and 'compressfillpbmetric' in cfg['prune_method']:
+        #     momentum = 1 - ((1 - momentum) / (default_batch_size))
         if 'savemetricseq' in cfg['prune_method']:
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
                 self.scaler_inp = self.scaler_inp.to(cur_device)
-                self.nsamples = self.nsamples.to(cur_device)
+                # self.nsamples = self.nsamples.to(cur_device)
                 update_indices = update_indices.to(cur_device)
                 self.scaler_inp[:, update_indices] *= momentum
                 if cfg['calibration_stage'] == True:
@@ -355,10 +357,9 @@ class Linear(nn.Linear, EriLayer):
                 self.scaler_inp[:, update_indices] += (1 - momentum) * norm_squared / batch_size
         else:
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-                
                 # print('mpomentum', momentum)
                 self.scaler_inp = self.scaler_inp.to(cur_device)
-                self.nsamples = self.nsamples.to(cur_device)
+                # self.nsamples = self.nsamples.to(cur_device)
                 update_indices = update_indices.to(cur_device)
 
                 self.scaler_inp[update_indices] *= momentum
@@ -379,7 +380,8 @@ class Linear(nn.Linear, EriLayer):
                 # print('self.scaler_inp', self.scaler_inp, flush=True)
             elif self.prune_metric == "flap":
                pass
-        self.nsamples[update_indices] += batch_size
+        self.async_interbatch_metric_index += 1
+        # self.nsamples[update_indices] += batch_size
 
     # def update_global_metric_score_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
     def update_global_metric_score_distribution(self, inp, update_indices):
@@ -531,8 +533,8 @@ class Linear(nn.Linear, EriLayer):
         else:
             raise ValueError('Not valid input')
         # print('herererere')
-        self.async_interbatch_index += 1
-        # print('self.async_interbatch_index', self.async_interbatch_index, self.key)
+        self.async_interbatch_weight_index += 1
+        # print('async_interbatch_weight_index', async_interbatch_weight_index, self.key)
         return
     
     def prepare_async_intrabatch_weight(self):
@@ -560,9 +562,9 @@ class Linear(nn.Linear, EriLayer):
         elif cfg['mode'] == 'asyncinter':
             # dont have the prepared weight for current batch
             # sync the stream1
-            if self.async_interbatch_index != cfg['cur_batch_index'] - 1:
+            if self.async_interbatch_weight_index != cfg['cur_batch_index'] - 1:
                 torch.cuda.synchronize(cfg['cuda_stream1'])
-                print('sync step end', self.async_interbatch_index)
+                print('wait sync weight step end', self.key, self.async_interbatch_weight_index)
             return self.async_interbatch_weight
         elif cfg['mode'] == 'asyncintra':
             return self.async_intrabatch_weight
@@ -595,18 +597,21 @@ class Linear(nn.Linear, EriLayer):
                 if cfg['mode'] == 'asyncinter':
                     if 'o_proj' in self.key or 'down_proj' in self.key:
                         # torch.cuda.synchronize(cfg['cuda_default_stream'])
-                        with torch.cuda.stream(cfg['cuda_stream1']):
-                            update_time = time.time()
-                            async_in_dim_indices = self.get_async_in_dim_indices()
-                            # wait in gpu until the operations before o_proj or down_proj are done
-                            # cfg['cuda_stream1'].wait_event(kwargs['cur_event'])
-                            # if cfg['logger_detailed_info'] == True:
-                            #     print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, async_in_dim_indices, flush=True)
-                            # if 'runningmean' in cfg['prune_method']:
-                            #     self.update_global_metric_score_distribution(x, async_in_dim_indices)    
-                            # elif 'ema' in cfg['prune_method']:
-                            #     self.update_global_metric_score_distribution_ema(x, async_in_dim_indices)
-                            update_time_end = time.time()
+                        update_time = time.time()
+                        # with torch.cuda.stream(cfg['cuda_stream1']):
+                        update_time = time.time()
+                        async_in_dim_indices = self.get_async_in_dim_indices()
+                        # wait in gpu until the operations before o_proj or down_proj are done
+                        # cfg['cuda_stream1'].wait_event(kwargs['cur_event'])
+                        if cfg['logger_detailed_info'] == True:
+                            print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, async_in_dim_indices, flush=True)
+                        if 'runningmean' in cfg['prune_method']:
+                            self.update_global_metric_score_distribution(x, async_in_dim_indices)    
+                        elif 'ema' in cfg['prune_method']:
+                            self.update_global_metric_score_distribution_ema(x, async_in_dim_indices)
+                        # torch.cuda.synchronize(cfg['cuda_default_stream'])
+                        update_time_end = time.time()
+                        # print('metric update_time', update_time_end - update_time, flush=True)
                         # print('update_time', update_time_end - update_time, flush=True)
                         # torch.cuda.synchronize(cfg['cuda_stream1'])
                     previous_dtype = x.dtype

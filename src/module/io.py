@@ -14,7 +14,6 @@ def remove_non_picklable_items(input_dict):
         try:
             pickle.dumps(value)
         except (pickle.PicklingError, TypeError):
-            print('Key {} is not picklable'.format(key))
             non_picklable_keys.append(key)
 
     # Remove the non-picklable items

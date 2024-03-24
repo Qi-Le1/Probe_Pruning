@@ -327,8 +327,8 @@ def test(data_loader, model, model_prof, metric, logger):
         inference_duration = 0
         for i, input in enumerate(data_loader):
             cfg['cur_batch_index'] += 1
-            if cfg['logger_detailed_info']:
-                print('cur_batch_index', cfg['cur_batch_index'])
+            # if cfg['logger_detailed_info']:
+            print('cur_batch_index', cfg['cur_batch_index'])
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],

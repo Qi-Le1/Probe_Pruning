@@ -618,7 +618,7 @@ class HiddenRepresentationPruning(BasePruning):
         
         start_time = time.time()
         num_prune = nearest_multiple(num_prune, probe_out_dim_metric.shape[0], multiple)
-        print(f'{self.key} nearest_multiple time', time.time() - start_time)
+        # print(f'{self.key} nearest_multiple time', time.time() - start_time)
         return sorted_indices[num_prune:], sorted_indices[:num_prune]
     
     def sort_mlp_metric_parallel(self, probe_out_dim_metric, multiple):
