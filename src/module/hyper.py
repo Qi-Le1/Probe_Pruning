@@ -19,6 +19,8 @@ def process_control():
     except Exception as e:
         print(f"An error occurred: {e}")
     cfg['data_type'] = torch.float16
+    cfg['data_type_max'] = torch.finfo(cfg['data_type']).max
+    cfg['data_type_min'] = torch.finfo(cfg['data_type']).min
     # This can be implemented dynamically in each layer
     # tc stands for tensor core
     if cfg['data_type'] == torch.float16:
@@ -27,6 +29,8 @@ def process_control():
                 cfg['tc_multiple'] = 64
             elif gpu_name == 'NVIDIA GeForce RTX 4090':
                 cfg['tc_multiple'] = 8
+            else:
+                raise ValueError('Not valid GPU')
 
     cfg['model_name'] = cfg['control']['model_name']
     cfg['task_name'] = cfg['control']['task_name']
@@ -40,28 +44,31 @@ def process_control():
         if match:
             # Convert the matched string to a float
             float_value = float(match.group(1))
+            cfg['probefixratio'] = float_value 
         else:
             float_value = None
-        cfg['probefixratio'] = float_value   
-    
+          
     cfg['ema_momentum'] = 0.99
     if 'ema' in cfg['prune_method']:
         match = re.search(r'ema(\d+\.\d+)', cfg['prune_method'])
+        print('match', match)
         if match:
             # Convert the matched string to a float
             float_value = float(match.group(1))
+            cfg['ema_momentum'] = float_value  
         else:
             float_value = None
-        cfg['ema_momentum'] = float_value  
+        
 
     cfg['mode'] = cfg['control']['mode']
     if cfg['mode'] not in ['sync', 'asyncinter', 'asyncintra']:
         raise ValueError('Not valid mode')
-    if cfg['mode'] in ['asyncinter', 'asyncintra']:
-        if torch.cuda.is_available():
-            cfg['cuda_stream1'] = torch.cuda.Stream()
-        else:
-            raise ValueError('No cuda device available')
+    
+    if torch.cuda.is_available():
+        cfg['cuda_default_stream'] = torch.cuda.default_stream()
+        cfg['cuda_stream1'] = torch.cuda.Stream()
+    else:
+        raise ValueError('No cuda device available')
 
     cfg['calib_info'] = cfg['control']['calib_info']
     if cfg['calib_info'] != 'None':
@@ -166,9 +173,9 @@ def process_control():
         if match:
             # Convert the matched string to a float
             int_value = int(match.group(1))
+            cfg['skip_layers'] = int_value  
         else:
             int_value = None
-        cfg['skip_layers'] = int_value   
 
     cfg['cur_batch_index'] = -1
     cfg['prune_dim'] = -1

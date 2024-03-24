@@ -14,7 +14,7 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, update_model_prof, model_forward
+    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, update_model_prof, model_forward, remove_non_picklable_items
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 from lm_eval import tasks
 from lm_eval import evaluator
@@ -114,7 +114,7 @@ def runExperiment():
     print('inference_duration', inference_duration)
     # thread lock bug
     test_logger.writer = None
-    cfg.pop('cuda_stream1', None)
+    remove_non_picklable_items(cfg)
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
               'dense_info_list': dense_info_list, 'dense_duration': inference_duration}
 

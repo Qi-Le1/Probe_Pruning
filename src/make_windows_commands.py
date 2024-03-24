@@ -543,7 +543,7 @@ def main():
 #             controls.extend(CIFAR10_controls_9)
 
             control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.0', '0.3', '0.6', '0.8'], 
-                             ['probe'], ['calib-ema'], ['sync', 'asyncinter'], ['c4-2'], ['None'],
+                             ['probe'], ['calib-ema'], ['sync', 'asyncinter'], ['c4-15'], ['None'],
                             #  [
                             #     #  'mag-calib-probe-None-None+c4-2000',
                             # #   'mag-calibrunningmean-probe-None-None+c4-2000',

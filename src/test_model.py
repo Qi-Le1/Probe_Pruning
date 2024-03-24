@@ -13,7 +13,7 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward
+    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward, remove_non_picklable_items
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -46,6 +46,11 @@ def main():
         runExperiment()
     return
 
+def prepare_cude_events(model):
+    if 'llama-2' in cfg['model_name']:
+        for i in range(model.config.num_hidden_layers):
+            cfg[f'cuda_events_mlp_{i}'] = torch.cuda.Event()
+        
 
 def runExperiment():
     cfg['seed'] = int(cfg['model_tag'].split('_')[0])
@@ -57,7 +62,7 @@ def runExperiment():
     cfg['epoch'] = 0 
     dense_name_list = cfg['model_tag'].split('_')
     # batch_size
-    dense_name_list[4] = cfg[cfg['model_name']]['batch_size']['test']
+    dense_name_list[4] = str(cfg[cfg['model_name']]['batch_size']['test'])
     # prune_hyper
     dense_name_list[6] = '0'
     # prune_metric
@@ -72,7 +77,6 @@ def runExperiment():
     dense_name_list[11] = 'None'
     # cust_tgt_modules
     dense_name_list[12] = 'None'
-
     dense_model_path = os.path.join(result_path, '_'.join(dense_name_list))
     if not os.path.exists(dense_model_path):
         dense_model_path = os.path.join(result_path, 'dense', '_'.join(dense_name_list))
@@ -81,6 +85,7 @@ def runExperiment():
 
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
+    prepare_cude_events(model)
     dataset = process_dataset(dataset, tokenizer)
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
@@ -107,7 +112,7 @@ def runExperiment():
     print('evaluation_for_full', evaluation)
     # thread lock bug
     test_logger.writer = None
-    cfg.pop('cuda_stream1', None)
+    remove_non_picklable_items(cfg)
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
               'dense_info_list': dense_info_list, 'pruned_info_list': pruned_info_list, \
               'dense_duration': dense_duration, 'pruned_duration': inference_duration, 'dataset_size': cfg['dataset_size']['test']}
@@ -116,15 +121,15 @@ def runExperiment():
 
 def cal_prune_metric(x, weight, metric_type):
     if 'savemetricseq' in cfg['prune_method']:
-        x = torch.clamp(torch.sum(x, dim=0), min=None, max=65504)
-        # x = torch.clamp(torch.norm(x, p=2, dim=0) ** 2, min=None, max=65504)
+        x = torch.clamp(torch.sum(x, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
+        # x = torch.clamp(torch.norm(x, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
     if 'wandasp' in metric_type:
         # probe_out_dim_metric = (torch.sqrt(norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
         pass
     elif 'flap' in metric_type:
         pass
     elif 'probe' in metric_type:    
-        x = torch.sqrt(((x.unsqueeze(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=None, max=65504))
+        x = torch.sqrt(((x.unsqueeze(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=cfg['data_type_min'], max=cfg['data_type_max']))
     return x
 
 def global_determine_ratio(model, if_log=False):
@@ -148,7 +153,7 @@ def global_determine_ratio(model, if_log=False):
             if if_log:
                 x = torch.log(x + 1)
             # if 'savemetricseq' in cfg['prune_method']:
-            #     x = torch.clamp(torch.sum(x, dim=0), min=None, max=65504)
+            #     x = torch.clamp(torch.sum(x, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
             if 'globalratiostd' in cfg['prune_method']:
                 if 'down_proj' in name:
                     x = (x - torch.mean(x, axis=-1, keepdim=True)) / torch.std(x, axis=-1, keepdim=True)
@@ -198,7 +203,7 @@ def global_determine_ratio(model, if_log=False):
             if if_log:
                 x = torch.log(x + 1)
             # if 'savemetricseq' in cfg['prune_method']:
-            #     x = torch.clamp(torch.sum(x, dim=0), min=None, max=65504)
+            #     x = torch.clamp(torch.sum(x, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
             print('name', name, 'x', x, 'sorted_x', torch.sort(x)[0])
             print('mean', torch.mean(x, axis=-1), 'std', torch.std(x, axis=-1))
             if 'globalratiostd' in cfg['prune_method']:
@@ -303,7 +308,6 @@ def run_calibration(model, data_loader):
             if iterate_small_samples:
                 if i == 100:
                     break
-            break
         if 'globalratio' in cfg['prune_method']:
             global_determine_ratio(model)
             # global_determine_ratio(model, if_log=True)
@@ -323,6 +327,8 @@ def test(data_loader, model, model_prof, metric, logger):
         inference_duration = 0
         for i, input in enumerate(data_loader):
             cfg['cur_batch_index'] += 1
+            if cfg['logger_detailed_info']:
+                print('cur_batch_index', cfg['cur_batch_index'])
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -381,6 +387,8 @@ def test(data_loader, model, model_prof, metric, logger):
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
+            # if i == 3:
+            #     break
         evaluation = metric.evaluate('test', 'full')
         print('evaluation_for_full', evaluation)
         logger.append(evaluation, 'test')

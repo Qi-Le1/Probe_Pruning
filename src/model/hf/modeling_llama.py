@@ -373,7 +373,7 @@ class LlamaMLP(nn.Module):
                         # down_proj = self.down_proj(temp, **kwargs)
                         # custom_duration = time.time() - time_start
                         # return down_proj
-
+                    torch.cuda.synchronize(cfg['cuda_default_stream'])
                     mlp_duration_start = time.time()
                     time_start = time.time()
                     temp_gate = self.act_fn(self.gate_proj(x))
@@ -389,6 +389,7 @@ class LlamaMLP(nn.Module):
                     down_proj = self.down_proj(temp_gate * temp_up)
                     custom_duration = time.time() - time_start
                     print('custom_duration down', custom_duration, flush=True)
+                    torch.cuda.synchronize(cfg['cuda_default_stream'])
                     mlp_duration = time.time() - mlp_duration_start
                     print('mlp_duration', mlp_duration, flush=True)
                     del temp_gate, temp_up
@@ -678,7 +679,7 @@ class LlamaMLP(nn.Module):
 
                             if 'squareasync' in cfg['prune_method']:
                                 if self.last_batch_probe_out is None:
-                                    norm_probe_out_square = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2, min=None, max=65504) / cfg['probe_num']
+                                    norm_probe_out_square = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max']) / cfg['probe_num']
                                     self.last_batch_probe_out = norm_probe_out_square.detach()
                                     probe_out = torch.zeros(1, probe_out.size(-2), probe_out.size(-1), device=probe_out.device, dtype=probe_out.dtype)
                                 else:
@@ -694,7 +695,7 @@ class LlamaMLP(nn.Module):
                                     #     probe_out, self.last_batch_probe_out = torch.sqrt(self.last_batch_probe_out).unsqueeze(0), combined_probe
                                     # if 'squareasync' in cfg['prune_method']:
                                     proportion = cfg['asyncratio']
-                                    probe_out = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2, min=None, max=65504) / cfg['probe_num']
+                                    probe_out = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max']) / cfg['probe_num']
                                     combined_probe = (self.last_batch_probe_out * proportion + probe_out * (1 - proportion)).to(probe_out.dtype)
                                     # combined_probe = probe_out
                                     probe_out, self.last_batch_probe_out = torch.sqrt(self.last_batch_probe_out).unsqueeze(0), combined_probe
@@ -741,9 +742,9 @@ class LlamaMLP(nn.Module):
                             probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
 
                         if 'globalratio' in cfg['prune_method']:
-                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
+                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                         else:
-                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
+                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
 
                         # if 'dynaprobe' in cfg['prune_method']:
                         #     global_score = copy.deepcopy(self.down_proj.get_global_metric_score_distribution())
@@ -753,7 +754,7 @@ class LlamaMLP(nn.Module):
                         #         global_score = global_score.unsqueeze(0)
 
                         #     raw_calib_out_dim_metric, _ = cal_prune_metric(global_score, self.down_proj.weight.data, cfg['prune_metric'])
-                        #     raw_calib_out_dim_indices, raw_calib_prune_dim_indices = self.pruning_module.sort_probe_mlp_metric(raw_calib_out_dim_metric, multiple)
+                        #     raw_calib_out_dim_indices, raw_calib_prune_dim_indices = self.pruning_module.sort_mlp_metric(raw_calib_out_dim_metric, multiple)
 
                         #     raw_calib_set = set(raw_calib_out_dim_indices.tolist())
                         #     probe_out_set = set(probe_out_dim_indices.tolist())
@@ -831,11 +832,11 @@ class LlamaMLP(nn.Module):
                                     self.down_proj.update_global_metric_score_distribution_ema(probe_out[..., prune_out_dim_indices], prune_out_dim_indices, is_probe=True)
 
                                     # bsz_tensor = torch.tensor(bsz, dtype=torch.float16, device=gate_out.device)
-                                    # # real_out_channel = torch.clamp(torch.norm(gate_out * up_out, p=2, dim=0) ** 2, min=None, max=65504) / torch.sqrt(bsz_tensor)
-                                    # probe_select = torch.clamp(torch.norm(probe_out[..., probe_out_dim_indices], p=2, dim=0) ** 2, min=None, max=65504)
-                                    # prune_prune = torch.clamp(torch.norm(probe_out[..., prune_out_dim_indices], p=2, dim=0) ** 2, min=None, max=65504)
+                                    # # real_out_channel = torch.clamp(torch.norm(gate_out * up_out, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max']) / torch.sqrt(bsz_tensor)
+                                    # probe_select = torch.clamp(torch.norm(probe_out[..., probe_out_dim_indices], p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                                    # prune_prune = torch.clamp(torch.norm(probe_out[..., prune_out_dim_indices], p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
                                     # full_inference = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
-                                    # full_inference = torch.clamp(torch.norm(full_inference, p=2, dim=0) ** 2, min=None, max=65504) / bsz_tensor
+                                    # full_inference = torch.clamp(torch.norm(full_inference, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max']) / bsz_tensor
                                     # full_selected = full_inference[..., probe_out_dim_indices]
                                     # full_pruned = full_inference[..., prune_out_dim_indices]
 
@@ -904,13 +905,13 @@ class LlamaMLP(nn.Module):
                                     self.down_proj.update_global_metric_score_distribution_ema(comined_probe_out[..., prune_out_dim_indices], prune_out_dim_indices, is_probe=True)
                                 elif 'fillpbmetricub' in cfg['prune_method']:
                                     full_inference = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
-                                    # full_inference = torch.clamp(torch.norm(full_inference, p=2, dim=0) ** 2, min=None, max=65504) / bsz_tensor
+                                    # full_inference = torch.clamp(torch.norm(full_inference, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max']) / bsz_tensor
                                     # full_selected = full_inference[..., probe_out_dim_indices]
                                     full_pruned = full_inference[..., prune_out_dim_indices]
                                     self.down_proj.update_global_metric_score_distribution_ema(full_pruned, prune_out_dim_indices)
 
                         if 'halfsquareasync' in cfg['prune_method'] and 'savemetricseq' in cfg['prune_method']:
-                            temp_norm_square = torch.clamp(torch.norm(gate_out * up_out, p=2, dim=0) ** 2, min=None, max=65504) / bsz
+                            temp_norm_square = torch.clamp(torch.norm(gate_out * up_out, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max']) / bsz
                             self.last_batch_probe_out[..., probe_out_dim_indices] = temp_norm_square
 
                         kwargs['probe_in_dim_indices'] = probe_out_dim_indices
@@ -919,27 +920,67 @@ class LlamaMLP(nn.Module):
                         # print('fll_batch_duration', custom_duration, flush=True)
                         return down_proj
                     elif 'calib' in cfg['prune_method'] and ('runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']):
+                        # if cfg['logger_detailed_info'] == True:
+                        #     print('input', x, flush=True)
                         bsz, _, _ = x.shape
                         time_start = time.time()
 
-                        down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-
-                        with torch.cuda.stream(cfg['cuda_stream1']):
-                            if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
+                        if cfg['mode'] == 'sync':
+                            if torch.all(self.down_proj.get_global_metric_score_distribution() == 0) or cfg['cur_batch_index'] == 0:
                                 out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
                             else:
                                 out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
                                 if 'globalratio' in cfg['prune_method']:
-                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                 else:
-                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(out_dim_metric, cfg['tc_multiple'])
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
 
-                            self.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
-                            self.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
-                            self.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
+
+                            temp = self.act_fn(self.gate_proj(x, out_dim_indices=out_dim_indices)) * self.up_proj(x, out_dim_indices=out_dim_indices)
+                            down_proj = self.down_proj(temp, in_dim_indices=out_dim_indices)
+                            if cfg['logger_detailed_info'] == True:
+                                print('temp out', temp, flush=True)
+                                print('down_proj out', down_proj, flush=True)
+                            # down_proj = self.down_proj(self.act_fn(self.gate_proj(x, out_dim_indices=out_dim_indices)) * self.up_proj(x, out_dim_indices=out_dim_indices), in_dim_indices=out_dim_indices)
+                        elif cfg['mode'] == 'asyncinter':
+                            temp = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
+                            # cur_event = cfg[f'cuda_events_mlp_{self.layer_order}']
+                            # cur_event.record(stream=cfg['cuda_default_stream'])
+                            # torch.cuda.synchronize(cfg['cuda_default_stream'])
+                            down_proj = self.down_proj(temp)
+                            # down_proj = self.down_proj(temp, cur_event=cur_event)
+                            if cfg['logger_detailed_info'] == True:
+                                print('temp out', temp, flush=True)
+                                print('down_proj out', down_proj, flush=True)
+
+                            # down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+
+                            with torch.cuda.stream(cfg['cuda_stream1']):
+
+                                if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
+                                    out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
+                                else:
+                                    out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+
+                                    if 'globalratio' in cfg['prune_method']:
+                                        out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
+                                    else:
+                                        out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
+
+                                if cfg['logger_detailed_info'] == True:
+                                    print('out_dim_indices', out_dim_indices, flush=True)
+                                    print('prune_out_dim_indices', prune_out_dim_indices, flush=True)
+                                self.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
+                                self.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
+                                self.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
+                            # torch.cuda.synchronize()
+                            # torch.cuda.synchronize(cfg['cuda_stream1'])
+                        # if cfg['logger_detailed_info'] == True:
+                        #     print('down_proj_out', down_proj, flush=True)
                         return down_proj
                     elif 'calib' in cfg['prune_method']:
+                        # no ema or runningmean
                         bsz, _, _ = x.shape
                         time_start = time.time()
 
@@ -950,13 +991,11 @@ class LlamaMLP(nn.Module):
                                 out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
                                 if 'globalratio' in cfg['prune_method']:
-                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                 else:
-                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(out_dim_metric, cfg['tc_multiple'])
-
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
 
                             down_proj = self.down_proj(self.act_fn(self.gate_proj(x, out_dim_indices=out_dim_indices)) * self.up_proj(x, out_dim_indices=out_dim_indices), in_dim_indices=out_dim_indices)
-
                         if cfg['mode'] == 'asyncinter':
                             down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
@@ -968,9 +1007,9 @@ class LlamaMLP(nn.Module):
                                         out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
                                         if 'globalratio' in cfg['prune_method']:
-                                            out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
+                                            out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                         else:
-                                            out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(out_dim_metric, cfg['tc_multiple'])
+                                            out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
 
                                     self.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
                                     self.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
@@ -999,7 +1038,7 @@ class LlamaMLP(nn.Module):
                     #         # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
                     #     else:
                     #         probe_out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
-                    #         probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+                    #         probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
 
                     #     temp = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
                     #     # if 'runningmean' in cfg['prune_method']:
@@ -1010,7 +1049,7 @@ class LlamaMLP(nn.Module):
                     #         # Update the running_mean and running_mean_counter here
                     #         # self.running_mean[probe_out_dim_indices] *= self.running_mean_counter[probe_out_dim_indices] / (self.running_mean_counter[probe_out_dim_indices] + bsz)
                     #         # # Ensure the denominator is broadcastable; might need to unsqueeze to add a dimension for correct broadcasting
-                    #         # norm_squared = torch.clamp(torch.norm(temp, p=2, dim=1) ** 2, min=None, max=65504)
+                    #         # norm_squared = torch.clamp(torch.norm(temp, p=2, dim=1) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
                     #         # denominator = (self.running_mean_counter[probe_out_dim_indices].unsqueeze(0) + bsz)
                     #         # # Update running mean
                     #         # self.running_mean[probe_out_dim_indices] += torch.sum(norm_squared / denominator, dim=0)
@@ -1046,7 +1085,7 @@ class LlamaMLP(nn.Module):
                 down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
                 torch.cuda.synchronize()
                 end_time = time.time() - start_time
-                print('mlp_full_batch_duration', end_time, flush=True)
+                # print('mlp_full_batch_duration', end_time, flush=True)
                 
                 return down_proj
 
@@ -1474,7 +1513,7 @@ class LlamaAttention(nn.Module):
                     if 'globalratio' in cfg['prune_method']:
                         probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                     else:
-                        # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+                        # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
                         probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
                     
                     if 'whole' in vo_prune_way:
@@ -1632,7 +1671,7 @@ class LlamaAttention(nn.Module):
                             if 'globalratio' in cfg['prune_method']:
                                 probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                             else:
-                                # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, multiple)
+                                # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
                                 probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
                     
                     if qk_prune_way is None:
@@ -1922,8 +1961,8 @@ class LlamaDecoderLayer(nn.Module):
             
             # Calculate the difference percentage for each position
             # Use torch.clamp to avoid division by zero, setting a minimum value
-            hidden_states_nonzero = torch.clamp(hidden_states, min=1e-6, max=65504)
-            temp_nonzero = torch.clamp(temp, min=1e-6, max=65504)
+            hidden_states_nonzero = torch.clamp(hidden_states, min=1e-6, max=cfg['data_type_max'])
+            temp_nonzero = torch.clamp(temp, min=1e-6, max=cfg['data_type_max'])
             difference_percentage = (torch.abs(temp_nonzero) / torch.abs(hidden_states_nonzero)) * 100
             
             # difference_sum = torch.sum(torch.abs(hidden_states - temp)) / hidden_states.numel()

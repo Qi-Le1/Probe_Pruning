@@ -45,6 +45,44 @@ torch.backends.cudnn.benchmark = False
 
 
 
+import torch
+
+start_event = torch.cuda.Event(enable_timing=True)
+end_event = torch.cuda.Event(interprocess=True) # what I want to share between the streams by ipc_handle
+# end_event_ipc_handle = end_event.ipc_handle()
+pin1_event = torch.cuda.Event(enable_timing=True)
+pin2_event = torch.cuda.Event(enable_timing=True)
+
+with torch.cuda.stream(torch.cuda.Stream()):
+    start_event.record()
+    
+    # Run some things here
+    
+    pin1_event.record()
+    end_event.record()
+
+with torch.cuda.stream(torch.cuda.Stream()):
+    # end_event = torch.cuda.Event.from_ipc_handle(torch.cuda.current_device(), end_event_ipc_handle)
+    end_event.wait() # wait asynchronously
+
+    # Run some things here
+
+    pin2_event.record()
+
+torch.cuda.synchronize()
+
+elapsed_time_ms = start_event.elapsed_time(pin1_event)
+print(f"Elapsed time: {elapsed_time_ms} ms")
+
+elapsed_time_ms = pin1_event.elapsed_time(pin2_event)
+print(f"Elapsed time: {elapsed_time_ms} ms")
+
+
+default_stream = torch.cuda.default_stream()
+print(default_stream)
+
+another_steam = torch.cuda.Stream()
+print(another_steam)
 
 
 class CustomModel(nn.Module):

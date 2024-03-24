@@ -407,9 +407,9 @@ class OPTDecoderLayer(nn.Module):
                         probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'])
 
                     if 'globalratio' in cfg['prune_method']:
-                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
+                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
                     else:
-                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
+                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
 
                     # if self.probe_out_dim_indices is None:
                     #     self.probe_out_dim_indices = probe_out_dim_indices
@@ -446,9 +446,9 @@ class OPTDecoderLayer(nn.Module):
                         probe_out_dim_metric = cal_calib_prune_metric(self.fc2.get_global_metric_score_distribution(), self.fc2.weight.data, cfg['prune_metric'])
 
                         if 'globalratio' in cfg['prune_method']:
-                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
+                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
                         else:
-                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_probe_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
+                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
 
                     kwargs['probe_in_dim_indices'] = probe_out_dim_indices
                     hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states, probe_out_dim_indices=probe_out_dim_indices)), **kwargs)

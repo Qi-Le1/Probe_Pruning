@@ -8,6 +8,21 @@ from torchvision.utils import save_image
 from .utils import recur
 
 
+def remove_non_picklable_items(input_dict):
+    non_picklable_keys = []
+    for key, value in input_dict.items():
+        try:
+            pickle.dumps(value)
+        except (pickle.PicklingError, TypeError):
+            print('Key {} is not picklable'.format(key))
+            non_picklable_keys.append(key)
+
+    # Remove the non-picklable items
+    for key in non_picklable_keys:
+        del input_dict[key]
+
+    return
+
 def check_exists(path):
     return os.path.exists(path)
 
