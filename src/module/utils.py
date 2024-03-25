@@ -24,6 +24,7 @@ def model_forward(model, input, inference_duration, index):
     output = model(**input)
     torch.cuda.synchronize(cfg['cuda_default_stream'])
     inference_duration += time.time() - start_time
+    print(f'index: {index} - inference_duration: {inference_duration}', flush=True)
     # not considering edge case for time cost
     if index == 0:
         return output, 0
