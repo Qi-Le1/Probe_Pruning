@@ -26,7 +26,7 @@ def process_control():
     # tc stands for tensor core
     if cfg['data_type'] == torch.float16:
         if cfg['cudatoolkit_version'] >= 11 and cfg['cudnn_version'] >= 7630:
-            if gpu_name == 'A100':
+            if gpu_name == 'NVIDIA A100-SXM4-40GB':
                 cfg['tc_multiple'] = 64
             elif gpu_name == 'NVIDIA GeForce RTX 4090':
                 cfg['tc_multiple'] = 8

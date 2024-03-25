@@ -325,6 +325,9 @@ def test(data_loader, model, model_prof, metric, logger):
         model.train(False)
         start_time = time.time()
         inference_duration = 0
+
+        # torch.cuda.synchronize()
+        # start_time = time.time()
         for i, input in enumerate(data_loader):
             cfg['cur_batch_index'] += 1
             # if cfg['logger_detailed_info']:
@@ -389,6 +392,9 @@ def test(data_loader, model, model_prof, metric, logger):
                 print('running_info', info)
             # if i == 3:
             #     break
+        # torch.cuda.synchronize()
+        # inference_duration = time.time() - start_time
+        # print('inference_duration', inference_duration)
         evaluation = metric.evaluate('test', 'full')
         print('evaluation_for_full', evaluation)
         logger.append(evaluation, 'test')

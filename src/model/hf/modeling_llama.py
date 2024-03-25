@@ -956,23 +956,23 @@ class LlamaMLP(nn.Module):
 
                             # down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
-                            # with torch.cuda.stream(cfg['cuda_stream1']):
-                            #     if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
-                            #         out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
-                            #     else:
-                            #         out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                            with torch.cuda.stream(cfg['cuda_stream1']):
+                                if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
+                                    out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
+                                else:
+                                    out_dim_metric = cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
-                            #         if 'globalratio' in cfg['prune_method']:
-                            #             out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
-                            #         else:
-                            #             out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
+                                    if 'globalratio' in cfg['prune_method']:
+                                        out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
+                                    else:
+                                        out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
 
-                            #     if cfg['logger_detailed_info'] == True:
-                            #         print('out_dim_indices', out_dim_indices, flush=True)
-                            #         print('prune_out_dim_indices', prune_out_dim_indices, flush=True)
-                            #     self.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
-                            #     self.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
-                            #     self.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
+                                if cfg['logger_detailed_info'] == True:
+                                    print('out_dim_indices', out_dim_indices, flush=True)
+                                    print('prune_out_dim_indices', prune_out_dim_indices, flush=True)
+                                self.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
+                                self.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
+                                self.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
                             # torch.cuda.synchronize()
                             # torch.cuda.synchronize(cfg['cuda_stream1'])
                         # if cfg['logger_detailed_info'] == True:
@@ -981,6 +981,7 @@ class LlamaMLP(nn.Module):
                     elif 'calib' in cfg['prune_method']:
                         # no ema or runningmean
                         bsz, _, _ = x.shape
+                        torch.cuda.synchronize(cfg['cuda_default_stream'])
                         time_start = time.time()
 
                         if cfg['mode'] == 'sync':
@@ -1025,8 +1026,9 @@ class LlamaMLP(nn.Module):
                         #         print(self.layer_order, 'intersection_ratio', intersection_ratio, flush=True)
                         #         self.prev = probe_out_dim_indices
                         # self.cur_batch += 1
+                        torch.cuda.synchronize(cfg['cuda_default_stream'])
                         custom_duration = time.time() - time_start
-                        # print('fll_batch_duration', custom_duration, flush=True)
+                        print('mlp_full_batch_duration', custom_duration, flush=True)
                         return down_proj
                     # elif 'runningmean' in cfg['prune_method'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
                     #     bsz, _, _ = x.shape
@@ -1079,12 +1081,12 @@ class LlamaMLP(nn.Module):
                     #     del temp_gate, temp_up
                     #     return down_proj
             else:
-                torch.cuda.synchronize()
+                torch.cuda.synchronize(cfg['cuda_default_stream'])
                 start_time = time.time()
                 down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-                torch.cuda.synchronize()
+                torch.cuda.synchronize(cfg['cuda_default_stream'])
                 end_time = time.time() - start_time
-                # print('mlp_full_batch_duration', end_time, flush=True)
+                print('mlp_full_batch_duration', end_time, flush=True)
                 
                 return down_proj
 
@@ -2340,40 +2342,42 @@ class LlamaModel(LlamaPreTrainedModel):
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
-            if cfg['calibration_stage'] == False:
-                if idx == len(self.layers)//2 - 1 or idx == len(self.layers) - 1:
-                    with torch.cuda.stream(cfg['cuda_stream1']):
-                        if idx == len(self.layers)//2 - 1:
-                            finished_layers = list(range(cfg['skip_layers'] + 1, len(self.layers)//2))
-                        else:
-                            finished_layers = list(range(len(self.layers)//2, len(self.layers)))
-                        for layer_order in finished_layers:
-                            # print('layer_order', layer_order, flush=True)
-                            cur_mlp = self.layers[layer_order].mlp
-                            # attributes = dir(cur_mlp.down_proj)
-                            # non_method_attributes = [attr for attr in attributes if not callable(getattr(cur_mlp.down_proj, attr)) and not attr.startswith('_')]
-                            # print(non_method_attributes)
-                            if cur_mlp.down_proj.async_interbatch_metric_index != cfg['cur_batch_index']:
-                                print('sync metric step start', cur_mlp.down_proj.async_interbatch_metric_index)
-                                print('sync metric step start batch', cfg['cur_batch_index'])
-                                torch.cuda.synchronize(cfg['cuda_default_stream'])
-                                print('sync metric step end', cur_mlp.down_proj.async_interbatch_metric_index)
-                            if torch.all(cur_mlp.down_proj.get_global_metric_score_distribution() == 0):
-                                out_dim_indices = torch.arange(cur_mlp.intermediate_size, dtype=torch.long).to(device=cur_mlp.down_proj.weight.data.device)
-                            else:
-                                out_dim_metric = cal_calib_prune_metric(cur_mlp.down_proj.get_global_metric_score_distribution(), cur_mlp.down_proj.weight.data, cfg['prune_metric'])
+            # if ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
+            #     if cfg['mode'] == 'asyncinter':
+            #         if cfg['calibration_stage'] == False:
+            #             if idx == len(self.layers)//2 - 1 or idx == len(self.layers) - 1:
+            #                 with torch.cuda.stream(cfg['cuda_stream1']):
+            #                     if idx == len(self.layers)//2 - 1:
+            #                         finished_layers = list(range(cfg['skip_layers'] + 1, len(self.layers)//2))
+            #                     else:
+            #                         finished_layers = list(range(len(self.layers)//2, len(self.layers)))
+            #                     for layer_order in finished_layers:
+            #                         # print('layer_order', layer_order, flush=True)
+            #                         cur_mlp = self.layers[layer_order].mlp
+            #                         # attributes = dir(cur_mlp.down_proj)
+            #                         # non_method_attributes = [attr for attr in attributes if not callable(getattr(cur_mlp.down_proj, attr)) and not attr.startswith('_')]
+            #                         # print(non_method_attributes)
+            #                         if cur_mlp.down_proj.async_interbatch_metric_index != cfg['cur_batch_index']:
+            #                             print('sync metric step start', cur_mlp.down_proj.async_interbatch_metric_index)
+            #                             print('sync metric step start batch', cfg['cur_batch_index'])
+            #                             torch.cuda.synchronize(cfg['cuda_default_stream'])
+            #                             print('sync metric step end', cur_mlp.down_proj.async_interbatch_metric_index)
+            #                         if torch.all(cur_mlp.down_proj.get_global_metric_score_distribution() == 0):
+            #                             out_dim_indices = torch.arange(cur_mlp.intermediate_size, dtype=torch.long).to(device=cur_mlp.down_proj.weight.data.device)
+            #                         else:
+            #                             out_dim_metric = cal_calib_prune_metric(cur_mlp.down_proj.get_global_metric_score_distribution(), cur_mlp.down_proj.weight.data, cfg['prune_metric'])
 
-                                if 'globalratio' in cfg['prune_method']:
-                                    out_dim_indices, prune_out_dim_indices = cur_mlp.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=cur_mlp.down_proj.pruning_ratio)
-                                else:
-                                    out_dim_indices, prune_out_dim_indices = cur_mlp.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
+            #                             if 'globalratio' in cfg['prune_method']:
+            #                                 out_dim_indices, prune_out_dim_indices = cur_mlp.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=cur_mlp.down_proj.pruning_ratio)
+            #                             else:
+            #                                 out_dim_indices, prune_out_dim_indices = cur_mlp.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
 
-                            if cfg['logger_detailed_info'] == True:
-                                print('out_dim_indices', out_dim_indices, flush=True)
-                                print('prune_out_dim_indices', prune_out_dim_indices, flush=True)
-                            cur_mlp.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
-                            cur_mlp.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
-                            cur_mlp.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
+            #                         if cfg['logger_detailed_info'] == True:
+            #                             print('out_dim_indices', out_dim_indices, flush=True)
+            #                             print('prune_out_dim_indices', prune_out_dim_indices, flush=True)
+            #                         cur_mlp.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
+            #                         cur_mlp.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
+            #                         cur_mlp.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
 
         hidden_states = self.norm(hidden_states)
 

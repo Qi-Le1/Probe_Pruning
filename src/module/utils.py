@@ -18,8 +18,6 @@ FLOPS_UNIT = (1000000, 'Million')
 # already in seconds unit
 TIME_UNIT = (1, 's')
 
-
-
 def model_forward(model, input, inference_duration, index):
     torch.cuda.synchronize(cfg['cuda_default_stream'])
     start_time = time.time()

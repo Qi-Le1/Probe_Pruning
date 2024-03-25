@@ -17,13 +17,13 @@ from .hf.modeling_opt import OPTForCausalLM
 from module import MULTIGPUS_MODEL_NAME_LIST, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING, alternate_broadcast
 
 
-def check_multiple_for_tensor_cores(data_type):
-    if data_type == torch.float16:
-        if cfg['cudatoolkit_version'] >= 11 and cfg['cudnn_version'] >= 7630:
-            if cfg['gpu_type'] == 'A100':
-                return 64
-            else:
-                return 8
+# def check_multiple_for_tensor_cores(data_type):
+#     if data_type == torch.float16:
+#         if cfg['cudatoolkit_version'] >= 11 and cfg['cudnn_version'] >= 7630:
+#             if cfg['gpu_type'] == 'A100':
+#                 return 64
+#             else:
+#                 return 8
 
 
 def make_hf_model(model_name, sub_model_name=None):
@@ -42,7 +42,7 @@ def make_hf_model(model_name, sub_model_name=None):
             if cfg['gpu_name'] == 'NVIDIA GeForce RTX 4090':
                 if approximate_gpu_memory_gb > 24:
                     device_map = "auto"
-            else:
+            elif cfg['gpu_name'] == 'NVIDIA A100-SXM4-40GB':
                 # A100
                 if approximate_gpu_memory_gb > 40:
                     device_map = "auto"

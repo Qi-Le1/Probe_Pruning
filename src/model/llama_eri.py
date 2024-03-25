@@ -562,9 +562,10 @@ class Linear(nn.Linear, EriLayer):
         elif cfg['mode'] == 'asyncinter':
             # dont have the prepared weight for current batch
             # sync the stream1
-            if self.async_interbatch_weight_index != cfg['cur_batch_index'] - 1:
-                torch.cuda.synchronize(cfg['cuda_stream1'])
-                print('wait sync weight step end', self.key, self.async_interbatch_weight_index)
+            if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
+                if self.async_interbatch_weight_index != cfg['cur_batch_index'] - 1:
+                    torch.cuda.synchronize(cfg['cuda_stream1'])
+                    print('wait sync weight step end', self.key, self.async_interbatch_weight_index)
             return self.async_interbatch_weight
         elif cfg['mode'] == 'asyncintra':
             return self.async_intrabatch_weight
@@ -616,7 +617,7 @@ class Linear(nn.Linear, EriLayer):
                         # torch.cuda.synchronize(cfg['cuda_stream1'])
                     previous_dtype = x.dtype
                     result = F.linear(x, weight, bias=None)
-                    result = result.to(previous_dtype)
+                    # result = result.to(previous_dtype)
                     return result
                 elif cfg['mode'] == 'sync':
                     if 'o_proj' in self.key or 'down_proj' in self.key:
