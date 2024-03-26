@@ -542,7 +542,7 @@ def main():
 #             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
 #             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.0', '0.3', '0.6', '0.8'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3', '10'], ['128'], ['0.0', '0.3', '0.6', '0.8'], 
                              ['probe'], ['calib-ema'], ['sync', 'asyncinter'], ['c4-15'], ['None'],
                             #  [
                             #     #  'mag-calib-probe-None-None+c4-2000',
@@ -953,7 +953,7 @@ def main():
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3', '5', '10'], ['10', '50', '128'], ['0'], 
                              ['None'], ['dense'], ['sync'], ['None'], ['None'],        
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)

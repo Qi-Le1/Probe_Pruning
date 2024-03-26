@@ -131,8 +131,10 @@ def test(data_loader, model, model_prof, metric, logger):
         model.train(False)
         start_time = time.time()
         inference_duration = 0
+        # torch.cuda.cudart().cudaProfilerStart()
         for i, input in enumerate(data_loader):
-            print("Debug 12.1: Test logger created", flush=True)
+            # print("Debug 12.1: Test logger created", flush=True)
+            # torch.cuda.nvtx.range_push("iteration{}".format(i))
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -170,6 +172,7 @@ def test(data_loader, model, model_prof, metric, logger):
             print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
+            # torch.cuda.nvtx.range_pop()
             # return
             # break
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
@@ -186,6 +189,7 @@ def test(data_loader, model, model_prof, metric, logger):
         print(logger.write('test', metric.metric_name['test']), flush=True)
         model_prof.stop_profile()
         print("Debug 12.2: Test logger created", flush=True)
+        # torch.cuda.cudart().cudaProfilerStop()
     return inference_duration
 
 
