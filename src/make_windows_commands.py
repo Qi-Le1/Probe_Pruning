@@ -542,7 +542,7 @@ def main():
 #             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
 #             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3', '10'], ['128'], ['0.0', '0.3', '0.6', '0.8'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], [ '10', '80'], ['128'], ['0.0', '0.3', '0.6', '0.8'], 
                              ['probe'], ['calib-ema'], ['sync', 'asyncinter'], ['c4-15'], ['None'],
                             #  [
                             #     #  'mag-calib-probe-None-None+c4-2000',
@@ -582,7 +582,7 @@ def main():
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['3', '10'], ['128'], ['0.0', '0.3', '0.6', '0.8'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128', '1024'], ['0.0', '0.3', '0.6', '0.8'], 
                              ['probe'], ['calib-probe-ema'], [ 'asyncintra'], ['c4-15'], ['0-0-0-1-1'],
                             #  [
                             #     #  'mag-calib-probe-None-None+c4-2000',
@@ -993,7 +993,7 @@ def main():
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['120'], ['128'], ['0'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '20', '80'], ['128', '1024'], ['0'], 
                              ['None'], ['dense'], ['sync'], ['None'], ['None'],        
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
@@ -1217,7 +1217,8 @@ def main():
         # time_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
         for item in sub_controls:
             s += '\n'
-            s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
+            # s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
+            s = s + 'nsys profile -w true --gpu-metrics-device=0 -x true --force-overwrite=true -o {} python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(item[4], *item, item[-1])
 
         s += 'wait\n'
         # controls[i][0] = 'test_classifier_fl.py'

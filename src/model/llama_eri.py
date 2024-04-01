@@ -195,34 +195,16 @@ class EriLayer:
         self.weight_norm_across_channel_dims = None
         pass
         
-    # def extract_in_weight(self, input_dim, pruned_dim, preserve_channels, layer_type):
-    #     # unstruct pruning
-    #     if pruned_dim is None:
-    #         return self.weight
-        
-    #     if layer_type == 'linear':
-    #         #  [batch_size, seq_lens, token_lens]
-    #         if input_dim != 3:
-    #             raise ValueError('Not valid input dimension')
-            
-    #         if pruned_dim != input_dim - 1:
-    #             raise ValueError('Not valid input dimension')
+    def extract_in_dim_weight(self, weight, indices):
 
-    #         # weight = torch.index_select(self.weight, dim=1, index=preserve_channels.to(self.weight.device))
-    #         weight = self.weight[:, preserve_channels.to(self.weight.device)]
-    #         return weight
+        return weight[:, indices.to(self.weight.device)]
+        # return torch.index_select(weight, dim=1, index=indices.to(self.weight.device))
            
         
-    # def extract_out_weight(self, input_dim, pruned_dim, preserve_channels, layer_type):
+    def extract_out_dim_weight(self, weight, indices):
         
-    #     if layer_type == 'linear':
-    #         #  [batch_size, seq_lens, token_lens]
-    #         if input_dim != 3:
-    #             raise ValueError('Not valid input dimension')
-                
-    #         # weight = torch.index_select(self.weight, dim=0, index=preserve_channels.to(self.weight.device))
-    #         weight = self.weight[preserve_channels.to(self.weight.device), :]
-    #         return weight
+        return weight[indices.to(self.weight.device), :]
+        # return torch.index_select(weight, dim=0, index=indices.to(self.weight.device))
         
 class Linear(nn.Linear, EriLayer):
     def __init__(
@@ -347,12 +329,25 @@ class Linear(nn.Linear, EriLayer):
                 # self.nsamples = self.nsamples.to(cur_device)
                 update_indices = update_indices.to(cur_device)
                 self.scaler_inp[:, update_indices] *= momentum
+                has_nan = torch.isnan(self.scaler_inp).any()
+                has_inf = torch.isinf(self.scaler_inp).any()
+                if has_nan:
+                    print("Does 'self.scaler_inp111' contain NaN values? Yes")
+                if has_inf:
+                    print("Does 'self.scaler_inp111' contain infinite values? Yes")
                 if cfg['calibration_stage'] == True:
                     norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 elif cfg['calibration_stage'] == False:
                     norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 # denominator = (self.nsamples[update_indices] + )
                 self.scaler_inp[:, update_indices] += (1 - momentum) * norm_squared / batch_size
+
+                has_nan = torch.isnan(self.scaler_inp).any()
+                has_inf = torch.isinf(self.scaler_inp).any()
+                if has_nan:
+                    print("Does 'self.scaler_inp' contain NaN values? Yes")
+                if has_inf:
+                    print("Does 'self.scaler_inp' contain infinite values? Yes")
         else:
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
                 # print('mpomentum', momentum)
@@ -402,15 +397,13 @@ class Linear(nn.Linear, EriLayer):
                 update_indices = update_indices.to(cur_device)
 
                 self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+
                 if cfg['calibration_stage'] == True:
                     norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 elif cfg['calibration_stage'] == False:
                     norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-                # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
-                # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 denominator = (self.nsamples[update_indices] + batch_size)
                 self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-
         else:
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
                 self.scaler_inp = self.scaler_inp.to(cur_device)
@@ -482,12 +475,13 @@ class Linear(nn.Linear, EriLayer):
         if 'out_dim_indices' in kwargs:
             # print('out_dim_indices', kwargs['out_dim_indices'].shape, kwargs['out_dim_indices'], flush=True)
             # self.async_interbatch_weight = self.weight[kwargs['out_dim_indices'].to(self.weight.device), :]
-            self.async_interbatch_weight = torch.index_select(self.weight, dim=0, index=kwargs['out_dim_indices'].to(self.weight.device))
+            self.async_interbatch_weight = self.extract_out_dim_weight(self.weight, kwargs['out_dim_indices'])
             
             # print('self.async_interbatch_weight', self.async_interbatch_weight.shape, flush=True)
         elif 'in_dim_indices' in kwargs:
             # self.async_interbatch_weight = self.weight[:, kwargs['in_dim_indices'].to(self.weight.device)]
-            self.async_interbatch_weight = torch.index_select(self.weight, dim=1, index=kwargs['in_dim_indices'].to(self.weight.device))
+            # self.async_interbatch_weight = torch.index_select(self.weight, dim=1, index=kwargs['in_dim_indices'].to(self.weight.device))
+            self.async_interbatch_weight = self.extract_in_dim_weight(self.weight, kwargs['in_dim_indices'])
             # record indices to update metric
             self.async_interbatch_in_dim_indices = kwargs['in_dim_indices']
         else:
@@ -503,12 +497,13 @@ class Linear(nn.Linear, EriLayer):
         if 'out_dim_indices' in kwargs:
             # print('out_dim_indices', kwargs['out_dim_indices'].shape, kwargs['out_dim_indices'], flush=True)
             # self.async_interbatch_weight = self.weight[kwargs['out_dim_indices'].to(self.weight.device), :]
-            self.async_intrabatch_weight = torch.index_select(self.weight, dim=0, index=kwargs['out_dim_indices'].to(self.weight.device))
-            
+            # self.async_intrabatch_weight = torch.index_select(self.weight, dim=0, index=kwargs['out_dim_indices'].to(self.weight.device))
+            self.async_intrabatch_weight = self.extract_out_dim_weight(self.weight, kwargs['out_dim_indices'])
             # print('self.async_interbatch_weight', self.async_interbatch_weight.shape, flush=True)
         elif 'in_dim_indices' in kwargs:
             # self.async_interbatch_weight = self.weight[:, kwargs['in_dim_indices'].to(self.weight.device)]
-            self.async_intrabatch_weight = torch.index_select(self.weight, dim=1, index=kwargs['in_dim_indices'].to(self.weight.device))
+            # self.async_intrabatch_weight = torch.index_select(self.weight, dim=1, index=kwargs['in_dim_indices'].to(self.weight.device))
+            self.async_intrabatch_weight = self.extract_in_dim_weight(self.weight, kwargs['in_dim_indices'])
             # record indices to update metric
             self.async_intrabatch_in_dim_indices = kwargs['in_dim_indices']
         else:
@@ -517,7 +512,7 @@ class Linear(nn.Linear, EriLayer):
         if self.async_intrabatch_weight_index.device != self.weight.device:
             self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
         self.async_intrabatch_weight_index += 1
-        print('async_intrabatch_weight_index', self.async_intrabatch_weight_index, self.key, self.async_intrabatch_weight.shape)
+        # print('async_intrabatch_weight_index', self.async_intrabatch_weight_index, self.key, self.async_intrabatch_weight.shape)
         return
 
     
@@ -561,7 +556,6 @@ class Linear(nn.Linear, EriLayer):
             # if self.async_intrabatch_weight_index != cfg['cur_batch_index']:
                 # torch.cuda.synchronize(cfg['cuda_stream1'])
                 print('wait sync weight step end', self.key, self.async_intrabatch_weight_index)
-            print('return async_intrabatch_weight', self.async_intrabatch_weight.shape, flush=True)
             return self.async_intrabatch_weight
     
     def get_async_in_dim_indices(self):
@@ -629,15 +623,15 @@ class Linear(nn.Linear, EriLayer):
                     return result
                 elif cfg['mode'] == 'asyncintra':
                     weight = self.get_weight()
-                    print('weight', weight.dtype, weight.shape, self.key, flush=True)
+                    # print('weight', weight.dtype, weight.shape, self.key, flush=True)
                     if 'o_proj' in self.key or 'down_proj' in self.key:
                         # torch.cuda.synchronize(cfg['cuda_default_stream'])
                         update_time = time.time()
                         # with torch.cuda.stream(cfg['cuda_stream1']):
                         update_time = time.time()
                         async_in_dim_indices = self.get_async_in_dim_indices()
-                        print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, flush=True)
-                        print('xshape', x.shape, flush=True)
+                        # print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, flush=True)
+                        # print('xshape', x.shape, flush=True)
                         # wait in gpu until the operations before o_proj or down_proj are done
                         # cfg['cuda_stream1'].wait_event(kwargs['cur_event'])
                         if cfg['logger_detailed_info'] == True:
@@ -688,14 +682,16 @@ class Linear(nn.Linear, EriLayer):
                     if 'out_dim_indices' in kwargs:
                         if 'attn' in self.key:
                             # weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
-                            weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
+                            # weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
+                            weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
 
                             if self.check_fill_case():
                                 # print('fill', flush=True)
                                 self.out_selected_dim = kwargs['out_dim_indices']
                         else:
                             # weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
-                            weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
+                            # weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
+                            weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
 
                         result = F.linear(x, weight, bias=None)
                         if 'attn' in self.key:
@@ -709,10 +705,13 @@ class Linear(nn.Linear, EriLayer):
                     elif 'in_dim_indices' in kwargs:
                         if 'attn' in self.key:
                             # weight = weight[:, kwargs['in_dim_indices'].to(weight.device)]
-                            weight = torch.index_select(weight, dim=1, index=kwargs['in_dim_indices'].to(weight.device))
+                            # weight = torch.index_select(weight, dim=1, index=kwargs['in_dim_indices'].to(weight.device))
+                            weight = self.extract_in_dim_weight(weight, kwargs['in_dim_indices'])
                         else:
                             # weight = weight[:, kwargs['in_dim_indices'].to(weight.device)]
-                            weight = torch.index_select(weight, dim=1, index=kwargs['in_dim_indices'].to(weight.device))
+                            # weight = torch.index_select(weight, dim=1, index=kwargs['in_dim_indices'].to(weight.device))
+                            weight = self.extract_in_dim_weight(weight, kwargs['in_dim_indices'])
+
                         result = F.linear(x, weight, bias=None)
                         result = result.to(previous_dtype)
                         return result

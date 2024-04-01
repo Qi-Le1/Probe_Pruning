@@ -346,7 +346,6 @@ def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distrib
             if global_metric_score_distribution is not None:
                 norm_probe_out_square = torch.clamp(torch.norm(probe_out, p=2, dim=0) ** 2 / probe_num, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 global_metric_score_distribution = global_metric_score_distribution.to(probe_out.device)
-                print('global_metric_score_distribution retrieve', global_metric_score_distribution.shape, global_metric_score_distribution)
                 has_nan = torch.isnan(global_metric_score_distribution).any()
                 has_inf = torch.isinf(global_metric_score_distribution).any()
                 if has_nan:
@@ -369,23 +368,15 @@ def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distrib
                         print("Does 'probe_ratio' contain infinite values? Yes")
                     # global_metric_score_distribution.to(probe_out.device) / (denominator + 1e-10)
                     global_ratio = 1 - probe_ratio
-                    has_nan = torch.isnan(global_ratio).any()
-                    has_inf = torch.isinf(global_ratio).any()
-
-                    # Printing checks for NaN and Inf
-                    if has_nan:
-                        print("Does 'global_ratio' contain NaN values? Yes")
-                    if has_inf:
-                        print("Does 'global_ratio' contain infinite values? Yes")
                     combined_probe_out = global_ratio * global_metric_score_distribution + probe_ratio * norm_probe_out_square
                     # norm_probe_out = torch.sqrt(combined_probe_out)
 
-                    temp_sort_value, _ = torch.sort(norm_probe_out_square, dim=-1)
-                    torch.set_printoptions(threshold=5000)
-                    print('norm_probe_out_square', norm_probe_out_square.shape, temp_sort_value)
-                    temp_sort_value, _ = torch.sort(global_metric_score_distribution, dim=-1)
-                    print('global_metric_score_distribution', global_metric_score_distribution.shape, temp_sort_value)
-                    print('globaratio', global_ratio, torch.mean(global_ratio))
+                    # temp_sort_value, _ = torch.sort(norm_probe_out_square, dim=-1)
+                    # torch.set_printoptions(threshold=5000)
+                    # print('norm_probe_out_square', norm_probe_out_square.shape, temp_sort_value)
+                    # temp_sort_value, _ = torch.sort(global_metric_score_distribution, dim=-1)
+                    # print('global_metric_score_distribution', global_metric_score_distribution.shape, temp_sort_value)
+                    # print('globaratio', global_ratio, torch.mean(global_ratio))
 
                 combined_probe_out = torch.sum(combined_probe_out, dim=0)
                 probe_out_dim_metric = torch.sqrt(((combined_probe_out.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=cfg['data_type_min_positive'], max=cfg['data_type_max']))

@@ -390,6 +390,7 @@ class LlamaMLP(nn.Module):
             # TODO if 'saveseqdim' in cfg['prune_method']:
             #     probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
             # else:
+            print('key', self.down_proj.key)
             probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution())
         else:
             probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
@@ -475,7 +476,7 @@ class LlamaMLP(nn.Module):
                         elif cfg['mode'] == 'asyncintra':
                             # if not, do full inference
                             if 'post_layernorm_attn_residual' in kwargs:
-                                print('post_layernorm_attn_residual', flush=True)
+                                # print('post_layernorm_attn_residual', flush=True)
                                 _ = self.probe_process(kwargs['post_layernorm_attn_residual'])
                                 return
                         # if 'asyncfullinf' in cfg['prune_method']:
@@ -570,7 +571,7 @@ class LlamaMLP(nn.Module):
                             kwargs['probe_in_dim_indices'] = probe_out_dim_indices
                             down_proj = self.down_proj(gate_out * up_out, **kwargs)
                         else:                   
-                            print('here')      
+                            # print('here')      
                             down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
                         # else:
                         #     # up_out = self.up_proj(x)
@@ -1639,7 +1640,7 @@ class LlamaDecoderLayer(nn.Module):
         
         # Fully Connected
         residual = hidden_states
-        hidden_states = self.input_layernorm(hidden_states)
+        hidden_states = self.post_attention_layernorm(hidden_states)
         if self.check_asyncintra_attention():
             with torch.cuda.stream(cfg['cuda_stream1']):
                 input_layernorm_mlp_residual = kwargs['next_layer'].input_layernorm(residual)

@@ -166,7 +166,8 @@ def test(data_loader, model, model_prof, metric, logger):
         update_model_prof(model_prof)
         torch.cuda.cudart().cudaProfilerStart()
         for i, input in enumerate(data_loader):
-            # print("Debug 12.1: Test logger created", flush=True)
+            cfg['cur_batch_index'] += 1
+            print('cur_batch_index', cfg['cur_batch_index'])
             torch.cuda.nvtx.range_push("iteration{}".format(i))
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
@@ -205,8 +206,8 @@ def test(data_loader, model, model_prof, metric, logger):
             record_pruing_info(model, logger)
             torch.cuda.nvtx.range_pop()
             # return
-            if i == 10:
-                break
+            # if i == 10:
+            #     break
             # break
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)
