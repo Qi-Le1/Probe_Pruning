@@ -16,7 +16,6 @@ from module import save, to_device, process_control, resume, makedir_exist_ok, \
     record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward, remove_non_picklable_items
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 iterate_small_samples = False
 # iterate_small_samples = True
@@ -320,14 +319,46 @@ def run_calibration(model, data_loader):
 def test(data_loader, model, model_prof, metric, logger):
     start_time = time.time()
     with torch.no_grad():
-        model_prof.start_profile()
-        update_model_prof(model_prof)
+        
         model.train(False)
         start_time = time.time()
         inference_duration = 0
 
-        # torch.cuda.synchronize()
+        data_loader_iter = iter(data_loader)
+        input = next(data_loader_iter)
+        cfg['cur_batch_index'] += 1
+        # warm up pytorch
+        if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+            input_size = input['labels'].size(0)
+            input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                    'labels': input['labels']}
+            input = to_device(input, cfg['device'])
+            output = model(**input)
+            input_ = {'target': input['labels']}
+            output_ = {'target': output['logits'], 'loss': output['loss']}
+        elif cfg['task_name'] in ['csr']:
+            input_size = input['labels'].size(0)
+            input_indices = input['input_indices']
+            correct_labels = input['correct_labels']
+            # print('input', input)
+            input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                    'labels': input['labels']}
+            input = to_device(input, cfg['device'])
+            output = model(**input)
+            input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
+            output_ = {'target': output['logits'], 'loss': output['loss']}
+        else:
+            input = collate(input)
+            input_size = input['data'].size(0)
+            input = to_device(input, cfg['device'])
+            output = model(**input)
+            input_ = {'target': input['target']}
+            output_ = {'target': output['target'], 'loss': output['loss']}
+        torch.cuda.synchronize()
+
         # start_time = time.time()
+        model_prof.start_profile()
+        update_model_prof(model_prof)
         torch.cuda.cudart().cudaProfilerStart()
         for i, input in enumerate(data_loader):
             cfg['cur_batch_index'] += 1
@@ -360,8 +391,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 output, inference_duration = model_forward(model, input, inference_duration, i)
                 input_ = {'target': input['target']}
                 output_ = {'target': output['target'], 'loss': output['loss']}
-            if i == 0:
-                continue
+
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
             print('evaluation_for_batch', evaluation)
@@ -385,8 +415,8 @@ def test(data_loader, model, model_prof, metric, logger):
             # if i == 50:
             # if i == 100:
             #     break
-            # if i == 10:
-            #     break
+            if i == 10:
+                break
             # break
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)

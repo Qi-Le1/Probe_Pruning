@@ -15,7 +15,7 @@ from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelF
 from .hf.modeling_llama import LlamaForCausalLM
 from .hf.modeling_opt import OPTForCausalLM
 from module import MULTIGPUS_MODEL_NAME_LIST, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING, alternate_broadcast
-
+from accelerate import infer_auto_device_map ,init_empty_weights
 
 # def check_multiple_for_tensor_cores(data_type):
 #     if data_type == torch.float16:
@@ -45,6 +45,7 @@ def make_hf_model(model_name, sub_model_name=None):
             elif cfg['gpu_name'] == 'NVIDIA A100-SXM4-40GB':
                 # A100
                 if approximate_gpu_memory_gb > 40:
+                    # pass
                     device_map = "auto"
                 
         # low_cpu_mem_usage = False

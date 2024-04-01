@@ -22,6 +22,7 @@ def process_control():
     cfg['data_type'] = torch.float16
     cfg['data_type_max'] = torch.finfo(cfg['data_type']).max
     cfg['data_type_min'] = torch.finfo(cfg['data_type']).min
+    cfg['data_type_min_positive'] = torch.finfo(cfg['data_type']).tiny
     # This can be implemented dynamically in each layer
     # tc stands for tensor core
     if cfg['data_type'] == torch.float16:
@@ -34,6 +35,7 @@ def process_control():
                 raise ValueError('Not valid GPU')
 
     cfg['model_name'] = cfg['control']['model_name']
+    model_name = cfg['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
     cfg['seq_len'] = int(cfg['control']['seq_len'])
@@ -57,6 +59,16 @@ def process_control():
             # Convert the matched string to a float
             float_value = float(match.group(1))
             cfg['ema_momentum'] = float_value  
+        else:
+            float_value = None
+    
+    cfg['resinfo_ratio'] = 0.1
+    if 'resinfo' in cfg['prune_method']:
+        match = re.search(r'resinfo(\d+\.\d+)', cfg['prune_method'])
+        if match:
+            # Convert the matched string to a float
+            float_value = float(match.group(1))
+            cfg['resinfo_ratio'] = float_value  
         else:
             float_value = None
         
@@ -85,6 +97,7 @@ def process_control():
         raise ValueError('probe_type is only valid with probe pruning')
     if cfg['probe_type'] != 'None':
         probe_type_list = cfg['probe_type'].split('-')
+        print('probe_type_list', probe_type_list)
         if 'llama' in cfg['model_name']:
             prune_keys = ['q', 'k', 'v', 'gate', 'up']
         elif 'opt' in cfg['model_name']:
@@ -93,18 +106,18 @@ def process_control():
             # default
             cfg[f'{key}_prune'] = probe_type_list[prune_keys.index(key)]
             cfg[f'{key}_probe_num'] = 1
-            cfg[f'{key}_probe_size'] = int(cfg[model_name]['batch_size']['test'] // 1)
+            cfg[f'{key}_probe_size'] = int(cfg['batch_size'] // 1)
 
             match = re.search(r'\d+', cfg[f'{key}_prune'])
             if match:
-                int_value = int(match.group(1))
+                int_value = int(match.group(0))
             else:
                 int_value = None
 
             cfg[f'{key}_probe_num'] = int_value
             if int_value:  # Ensure int_value is not None to avoid division by zero
-                probe_size = int(cfg[model_name]['batch_size']['test'] // int_value)
-                if cfg[model_name]['batch_size']['test'] % int_value != 0:
+                probe_size = int(cfg['batch_size'] // int_value)
+                if cfg['batch_size'] % int_value != 0:
                     raise ValueError(f'probe_num needs to be divisible by batch size for {key}')
                 cfg[f'{key}_probe_size'] = probe_size
 

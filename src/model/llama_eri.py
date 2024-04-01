@@ -195,34 +195,34 @@ class EriLayer:
         self.weight_norm_across_channel_dims = None
         pass
         
-    def extract_in_weight(self, input_dim, pruned_dim, preserve_channels, layer_type):
-        # unstruct pruning
-        if pruned_dim is None:
-            return self.weight
+    # def extract_in_weight(self, input_dim, pruned_dim, preserve_channels, layer_type):
+    #     # unstruct pruning
+    #     if pruned_dim is None:
+    #         return self.weight
         
-        if layer_type == 'linear':
-            #  [batch_size, seq_lens, token_lens]
-            if input_dim != 3:
-                raise ValueError('Not valid input dimension')
+    #     if layer_type == 'linear':
+    #         #  [batch_size, seq_lens, token_lens]
+    #         if input_dim != 3:
+    #             raise ValueError('Not valid input dimension')
             
-            if pruned_dim != input_dim - 1:
-                raise ValueError('Not valid input dimension')
+    #         if pruned_dim != input_dim - 1:
+    #             raise ValueError('Not valid input dimension')
 
-            # weight = torch.index_select(self.weight, dim=1, index=preserve_channels.to(self.weight.device))
-            weight = self.weight[:, preserve_channels.to(self.weight.device)]
-            return weight
+    #         # weight = torch.index_select(self.weight, dim=1, index=preserve_channels.to(self.weight.device))
+    #         weight = self.weight[:, preserve_channels.to(self.weight.device)]
+    #         return weight
            
         
-    def extract_out_weight(self, input_dim, pruned_dim, preserve_channels, layer_type):
+    # def extract_out_weight(self, input_dim, pruned_dim, preserve_channels, layer_type):
         
-        if layer_type == 'linear':
-            #  [batch_size, seq_lens, token_lens]
-            if input_dim != 3:
-                raise ValueError('Not valid input dimension')
+    #     if layer_type == 'linear':
+    #         #  [batch_size, seq_lens, token_lens]
+    #         if input_dim != 3:
+    #             raise ValueError('Not valid input dimension')
                 
-            # weight = torch.index_select(self.weight, dim=0, index=preserve_channels.to(self.weight.device))
-            weight = self.weight[preserve_channels.to(self.weight.device), :]
-            return weight
+    #         # weight = torch.index_select(self.weight, dim=0, index=preserve_channels.to(self.weight.device))
+    #         weight = self.weight[preserve_channels.to(self.weight.device), :]
+    #         return weight
         
 class Linear(nn.Linear, EriLayer):
     def __init__(
@@ -250,26 +250,20 @@ class Linear(nn.Linear, EriLayer):
         self.async_interbatch_weight = None
         self.async_intrabatch_weight = None
 
-        self.async_interbatch_weight_index = -1
-        self.async_interbatch_metric_index = -1
+        self.async_interbatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
+        self.async_intrabatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
 
-        if 'o_proj' in self.key or 'down_proj' in self.key:
+        if ('o_proj' in self.key or 'down_proj' in self.key) and cfg['mode'] == 'asyncinter':
             self.async_interbatch_in_dim_indices = torch.arange((in_features), device=self.weight.data.device, dtype=torch.int32)
 
         if 'meanglobalinput' in cfg['prune_method']:
             self.mean_for_all_batches = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
             self.variance_for_all_batches = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
 
-        self.baseline_inp = torch.zeros((in_features), device=self.weight.data.device)
-        if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-            self.scaler_inp = torch.zeros((in_features), device=self.weight.data.device)
-        elif self.prune_metric == "flap":
-            self.fluc_inp = torch.zeros((in_features), device=self.weight.data.device)
-        else:
-            raise ValueError(f"Unknown pruning method")
         self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
+
         
-        if 'savemetricseq' in cfg['prune_method']:
+        if 'probe' in cfg['prune_method']:
             self.baseline_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
                 self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
@@ -277,46 +271,50 @@ class Linear(nn.Linear, EriLayer):
                 self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
             else:
                 raise ValueError(f"Unknown pruning method")
-        self.position_distribution_1 = []
-        self.position_distribution_2 = []
-        self.position_distribution_3 = []
-        self.position_distribution_4 = []
-        self.position_distribution_5 = []
+        else:
+            self.baseline_inp = torch.zeros((in_features), device=self.weight.data.device)
+            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+                self.scaler_inp = torch.zeros((in_features), device=self.weight.data.device)
+            elif self.prune_metric == "flap":
+                self.fluc_inp = torch.zeros((in_features), device=self.weight.data.device)
+            else:
+                raise ValueError(f"Unknown pruning method")
 
-    def update_global_input_distribution(self, inp, update_indices):
-        if len(inp.shape) == 2:
-            inp = inp.unsqueeze(0)
-        # batch_size = inp.shape[0] if batch_size is None else batch_size
-        batch_size = inp.shape[0]
-        default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
-        if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
-            raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
+
+    # def update_global_input_distribution(self, inp, update_indices):
+    #     if len(inp.shape) == 2:
+    #         inp = inp.unsqueeze(0)
+    #     # batch_size = inp.shape[0] if batch_size is None else batch_size
+    #     batch_size = inp.shape[0]
+    #     default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
+    #     if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
+    #         raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
         
-        cur_device = inp.device
-        self.mean_for_all_batches = self.mean_for_all_batches.to(cur_device)
-        self.variance_for_all_batches = self.variance_for_all_batches.to(cur_device)
-        self.samples_num = self.samples_num.to(cur_device)
-        update_indices = update_indices.to(cur_device)
+    #     cur_device = inp.device
+    #     self.mean_for_all_batches = self.mean_for_all_batches.to(cur_device)
+    #     self.variance_for_all_batches = self.variance_for_all_batches.to(cur_device)
+    #     self.samples_num = self.samples_num.to(cur_device)
+    #     update_indices = update_indices.to(cur_device)
 
-        for new_sample in inp:
-            # sample_count += 1
-            # delta = new_sample - running_mean
-            # running_mean += delta / sample_count
-            # delta2 = new_sample - running_mean  # Recalculate delta after updating the mean
-            # running_variance += delta * delta2
-            self.samples_num[update_indices] += 1
-            delta = new_sample - self.mean_for_all_batches[:, update_indices]
-            self.mean_for_all_batches[:, update_indices] += delta / self.samples_num[update_indices]
-            delta2 = new_sample - self.mean_for_all_batches[:, update_indices]  # Recalculate delta after updating the mean
-            self.variance_for_all_batches[:, update_indices] += delta * delta2
-            # print('new_sample', new_sample.shape, flush=True)
-            if 'up_proj' in self.key:
-                # print('self.key', self.key, flush=True)
-                self.position_distribution_1.append(new_sample[0][0].item())
-                self.position_distribution_2.append(new_sample[1][20].item())
-                self.position_distribution_3.append(new_sample[2][400].item())
-                self.position_distribution_4.append(new_sample[3][600].item())
-                self.position_distribution_5.append(new_sample[4][800].item())
+    #     for new_sample in inp:
+    #         # sample_count += 1
+    #         # delta = new_sample - running_mean
+    #         # running_mean += delta / sample_count
+    #         # delta2 = new_sample - running_mean  # Recalculate delta after updating the mean
+    #         # running_variance += delta * delta2
+    #         self.samples_num[update_indices] += 1
+    #         delta = new_sample - self.mean_for_all_batches[:, update_indices]
+    #         self.mean_for_all_batches[:, update_indices] += delta / self.samples_num[update_indices]
+    #         delta2 = new_sample - self.mean_for_all_batches[:, update_indices]  # Recalculate delta after updating the mean
+    #         self.variance_for_all_batches[:, update_indices] += delta * delta2
+    #         # print('new_sample', new_sample.shape, flush=True)
+    #         if 'up_proj' in self.key:
+    #             # print('self.key', self.key, flush=True)
+    #             self.position_distribution_1.append(new_sample[0][0].item())
+    #             self.position_distribution_2.append(new_sample[1][20].item())
+    #             self.position_distribution_3.append(new_sample[2][400].item())
+    #             self.position_distribution_4.append(new_sample[3][600].item())
+    #             self.position_distribution_5.append(new_sample[4][800].item())
         # print('self.position_1', len(self.position_1), flush=True)
         # running_variance_increment = torch.zeros((inp.shape[1]), device=inp.device, dtype=torch.float32)
         # self.mean_for_all_batches = self.mean_for_all_batches.to(cur_device)
@@ -343,16 +341,16 @@ class Linear(nn.Linear, EriLayer):
         momentum = cfg['ema_momentum']
         # if is_probe and 'compressfillpbmetric' in cfg['prune_method']:
         #     momentum = 1 - ((1 - momentum) / (default_batch_size))
-        if 'savemetricseq' in cfg['prune_method']:
+        if 'probe' in cfg['prune_method']:
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
                 self.scaler_inp = self.scaler_inp.to(cur_device)
                 # self.nsamples = self.nsamples.to(cur_device)
                 update_indices = update_indices.to(cur_device)
                 self.scaler_inp[:, update_indices] *= momentum
                 if cfg['calibration_stage'] == True:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 elif cfg['calibration_stage'] == False:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 # denominator = (self.nsamples[update_indices] + )
                 self.scaler_inp[:, update_indices] += (1 - momentum) * norm_squared / batch_size
         else:
@@ -363,7 +361,7 @@ class Linear(nn.Linear, EriLayer):
                 update_indices = update_indices.to(cur_device)
 
                 self.scaler_inp[update_indices] *= momentum
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 if cfg['logger_detailed_info'] == True:
                     print(f'{self.key}_inp', inp)
                     print('self.scaler_inp', self.scaler_inp)
@@ -377,10 +375,13 @@ class Linear(nn.Linear, EriLayer):
                 # print('norm_squared', norm_squared.shape, flush=True)
                 # print('update_indices', update_indices.shape, flush=True)
                 self.scaler_inp[update_indices] += (1 - momentum) * norm_squared / batch_size
-                # print('self.scaler_inp', self.scaler_inp, flush=True)
-            elif self.prune_metric == "flap":
-               pass
-        self.async_interbatch_metric_index += 1
+
+        # else:
+            
+        #         # print('self.scaler_inp', self.scaler_inp, flush=True)
+        #     elif self.prune_metric == "flap":
+        #        pass
+        # self.async_interbatch_metric_index += 1
         # self.nsamples[update_indices] += batch_size
 
     # def update_global_metric_score_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
@@ -394,7 +395,7 @@ class Linear(nn.Linear, EriLayer):
             raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
         cur_device = inp.device
 
-        if 'savemetricseq' in cfg['prune_method']:
+        if 'probe' in cfg['prune_method']:
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
                 self.scaler_inp = self.scaler_inp.to(cur_device)
                 self.nsamples = self.nsamples.to(cur_device)
@@ -402,57 +403,13 @@ class Linear(nn.Linear, EriLayer):
 
                 self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
                 if cfg['calibration_stage'] == True:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 elif cfg['calibration_stage'] == False:
-                    # if 'coeff' in cfg['prune_method']:
-                    #     # Assuming inp is your input tensor
-                    #     # inp_square = torch.clamp(inp ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
-
-                    #     # # Directly compute the sum of squares once and reuse it
-                    #     # sum_inp_square = torch.sum(inp_square, dim=0, keepdim=True) + 1e-10
-                    #     # sum_inp_square_clamped = torch.clamp(sum_inp_square, min=cfg['data_type_min'], max=cfg['data_type_max'])
-
-                    #     # # Calculate ratio, notice that clamping sum_inp_square_clamped again is unnecessary
-                    #     # # ratio = inp_square / sum_inp_square_clamped
-                    #     # ratio = inp_square / inp_square
-                    #     # # print('ratio', ratio.shape, flush=True)
-
-                    #     # # Calculate norm_squared without redundant clamping of sum_inp_square
-                    #     # norm_squared = torch.clamp(torch.sum(ratio * inp_square, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
-
-                    #     square_x = torch.clamp(torch.square(inp).to(torch.float32), min=cfg['data_type_min'], max=cfg['data_type_max'])
-                    #     sum_across_bsz = torch.clamp(square_x.sum(dim=0, keepdim=True), min=cfg['data_type_min'], max=cfg['data_type_max'])
-                    #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
-                    #     proportion = (square_x / (sum_across_bsz + 1e-10)).to(inp.dtype)
-                    #     # Check for NaN values
-                    #     has_nan = torch.isnan(proportion).any()
-
-                    #     # Check for infinite values
-                    #     has_inf = torch.isinf(proportion).any()
-
-                    #     if has_nan or has_inf:
-                    #         print("proportion contains NaN or infinite values.")
-                    #         # print(torch.sort(proportion)[0])
-                    #         nan_indices = torch.where(torch.isnan(proportion))
-
-                    #         # Print the indices of NaN values
-                    #         print("Indices of NaN values:", nan_indices)
-
-                    #         # Print the NaN values using the indices (optional, as they are known to be NaN)
-                    #         print("NaN values at these indices:", square_x[nan_indices],  proportion[nan_indices])
-                    #     else:
-                    #         # print("proportion does not contain NaN or infinite values.")
-                    #         pass
-                    #     # print('proportion ', proportion, flush=True)
-                    #     # proportion = 10
-                    #     # print('proportion ', proportion, flush=True)
-                    #     norm_squared = torch.sum(square_x * proportion, dim=0)
-                    # else:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 denominator = (self.nsamples[update_indices] + batch_size)
-                self.scaler_inp[:, update_indices] += norm_squared / denominator
+                self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
 
         else:
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
@@ -465,7 +422,7 @@ class Linear(nn.Linear, EriLayer):
                 # print("self.nsamples[update_indices].shape:", self.nsamples[update_indices].shape)
                 # print("batch_size:", batch_size)
                 self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 # print('update_indices', update_indices.shape, flush=True)
                 # print('norm_squared', norm_squared.shape, flush=True)
@@ -524,24 +481,45 @@ class Linear(nn.Linear, EriLayer):
     def prepare_async_interbatch_weight(self, **kwargs):
         if 'out_dim_indices' in kwargs:
             # print('out_dim_indices', kwargs['out_dim_indices'].shape, kwargs['out_dim_indices'], flush=True)
-            self.async_interbatch_weight = self.weight[kwargs['out_dim_indices'].to(self.weight.device), :]
+            # self.async_interbatch_weight = self.weight[kwargs['out_dim_indices'].to(self.weight.device), :]
+            self.async_interbatch_weight = torch.index_select(self.weight, dim=0, index=kwargs['out_dim_indices'].to(self.weight.device))
+            
             # print('self.async_interbatch_weight', self.async_interbatch_weight.shape, flush=True)
         elif 'in_dim_indices' in kwargs:
-            self.async_interbatch_weight = self.weight[:, kwargs['in_dim_indices'].to(self.weight.device)]
+            # self.async_interbatch_weight = self.weight[:, kwargs['in_dim_indices'].to(self.weight.device)]
+            self.async_interbatch_weight = torch.index_select(self.weight, dim=1, index=kwargs['in_dim_indices'].to(self.weight.device))
             # record indices to update metric
             self.async_interbatch_in_dim_indices = kwargs['in_dim_indices']
         else:
             raise ValueError('Not valid input')
         # print('herererere')
+        if self.async_interbatch_weight_index.device != self.weight.device:
+            self.async_interbatch_weight_index = self.async_interbatch_weight_index.to(self.weight.device)
         self.async_interbatch_weight_index += 1
         # print('async_interbatch_weight_index', async_interbatch_weight_index, self.key)
         return
     
-    def prepare_async_intrabatch_weight(self):
-
-
-
+    def prepare_async_intrabatch_weight(self, **kwargs):
+        if 'out_dim_indices' in kwargs:
+            # print('out_dim_indices', kwargs['out_dim_indices'].shape, kwargs['out_dim_indices'], flush=True)
+            # self.async_interbatch_weight = self.weight[kwargs['out_dim_indices'].to(self.weight.device), :]
+            self.async_intrabatch_weight = torch.index_select(self.weight, dim=0, index=kwargs['out_dim_indices'].to(self.weight.device))
+            
+            # print('self.async_interbatch_weight', self.async_interbatch_weight.shape, flush=True)
+        elif 'in_dim_indices' in kwargs:
+            # self.async_interbatch_weight = self.weight[:, kwargs['in_dim_indices'].to(self.weight.device)]
+            self.async_intrabatch_weight = torch.index_select(self.weight, dim=1, index=kwargs['in_dim_indices'].to(self.weight.device))
+            # record indices to update metric
+            self.async_intrabatch_in_dim_indices = kwargs['in_dim_indices']
+        else:
+            raise ValueError('Not valid input')
+        # print('herererere')
+        if self.async_intrabatch_weight_index.device != self.weight.device:
+            self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
+        self.async_intrabatch_weight_index += 1
+        print('async_intrabatch_weight_index', self.async_intrabatch_weight_index, self.key, self.async_intrabatch_weight.shape)
         return
+
     
     def prepare_async_weight(self, **kwargs):
         if cfg['mode'] == 'sync':
@@ -554,27 +532,43 @@ class Linear(nn.Linear, EriLayer):
             raise ValueError('Not valid mode')
         return
     
-    def get_weight(self):
-        if cfg['cur_batch_index'] == 0:
-            return self.weight
+    def get_weight(self):        
         if cfg['mode'] == 'sync':
             return self.weight
         elif cfg['mode'] == 'asyncinter':
             # dont have the prepared weight for current batch
             # sync the stream1
             if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
-                if self.async_interbatch_weight_index != cfg['cur_batch_index'] - 1:
-                    torch.cuda.synchronize(cfg['cuda_stream1'])
+                # if self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
+                #     torch.cuda.synchronize(cfg['cuda_stream1'])
+                #     # time.sleep(0.001)
+                #     print('wait sync weight step end', self.key, self.async_interbatch_weight_index)
+                
+                while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
+                    # torch.cuda.synchronize(cfg['cuda_stream1'])
+                    time.sleep(0.001)
                     print('wait sync weight step end', self.key, self.async_interbatch_weight_index)
             return self.async_interbatch_weight
         elif cfg['mode'] == 'asyncintra':
+            # if self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
+            #     # time.sleep(0.001)  # Sleep for 1 millisecond
+            # # if self.async_intrabatch_weight_index != cfg['cur_batch_index']:
+            #     torch.cuda.synchronize(cfg['cuda_stream1'])
+            #     print('wait sync weight step end', self.key, self.async_intrabatch_weight_index)
+            
+            while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
+                time.sleep(0.001)  # Sleep for 1 millisecond
+            # if self.async_intrabatch_weight_index != cfg['cur_batch_index']:
+                # torch.cuda.synchronize(cfg['cuda_stream1'])
+                print('wait sync weight step end', self.key, self.async_intrabatch_weight_index)
+            print('return async_intrabatch_weight', self.async_intrabatch_weight.shape, flush=True)
             return self.async_intrabatch_weight
     
     def get_async_in_dim_indices(self):
         if cfg['mode'] == 'asyncinter':
             return self.async_interbatch_in_dim_indices
         elif cfg['mode'] == 'asyncintra':
-            pass
+            return self.async_intrabatch_in_dim_indices
     
     # no bias in llama-2
     def forward(self, x: torch.Tensor, **kwargs):
@@ -582,7 +576,7 @@ class Linear(nn.Linear, EriLayer):
             forward_start_time = time.time()
             previous_dtype = x.dtype
             if cfg['calibration_stage'] == True:
-                # print('calibration_stage', flush=True)
+                # running mean
                 self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
                 result = F.linear(x, self.weight, bias=None)
                     # print('calibrateresult', result.dtype, result.shape, result, flush=True)
@@ -594,14 +588,56 @@ class Linear(nn.Linear, EriLayer):
                 # metric_score = self.get_global_metric_score_distribution()
                 # mean_for_all_batches, std_for_all_batches = self.get_global_input_distribution()
             elif cfg['calibration_stage'] == False:
-                weight = self.get_weight()
+                if cfg['cur_batch_index'] == 0:
+                    result = F.linear(x, self.weight, bias=None)
+                    result = result.to(previous_dtype)
+                    return result
+                
+                if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
+                    result = F.linear(x, self.weight, bias=None)
+                    result = result.to(previous_dtype)
+                    return result
+                elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:                 
+                    result = F.linear(x, self.weight, bias=None)
+                    result = result.to(previous_dtype)
+                    return result
+        
                 if cfg['mode'] == 'asyncinter':
+                    weight = self.get_weight()
                     if 'o_proj' in self.key or 'down_proj' in self.key:
                         # torch.cuda.synchronize(cfg['cuda_default_stream'])
                         update_time = time.time()
                         # with torch.cuda.stream(cfg['cuda_stream1']):
                         update_time = time.time()
                         async_in_dim_indices = self.get_async_in_dim_indices()
+                        # wait in gpu until the operations before o_proj or down_proj are done
+                        # cfg['cuda_stream1'].wait_event(kwargs['cur_event'])
+                        if cfg['logger_detailed_info'] == True:
+                            print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, flush=True)
+                        if 'runningmean' in cfg['prune_method']:
+                            self.update_global_metric_score_distribution(x, async_in_dim_indices)    
+                        elif 'ema' in cfg['prune_method']:
+                            self.update_global_metric_score_distribution_ema(x, async_in_dim_indices)
+                        # torch.cuda.synchronize(cfg['cuda_default_stream'])
+                        update_time_end = time.time()
+                        # print('metric update_time', update_time_end - update_time, flush=True)
+                        # print('update_time', update_time_end - update_time, flush=True)
+                        # torch.cuda.synchronize(cfg['cuda_stream1'])
+                    previous_dtype = x.dtype
+                    result = F.linear(x, weight, bias=None)
+                    # result = result.to(previous_dtype)
+                    return result
+                elif cfg['mode'] == 'asyncintra':
+                    weight = self.get_weight()
+                    print('weight', weight.dtype, weight.shape, self.key, flush=True)
+                    if 'o_proj' in self.key or 'down_proj' in self.key:
+                        # torch.cuda.synchronize(cfg['cuda_default_stream'])
+                        update_time = time.time()
+                        # with torch.cuda.stream(cfg['cuda_stream1']):
+                        update_time = time.time()
+                        async_in_dim_indices = self.get_async_in_dim_indices()
+                        print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, flush=True)
+                        print('xshape', x.shape, flush=True)
                         # wait in gpu until the operations before o_proj or down_proj are done
                         # cfg['cuda_stream1'].wait_event(kwargs['cur_event'])
                         if cfg['logger_detailed_info'] == True:
@@ -620,6 +656,7 @@ class Linear(nn.Linear, EriLayer):
                     # result = result.to(previous_dtype)
                     return result
                 elif cfg['mode'] == 'sync':
+                    weight = self.get_weight()
                     if 'o_proj' in self.key or 'down_proj' in self.key:
                         update_time = time.time()
                         if 'runningmean' in cfg['prune_method']:
@@ -638,29 +675,7 @@ class Linear(nn.Linear, EriLayer):
                         if cfg['logger_detailed_info'] == True:
                             print('metric update_time', update_time_end - update_time, flush=True)
 
-                    if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
-                        # print('probeinput', x.dtype, x.shape, x, flush=True)
-                        # print('probeweight', self.weight.dtype, self.weight.shape, self.weight, flush=True)
-                        # x = x.to(torch.float32)
-                        # weight = self.weight.to(torch.float32)
-                        # print('probeinput 2 ', x.dtype, x.shape, x, flush=True)
-                        # for i in range(x.shape[-2]):
-                        #     print('\n\n', i)
-                        #     for j in range(x.shape[-1]):
-                        #         print(x[:, i, j])
-                        # print('probeweight2 ', weight.dtype, weight.shape, weight, flush=True)
-                        # if 'square' in cfg['prune_method']:
-                        #     result = torch.clamp(F.linear(x, self.weight ** 2, bias=None), min=cfg['data_type_min'], max=cfg['data_type_max'])
-                        #     print('probesquareresult', result.dtype, result.shape, result, flush=True)
-                        # else:
-                        result = F.linear(x, weight, bias=None)
-                        # print('proberesult', result.dtype, result.shape, result, flush=True)
-                        result = result.to(previous_dtype)
-                        return result
-                    elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:                 
-                        result = F.linear(x, weight, bias=None)
-                        result = result.to(previous_dtype)
-                        return result
+                    
 
                     input_dim = x.dim()
                     batch_size = x.size(0)
@@ -672,12 +687,16 @@ class Linear(nn.Linear, EriLayer):
 
                     if 'out_dim_indices' in kwargs:
                         if 'attn' in self.key:
-                            weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
+                            # weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
+                            weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
+
                             if self.check_fill_case():
                                 # print('fill', flush=True)
                                 self.out_selected_dim = kwargs['out_dim_indices']
                         else:
-                            weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
+                            # weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
+                            weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
+
                         result = F.linear(x, weight, bias=None)
                         if 'attn' in self.key:
                             if self.check_fill_case():
@@ -689,9 +708,11 @@ class Linear(nn.Linear, EriLayer):
                         return result
                     elif 'in_dim_indices' in kwargs:
                         if 'attn' in self.key:
-                            weight = weight[:, kwargs['in_dim_indices'].to(weight.device)]
+                            # weight = weight[:, kwargs['in_dim_indices'].to(weight.device)]
+                            weight = torch.index_select(weight, dim=1, index=kwargs['in_dim_indices'].to(weight.device))
                         else:
-                            weight = weight[:, kwargs['in_dim_indices'].to(weight.device)]
+                            # weight = weight[:, kwargs['in_dim_indices'].to(weight.device)]
+                            weight = torch.index_select(weight, dim=1, index=kwargs['in_dim_indices'].to(weight.device))
                         result = F.linear(x, weight, bias=None)
                         result = result.to(previous_dtype)
                         return result

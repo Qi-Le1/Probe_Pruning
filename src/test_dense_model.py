@@ -126,15 +126,48 @@ def runExperiment():
 
 def test(data_loader, model, model_prof, metric, logger):   
     with torch.no_grad():
-        model_prof.start_profile()
-        update_model_prof(model_prof)
+        
         model.train(False)
         start_time = time.time()
         inference_duration = 0
-        # torch.cuda.cudart().cudaProfilerStart()
+        data_loader_iter = iter(data_loader)
+        input = next(data_loader_iter)
+        cfg['cur_batch_index'] += 1
+        # warm up pytorch
+        if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+            input_size = input['labels'].size(0)
+            input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                    'labels': input['labels']}
+            input = to_device(input, cfg['device'])
+            output = model(**input)
+            input_ = {'target': input['labels']}
+            output_ = {'target': output['logits'], 'loss': output['loss']}
+        elif cfg['task_name'] in ['csr']:
+            input_size = input['labels'].size(0)
+            input_indices = input['input_indices']
+            correct_labels = input['correct_labels']
+            # print('input', input)
+            input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                    'labels': input['labels']}
+            input = to_device(input, cfg['device'])
+            output = model(**input)
+            input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
+            output_ = {'target': output['logits'], 'loss': output['loss']}
+        else:
+            input = collate(input)
+            input_size = input['data'].size(0)
+            input = to_device(input, cfg['device'])
+            output = model(**input)
+            input_ = {'target': input['target']}
+            output_ = {'target': output['target'], 'loss': output['loss']}
+
+        torch.cuda.synchronize()
+        model_prof.start_profile()
+        update_model_prof(model_prof)
+        torch.cuda.cudart().cudaProfilerStart()
         for i, input in enumerate(data_loader):
             # print("Debug 12.1: Test logger created", flush=True)
-            # torch.cuda.nvtx.range_push("iteration{}".format(i))
+            torch.cuda.nvtx.range_push("iteration{}".format(i))
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -165,15 +198,15 @@ def test(data_loader, model, model_prof, metric, logger):
                 output, inference_duration = model_forward(model, input, inference_duration, i)
                 input_ = {'target': input['target']}
                 output_ = {'target': output['target'], 'loss': output['loss']}
-            if i == 0:
-                continue
             metric.add('test', input_, output_)
             evaluation = metric.evaluate('test', 'batch', input_, output_)
             print('evaluation_for_batch', evaluation)
             logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
-            # torch.cuda.nvtx.range_pop()
+            torch.cuda.nvtx.range_pop()
             # return
+            if i == 10:
+                break
             # break
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                 batch_time = (time.time() - start_time) / (i + 1)
@@ -189,7 +222,7 @@ def test(data_loader, model, model_prof, metric, logger):
         print(logger.write('test', metric.metric_name['test']), flush=True)
         model_prof.stop_profile()
         print("Debug 12.2: Test logger created", flush=True)
-        # torch.cuda.cudart().cudaProfilerStop()
+        torch.cuda.cudart().cudaProfilerStop()
     return inference_duration
 
 
