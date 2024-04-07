@@ -33,21 +33,21 @@ def make_hf_model(model_name, sub_model_name=None):
         device_map = "auto"
         # low_cpu_mem_usage = True
     else:
-        device_map = cfg['device']
-        if 'llama' in model_name:
-            match = re.search(r'(\d+)b', model_name)
-            number_before_b = match.group(1)
-            approximate_gpu_memory_gb = int(number_before_b) * 2 + cfg['batch_size'] * cfg['seq_len'] * 11000 * 8 / 1024 / 1024 / 1024 + 5
-            print('approximate_gpu_memory_gb', approximate_gpu_memory_gb)
-            if cfg['gpu_name'] == 'NVIDIA GeForce RTX 4090':
-                if approximate_gpu_memory_gb > 24:
-                    device_map = "auto"
-            elif cfg['gpu_name'] == 'NVIDIA A100-SXM4-40GB':
-                # A100
-                if approximate_gpu_memory_gb > 40:
-                    # pass
-                    device_map = "auto"
-                
+        # device_map = cfg['device']
+        # if 'llama' in model_name:
+        #     match = re.search(r'(\d+)b', model_name)
+        #     number_before_b = match.group(1)
+        #     approximate_gpu_memory_gb = int(number_before_b) * 2 + cfg['batch_size'] * cfg['seq_len'] * 11000 * 8 / 1024 / 1024 / 1024 + 5
+        #     print('approximate_gpu_memory_gb', approximate_gpu_memory_gb)
+        #     if cfg['gpu_name'] == 'NVIDIA GeForce RTX 4090':
+        #         if approximate_gpu_memory_gb > 24:
+        #             device_map = "auto"
+        #     elif cfg['gpu_name'] == 'NVIDIA A100-SXM4-40GB':
+        #         # A100
+        #         if approximate_gpu_memory_gb > 40:
+        #             # pass
+        #             device_map = "auto"
+        device_map = "auto"
         # low_cpu_mem_usage = False
     print('device_map', device_map)
     if 'bart' in model_name:

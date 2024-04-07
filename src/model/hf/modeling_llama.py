@@ -25,6 +25,7 @@ from typing import List, Optional, Tuple, Union
 
 import copy
 import torch
+import threading
 import torch.nn.functional as F
 import torch.utils.checkpoint
 from torch import nn
@@ -1518,6 +1519,8 @@ class LlamaAttention(nn.Module):
             # upcast attention to fp32
             # attn_weights: bsz, self.num_heads, q_len, q_len
             # attn_weights: 1, self.num_heads, q_len, q_len
+            # print(torch.cuda.memory_summary())
+            print('attn_weights', attn_weights.shape, flush=True)
             attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
             # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
             # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
@@ -1613,34 +1616,81 @@ class LlamaDecoderLayer(nn.Module):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
         
+        torch.cuda.nvtx.range_push("zzzzzzz")
         start_time = time.time()
         residual = hidden_states
-        if self.check_asyncintra_mlp():
-            with torch.cuda.stream(cfg['cuda_stream1']):
-                post_layernorm_attn_residual = self.post_attention_layernorm(residual)
-                self.mlp(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual)
-
-
-        hidden_states = self.input_layernorm(hidden_states)
         
-        # Self Attention
-        hidden_states, self_attn_weights, present_key_value = self.self_attn(
-            hidden_states=hidden_states,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_value=past_key_value,
-            output_attentions=output_attentions,
-            use_cache=use_cache,
-        )
+        
+        def probe_mlp_inf(result_dict):
+            if self.check_asyncintra_mlp():
+                with torch.cuda.stream(cfg['cuda_stream1']):
+                    post_layernorm_attn_residual = self.post_attention_layernorm(residual)
+                    if 'resinfo' in cfg['prune_method']: 
+                        result_dict['post_layernorm_attn_residual'] = post_layernorm_attn_residual
+                    self.mlp(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual)
+        
+        
 
-        hidden_states = residual + hidden_states
+        
+
+        # def full_attn_inf(result_dict):
+        # hidden_states = self.input_layernorm(hidden_states)
+    
+        # # Self Attention
+        # hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        #     hidden_states=hidden_states,
+        #     attention_mask=attention_mask,
+        #     position_ids=position_ids,
+        #     past_key_value=past_key_value,
+        #     output_attentions=output_attentions,
+        #     use_cache=use_cache,
+        # )
+
+        # hidden_states = residual + hidden_states
+        
+        def full_attn_inf(result_dict):
+            try:
+                hidden_states = self.input_layernorm(residual)
+                hidden_states, self_attn_weights, present_key_value = self.self_attn(
+                    hidden_states=hidden_states,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_value,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                )
+                hidden_states = residual + hidden_states
+                result_dict['hidden_states'] = hidden_states
+                print("Thread completed and added 'hidden_states'")
+            except Exception as e:
+                print(f"Error in full_attn_inf: {e}")
+
+        # Wait for both threads to complete
+        # thread1.join()
+        # thread2.join()
+        # Create threads
+        probe_mlp_inf_result = {}
+        full_attn_inf_result = {}
+        thread1 = threading.Thread(target=full_attn_inf, args=(full_attn_inf_result,))
+        thread2 = threading.Thread(target=probe_mlp_inf, args=(probe_mlp_inf_result,))
+
+        # Start the threads
+        thread1.start()
+        thread2.start()
+        
+        
 
         if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_mlp():
-            self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, post_layernorm_attn_residual)
+            self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_mlp_inf_result['post_layernorm_attn_residual'])
         
         # Fully Connected
-        residual = hidden_states
+        # hidden_states = full_attn_inf_result['hidden_states']
+        # residual = hidden_states
+        thread1.join()
+        thread2.join()
+        residual = full_attn_inf_result['hidden_states']
         hidden_states = self.post_attention_layernorm(hidden_states)
+        hidden_states = self.mlp(hidden_states)
         if self.check_asyncintra_attention():
             with torch.cuda.stream(cfg['cuda_stream1']):
                 input_layernorm_mlp_residual = kwargs['next_layer'].input_layernorm(residual)
@@ -1653,8 +1703,6 @@ class LlamaDecoderLayer(nn.Module):
                     use_cache=use_cache,
                     input_layernorm_mlp_residual=input_layernorm_mlp_residual
                 )
-                
-        hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
         if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_attention():
@@ -1668,6 +1716,7 @@ class LlamaDecoderLayer(nn.Module):
         if use_cache:
             outputs += (present_key_value,)
         custom_duration = time.time() - start_time
+        torch.cuda.nvtx.range_pop()
         # print('custom_duration decoder layer', custom_duration, flush=True)
         return outputs
 
@@ -1795,7 +1844,9 @@ class LlamaModel(LlamaPreTrainedModel):
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
-        self.layers = nn.ModuleList([LlamaDecoderLayer(config, layer_order) for layer_order in range(config.num_hidden_layers)])
+        hidden_layers = config.num_hidden_layers
+        # hidden_layers = 1
+        self.layers = nn.ModuleList([LlamaDecoderLayer(config, layer_order) for layer_order in range(hidden_layers)])
         self.norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
         self.gradient_checkpointing = False
@@ -1899,6 +1950,12 @@ class LlamaModel(LlamaPreTrainedModel):
                     use_cache,
                 )
             else:
+                torch.cuda.synchronize(cfg['cuda_default_stream']) 
+                start_time = time.time()
+                # start_event = torch.cuda.Event(enable_timing=True)
+                # stop_event = torch.cuda.Event(enable_timing=True)
+                torch.cuda.nvtx.range_push("layer{}".format(idx))
+                # start_event.record()
                 layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=attention_mask,
@@ -1908,6 +1965,20 @@ class LlamaModel(LlamaPreTrainedModel):
                     use_cache=use_cache,
                     next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) else None,
                 )
+
+                # Record the end time
+                # stop_event.record()
+
+                # Wait for all the operations to complete
+                 # Wait for the events to be recorded!
+
+                # Calculate the elapsed time
+                # elapsed_time_ms = start_event.elapsed_time(stop_event)
+                torch.cuda.synchronize(cfg['cuda_default_stream']) 
+                duration = time.time() - start_time
+                torch.cuda.nvtx.range_pop()
+                print(f"layer: {idx}, Elapsed time: {duration} milliseconds")
+               
             
             
 
@@ -2075,17 +2146,22 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         loss = None
         if labels is not None:
             # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-            # print('shift_logits', shift_logits, shift_logits.shape, flush=True)
-            # print('shift_labels', shift_labels, shift_labels.shape, flush=True)
-            # Flatten the tokens
-            loss_fct = CrossEntropyLoss()
-            shift_logits = shift_logits.view(-1, self.config.vocab_size)
-            shift_labels = shift_labels.view(-1)
-            # Enable model parallelism
-            shift_labels = shift_labels.to(shift_logits.device)
-            loss = loss_fct(shift_logits, shift_labels)
+            # shift_logits = logits[..., :-1, :].contiguous()
+            # shift_labels = labels[..., 1:].contiguous()
+
+            # # shift_logits = logits[..., :-1, :]
+            # # shift_labels = labels[..., 1:]
+            # # print('shift_logits', shift_logits, shift_logits.shape, flush=True)
+            # # print('shift_labels', shift_labels, shift_labels.shape, flush=True)
+            # # Flatten the tokens
+            # loss_fct = CrossEntropyLoss()
+            # shift_logits = shift_logits.view(-1, self.config.vocab_size)
+            # shift_labels = shift_labels.view(-1)
+            # # Enable model parallelism
+            # shift_labels = shift_labels.to(shift_logits.device)
+            # loss = loss_fct(shift_logits, shift_labels)
+
+            loss = torch.tensor(5, device=logits.device)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

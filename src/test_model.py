@@ -362,7 +362,7 @@ def test(data_loader, model, model_prof, metric, logger):
         torch.cuda.cudart().cudaProfilerStart()
         for i, input in enumerate(data_loader):
             cfg['cur_batch_index'] += 1
-            torch.cuda.nvtx.range_push("iteration{}".format(i))
+            
             # if cfg['logger_detailed_info']:
             print('cur_batch_index', cfg['cur_batch_index'])
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
@@ -411,7 +411,7 @@ def test(data_loader, model, model_prof, metric, logger):
                         # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
                         # Append the attribute to the logger
                         logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-            torch.cuda.nvtx.range_pop()
+            
             # if i == 50:
             # if i == 100:
             #     break

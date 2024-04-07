@@ -542,7 +542,7 @@ def main():
 #             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
 #             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], [ '10', '80'], ['128'], ['0.0', '0.3', '0.6', '0.8'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], [ '100'], ['512', '384', '448'], ['0.0', '0.3', '0.6', '0.8'], 
                              ['probe'], ['calib-ema'], ['sync', 'asyncinter'], ['c4-15'], ['None'],
                             #  [
                             #     #  'mag-calib-probe-None-None+c4-2000',
@@ -582,8 +582,8 @@ def main():
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128', '1024'], ['0.0', '0.3', '0.6', '0.8'], 
-                             ['probe'], ['calib-probe-ema'], [ 'asyncintra'], ['c4-15'], ['0-0-0-1-1'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['100'], ['512', '384', '448'], ['0.0', '0.3', '0.6', '0.8'], 
+                             ['probe'], ['calib-probe-ema'], [ 'asyncintra'], ['c4-15'], ['0-0-0-5-5'],
                             #  [
                             #     #  'mag-calib-probe-None-None+c4-2000',
                             # #   'mag-calibrunningmean-probe-None-None+c4-2000',
@@ -993,7 +993,7 @@ def main():
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '20', '80'], ['128', '1024'], ['0'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['100'], ['512', '384', '448'], ['0'], 
                              ['None'], ['dense'], ['sync'], ['None'], ['None'],        
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)

@@ -79,7 +79,8 @@ def process_control():
     
     if torch.cuda.is_available():
         cfg['cuda_default_stream'] = torch.cuda.default_stream()
-        cfg['cuda_stream1'] = torch.cuda.Stream(priority=1)
+        # cfg['cuda_stream1'] = torch.cuda.Stream(priority=1)
+        cfg['cuda_stream1'] = torch.cuda.Stream()
     else:
         raise ValueError('No cuda device available')
 
@@ -181,7 +182,7 @@ def process_control():
     
     cfg['calibration_stage'] = False
     # default skip 3 layers
-    cfg['skip_layers'] = 2
+    cfg['skip_layers'] = -1
     if 'skip' in cfg['prune_method']:
         match = re.search(r'skip(\d+)', cfg['prune_method'])
         if match:
