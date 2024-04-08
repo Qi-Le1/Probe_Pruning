@@ -1,88 +1,838 @@
 
-
-# -*- coding: utf-8 -*-
-# import torch
-# import numpy as np
-
-# a = torch.tensor([])
-
-# b = [a]
-import collections
-# print(len(b))
-
-
-# mask = torch.ones(10, dtype=torch.bool)
-# print('pre_mask', mask)
-# # Mark the indices to be pruned as False
-# mask[None] = False
-# print('mask', mask)
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-import torch
-
-import torch
-
-
-import torch
-
-import torch
-import torch.nn as nn
-# from transformers import AutoTokenizer
-
-
-
 import torch
 import time
+print("PyTorch version:", torch.__version__)
+print("CUDA available:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("CUDA version:", torch.version.cuda)
+print(torch.__version__)
+print(torch.version.cuda)
+print(torch.backends.cudnn.version())
+'''
+PyTorch version: 2.0.1+cu117
+CUDA available: True
+CUDA version: 11.7
+2.0.1+cu117
+11.7
+8906
+
+System: ubuntu 20.04
+GPU: NVIDIA GeForce RTX 4090
+'''
+import torch
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+a = torch.rand(4096, 11008, device=device, dtype=torch.float16)
+b = torch.rand(4096, 11008, device=device, dtype=torch.float16)
+a_large = torch.rand(10000, 10000, device=device, dtype=torch.float16)
+b_large = torch.rand(10000, 10000, device=device, dtype=torch.float16)
+
+# Create two CUDA streams
+stream1 = torch.cuda.Stream()
+stream2 = torch.cuda.Stream()
+
+import threading
+
+
+
+def func1():
+    # ----test multiply async
+    with torch.cuda.stream(stream1):
+        for i in range(10000):
+            result1 = torch.multiply(a, a)  # a * a
+
+def func2():
+    with torch.cuda.stream(stream2):
+        for i in range(10000):
+            result2 = torch.multiply(b, b)  # b * b
+
+
+# Create threads
+thread1 = threading.Thread(target=func1)
+thread2 = threading.Thread(target=func2)
+
+# Start the threads
+thread1.start()
+thread2.start()
+
+# Wait for both threads to complete
+thread1.join()
+thread2.join()
+
+
+
+torch.cuda.synchronize()
+
+
+time.sleep(5)
+
+def func1():
+    # ----test multiply async
+    with torch.cuda.stream(stream1):
+        for i in range(10000):
+            result1 = torch.multiply(a, a)  # a * a
+
+def func2():
+    with torch.cuda.stream(stream2):
+        for i in range(10000):
+            result2 = torch.multiply(b, b)  # b * b
+
+
+# Create threads
+thread1 = threading.Thread(target=func1)
+thread1.start()
+# thread2 = threading.Thread(target=func2)
+func2()
+
+# Start the threads
+
+# thread2.start()
+
+# Wait for both threads to complete
+thread1.join()
+# thread2.join()
+
+
+
+torch.cuda.synchronize()
+time.sleep(5)
+
+# ----test multiply async
+with torch.cuda.stream(stream1):
+    for i in range(10000):
+        result1 = torch.multiply(a, a)  # a * a
+
+
+with torch.cuda.stream(stream2):
+    for i in range(10000):
+        result2 = torch.multiply(b, b)  # b * b
+
+torch.cuda.synchronize()
+# # Create threads
+# thread1 = threading.Thread(target=func1)
+# thread2 = threading.Thread(target=func2)
+
+# # Start the threads
+# thread1.start()
+# thread2.start()
+
+# # Wait for both threads to complete
+# thread1.join()
+# thread2.join()
+import time
+time.sleep(5)
+
+# ----test matmul, multiply async
+layer1 = torch.nn.Linear(4096, 11008, device=device)
+layer2 = torch.nn.Linear(11008, 4096, device=device)
+input_tensor = torch.randn(128, 4096, device=device)
+
+def func1():
+    with torch.cuda.stream(stream1):
+        for i in range(10000):
+            result1 = layer2(layer1(input_tensor))  # layer1(input_tensor)
+
+def func2():
+    with torch.cuda.stream(stream2):
+        for i in range(10000):
+            result2 = torch.multiply(b, b)  # b * b
+
+
+
+# Create threads
+thread1 = threading.Thread(target=func1)
+thread2 = threading.Thread(target=func2)
+
+# Start the threads
+thread1.start()
+thread2.start()
+
+# Wait for both threads to complete
+thread1.join()
+thread2.join()
+
+torch.cuda.synchronize()
+
+# # ----test matmul, select indices async
+# layer1 = torch.nn.Linear(80, 80, device=device)
+# layer2 = torch.nn.Linear(80, 80, device=device)
+# input_tensor = torch.randn(128, 80, device=device)
+# select_indices = torch.arange(500, device=device)
+
+# with torch.cuda.stream(stream1):
+#     for i in range(100000):
+#         result1 = layer2(layer1(input_tensor))  # layer1(input_tensor)
+
+# with torch.cuda.stream(stream2):
+#     for i in range(100000):
+#         _ = b[:, select_indices]
+
+# torch.cuda.synchronize()
+
+# # ----test matmul, select indices async (large matrix)
+# layer1 = torch.nn.Linear(4000, 4000, device=device)
+# layer2 = torch.nn.Linear(4000, 4000, device=device)
+# input_tensor = torch.randn(128, 4000, device=device)
+# select_indices = torch.arange(5000, device=device)
+
+# with torch.cuda.stream(stream1):
+#     for i in range(100000):
+#         result1 = layer2(layer1(input_tensor))  # layer1(input_tensor)
+
+# with torch.cuda.stream(stream2):
+#     for i in range(100000):
+#         _ = b_large[:, select_indices]
+
+# torch.cuda.synchronize()
+exit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # -*- coding: utf-8 -*-
+# # import torch
+# # import numpy as np
+
+# # a = torch.tensor([])
+
+# # b = [a]
+# import collections
+# # print(len(b))
+
+
+# # mask = torch.ones(10, dtype=torch.bool)
+# # print('pre_mask', mask)
+# # # Mark the indices to be pruned as False
+# # mask[None] = False
+# # print('mask', mask)
+
+# import torch
+# import torch.nn as nn
+# import torch.nn.functional as F
+
+# import torch
+
+# import torch
+
+
+# import torch
+
+# import torch
+# import torch.nn as nn
+# # from transformers import AutoTokenizer
+
+
+
+# import torch
+# import time
+
+
+# import torch
+# import torch.nn as nn
+# torch.backends.cudnn.benchmark = False
+
+
+# # import torch
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# # # Assume we are using float16 for the computation
+# # datamin = torch.finfo(torch.float16).min
+# # dataminpositive = torch.finfo(torch.float16).tiny
+# # print("Minimum value for float16:", datamin)
+# # print("Minimum positive value for float16:", dataminpositive)
+
+# # x = torch.tensor([1e-6], dtype=torch.float16, device=device) / 10
+
+# # # Check if the result is NaN
+# # print("Result of division:", x)
+
+# # # Use clamp on the result with a min range of 1e-5
+# # clamped_x = torch.clamp(x, min=1e-5)
+
+# # print("Result after clamping:", clamped_x)
+
+
+# # x = torch.tensor([1e-10], dtype=torch.float16, device=device) / 10
+
+# # # Check if the result is NaN
+# # print("Result of division:", x)
+
+# # # Use clamp on the result with a min range of 1e-5
+# # clamped_x = torch.clamp(x, min=1e-5)
+
+# # print("Result after clamping:", clamped_x)
+
+
+# # x = torch.tensor(1e-10, dtype=torch.float16, device=device)
+# # x = x * x
+
+# # # Check if the result is NaN
+# # print("Result of division:", x)
+
+# # # Use clamp on the result with a min range of 1e-5
+# # clamped_x = torch.clamp(x, min=1e-5)
+
+# # print("Result after clamping:", clamped_x)
+
+
+
+
+
+
+
+
+
+# # exit()
+# # import torch
+# # lowest_priority, highest_priority = torch.cuda.get_device_properties(0).priority_range
+# # print(f"Priority range: {lowest_priority} (highest priority) to {highest_priority} (lowest priority)")
+# # start_event = torch.cuda.Event(enable_timing=True)
+# # end_event = torch.cuda.Event(interprocess=True) # what I want to share between the streams by ipc_handle
+# # # end_event_ipc_handle = end_event.ipc_handle()
+# # pin1_event = torch.cuda.Event(enable_timing=True)
+# # pin2_event = torch.cuda.Event(enable_timing=True)
+
+# # with torch.cuda.stream(torch.cuda.Stream()):
+# #     start_event.record()
+    
+# #     # Run some things here
+    
+# #     pin1_event.record()
+# #     end_event.record()
+
+# # with torch.cuda.stream(torch.cuda.Stream()):
+# #     # end_event = torch.cuda.Event.from_ipc_handle(torch.cuda.current_device(), end_event_ipc_handle)
+# #     end_event.wait() # wait asynchronously
+
+# #     # Run some things here
+
+# #     pin2_event.record()
+
+# # torch.cuda.synchronize()
+
+# # elapsed_time_ms = start_event.elapsed_time(pin1_event)
+# # print(f"Elapsed time: {elapsed_time_ms} ms")
+
+# # elapsed_time_ms = pin1_event.elapsed_time(pin2_event)
+# # print(f"Elapsed time: {elapsed_time_ms} ms")
+
+
+# # default_stream = torch.cuda.default_stream()
+# # print(default_stream)
+
+# # another_steam = torch.cuda.Stream()
+# # print(another_steam)
+
+
+# class CustomModel(nn.Module):
+#     def __init__(self, in_shape=4096, out_shape=11008, device='cuda:0'):
+#         super(CustomModel, self).__init__()
+#         # Initialize the large matrix as a parameter
+#         # self.large_matrix = nn.Parameter(torch.randn(rows, cols, device=device))
+
+#         self.linear1 = torch.nn.Linear(in_shape, out_shape, device=device)
+#         self.linear2 = torch.nn.Linear(out_shape, in_shape, device=device)
+#         # Optionally, you can set `requires_grad=False` if you don't want to update this matrix during training
+        
+#     def forward(self, indices):
+#         """
+#         Extracts columns from the large matrix based on the provided indices.
+#         Indices should be a tensor of column indices to extract.
+#         """
+#         # Ensure indices are on the same device as the matrix
+#         indices = indices.to(self.large_matrix.device)
+#         # Extract columns based on indices
+#         extracted_columns = self.large_matrix[:, indices]
+#         return extracted_columns
+
+# # # Example usage
+
+# model = CustomModel(device=device)
+# model.to(device)  # Move model to the appropriate device
+# # x = torch.randn(10, 128, 4096).to(device)
+# # x_sample = torch.randn(1, 128, 4096).to(device)
+
+# # # Function to measure extraction time
+# # def matrix_multiplication(x):
+# #     start = time.time()
+# #     # Ensure the operation is performed on the GPU
+# #     _ = model.linear1.weight.to(device)
+# #     _ = F.linear(x, model.linear1.weight)
+# #     # torch.cuda.synchronize()  # Wait for GPU operations to complete
+# #     return time.time() - start
+
+
+
+# # def measure_matrix_elementwise(calib):
+# #     torch.cuda.synchronize()
+# #     weight = model.linear2.weight
+# #     torch.cuda.nvtx.range_push("iteration{}".format(0))
+# #     squared_weight = torch.pow(weight, 2)
+# #     squared_weight = weight.pow(2)
+# #     # squared_weight = torch.mul(weight, weight)
+# #     torch.cuda.synchronize()
+# #     torch.cuda.nvtx.range_pop()
+
+# #     # torch.cuda.nvtx.range_push("iteration{}".format(10))
+# #     # squared_weight = torch.abs(weight)
+# #     # torch.cuda.nvtx.range_pop()
+
+# #     torch.cuda.nvtx.range_push("iteration{}".format(1))
+# #     print('squared_weight', squared_weight.shape)
+# #     calib_reshaped = calib.reshape((1 ,-1))
+# #     torch.cuda.synchronize()
+# #     torch.cuda.nvtx.range_pop()
+# #     torch.cuda.nvtx.range_push("iteration{}".format(2))
+# #     mult_result = torch.mul(calib_reshaped, squared_weight)
+# #     # mult_result = torch.multiply(calib_reshaped, squared_weight)    
+# #     torch.cuda.synchronize()
+# #     torch.cuda.nvtx.range_pop()
+# #     torch.cuda.nvtx.range_push("iteration{}".format(3))
+
+# #     probe_out_dim_metric = torch.sqrt(torch.clamp(torch.sum(mult_result, dim=0), 0, 10))
+# #     torch.cuda.synchronize()
+# #     # torch.cuda.nvtx.range_pop()
+# #     # torch.cuda.nvtx.range_push("iteration{}".format(4))
+
+# #     # # Use torch.sum instead of .sum(), then apply torch.clamp and finally compute the square root
+    
+# #     # torch.cuda.synchronize()
+# #     torch.cuda.nvtx.range_pop()
+# #     # torch.cuda.nvtx.range_push("iteration{}".format(4))
+# #     torch.cuda.synchronize()  # Wait for GPU operations to complete
+# #     return 
+
+# # # Extraction sizes and their corresponding times
+# extraction_sizes = [640, 1280, 2560, 4096]
+# # sorted_times = []
+# # unsorted_times = []
+# # # stream1 = torch.cuda.Stream()
+# # # stream2 = torch.cuda.Stream()
+
+# #     # start_time = time.time()
+# #     # with torch.cuda.stream(stream1):
+# #     #     time_sorted = measure_extraction_time(sorted_indices)
+ 
+# #     # with torch.cuda.stream(stream2):
+# #     #     time_unsorted = measure_extraction_time(unsorted_indices)
+    
+# #     # # 
+# #     # # torch.cuda.synchronize(stream1)
+# #     # # torch.cuda.synchronize(stream2)
+# #     # end_time_1 = time.time() - start_time
+
+# # # for size in extraction_sizes:
+# # #     # Sorted indices
+
+
+# # #     sorted_indices = torch.arange(size, device=device)
+    
+# # #     # Unsorted indices: Shuffle the sorted indices
+# # #     unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
+# # #     # print('sorted_indices', sorted_indices)
+# # #     # print('unsorted_indices', unsorted_indices)
+# # #     # Measure time for sorted indices
+# # #     time_sorted = matrix_multiplication(x)
+
+# # #     start_time = time.time()
+# # #     time_sorted = matrix_multiplication(x)
+# # #     time_sorted = matrix_multiplication(x)
+# # #     time_sorted = matrix_multiplication(x)
+# # #     measure_row_extraction_time(unsorted_indices)
+# # #     measure_row_extraction_time(unsorted_indices)
+# # #     # sorted_times.append(time_sorted)
+    
+# # #     # Measure time for unsorted indices
+# # #     # time_unsorted = matrix_multiplication(unsorted_indices)
+# # #     # time_sorted = matrix_multiplication(sorted_indices)
+# # #     # time_sorted = matrix_multiplication(sorted_indices)
+# # #     # unsorted_times.append(time_unsorted)
+# # #     torch.cuda.synchronize()
+# # #     end_time = time.time() - start_time
+
+# # #     # stream2 = torch.cuda.Stream()
+# # #     start_time = time.time()
+# # #     # with torch.cuda.stream(stream1):
+# # #     with torch.cuda.stream(stream1):
+# # #         time_sorted = matrix_multiplication(x_sample)
+# # #         time_sorted = matrix_multiplication(x_sample)
+# # #         time_sorted = matrix_multiplication(x_sample)
+# # #         measure_row_extraction_time(unsorted_indices)
+# # #         measure_row_extraction_time(unsorted_indices)
+    
+# # #     time_unsorted = matrix_multiplication(x)
+# # #     time_sorted = matrix_multiplication(x)
+# # #     time_sorted = matrix_multiplication(x)
+# # #     torch.cuda.synchronize(stream1)
+# # #     torch.cuda.synchronize()
+# # #     end_time_2 = time.time() - start_time
+
+# # #     # total time with stream: {end_time_1:.6f} seconds,
+# # #     print(f"Extraction size: {size}, total time: {end_time:.6f} seconds,  total time with one stream: {end_time_2:.6f} seconds")
+# #     # print(f"Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds, Time (unsorted): {time_unsorted:.6f} seconds")
+
+# # extraction_sizes = [640, 1280, 2560, 4096, 8808]
+# # sorted_times = []
+# # unsorted_times = []
+
+# # for size in extraction_sizes:
+# #     # Sorted indices
+# #     sorted_indices = torch.arange(size, device=device)
+    
+# #     # Unsorted indices: Shuffle the sorted indices
+# #     unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
+    
+# #     # Measure time for sorted indices
+# #     time_sorted = measure_row_extraction_time(sorted_indices)
+# #     sorted_times.append(time_sorted)
+    
+# #     # # Measure time for unsorted indices
+# #     # time_unsorted = measure_row_extraction_time(unsorted_indices)
+# #     # unsorted_times.append(time_unsorted)
+
+# #     print(f"Initialization Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds")
+
+# # for size in extraction_sizes:
+# #     # Sorted indices
+# #     sorted_indices = torch.arange(size, device=device)
+    
+# #     # Unsorted indices: Shuffle the sorted indices
+# #     unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
+    
+# #     # Measure time for sorted indices
+# #     # time_sorted = measure_row_extraction_time(sorted_indices)
+# #     # sorted_times.append(time_sorted)
+    
+# #     # Measure time for unsorted indices
+# #     time_unsorted = measure_row_extraction_time(unsorted_indices)
+# #     unsorted_times.append(time_unsorted)
+
+# #     print(f"Extraction size: {size}, Time (unsorted): {time_unsorted:.6f} seconds")
+
+
+
+# from torch.utils.data import Dataset, DataLoader
+# def measure_row_extraction_time(indices):
+#     start = time.time()
+#     # Ensure the operation is performed on the GPU
+#     _ = model.linear1.weight[indices, :].to(device)
+#     return time.time() - start
+
+
+# def measure_row_extraction_time_indexselect(indices):
+#     torch.cuda.synchronize()
+#     start = time.time()
+#     # Ensure the operation is performed on the GPU
+#     # Using torch.index_select to select rows. Change dim=0 to dim=1 if you want to select columns.
+#     print(model.linear1.weight.shape, model.linear1.weight.dim(), flush=True)
+#     _ = torch.index_select(model.linear1.weight, dim=0, index=torch.tensor(indices).to(device)).to(device)
+#     torch.cuda.synchronize()  # Wait for GPU operations to complete
+#     end = time.time()
+#     return end - start
+
+# default_stream = torch.cuda.default_stream()
+# stream1 = torch.cuda.Stream()
+# class LargeDataset(Dataset):
+#     def __init__(self, total_batches, batch_size, data_shape):
+#         # Total dataset size is total_batches * batch_size
+#         self.data_len = total_batches * batch_size
+#         self.data_shape = data_shape
+
+#     def __len__(self):
+#         return self.data_len
+
+#     def __getitem__(self, idx):
+#         # Return data of the specified shape (here, it's just random data)
+#         return torch.randn(self.data_shape)
+
+# total_batches = 30
+# batch_size = 5
+# data_shape = (80, 80)
+
+# # Create the dataset
+# dataset = LargeDataset(total_batches, batch_size, data_shape)
+
+# # Create the DataLoader
+# dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+
+
+# # 4096 * 11008
+# gate_proj = torch.nn.Linear(80, 11008, device=device)
+# up_proj = torch.nn.Linear(80, 11008, device=device)
+# silu = torch.nn.SiLU(device)
+# down_proj = torch.nn.Linear(11008, 80, device=device)
+
+# # matrix multiplicatoin
+# with torch.cuda.stream(stream1):
+#     for i in range(10):
+#         for j, batch in enumerate(dataloader):
+#             batch = batch.to(device)
+#             res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
+
+# # matrix extractoin
+# with torch.cuda.stream(default_stream):
+#     for size in extraction_sizes:
+#         # Sorted indices
+#         for i in range(40):
+#             sorted_indices = torch.arange(size, device=device)
+#             # Unsorted indices: Shuffle the sorted indices
+#             unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
+#             time_sorted = measure_row_extraction_time(sorted_indices)
+
+
+# a[:, list]
+
+import torch
+
+# # Assuming CUDA is available
+# assert torch.cuda.is_available()
+
+# Custom matrix multiplication function
+# def custom_matmul(a, b):
+#     # Simple implementation of matrix multiplication
+#     # Note: This is not optimized and is for demonstration purposes only
+#     # assert a.shape[1] == b.shape[0]
+#     # result = torch.zeros(a.shape[0], b.shape[1], device='cuda')
+#     # for i in range(a.shape[0]):
+#     #     for j in range(b.shape[1]):
+#     #         for k in range(a.shape[1]):
+    
+#     # torch.select
+#     # _ = a[:, unsorted_indices]
+#     _ = torch.multiply(a, b)
+#     return
+#     # return torch.matmul(a, b)
+# sorted_indices = torch.arange(500, device='cuda')
+    
+# # # #     # Unsorted indices: Shuffle the sorted indices
+# unsorted_indices = sorted_indices[torch.randperm(500, device='cuda')]
+# # Create two tensors on GPU
+# a = torch.rand(1000, 1000, device='cuda')  # Reduced size for simplicity
+# b = torch.rand(1000, 1000, device='cuda')
+# c = torch.rand(1000, 1000, device='cuda')
+# d = torch.rand(1000, 1000, device='cuda')
+
+# # Create two CUDA streams
+# stream1 = torch.cuda.Stream()
+# stream2 = torch.cuda.Stream()
+
+# # Perform first matrix multiplication in stream1
+# with torch.cuda.stream(stream1):
+#     for i in range(60000):
+#         result1 = custom_matmul(a, b)
+
+# # Perform second matrix multiplication in stream2
+# with torch.cuda.stream(stream2):
+#     for i in range(60000):
+#         result2 = custom_matmul(c, d)
+
+# # Synchronize streams if necessary before accessing results
+# torch.cuda.synchronize()
+
+iterations = 1000000
+# import torch
+
+# # Ensure CUDA is available
+# assert torch.cuda.is_available()
+
+# # Create two large tensors
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# a = torch.rand(20000, 20000, device=device, dtype=torch.float16)
+# b = torch.rand(20000, 20000, device=device, dtype=torch.float16)
+# # print(a.dtype)
+# # Create two CUDA streams
+# stream1 = torch.cuda.Stream()
+# stream2 = torch.cuda.Stream()
+
+# # Operation 1 in stream1
+# with torch.cuda.stream(stream1):
+#     for i in range(iterations):
+#         result1 = torch.multiply(a, a)  # a * a
+       
+# # Operation 2 in stream2
+# with torch.cuda.stream(stream2):
+#     for i in range(iterations):
+#         result2 = torch.multiply(b, b)  # b * b
+
+# # Wait for all streams to complete
+# torch.cuda.synchronize()
+# print('result1', result1.device)
+
 
 
 import torch
-import torch.nn as nn
-torch.backends.cudnn.benchmark = False
 
 
-import torch
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# Assume we are using float16 for the computation
-datamin = torch.finfo(torch.float16).min
-dataminpositive = torch.finfo(torch.float16).tiny
-print("Minimum value for float16:", datamin)
-print("Minimum positive value for float16:", dataminpositive)
+from numba import cuda
+import numpy as np
 
-x = torch.tensor([1e-6], dtype=torch.float16, device=device) / 10
+# Define a CUDA kernel using Numba
+@cuda.jit
+def multiply_kernel(x, y, out):
+    # Calculate the index of the current thread in the grid
+    tx = cuda.threadIdx.x  # Thread index in the block
+    ty = cuda.blockIdx.x   # Block index in the grid
+    bw = cuda.blockDim.x   # Number of threads per block
 
-# Check if the result is NaN
-print("Result of division:", x)
+    # Calculate the flat index
+    index = ty * bw + tx
 
-# Use clamp on the result with a min range of 1e-5
-clamped_x = torch.clamp(x, min=1e-5)
+    # Check if the index is within the bounds of the arrays
+    if index < x.size:
+        out[index] = x[index] * y[index]
 
-print("Result after clamping:", clamped_x)
+# Example usage
+def multiply_arrays(x, y):
+    # Ensure the arrays are of the same size and type
+    assert x.size == y.size
+    assert x.dtype == y.dtype
+    
+    # Output array
+    out = np.zeros_like(x)
+
+    # Number of threads per block
+    threads_per_block = 1024
+    # Number of blocks in the grid
+    blocks = (x.size + (threads_per_block - 1)) // threads_per_block
+
+    # Launch the CUDA kernel
+    multiply_kernel[blocks, threads_per_block](x, y, out)
+
+    return out
 
 
-x = torch.tensor([1e-10], dtype=torch.float16, device=device) / 10
 
-# Check if the result is NaN
-print("Result of division:", x)
+@cuda.jit
+def multiply_2d_kernel(x, y, out):
+    # Calculate the row and column index for each thread
+    row = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
+    col = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
 
-# Use clamp on the result with a min range of 1e-5
-clamped_x = torch.clamp(x, min=1e-5)
+    # Check if the row and column are within the bounds of the matrices
+    if row < x.shape[0] and col < x.shape[1]:
+        out[row, col] = x[row, col] * y[row, col]
 
-print("Result after clamping:", clamped_x)
+# Example usage for 2D matrices
+def multiply_matrices(x, y):
+    # Ensure the arrays are of the same size and type
+    assert x.shape == y.shape
+    assert x.dtype == y.dtype
+    
+    # Output array
+    out = np.zeros_like(x)
+
+    # Define the number of threads in a block
+    threads_per_block = (16, 16)  # 16x16 is a common block size
+    # Calculate the number of blocks in the grid
+    blocks_in_grid_x = (x.shape[1] + (threads_per_block[1] - 1)) // threads_per_block[1]
+    blocks_in_grid_y = (x.shape[0] + (threads_per_block[0] - 1)) // threads_per_block[0]
+
+    # Launch the CUDA kernel
+    multiply_2d_kernel[(blocks_in_grid_x, blocks_in_grid_y), threads_per_block](x, y, out)
+
+    return out
+# Create example data
+# x = np.random.rand(10000).astype(np.float32)
+a = torch.rand(10000, 10000, device='cuda')
+b = torch.rand(10000, 10000, device='cuda')
+c = torch.rand(1000, 1000, device='cuda')
+# y = np.random.rand(10000).astype(np.float32)
+
+stream1 = torch.cuda.Stream()
+with torch.cuda.stream(stream1):
+    for i in range(1000000):
+        result1 = torch.multiply(c, c)  # a * a
+
+# Multiply arrays on the GPU
+for i in range(10):
+    result = multiply_matrices(a.cpu().numpy(), b.cpu().numpy())
 
 
-x = torch.tensor(1e-10, dtype=torch.float16, device=device)
-x = x * x
 
-# Check if the result is NaN
-print("Result of division:", x)
+# # Ensure CUDA is available
+# assert torch.cuda.is_available()
 
-# Use clamp on the result with a min range of 1e-5
-clamped_x = torch.clamp(x, min=1e-5)
+# # Create two large tensors
+# a = torch.rand(1000, 1000, device='cuda')
+# b = torch.rand(1000, 1000, device='cuda')
 
-print("Result after clamping:", clamped_x)
+# # Create two CUDA streams
+# stream1 = torch.cuda.Stream()
+# stream2 = torch.cuda.Stream()
+
+# # Operation 1 in stream1
+# with torch.cuda.stream(stream1):
+#     for i in range(iterations):
+#         result1 = torch.multiply(a, a)  # a * a
+
+# # Operation 2 in stream2
+# with torch.cuda.stream(stream2):
+#     for i in range(iterations):
+#         result2 = torch.multiply(b, b)  # b * b
+
+# # Wait for all streams to complete
+# torch.cuda.synchronize()
+# print(result1, result2)
+
+# import torch
+
+# # Assuming CUDA is available
+# assert torch.cuda.is_available()
+
+# # Create two tensors on GPU
+# a = torch.rand(1000, 1000, device='cuda')
+# b = torch.rand(1000, 1000, device='cuda')
+# c = torch.rand(1000, 1000, device='cuda')
+# d = torch.rand(1000, 1000, device='cuda')
+
+# # Create two CUDA streams
+# stream1 = torch.cuda.Stream()
+# stream2 = torch.cuda.Stream()
+
+# # Perform first matrix multiplication in stream1
+# with torch.cuda.stream(stream1):
+#     for i in range(50):
+#         result1 = torch.matmul(a, b)
+
+# # Perform second matrix multiplication in stream2
+# with torch.cuda.stream(stream2):
+#     for i in range(50):
+#         result2 = torch.matmul(c, d)
+#     # result2 = torch.matmul(c, d)
+
+# # Synchronize streams if necessary before accessing results
+# # This ensures that the matrix multiplications are complete
+# torch.cuda.synchronize()
+
+# print(result1, result2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -93,316 +843,43 @@ print("Result after clamping:", clamped_x)
 
 
 exit()
-# import torch
-# lowest_priority, highest_priority = torch.cuda.get_device_properties(0).priority_range
-# print(f"Priority range: {lowest_priority} (highest priority) to {highest_priority} (lowest priority)")
-# start_event = torch.cuda.Event(enable_timing=True)
-# end_event = torch.cuda.Event(interprocess=True) # what I want to share between the streams by ipc_handle
-# # end_event_ipc_handle = end_event.ipc_handle()
-# pin1_event = torch.cuda.Event(enable_timing=True)
-# pin2_event = torch.cuda.Event(enable_timing=True)
-
-# with torch.cuda.stream(torch.cuda.Stream()):
-#     start_event.record()
-    
-#     # Run some things here
-    
-#     pin1_event.record()
-#     end_event.record()
-
-# with torch.cuda.stream(torch.cuda.Stream()):
-#     # end_event = torch.cuda.Event.from_ipc_handle(torch.cuda.current_device(), end_event_ipc_handle)
-#     end_event.wait() # wait asynchronously
-
-#     # Run some things here
-
-#     pin2_event.record()
-
-# torch.cuda.synchronize()
-
-# elapsed_time_ms = start_event.elapsed_time(pin1_event)
-# print(f"Elapsed time: {elapsed_time_ms} ms")
-
-# elapsed_time_ms = pin1_event.elapsed_time(pin2_event)
-# print(f"Elapsed time: {elapsed_time_ms} ms")
-
-
-# default_stream = torch.cuda.default_stream()
-# print(default_stream)
-
-# another_steam = torch.cuda.Stream()
-# print(another_steam)
-
-
-class CustomModel(nn.Module):
-    def __init__(self, in_shape=4096, out_shape=11008, device='cuda:0'):
-        super(CustomModel, self).__init__()
-        # Initialize the large matrix as a parameter
-        # self.large_matrix = nn.Parameter(torch.randn(rows, cols, device=device))
-
-        self.linear1 = torch.nn.Linear(in_shape, out_shape, device=device)
-        self.linear2 = torch.nn.Linear(out_shape, in_shape, device=device)
-        # Optionally, you can set `requires_grad=False` if you don't want to update this matrix during training
-        
-    def forward(self, indices):
-        """
-        Extracts columns from the large matrix based on the provided indices.
-        Indices should be a tensor of column indices to extract.
-        """
-        # Ensure indices are on the same device as the matrix
-        indices = indices.to(self.large_matrix.device)
-        # Extract columns based on indices
-        extracted_columns = self.large_matrix[:, indices]
-        return extracted_columns
-
-# # Example usage
-
-model = CustomModel(device=device)
-model.to(device)  # Move model to the appropriate device
-# x = torch.randn(10, 128, 4096).to(device)
-# x_sample = torch.randn(1, 128, 4096).to(device)
-
-# # Function to measure extraction time
-# def matrix_multiplication(x):
-#     start = time.time()
-#     # Ensure the operation is performed on the GPU
-#     _ = model.linear1.weight.to(device)
-#     _ = F.linear(x, model.linear1.weight)
-#     # torch.cuda.synchronize()  # Wait for GPU operations to complete
-#     return time.time() - start
-
-
-
-# def measure_matrix_elementwise(calib):
-#     torch.cuda.synchronize()
-#     weight = model.linear2.weight
-#     torch.cuda.nvtx.range_push("iteration{}".format(0))
-#     squared_weight = torch.pow(weight, 2)
-#     squared_weight = weight.pow(2)
-#     # squared_weight = torch.mul(weight, weight)
-#     torch.cuda.synchronize()
-#     torch.cuda.nvtx.range_pop()
-
-#     # torch.cuda.nvtx.range_push("iteration{}".format(10))
-#     # squared_weight = torch.abs(weight)
-#     # torch.cuda.nvtx.range_pop()
-
-#     torch.cuda.nvtx.range_push("iteration{}".format(1))
-#     print('squared_weight', squared_weight.shape)
-#     calib_reshaped = calib.reshape((1 ,-1))
-#     torch.cuda.synchronize()
-#     torch.cuda.nvtx.range_pop()
-#     torch.cuda.nvtx.range_push("iteration{}".format(2))
-#     mult_result = torch.mul(calib_reshaped, squared_weight)
-#     # mult_result = torch.multiply(calib_reshaped, squared_weight)    
-#     torch.cuda.synchronize()
-#     torch.cuda.nvtx.range_pop()
-#     torch.cuda.nvtx.range_push("iteration{}".format(3))
-
-#     probe_out_dim_metric = torch.sqrt(torch.clamp(torch.sum(mult_result, dim=0), 0, 10))
-#     torch.cuda.synchronize()
-#     # torch.cuda.nvtx.range_pop()
-#     # torch.cuda.nvtx.range_push("iteration{}".format(4))
-
-#     # # Use torch.sum instead of .sum(), then apply torch.clamp and finally compute the square root
-    
-#     # torch.cuda.synchronize()
-#     torch.cuda.nvtx.range_pop()
-#     # torch.cuda.nvtx.range_push("iteration{}".format(4))
-#     torch.cuda.synchronize()  # Wait for GPU operations to complete
-#     return 
-
-# # Extraction sizes and their corresponding times
-extraction_sizes = [640, 1280, 2560, 4096]
-# sorted_times = []
-# unsorted_times = []
-# # stream1 = torch.cuda.Stream()
-# # stream2 = torch.cuda.Stream()
-
-#     # start_time = time.time()
-#     # with torch.cuda.stream(stream1):
-#     #     time_sorted = measure_extraction_time(sorted_indices)
- 
-#     # with torch.cuda.stream(stream2):
-#     #     time_unsorted = measure_extraction_time(unsorted_indices)
-    
-#     # # 
-#     # # torch.cuda.synchronize(stream1)
-#     # # torch.cuda.synchronize(stream2)
-#     # end_time_1 = time.time() - start_time
-
-# # for size in extraction_sizes:
-# #     # Sorted indices
-
-
-# #     sorted_indices = torch.arange(size, device=device)
-    
-# #     # Unsorted indices: Shuffle the sorted indices
-# #     unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
-# #     # print('sorted_indices', sorted_indices)
-# #     # print('unsorted_indices', unsorted_indices)
-# #     # Measure time for sorted indices
-# #     time_sorted = matrix_multiplication(x)
-
-# #     start_time = time.time()
-# #     time_sorted = matrix_multiplication(x)
-# #     time_sorted = matrix_multiplication(x)
-# #     time_sorted = matrix_multiplication(x)
-# #     measure_row_extraction_time(unsorted_indices)
-# #     measure_row_extraction_time(unsorted_indices)
-# #     # sorted_times.append(time_sorted)
-    
-# #     # Measure time for unsorted indices
-# #     # time_unsorted = matrix_multiplication(unsorted_indices)
-# #     # time_sorted = matrix_multiplication(sorted_indices)
-# #     # time_sorted = matrix_multiplication(sorted_indices)
-# #     # unsorted_times.append(time_unsorted)
-# #     torch.cuda.synchronize()
-# #     end_time = time.time() - start_time
-
-# #     # stream2 = torch.cuda.Stream()
-# #     start_time = time.time()
-# #     # with torch.cuda.stream(stream1):
-# #     with torch.cuda.stream(stream1):
-# #         time_sorted = matrix_multiplication(x_sample)
-# #         time_sorted = matrix_multiplication(x_sample)
-# #         time_sorted = matrix_multiplication(x_sample)
-# #         measure_row_extraction_time(unsorted_indices)
-# #         measure_row_extraction_time(unsorted_indices)
-    
-# #     time_unsorted = matrix_multiplication(x)
-# #     time_sorted = matrix_multiplication(x)
-# #     time_sorted = matrix_multiplication(x)
-# #     torch.cuda.synchronize(stream1)
-# #     torch.cuda.synchronize()
-# #     end_time_2 = time.time() - start_time
-
-# #     # total time with stream: {end_time_1:.6f} seconds,
-# #     print(f"Extraction size: {size}, total time: {end_time:.6f} seconds,  total time with one stream: {end_time_2:.6f} seconds")
-#     # print(f"Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds, Time (unsorted): {time_unsorted:.6f} seconds")
-
-# extraction_sizes = [640, 1280, 2560, 4096, 8808]
-# sorted_times = []
-# unsorted_times = []
-
-# for size in extraction_sizes:
-#     # Sorted indices
-#     sorted_indices = torch.arange(size, device=device)
-    
-#     # Unsorted indices: Shuffle the sorted indices
-#     unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
-    
-#     # Measure time for sorted indices
-#     time_sorted = measure_row_extraction_time(sorted_indices)
-#     sorted_times.append(time_sorted)
-    
-#     # # Measure time for unsorted indices
-#     # time_unsorted = measure_row_extraction_time(unsorted_indices)
-#     # unsorted_times.append(time_unsorted)
-
-#     print(f"Initialization Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds")
-
-# for size in extraction_sizes:
-#     # Sorted indices
-#     sorted_indices = torch.arange(size, device=device)
-    
-#     # Unsorted indices: Shuffle the sorted indices
-#     unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
-    
-#     # Measure time for sorted indices
-#     # time_sorted = measure_row_extraction_time(sorted_indices)
-#     # sorted_times.append(time_sorted)
-    
-#     # Measure time for unsorted indices
-#     time_unsorted = measure_row_extraction_time(unsorted_indices)
-#     unsorted_times.append(time_unsorted)
-
-#     print(f"Extraction size: {size}, Time (unsorted): {time_unsorted:.6f} seconds")
-
-
-def measure_row_extraction_time(indices):
-    torch.cuda.synchronize()
-    start = time.time()
-    # Ensure the operation is performed on the GPU
-    _ = model.linear1.weight[indices, :].to(device)
-    torch.cuda.synchronize()  # Wait for GPU operations to complete
-    return time.time() - start
-
-
-def measure_row_extraction_time_indexselect(indices):
-    torch.cuda.synchronize()
-    start = time.time()
-    # Ensure the operation is performed on the GPU
-    # Using torch.index_select to select rows. Change dim=0 to dim=1 if you want to select columns.
-    print(model.linear1.weight.shape, model.linear1.weight.dim(), flush=True)
-    _ = torch.index_select(model.linear1.weight, dim=0, index=torch.tensor(indices).to(device)).to(device)
-    torch.cuda.synchronize()  # Wait for GPU operations to complete
-    end = time.time()
-    return end - start
-
-
-for size in extraction_sizes:
-    # Sorted indices
-    sorted_indices = torch.arange(size, device=device)
-    
-    # Unsorted indices: Shuffle the sorted indices
-    unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
-    torch.cuda.nvtx.range_push("iteration{}".format(1))
-    # Measure time for sorted indices
-    if device.type == 'cuda':
-        print(f"Memory Allocated: {torch.cuda.memory_allocated(device)} bytes")
-        print(f"Memory Cached (Reserved): {torch.cuda.memory_reserved(device)} bytes")
-        print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device)} bytes")
-        print(f"Max Memory Cached (Reserved): {torch.cuda.max_memory_reserved(device)} bytes")
-    time_sorted = measure_row_extraction_time(sorted_indices)
-    torch.cuda.nvtx.range_pop()
-    # sorted_times.append(time_sorted)
-    
-    # # Measure time for unsorted indices
-    # time_unsorted = measure_row_extraction_time(unsorted_indices)
-    # unsorted_times.append(time_unsorted)
-
-    print(f"Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds")
-
-
 # torch.cuda.nvtx.range_push("iteration{}".format(100))
-for size in extraction_sizes:
-    # Sorted indices
-    sorted_indices = torch.arange(size, device=device)
+# for size in extraction_sizes:
+#     # Sorted indices
+#     sorted_indices = torch.arange(size, device=device)
     
-    # Unsorted indices: Shuffle the sorted indices
-    unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
-    torch.cuda.nvtx.range_push("iteration{}".format(2))
-    # Measure time for sorted indices
-    if device.type == 'cuda':
-        print(f"Memory Allocated: {torch.cuda.memory_allocated(device)} bytes")
-        print(f"Memory Cached (Reserved): {torch.cuda.memory_reserved(device)} bytes")
-        print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device)} bytes")
-        print(f"Max Memory Cached (Reserved): {torch.cuda.max_memory_reserved(device)} bytes")
-    time_sorted = measure_row_extraction_time_indexselect(sorted_indices)
+#     # Unsorted indices: Shuffle the sorted indices
+#     unsorted_indices = sorted_indices[torch.randperm(size, device=device)]
+#     torch.cuda.nvtx.range_push("iteration{}".format(2))
+#     # Measure time for sorted indices
+#     if device.type == 'cuda':
+#         print(f"Memory Allocated: {torch.cuda.memory_allocated(device)} bytes")
+#         print(f"Memory Cached (Reserved): {torch.cuda.memory_reserved(device)} bytes")
+#         print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device)} bytes")
+#         print(f"Max Memory Cached (Reserved): {torch.cuda.max_memory_reserved(device)} bytes")
+#     time_sorted = measure_row_extraction_time_indexselect(sorted_indices)
 
-    torch.cuda.nvtx.range_pop()
+    # torch.cuda.nvtx.range_pop()
     # sorted_times.append(time_sorted)
     
     # # Measure time for unsorted indices
     # time_unsorted = measure_row_extraction_time(unsorted_indices)
     # unsorted_times.append(time_unsorted)
 
-    print(f"torch select Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds")
+    # print(f"torch select Extraction size: {size}, Time (sorted): {time_sorted:.6f} seconds")
 
 
 
-
-tensor = torch.randn(40, 1024, 4096, dtype=torch.float16, device=device)
-torch.cuda.nvtx.range_push("iteration{}".format(3))
-tensor = tensor.to(torch.float32)
-torch.cuda.nvtx.range_pop()
-torch.cuda.nvtx.range_push("iteration{}".format(4))
-tensor = torch.clamp(tensor, 0, 10)
-torch.cuda.nvtx.range_pop()
-torch.cuda.nvtx.range_push("iteration{}".format(5))
-tensor = torch.norm(tensor, p=2, dim=(0,1)) ** 2
-torch.cuda.nvtx.range_pop()
+# tensor = torch.randn(40, 1024, 4096, dtype=torch.float16, device=device)
+# torch.cuda.nvtx.range_push("iteration{}".format(3))
+# tensor = tensor.to(torch.float32)
+# torch.cuda.nvtx.range_pop()
+# torch.cuda.nvtx.range_push("iteration{}".format(4))
+# tensor = torch.clamp(tensor, 0, 10)
+# torch.cuda.nvtx.range_pop()
+# torch.cuda.nvtx.range_push("iteration{}".format(5))
+# tensor = torch.norm(tensor, p=2, dim=(0,1)) ** 2
+# torch.cuda.nvtx.range_pop()
 
 # torch.cuda.nvtx.range_pop()
 # torch.cuda.nvtx.range_push("iteration{}".format(200))
@@ -433,15 +910,6 @@ torch.cuda.nvtx.range_pop()
 # update = torch.randn(128, 5000, device=device)
 # scalar_inp[:, index] += update * 0.99
 
-
-import torch
-print("PyTorch version:", torch.__version__)
-print("CUDA available:", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("CUDA version:", torch.version.cuda)
-print(torch.__version__)
-print(torch.version.cuda)
-print(torch.backends.cudnn.version())
 
 
 
@@ -485,20 +953,17 @@ def measure_matrix_elementwise(calib):
     return 
 
 
-from torch.utils.data import Dataset, DataLoader
 
-class LargeDataset(Dataset):
-    def __init__(self, total_batches, batch_size, data_shape):
-        # Total dataset size is total_batches * batch_size
-        self.data_len = total_batches * batch_size
-        self.data_shape = data_shape
+# Iterating over the DataLoader
 
-    def __len__(self):
-        return self.data_len
 
-    def __getitem__(self, idx):
-        # Return data of the specified shape (here, it's just random data)
-        return torch.randn(self.data_shape)
+# for i, batch in enumerate(dataloader):
+#     batch = batch.to(device)
+#     res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
+#     # res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
+#     # res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
+#     # res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
+#     # res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
 
 # # Parameters
 # total_batches = 30
@@ -526,30 +991,7 @@ class LargeDataset(Dataset):
 # torch.cuda.empty_cache()
 
 
-total_batches = 30
-batch_size = 50
-data_shape = (512, 4096)
 
-# Create the dataset
-dataset = LargeDataset(total_batches, batch_size, data_shape)
-
-# Create the DataLoader
-dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-
-gate_proj = torch.nn.Linear(4096, 11008, device=device)
-up_proj = torch.nn.Linear(4096, 11008, device=device)
-silu = torch.nn.SiLU(device)
-down_proj = torch.nn.Linear(11008, 4096, device=device)
-# Iterating over the DataLoader
-
-
-# for i, batch in enumerate(dataloader):
-#     batch = batch.to(device)
-#     res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
-#     # res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
-#     # res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
-#     # res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
-#     # res = down_proj(silu(gate_proj(batch)) * up_proj(batch))
 # torch.cuda.empty_cache()
 
 # def nml_process(x, probe_num, probe_size):

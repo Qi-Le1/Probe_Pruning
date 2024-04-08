@@ -142,7 +142,383 @@ def main():
         if 'clm' in data:
             print('here')
             
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], [ '10', '80'], ['128'], ['0.0', '0.3', '0.6', '0.8'], 
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None', 'mag-probembsz-None-None', 'mag-probembszmseq-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each-onlyvo', 'mag-probembsz-fill-each-delseq-onlyvo'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembszwandasp-fill-each', 'mag-probembszwandasp-fill-each-delseq'],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0'], ['pq-probe-None-None-low', 'pq-probewandasp-None-None-low'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0'], ['pq-probeoptim-None-None-low', 'pq-probewandasp-None-None-low'],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0'], ['pq-probembsz-fill-fill-low', 'pq-probembsz-fill-fill-delseq-low'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0'], ['pq-probembszwandasp-fill-fill-low', 'pq-probembszwandasp-fill-fill-delseq-low'],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None-restore', 'mag-probembsz-None-None-restore', 'mag-probembszmseq-None-None-restore'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each-restore'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probekeepseq-None-None', 'mag-probekeepseqmbsz-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each-onlyvo', 'mag-probembsz-fill-each-onlyqk'],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['300'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0', '0.1', '0.2'], ['pq-probeoptim-fill-fill-low'],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0', '0.1', '0.2'], ['pq-probembsz-fill-fill-low'],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0', '0.1', '0.2'], ['pq-probembszkeepseq-fill-fill-low'],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name) 
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0', '0.1', '0.2'], ['pq-probeoptimwandasp-fill-fill-low'],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '0.95'], ['mag-probeoptim-fill-each-onlyvo'],
+            #         ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '0.95'], ['mag-probeoptim-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6'], ['mag-probembsz-fill-each-onlyvo', 'mag-probenmlmbsz-fill-each-onlyvo'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6'], ['mag-probembsz-fill-each-onlyqk', 'mag-probenmlmbsz-fill-each-onlyqk'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6'], ['mag-probembsz-fill-each', 'mag-probenmlmbsz-fill-each'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.3', '0.4', '0.5', '0.6'], ['mag-probembszkeepseq-None-None'],
+            #         ['gate-proj+up-proj+down-proj', 'gate-proj+down-proj', 'up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], ['mag-probe-None-None'],
+            #         [ 'gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['200'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], ['mag-probe-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024', '2048'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd0.01-None-None', 'mag-probesvd0.05-None-None', 'mag-probesvd0.07-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '60'], ['1024'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd0.01-None-None', 'mag-probesvd0.05-None-None', 'mag-probesvd0.07-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['2048'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd0.01-None-None', 'mag-probesvd0.05-None-None', 'mag-probesvd0.07-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['10'], ['128'], ['0.1'], ['mag-probesvd0.01-probe-None-None'],
+            #         ['fc1+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '1024'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7'], ['mag-runningmean-probe-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd0.01-None-None', 'mag-probesvd0.05-None-None', 'mag-probesvd0.07-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '100'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd1-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], ['mag-probeoptim-fill-each'],
+            #         ['fc1+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probe-None-None', 'mag-probembszkeepseq-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512', '1024'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None', 'mag-probenmlmbszkeepseq-None-None', 'mag-probestdmbszkeepseq-None-None', 'mag-probelogmbszkeepseq-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['1', '2', '4', '6', '8', '10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probe-None-None', 'mag-probembszkeepseq-None-None'],
+            #         ['fc1+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['10'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probewandasp-None-None'],
+            #         ['fc1+fc2']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probembsz-fill-each-onlyqk', 'mag-probembszcompressseq-fill-each-onlyqk', 'mag-probembsz-each-each-onlyqk', 'mag-probembszcompressseq-each-each-onlyqk'],
+            #         ['q-proj+k-proj+v-proj+o-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['1024'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probewandasp-None-None', 'mag-probewandaspmbszkeepseq-None-None', 'mag-probewandaspkeepseq-None-None'],
+            #         ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # calib (calibdataset-all), fixprune, runningmean, prune_metric放第三个, probe默认meanbsz, fillpbmetric
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
+            #                  ['mag-nmlprobe0.9calib-probe-None-None+wikivalid-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all'
+            #                   'mag-nmlprobe0.9runningmean-probe-None-None', 'mag-nmlprobe0.9runningmeanfillpbmetric-probe-None-None', 'mag-nmlprobe0.9calibrunningmean-probe-None-None+wikitest-all', 'mag-probe-probe-None-None'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
+            #                  ['mag-probe0.9runningmean-probe-None-None', 'mag-probe0.9calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None'
+            #                  'mag-probe0.9calib-probe-None-None+wikitest-all', 'mag-probe-probe-None-None'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5', '0.6'], 
+            #                  ['mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-nmlprobe0.5calib-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-probe0.9calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5', '0.6'], 
+            #                  ['mag-probefullinf-probe-None-None'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  ['mag-pcabszseqprobe-probe-None-None', 'mag-probe-probe-None-None'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.7', '0.8'], 
+            #                  ['mag-pcabszseqprobe0.9calib-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-probefullinf-probe-None-None', 'mag-pcabszseqprobe0.8calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.7', '0.8'], 
+            #                  [ 'mag-fullinfprobe0.1calib-probe-None-None+wikitest-all', 'mag-fullinfprobe0.1calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.7'], 
+            #                  ['mag-probefullinf-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all',\
+            #                    'mag-similarityprobe-probe-None-None+wikitest-all', 'mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'mag-normbszprobe0.9calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['50'], ['128'], ['0.7'], 
+            #                  ['mag-probefullinf-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all',\
+            #                    'mag-similarityprobe-probe-None-None+wikitest-all', 'mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'mag-normbszprobe0.9calib-probe-None-None+wikitest-all',
+            #                    'mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'pqlow-similarityprobe0.9calib-probe-None-None+wikitest-all', 'pqlow-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all',
+            #                    'pq-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            # 'mag-similarityprobe0.9calibskip5-probe-None-None+wikitest-all','mag-similarityprobe0.9calib-probe-None-None+wikitest-all',
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  ['mag-similarityprobe0.9calib-probe-None-None+wikitest-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.8calib-probe-None-None+wikitest-all', 'mag-savemetricseqnmlprobe0.7calib-probe-None-None+wikitest-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  ['mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+c4-2000', 'mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+wikivalid-all'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  ['mag-globalratiostd0.9calib-probe-None-None+c4-2000', 'mag-globalratiostdnmlprobe0.9calib-probe-None-None+c4-2000', 'mag-globalratiostdsavemetricseqv1nmlprobe0.9calib-probe-None-None+c4-2000',
+            #                   'mag-globalratiostdnmlprobe0.9calibrunningmean-probe-None-None+c4-2000', 'mag-globalratiostdnmlprobe0.9calibrunningmeanfillpbmetric-probe-None-None+c4-2000',
+            #                   'mag-globalratiostd0.9calib-probe-None-None+wikitest-all', 'mag-globalratiostdnmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+wikitest-all',
+            #                   'mag-globalratiostd0.9calib-probe-None-None+wikivalid-all', 'mag-globalratiostdnmlprobe0.9calib-probe-None-None+wikivalid-all', 'mag-globalratiostdsavemetricseqnmlprobe0.9calib-probe-None-None+wikivalid-all',],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  [    'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calibcoeffrunningmean-probe-None-None+c4-2000', 'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calibrunningmean-probe-None-None+c4-2000'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
+            #                  ['pq-nmlprobe0.9calib-probe-None-None+c4-2000'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            
+            
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.7', '0.8'], 
+            #                  ['mag-probesquare-probe-None-None', 'mag-probe-probe-None-None'],
+            #                 ['up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.6', '0.7', '0.8', '0.9'],
+#             control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], [ '0.7'], 
+#                              [
+#                             #      'mag-calib-probe-None-None+c4-2000',
+#                             #   'mag-calibrunningmean-probe-None-None+c4-2000',
+#                             'mag-calibema0.99-probe-None-None+c4-2000',
+#                             'mag-savemetricseqcalibema0.99-probe-None-None+c4-2000',
+#                             'mag-globalratiostdcalibema0.99-probe-None-None+c4-2000',
+#                             # 'mag-nmlprobe-probe-None-None+c4-2000',
+#                             # 'mag-similarityprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+#                             # async probe with full inf fill and no clib (totally last round)
+#                             # 'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseq-probe-None-None+c4-2000',
+#                             # 'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+#                             # async probe with full inf fill
+#                             # 'mag-nmlhalfsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlhalfsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+#                             # async probe with different momentum
+#                             # 'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+#                             # # async multi probe
+#                             # 'mag-nmlsquareasync0.0multiproble2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlsquareasync0.0multiproble5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseq-probe-None-None+c4-2000',
+
+#                             # # sync, 对比一下不加calib
+#                             # 'mag-nmlmultiprobe5probesavemetricseq-probe-None-None+c4-2000',
+#                             # 'mag-nmlmultiprobe2probesavemetricseq-probe-None-None+c4-2000',
+   
+#                             # # sync, 验证当前的epoch multiprobe
+#                             'mag-fullinfprobe-probe-None-None+c4-2000',
+#                             'mag-nmlmultiprobe10globalratiostdprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlmultiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlmultiprobe2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             'mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             'mag-nmlmultiprobe1probedynaratiosavemetricseqrunningmeancalib-probe-None-None+c4-2000',
+
+
+#                             # 'mag-nmlprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+
+#                             # 'mag-nmlprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+# #                             'mag-nmldynaprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+# # #
+# #                             'mag-probefullinf-probe-None-None+c4-2000',
+                            
+#                             #  'mag-nmlprobedynaratiosavemetricseqfillpbmetriccombineema0.99calib-probe-None-None+c4-2000',
+#                             #   'mag-nmlprobedynaratiosavemetricseqfillpbmetricoriginalema0.99calib-probe-None-None+c4-2000'
+#                             # # 'mag-nmlpr
+#                             # obedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlprobedynaratiosavemetricseqrunningmeancalib-probe-None-None+c4-2000',
+
+#                             # 'mag-globalratiostdema0.99calib-probe-None-None+c4-2000',
+#                             # # 'mag-nmlprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-globalratiostdnmlprobedynaratiosavemetricseqrunningmeancalib-probe-None-None+c4-2000',
+#                             # 'mag-nmlprobedynaratiosavemetricseqfillpbmetricoriginalema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlprobedynaratiosavemetricseqcompressfillpbmetriccombineema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlprobedynaratiosavemetricseqfillpbmetricoriginalema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlprobedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
+#                             # 'mag-nmlprobedynaratiosavemetricseqcompressfillpbmetricoriginalema0.99calib-probe-None-None+c4-2000',
+#                             ],
+#                             #   'mag-globalratiostdcalib-probe-None-None+c4-2000',
+#                             #   'mag-nmlprobe0.9calib-probe-None-None+c4-2000',
+#                             #   'mag-globalratiostdnmlprobe0.9calib-probe-None-None+c4-2000',
+#                             #   'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calib-probe-None-None+c4-2000',
+#                             #   'mag-globalratiostdsavemetricseqv2rationmlprobe0.9calibrunningmean-probe-None-None+c4-2000'],
+#                             ['gate-proj+up-proj+down-proj']]]
+#             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+#             controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], [ '100'], ['512', '384', '448'], ['0.0', '0.3', '0.6', '0.8'], 
                              ['probe'], ['calib-ema'], ['sync', 'asyncinter'], ['c4-15'], ['None'],
                             #  [
                             #     #  'mag-calib-probe-None-None+c4-2000',
@@ -182,8 +558,8 @@ def main():
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128', '1024'], ['0.0', '0.3', '0.6', '0.8'], 
-                             ['probe'], ['calib-probe-ema'], [ 'asyncintra'], ['c4-15'], ['0-0-0-1-1'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['100'], ['512', '384', '448'], ['0.0', '0.3', '0.6', '0.8'], 
+                             ['probe'], ['calib-probe-ema'], [ 'asyncintra'], ['c4-15'], ['0-0-0-5-5'],
                             #  [
                             #     #  'mag-calib-probe-None-None+c4-2000',
                             # #   'mag-calibrunningmean-probe-None-None+c4-2000',
@@ -593,7 +969,7 @@ def main():
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '20', '80'], ['128', '1024'], ['0'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['100'], ['512', '384', '448'], ['0'], 
                              ['None'], ['dense'], ['sync'], ['None'], ['None'],        
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)

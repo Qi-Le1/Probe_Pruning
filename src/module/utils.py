@@ -20,11 +20,13 @@ TIME_UNIT = (1, 's')
 
 def model_forward(model, input, inference_duration, index):
     torch.cuda.synchronize(cfg['cuda_default_stream'])
+    torch.cuda.nvtx.range_push("iteration{}".format(index))
     start_time = time.time()
     output = model(**input)
     torch.cuda.synchronize(cfg['cuda_default_stream'])
     cur_inference_duration = time.time() - start_time
     inference_duration += cur_inference_duration
+    torch.cuda.nvtx.range_pop()
     print(f'index: {index} - inference_duration: {cur_inference_duration}', flush=True)
     # not considering edge case for time cost
     if index == 0:
