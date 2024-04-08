@@ -870,6 +870,16 @@ class LlamaAttention(nn.Module):
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
         return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
 
+    def probe_process(self, x):
+        pass
+
+
+
+
+
+
+
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -925,7 +935,7 @@ class LlamaAttention(nn.Module):
                     kv_seq_len += past_key_value[0].shape[-2]
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
-                # print('query_states key_states after rotary', query_states, key_states, flush=True)
+
                 if past_key_value is not None:
                     # reuse k, v, self_attention
                     key_states = torch.cat([past_key_value[0], key_states], dim=2)
@@ -936,8 +946,6 @@ class LlamaAttention(nn.Module):
                 key_states = repeat_kv(key_states, self.num_key_value_groups)
                 value_states = repeat_kv(value_states, self.num_key_value_groups)
 
-                # query: bsz, self.num_heads, 1, self.head_dim
-                # key_states: bsz, self.num_key_value_heads, q_len+1, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len+1
                 attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
                 if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
@@ -953,14 +961,9 @@ class LlamaAttention(nn.Module):
                         )
                     attn_weights = attn_weights + attention_mask
                     attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
-                # upcast attention to fp32
-                # attn_weights: bsz, self.num_heads, q_len, q_len
-                # attn_weights: 1, self.num_heads, q_len, q_len
+
                 attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-                # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
-                # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
                 attn_output = torch.matmul(attn_weights, value_states)
-                # print('attn_output after value', attn_output)
 
                 if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
                     raise ValueError(
@@ -969,8 +972,6 @@ class LlamaAttention(nn.Module):
                     )
 
                 attn_output = attn_output.transpose(1, 2).contiguous()
-
-                # attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
                 attn_output = attn_output.reshape(bsz, q_len, self.num_heads * self.head_dim)
                 attn_output = self.o_proj(attn_output)
 
@@ -994,6 +995,19 @@ class LlamaAttention(nn.Module):
                         comp_across_bsz_q = hidden_states.mean(axis=0).unsqueeze_(0)
                         comp_across_bsz_k = hidden_states.mean(axis=0).unsqueeze_(0)
                         comp_across_bsz_v = hidden_states.mean(axis=0).unsqueeze_(0)
+
+                    if cfg['mode'] == 'sync':
+                        probe_out_dim_indices = self.probe_process(x)
+                    elif cfg['mode'] == 'asyncinter':
+                        with torch.cuda.stream(cfg['cuda_stream1']):
+                            _ = self.probe_process(x)
+                    elif cfg['mode'] == 'asyncintra':
+                        # if not, do full inference
+                        if 'post_layernorm_attn_residual' in kwargs:
+                            # print('post_layernorm_attn_residual', flush=True)
+                            _ = self.probe_process(kwargs['post_layernorm_attn_residual'])
+                            return
+                            
 
                     print('comp_across_bsz_v', comp_across_bsz_v.shape, flush=True)
                     q_num_heads, k_num_heads, v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
@@ -1845,7 +1859,7 @@ class LlamaModel(LlamaPreTrainedModel):
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
         hidden_layers = config.num_hidden_layers
-        # hidden_layers = 1
+        hidden_layers = 1
         self.layers = nn.ModuleList([LlamaDecoderLayer(config, layer_order) for layer_order in range(hidden_layers)])
         self.norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
