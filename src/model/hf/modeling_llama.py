@@ -25,6 +25,7 @@ from typing import List, Optional, Tuple, Union
 
 import copy
 import torch
+import traceback 
 import threading
 import torch.nn.functional as F
 import torch.utils.checkpoint
@@ -50,7 +51,7 @@ from config import cfg
 from ..pruning_module import HiddenRepresentationPruning, cal_intersection_ratio, cal_prune_metric, cal_calib_prune_metric
 from module import nearest_even_number
 from torch.nn.functional import cosine_similarity
-from .utils import nml_process, max_process, mean_process, cal_res_hidden_state_diff
+from .utils import nml_process, max_process, mean_process, cal_res_hidden_state_diff, vertical_process  
 '''
 Note: transformers 4.35.0 version
 '''
@@ -124,6 +125,8 @@ class LlamaRMSNorm(nn.Module):
         hidden_states = hidden_states.to(torch.float32)
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        print(self.weight.device)
+        print(hidden_states.device)
         return self.weight * hidden_states.to(input_dtype)
 
 
@@ -364,15 +367,20 @@ class LlamaMLP(nn.Module):
         elif 'fullinf' in cfg['prune_method']:
             comp_across_bsz_gate = x
             comp_across_bsz_up = x
+        elif 'probeseq' in cfg['prune_method']:
+            comp_across_bsz_gate = vertical_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
+            comp_across_bsz_up = comp_across_bsz_gate
         else:
             start_time = time.time()
             if cfg['gate_probe_num'] == cfg['up_probe_num']:
                 comp_across_bsz_gate = nml_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
+                # comp_across_bsz_gate = mean_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
                 comp_across_bsz_up = comp_across_bsz_gate
             else:
                 comp_across_bsz_gate = nml_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
                 comp_across_bsz_up = nml_process(x, cfg['up_probe_num'], cfg['up_probe_size'])
         
+        print('comp_across_bsz_gateshape', comp_across_bsz_gate.shape, flush=True)
         # run matrix multiplication
         if 'gate_proj' in cfg['cust_tgt_modules']:
             gate_out = self.act_fn(self.gate_proj(comp_across_bsz_gate, cal_mlp_probe_out_dim_metric=True))
@@ -385,6 +393,7 @@ class LlamaMLP(nn.Module):
             up_out = self.up_proj(x)
 
         probe_out = gate_out * up_out
+        # probe_out = torch.randn(1, cfg['seq_len'], 11008, dtype=torch.float16, device=comp_across_bsz_gate.device)
 
         # calculate score
         if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
@@ -405,7 +414,7 @@ class LlamaMLP(nn.Module):
         self.gate_proj.prepare_async_weight(out_dim_indices=probe_out_dim_indices)
         self.up_proj.prepare_async_weight(out_dim_indices=probe_out_dim_indices)
         self.down_proj.prepare_async_weight(in_dim_indices=probe_out_dim_indices)
-
+        print('extract weight')
         return probe_out_dim_indices
     
 
@@ -766,7 +775,7 @@ class LlamaMLP(nn.Module):
                 down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
                 torch.cuda.synchronize()
                 end_time = time.time() - start_time
-                # print('mlp_full_batch_duration', end_time, flush=True)
+                print('mlp_full_batch_duration', end_time, flush=True)
                 
                 return down_proj
 
@@ -1471,6 +1480,8 @@ class LlamaAttention(nn.Module):
             time_start = time.time()
             # full inference
             bsz, q_len, _ = hidden_states.size()
+            print('attn hiddenstate device', hidden_states.device)
+            print('q proj device', self.q_proj.weight.device)
 
             if self.config.pretraining_tp > 1:
                 key_value_slicing = (self.num_key_value_heads * self.head_dim) // self.config.pretraining_tp
@@ -1630,8 +1641,31 @@ class LlamaDecoderLayer(nn.Module):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
         
-        torch.cuda.nvtx.range_push("zzzzzzz")
+
+
+        # torch.cuda.nvtx.range_push("zzzzzzz")
         start_time = time.time()
+        # comp_across_bsz_gate = nml_process(hidden_states, cfg['gate_probe_num'], cfg['gate_probe_size'])
+        # torch.cuda.synchronize()
+        # end_time = time.time()
+        # print('comp_across_bsz_gate_duration', end_time-start_time, flush=True)
+
+        # tensor = torch.randn(100, 512, 4096, dtype=torch.float16, device='cuda')
+        # comp_across_bsz_gate = nml_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
+        # torch.cuda.synchronize()
+        # end_time_2 = time.time()
+        # print('comp_across_bsz_gate_duration2', end_time_2-end_time, flush=True)
+
+        # comp_across_bsz_gate = mean_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
+        # torch.cuda.synchronize()
+        # end_time_3= time.time()
+        # print('comp_across_bsz_gate_duration3', end_time_3-end_time_2, flush=True)
+
+        # comp_across_bsz_gate = optimized_nml_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
+        # torch.cuda.synchronize()
+        # end_time_4 = time.time()
+        # print('comp_across_bsz_gate_duration4', end_time_4-end_time_3, flush=True)
+
         residual = hidden_states
         
         
@@ -1644,23 +1678,6 @@ class LlamaDecoderLayer(nn.Module):
                     self.mlp(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual)
         
         
-
-        
-
-        # def full_attn_inf(result_dict):
-        # hidden_states = self.input_layernorm(hidden_states)
-    
-        # # Self Attention
-        # hidden_states, self_attn_weights, present_key_value = self.self_attn(
-        #     hidden_states=hidden_states,
-        #     attention_mask=attention_mask,
-        #     position_ids=position_ids,
-        #     past_key_value=past_key_value,
-        #     output_attentions=output_attentions,
-        #     use_cache=use_cache,
-        # )
-
-        # hidden_states = residual + hidden_states
         
         def full_attn_inf(result_dict):
             try:
@@ -1678,6 +1695,8 @@ class LlamaDecoderLayer(nn.Module):
                 print("Thread completed and added 'hidden_states'")
             except Exception as e:
                 print(f"Error in full_attn_inf: {e}")
+                
+                traceback.print_exc() 
 
         # Wait for both threads to complete
         # thread1.join()
@@ -1702,7 +1721,22 @@ class LlamaDecoderLayer(nn.Module):
         # residual = hidden_states
         thread1.join()
         thread2.join()
-        residual = full_attn_inf_result['hidden_states']
+        print('residual device', residual.device)
+        print('q_proj device', self.self_attn.q_proj.weight.device)
+        # hidden_states = self.input_layernorm(residual)
+        # hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        #     hidden_states=hidden_states,
+        #     attention_mask=attention_mask,
+        #     position_ids=position_ids,
+        #     past_key_value=past_key_value,
+        #     output_attentions=output_attentions,
+        #     use_cache=use_cache,
+        # )
+        # hidden_states = residual + hidden_states
+
+        hidden_states = full_attn_inf_result['hidden_states']
+        residual = hidden_states
+        print('hiddenstateshape', hidden_states.shape)
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         if self.check_asyncintra_attention():
@@ -1730,7 +1764,7 @@ class LlamaDecoderLayer(nn.Module):
         if use_cache:
             outputs += (present_key_value,)
         custom_duration = time.time() - start_time
-        torch.cuda.nvtx.range_pop()
+        # torch.cuda.nvtx.range_pop()
         # print('custom_duration decoder layer', custom_duration, flush=True)
         return outputs
 
@@ -1992,6 +2026,7 @@ class LlamaModel(LlamaPreTrainedModel):
                 duration = time.time() - start_time
                 torch.cuda.nvtx.range_pop()
                 print(f"layer: {idx}, Elapsed time: {duration} milliseconds")
+                print(f'layerdevice, {decoder_layer.mlp.gate_proj.weight.device}')
                
             
             
@@ -2160,22 +2195,22 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         loss = None
         if labels is not None:
             # Shift so that tokens < n predict n
-            # shift_logits = logits[..., :-1, :].contiguous()
-            # shift_labels = labels[..., 1:].contiguous()
+            shift_logits = logits[..., :-1, :].contiguous()
+            shift_labels = labels[..., 1:].contiguous()
 
-            # # shift_logits = logits[..., :-1, :]
-            # # shift_labels = labels[..., 1:]
-            # # print('shift_logits', shift_logits, shift_logits.shape, flush=True)
-            # # print('shift_labels', shift_labels, shift_labels.shape, flush=True)
-            # # Flatten the tokens
-            # loss_fct = CrossEntropyLoss()
-            # shift_logits = shift_logits.view(-1, self.config.vocab_size)
-            # shift_labels = shift_labels.view(-1)
-            # # Enable model parallelism
-            # shift_labels = shift_labels.to(shift_logits.device)
-            # loss = loss_fct(shift_logits, shift_labels)
+            # shift_logits = logits[..., :-1, :]
+            # shift_labels = labels[..., 1:]
+            # print('shift_logits', shift_logits, shift_logits.shape, flush=True)
+            # print('shift_labels', shift_labels, shift_labels.shape, flush=True)
+            # Flatten the tokens
+            loss_fct = CrossEntropyLoss()
+            shift_logits = shift_logits.view(-1, self.config.vocab_size)
+            shift_labels = shift_labels.view(-1)
+            # Enable model parallelism
+            shift_labels = shift_labels.to(shift_logits.device)
+            loss = loss_fct(shift_logits, shift_labels)
 
-            loss = torch.tensor(5, device=logits.device)
+            # loss = torch.tensor(5, device=logits.device)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

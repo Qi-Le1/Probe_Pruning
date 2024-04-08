@@ -1,3 +1,8 @@
-bash clm0wikitext-2v1_llama-2-7b_clm_100_512_0_None_dense_sync_None_None_None.sh --wait
-bash clm0wikitext-2v1_llama-2-7b_clm_100_384_0_None_dense_sync_None_None_None.sh --wait
-bash clm0wikitext-2v1_llama-2-7b_clm_100_448_0_None_dense_sync_None_None_None.sh --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_256_0_None_dense_sync_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_10_1024_0_None_dense_sync_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_50_256_0_None_dense_sync_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_50_1024_0_None_dense_sync_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_100_256_0_None_dense_sync_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_100_1024_0_None_dense_sync_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_200_256_0_None_dense_sync_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_200_1024_0_None_dense_sync_None_None_None.pbs --wait

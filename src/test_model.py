@@ -72,7 +72,7 @@ def runExperiment():
     dense_name_list[9] = 'sync'
     # calib_info
     dense_name_list[10] = 'None'
-    # probe_type
+    # probe_info
     dense_name_list[11] = 'None'
     # cust_tgt_modules
     dense_name_list[12] = 'None'

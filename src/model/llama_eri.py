@@ -114,8 +114,10 @@ class LlamaEriModel(torch.nn.Module):
             parent, target, target_name = _get_submodules(self.model, key)
             
             new_module = self._create_new_module(target, key)
-
+            
             self._replace_module(parent, target_name, new_module, target)
+            print('target device', target.weight.device, flush=True)
+            print('new_module device', new_module.weight.device, flush=True)
         if not is_target_modules_in_base_model:
             print(
                 f"Target modules {target_modules} not found in the base model. "

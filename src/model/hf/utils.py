@@ -4,11 +4,42 @@ from config import cfg
 
 def nml_process(x, probe_num, probe_size):
     # avoid nan proportion
-    abs_x = torch.clamp(torch.abs(x), min=cfg['data_type_min_positive'])
-    sum_across_bsz = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1)).sum(dim=1, keepdim=True)
-    proportion = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1)) / sum_across_bsz
-    comp_across_bsz = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * proportion).sum(dim=1)
+    
+    # abs_x = torch.clamp(torch.abs(x), min=cfg['data_type_min_positive'])
+    # sum_across_bsz = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1)).sum(dim=1, keepdim=True)
+    # proportion = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1)) / sum_across_bsz
+    # comp_across_bsz = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * proportion).sum(dim=1)
+
+    abs_x = torch.abs(x).clamp_min_(cfg['data_type_min_positive'])
+    abs_view = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
+    # Directly compute the sum across batch size without explicitly forming the proportion tensor
+    # Use broadcasting to avoid explicit creation of the proportion tensor
+    comp_across_bsz = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * (abs_view / abs_view.sum(dim=1, keepdim=True))).sum(dim=1)
     return comp_across_bsz
+
+
+
+
+def vertical_process(x, probe_num, probe_size):
+    # abs_x = torch.abs(x).clamp_min_(cfg['data_type_min_positive'])
+    # abs_view = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
+    # # Directly compute the sum across batch size without explicitly forming the proportion tensor
+    # # Use broadcasting to avoid explicit creation of the proportion tensor
+    # comp_across_bsz = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * (abs_view / abs_view.sum(dim=1, keepdim=True))).sum(dim=1)
+
+    l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
+    print('l2_norms', l2_norms.shape, flush=True)
+    # Select top 10% indices based on the L2 norm
+    top_x_percent = int(probe_num / cfg['batch_size'] * len(l2_norms))
+    _, indices = torch.topk(l2_norms, top_x_percent)
+    print('indices', indices.shape, flush=True)
+    sorted_indices = indices.sort()[0]
+    print('sorted_indices', sorted_indices.shape, flush=True)
+    cfg['vertical_indices'] = sorted_indices
+    return x[:, sorted_indices, :]
+
+
+
 
 def mean_process(x, probe_num, probe_size):
     mean_across_bsz = torch.mean(x.view(probe_num, probe_size, x.size(-2), x.size(-1)), dim=1)

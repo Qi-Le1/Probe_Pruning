@@ -358,6 +358,10 @@ def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distrib
                     # norm_probe_out = torch.sqrt(combined_probe_out)
                 # dynaratio
                 else:
+                    if 'probeseq' in cfg['prune_method']:
+                        global_metric_score_distribution = global_metric_score_distribution[cfg['vertical_indices'], :]
+                    # else:
+  
                     denominator = norm_probe_out_square + global_metric_score_distribution
                     probe_ratio = norm_probe_out_square / denominator
                     has_nan = torch.isnan(probe_ratio).any()

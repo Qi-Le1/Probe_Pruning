@@ -164,124 +164,124 @@ def make_hf_model(model_name, sub_model_name=None):
         model.config.pad_token_id = model.config.eos_token_id
     cfg['pad_token_id'] = tokenizer.pad_token_id    
 
-    if 'svd' in cfg['prune_method']:
-        def low_rank_approximation(U, S, V, ratio):
-            U, S, V = U.to(torch.float16), S.to(torch.float16), V.to(torch.float16)
-            remain_count = int(hidden_size * ratio)
-            k = math.ceil(remain_count / multiple) * multiple
-            print('k', k)
-            S_k = torch.diag(S[:k]).to(device_map)
-            U_k = U[:, :k].to(device_map)
-            V_k = V[:k, :].to(device_map)
-            return U_k, S_k, V_k
+    # if 'svd' in cfg['prune_method']:
+    #     def low_rank_approximation(U, S, V, ratio):
+    #         U, S, V = U.to(torch.float16), S.to(torch.float16), V.to(torch.float16)
+    #         remain_count = int(hidden_size * ratio)
+    #         k = math.ceil(remain_count / multiple) * multiple
+    #         print('k', k)
+    #         S_k = torch.diag(S[:k]).to(device_map)
+    #         U_k = U[:, :k].to(device_map)
+    #         V_k = V[:k, :].to(device_map)
+    #         return U_k, S_k, V_k
 
-        def cal_cumulative_contributions(S):
-            total_variance = torch.sum(S.float() ** 2)
-            # 计算每个奇异值的累积贡献率
-            cumulative_contributions = torch.cumsum(S.float() ** 2, dim=0) / total_variance
-            # 打印累积贡献率
-            for i, contribution in enumerate(cumulative_contributions, start=1):
-                if i == 600:
-                    return
-                print(f"Top {i} singular values' cumulative contribution: {contribution.item():.4f}")
-            return
+    #     def cal_cumulative_contributions(S):
+    #         total_variance = torch.sum(S.float() ** 2)
+    #         # 计算每个奇异值的累积贡献率
+    #         cumulative_contributions = torch.cumsum(S.float() ** 2, dim=0) / total_variance
+    #         # 打印累积贡献率
+    #         for i, contribution in enumerate(cumulative_contributions, start=1):
+    #             if i == 600:
+    #                 return
+    #             print(f"Top {i} singular values' cumulative contribution: {contribution.item():.4f}")
+    #         return
 
-        if 'llama' in model_name:
-            with torch.no_grad():
-                model.train(False)
-                hidden_size = model.config.hidden_size
-                num_heads = model.config.num_attention_heads
-                num_key_value_heads = model.config.num_key_value_heads
-                head_dim = model.config.hidden_size // num_heads
-                num_key_value_groups = num_heads // num_key_value_heads
+    #     if 'llama' in model_name:
+    #         with torch.no_grad():
+    #             model.train(False)
+    #             hidden_size = model.config.hidden_size
+    #             num_heads = model.config.num_attention_heads
+    #             num_key_value_heads = model.config.num_key_value_heads
+    #             head_dim = model.config.hidden_size // num_heads
+    #             num_key_value_groups = num_heads // num_key_value_heads
 
-                multiple = check_multiple_for_tensor_cores(torch.float16)
+    #             multiple = check_multiple_for_tensor_cores(torch.float16)
                 
                 
-                layers = model.model.layers
-                for layer in layers:               
-                    print('\nlayer_order', layer.mlp.layer_order)
-                    print('layer.mlp.gate_proj.device', layer.mlp.gate_proj.weight.data.device)
-                    U, S, V = torch.linalg.svd(layer.mlp.gate_proj.weight.data.float(), full_matrices=False)
-                    cal_cumulative_contributions(S)
-                    U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
-                    layer.mlp.gate_proj_svd_U = nn.Parameter(U).to(device_map)
-                    layer.mlp.gate_proj_svd_S = nn.Parameter(S).to(device_map)
-                    layer.mlp.gate_proj_svd_V = nn.Parameter(V).to(device_map)
-                    layer.mlp.gate_proj_svd_U.requires_grad = False
-                    layer.mlp.gate_proj_svd_S.requires_grad = False
-                    layer.mlp.gate_proj_svd_V.requires_grad = False
-                    quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
-                    for q in quantiles_to_calculate:
-                        quantile_value = torch.quantile(S.float(), q)
-                        print(f"Quantile {q}: {quantile_value}")
+    #             layers = model.model.layers
+    #             for layer in layers:               
+    #                 print('\nlayer_order', layer.mlp.layer_order)
+    #                 print('layer.mlp.gate_proj.device', layer.mlp.gate_proj.weight.data.device)
+    #                 U, S, V = torch.linalg.svd(layer.mlp.gate_proj.weight.data.float(), full_matrices=False)
+    #                 cal_cumulative_contributions(S)
+    #                 U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
+    #                 layer.mlp.gate_proj_svd_U = nn.Parameter(U).to(device_map)
+    #                 layer.mlp.gate_proj_svd_S = nn.Parameter(S).to(device_map)
+    #                 layer.mlp.gate_proj_svd_V = nn.Parameter(V).to(device_map)
+    #                 layer.mlp.gate_proj_svd_U.requires_grad = False
+    #                 layer.mlp.gate_proj_svd_S.requires_grad = False
+    #                 layer.mlp.gate_proj_svd_V.requires_grad = False
+    #                 quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
+    #                 for q in quantiles_to_calculate:
+    #                     quantile_value = torch.quantile(S.float(), q)
+    #                     print(f"Quantile {q}: {quantile_value}")
 
                     
 
-                    print('layer.mlp.up_proj.device', layer.mlp.up_proj.weight.data.device)
-                    U, S, V = torch.linalg.svd(layer.mlp.up_proj.weight.data.float(), full_matrices=False)
-                    cal_cumulative_contributions(S)
-                    U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
-                    layer.mlp.up_proj_svd_U = nn.Parameter(U).to(device_map)
-                    layer.mlp.up_proj_svd_S = nn.Parameter(S).to(device_map)
-                    layer.mlp.up_proj_svd_V = nn.Parameter(V).to(device_map)
-                    layer.mlp.up_proj_svd_U.requires_grad = False
-                    layer.mlp.up_proj_svd_S.requires_grad = False
-                    layer.mlp.up_proj_svd_V.requires_grad = False
-                    quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
-                    for q in quantiles_to_calculate:
-                        quantile_value = torch.quantile(S.float(), q)
-                        print(f"Quantile {q}: {quantile_value}")
+    #                 print('layer.mlp.up_proj.device', layer.mlp.up_proj.weight.data.device)
+    #                 U, S, V = torch.linalg.svd(layer.mlp.up_proj.weight.data.float(), full_matrices=False)
+    #                 cal_cumulative_contributions(S)
+    #                 U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
+    #                 layer.mlp.up_proj_svd_U = nn.Parameter(U).to(device_map)
+    #                 layer.mlp.up_proj_svd_S = nn.Parameter(S).to(device_map)
+    #                 layer.mlp.up_proj_svd_V = nn.Parameter(V).to(device_map)
+    #                 layer.mlp.up_proj_svd_U.requires_grad = False
+    #                 layer.mlp.up_proj_svd_S.requires_grad = False
+    #                 layer.mlp.up_proj_svd_V.requires_grad = False
+    #                 quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
+    #                 for q in quantiles_to_calculate:
+    #                     quantile_value = torch.quantile(S.float(), q)
+    #                     print(f"Quantile {q}: {quantile_value}")
                     
 
-                    print('layer.self_attn.q_proj.device', layer.self_attn.q_proj.weight.data.device)
-                    U, S, V = torch.linalg.svd(layer.self_attn.q_proj.weight.data.float(), full_matrices=False)
-                    cal_cumulative_contributions(S)
-                    U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
-                    # layer.self_attn.q_proj_svd_U = nn.Parameter(U).to(device_map)
-                    # layer.self_attn.q_proj_svd_S = nn.Parameter(S).to(device_map)
-                    # layer.self_attn.q_proj_svd_V = nn.Parameter(V).to(device_map)
-                    quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
-                    for q in quantiles_to_calculate:
-                        quantile_value = torch.quantile(S.float(), q)
-                        print(f"Quantile {q}: {quantile_value}")
+    #                 print('layer.self_attn.q_proj.device', layer.self_attn.q_proj.weight.data.device)
+    #                 U, S, V = torch.linalg.svd(layer.self_attn.q_proj.weight.data.float(), full_matrices=False)
+    #                 cal_cumulative_contributions(S)
+    #                 U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
+    #                 # layer.self_attn.q_proj_svd_U = nn.Parameter(U).to(device_map)
+    #                 # layer.self_attn.q_proj_svd_S = nn.Parameter(S).to(device_map)
+    #                 # layer.self_attn.q_proj_svd_V = nn.Parameter(V).to(device_map)
+    #                 quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
+    #                 for q in quantiles_to_calculate:
+    #                     quantile_value = torch.quantile(S.float(), q)
+    #                     print(f"Quantile {q}: {quantile_value}")
                     
 
-                    print('layer.self_attn.k_proj.device', layer.self_attn.k_proj.weight.data.device)
-                    U, S, V = torch.linalg.svd(layer.self_attn.k_proj.weight.data.float(), full_matrices=False)
-                    cal_cumulative_contributions(S)
-                    U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
+    #                 print('layer.self_attn.k_proj.device', layer.self_attn.k_proj.weight.data.device)
+    #                 U, S, V = torch.linalg.svd(layer.self_attn.k_proj.weight.data.float(), full_matrices=False)
+    #                 cal_cumulative_contributions(S)
+    #                 U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
                     
-                    # layer.self_attn.k_proj_svd_U = nn.Parameter(U).to(device_map)
-                    # layer.self_attn.k_proj_svd_S = nn.Parameter(S).to(device_map)
-                    # layer.self_attn.k_proj_svd_V = nn.Parameter(V).to(device_map)
-                    quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
-                    for q in quantiles_to_calculate:
-                        quantile_value = torch.quantile(S.float(), q)
-                        print(f"Quantile {q}: {quantile_value}")
+    #                 # layer.self_attn.k_proj_svd_U = nn.Parameter(U).to(device_map)
+    #                 # layer.self_attn.k_proj_svd_S = nn.Parameter(S).to(device_map)
+    #                 # layer.self_attn.k_proj_svd_V = nn.Parameter(V).to(device_map)
+    #                 quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
+    #                 for q in quantiles_to_calculate:
+    #                     quantile_value = torch.quantile(S.float(), q)
+    #                     print(f"Quantile {q}: {quantile_value}")
 
-                    print('layer.self_attn.v_proj.device', layer.self_attn.v_proj.weight.data.device)
-                    U, S, V = torch.linalg.svd(layer.self_attn.v_proj.weight.data.float(), full_matrices=False)
-                    cal_cumulative_contributions(S)
-                    U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
-                    # layer.self_attn.v_proj_svd_U = nn.Parameter(U).to(device_map)
-                    # layer.self_attn.v_proj_svd_S = nn.Parameter(S).to(device_map)
-                    # layer.self_attn.v_proj_svd_V = nn.Parameter(V).to(device_map)
-                    quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
-                    for q in quantiles_to_calculate:
-                        quantile_value = torch.quantile(S.float(), q)
-                        print(f"Quantile {q}: {quantile_value}")
-        elif 'opt' in model_name:
-            with torch.no_grad():
-                model.train(False)
-                for name, parameter in model.named_parameters():
-                    print('name', name)
-                    if 'fc' in name and 'weight' in name:
-                    # print('layer.mlp.gate_proj.device', layer.mlp.gate_proj.weight.data.device)
-                        U, S, V = torch.linalg.svd(parameter.float(), full_matrices=False)
-                        cal_cumulative_contributions(S)
+    #                 print('layer.self_attn.v_proj.device', layer.self_attn.v_proj.weight.data.device)
+    #                 U, S, V = torch.linalg.svd(layer.self_attn.v_proj.weight.data.float(), full_matrices=False)
+    #                 cal_cumulative_contributions(S)
+    #                 U, S, V = low_rank_approximation(U, S, V, cfg['svd_ratio'])
+    #                 # layer.self_attn.v_proj_svd_U = nn.Parameter(U).to(device_map)
+    #                 # layer.self_attn.v_proj_svd_S = nn.Parameter(S).to(device_map)
+    #                 # layer.self_attn.v_proj_svd_V = nn.Parameter(V).to(device_map)
+    #                 quantiles_to_calculate = [0.25, 0.5, 0.75, 0.9, 0.95, 1]  # For example, the first, second (median), and third quartiles
+    #                 for q in quantiles_to_calculate:
+    #                     quantile_value = torch.quantile(S.float(), q)
+    #                     print(f"Quantile {q}: {quantile_value}")
+    #     elif 'opt' in model_name:
+    #         with torch.no_grad():
+    #             model.train(False)
+    #             for name, parameter in model.named_parameters():
+    #                 print('name', name)
+    #                 if 'fc' in name and 'weight' in name:
+    #                 # print('layer.mlp.gate_proj.device', layer.mlp.gate_proj.weight.data.device)
+    #                     U, S, V = torch.linalg.svd(parameter.float(), full_matrices=False)
+    #                     cal_cumulative_contributions(S)
 
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
     # to fit flap and simplify for flops comparision
     if 'llama-2-70b' in cfg['model_name']:
         with torch.no_grad():
@@ -323,6 +323,8 @@ def make_hf_model(model_name, sub_model_name=None):
     model.config.use_cache = False
     print('model.config', model.config)
     print('padding_side', padding_side)
+    for key, param in model.named_parameters():
+        print(key, param.device)
     return model, tokenizer
 
 
