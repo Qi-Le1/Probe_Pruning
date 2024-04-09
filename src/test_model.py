@@ -324,10 +324,10 @@ def test(data_loader, model, model_prof, metric, logger):
         start_time = time.time()
         inference_duration = 0
 
+        # warm up pytorch
         data_loader_iter = iter(data_loader)
         input = next(data_loader_iter)
         cfg['cur_batch_index'] += 1
-        # warm up pytorch
         if cfg['task_name'] in ['s2s', 'sc', 'clm']:
             input_size = input['labels'].size(0)
             input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],

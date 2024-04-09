@@ -325,7 +325,7 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     # i = 1
                     # i = random.randint(0, trainenc.input_ids.shape[1] - max_length - 1)
                     i = torch.randint(0, trainenc.input_ids.shape[1] - max_length, (1,)).item()
-                    # print('icalib', i)
+                    print('icalib', i)
                     j = i + max_length
                     inp = trainenc.input_ids[0][i:j]
                     tar = inp.clone()

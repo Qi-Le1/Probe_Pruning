@@ -51,7 +51,7 @@ from config import cfg
 from ..pruning_module import HiddenRepresentationPruning, cal_intersection_ratio, cal_prune_metric, cal_calib_prune_metric
 from module import nearest_even_number
 from torch.nn.functional import cosine_similarity
-from .utils import nml_process, max_process, mean_process, cal_res_hidden_state_diff, vertical_process  
+from .utils import rank_process, mean_process, absnml_process, cal_res_hidden_state_diff  
 '''
 Note: transformers 4.35.0 version
 '''
@@ -357,43 +357,49 @@ class LlamaMLP(nn.Module):
         # 4. extract metric
 
         # generate probe
-        if 'mean' in cfg['prune_method']:
+        # rank / mean / absnml
+        selected_indices = None
+        if 'fullinf' in cfg['probe_info']:
+            probe_gate = x
+            probe_up = x
+        elif 'rank' in cfg['probe_info']:
             if cfg['gate_probe_num'] == cfg['up_probe_num']:
-                comp_across_bsz_gate = mean_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
-                comp_across_bsz_up = comp_across_bsz_gate
+                probe_gate, selected_indices = rank_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
+                probe_up = probe_gate
             else:
-                comp_across_bsz_gate = mean_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
-                comp_across_bsz_up = mean_process(x, cfg['up_probe_num'], cfg['up_probe_size'])
-        elif 'fullinf' in cfg['prune_method']:
-            comp_across_bsz_gate = x
-            comp_across_bsz_up = x
-        elif 'probeseq' in cfg['prune_method']:
-            comp_across_bsz_gate = vertical_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
-            comp_across_bsz_up = comp_across_bsz_gate
-        else:
-            start_time = time.time()
+                # leave an interface, not using yet
+                probe_gate, selected_indices = rank_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
+                probe_up, selected_indices = rank_process(x, cfg['up_probe_num'], cfg['up_probe_size'])
+        elif 'mean' in cfg['probe_info']:
             if cfg['gate_probe_num'] == cfg['up_probe_num']:
-                comp_across_bsz_gate = nml_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
-                # comp_across_bsz_gate = mean_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
-                comp_across_bsz_up = comp_across_bsz_gate
+                probe_gate = mean_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
+                probe_up = probe_gate
             else:
-                comp_across_bsz_gate = nml_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
-                comp_across_bsz_up = nml_process(x, cfg['up_probe_num'], cfg['up_probe_size'])
+                probe_gate = mean_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
+                probe_up = mean_process(x, cfg['up_probe_num'], cfg['up_probe_size'])
+        elif 'absnml' in cfg['probe_info']:
+            if cfg['gate_probe_num'] == cfg['up_probe_num']:
+                probe_gate = absnml_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
+                probe_up = probe_gate
+            else:
+                probe_gate = absnml_process(x, cfg['gate_probe_num'], cfg['gate_probe_size'])
+                probe_up = absnml_process(x, cfg['up_probe_num'], cfg['up_probe_size'])
+
         
-        print('comp_across_bsz_gateshape', comp_across_bsz_gate.shape, flush=True)
+        print('probe_gateshape', probe_gate.shape, flush=True)
         # run matrix multiplication
         if 'gate_proj' in cfg['cust_tgt_modules']:
-            gate_out = self.act_fn(self.gate_proj(comp_across_bsz_gate, cal_mlp_probe_out_dim_metric=True))
+            gate_out = self.act_fn(self.gate_proj(probe_gate, cal_mlp_probe_out_dim_metric=True, selected_indices=selected_indices))
         else:
             gate_out = self.act_fn(self.gate_proj(x))
         
         if 'up_proj' in cfg['cust_tgt_modules']:
-            up_out = self.up_proj(comp_across_bsz_up, cal_mlp_probe_out_dim_metric=True)
+            up_out = self.up_proj(probe_up, cal_mlp_probe_out_dim_metric=True, selected_indices=selected_indices)
         else:
             up_out = self.up_proj(x)
 
         probe_out = gate_out * up_out
-        # probe_out = torch.randn(1, cfg['seq_len'], 11008, dtype=torch.float16, device=comp_across_bsz_gate.device)
+        # probe_out = torch.randn(1, cfg['seq_len'], 11008, dtype=torch.float16, device=probe_gate.device)
 
         # calculate score
         if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
@@ -401,7 +407,7 @@ class LlamaMLP(nn.Module):
             #     probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
             # else:
             print('key', self.down_proj.key)
-            probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution())
+            probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution(), selected_indices=selected_indices)
         else:
             probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
 
@@ -414,7 +420,7 @@ class LlamaMLP(nn.Module):
         self.gate_proj.prepare_async_weight(out_dim_indices=probe_out_dim_indices)
         self.up_proj.prepare_async_weight(out_dim_indices=probe_out_dim_indices)
         self.down_proj.prepare_async_weight(in_dim_indices=probe_out_dim_indices)
-        print('extract weight')
+        print('extract weight', probe_out_dim_indices.shape, flush=True)
         return probe_out_dim_indices
     
 
@@ -570,15 +576,15 @@ class LlamaMLP(nn.Module):
                         time_start = time.time()
                         if cfg['mode'] == 'sync':
                             if 'gate_proj' in cfg['cust_tgt_modules']:
-                                gate_out = self.act_fn(self.gate_proj(x, probe_out_dim_indices=probe_out_dim_indices))
+                                gate_out = self.act_fn(self.gate_proj(x, out_dim_indices=probe_out_dim_indices))
                             # else:
                             #     # gate_out = self.act_fn(self.gate_proj(x))
                             #     gate_out = gate_out[..., probe_out_dim_indices]
 
                             if 'up_proj' in cfg['cust_tgt_modules']:
-                                up_out = self.up_proj(x, probe_out_dim_indices=probe_out_dim_indices)
+                                up_out = self.up_proj(x, out_dim_indices=probe_out_dim_indices)
                             
-                            kwargs['probe_in_dim_indices'] = probe_out_dim_indices
+                            kwargs['in_dim_indices'] = probe_out_dim_indices
                             down_proj = self.down_proj(gate_out * up_out, **kwargs)
                         else:                   
                             # print('here')      
@@ -1480,8 +1486,8 @@ class LlamaAttention(nn.Module):
             time_start = time.time()
             # full inference
             bsz, q_len, _ = hidden_states.size()
-            print('attn hiddenstate device', hidden_states.device)
-            print('q proj device', self.q_proj.weight.device)
+            # print('attn hiddenstate device', hidden_states.device)
+            # print('q proj device', self.q_proj.weight.device)
 
             if self.config.pretraining_tp > 1:
                 key_value_slicing = (self.num_key_value_heads * self.head_dim) // self.config.pretraining_tp
@@ -1545,7 +1551,7 @@ class LlamaAttention(nn.Module):
             # attn_weights: bsz, self.num_heads, q_len, q_len
             # attn_weights: 1, self.num_heads, q_len, q_len
             # print(torch.cuda.memory_summary())
-            print('attn_weights', attn_weights.shape, flush=True)
+            # print('attn_weights', attn_weights.shape, flush=True)
             attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
             # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
             # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
@@ -1645,26 +1651,26 @@ class LlamaDecoderLayer(nn.Module):
 
         # torch.cuda.nvtx.range_push("zzzzzzz")
         start_time = time.time()
-        # comp_across_bsz_gate = nml_process(hidden_states, cfg['gate_probe_num'], cfg['gate_probe_size'])
+        # probe_gate = nml_process(hidden_states, cfg['gate_probe_num'], cfg['gate_probe_size'])
         # torch.cuda.synchronize()
         # end_time = time.time()
-        # print('comp_across_bsz_gate_duration', end_time-start_time, flush=True)
+        # print('probe_gate_duration', end_time-start_time, flush=True)
 
         # tensor = torch.randn(100, 512, 4096, dtype=torch.float16, device='cuda')
-        # comp_across_bsz_gate = nml_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
+        # probe_gate = nml_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
         # torch.cuda.synchronize()
         # end_time_2 = time.time()
-        # print('comp_across_bsz_gate_duration2', end_time_2-end_time, flush=True)
+        # print('probe_gate_duration2', end_time_2-end_time, flush=True)
 
-        # comp_across_bsz_gate = mean_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
+        # probe_gate = mean_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
         # torch.cuda.synchronize()
         # end_time_3= time.time()
-        # print('comp_across_bsz_gate_duration3', end_time_3-end_time_2, flush=True)
+        # print('probe_gate_duration3', end_time_3-end_time_2, flush=True)
 
-        # comp_across_bsz_gate = optimized_nml_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
+        # probe_gate = optimized_nml_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
         # torch.cuda.synchronize()
         # end_time_4 = time.time()
-        # print('comp_across_bsz_gate_duration4', end_time_4-end_time_3, flush=True)
+        # print('probe_gate_duration4', end_time_4-end_time_3, flush=True)
 
         residual = hidden_states
         
@@ -1679,50 +1685,50 @@ class LlamaDecoderLayer(nn.Module):
         
         
         
-        def full_attn_inf(result_dict):
-            try:
-                hidden_states = self.input_layernorm(residual)
-                hidden_states, self_attn_weights, present_key_value = self.self_attn(
-                    hidden_states=hidden_states,
-                    attention_mask=attention_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_value,
-                    output_attentions=output_attentions,
-                    use_cache=use_cache,
-                )
-                hidden_states = residual + hidden_states
-                result_dict['hidden_states'] = hidden_states
-                print("Thread completed and added 'hidden_states'")
-            except Exception as e:
-                print(f"Error in full_attn_inf: {e}")
+        # def full_attn_inf(result_dict):
+        #     try:
+        #         hidden_states = self.input_layernorm(residual)
+        #         hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        #             hidden_states=hidden_states,
+        #             attention_mask=attention_mask,
+        #             position_ids=position_ids,
+        #             past_key_value=past_key_value,
+        #             output_attentions=output_attentions,
+        #             use_cache=use_cache,
+        #         )
+        #         hidden_states = residual + hidden_states
+        #         result_dict['hidden_states'] = hidden_states
+        #         print("Thread completed and added 'hidden_states'")
+        #     except Exception as e:
+        #         print(f"Error in full_attn_inf: {e}")
                 
-                traceback.print_exc() 
+        #         traceback.print_exc() 
 
-        # Wait for both threads to complete
+        # # Wait for both threads to complete
+        # # thread1.join()
+        # # thread2.join()
+        # # Create threads
+        # probe_mlp_inf_result = {}
+        # full_attn_inf_result = {}
+        # thread1 = threading.Thread(target=full_attn_inf, args=(full_attn_inf_result,))
+        # thread2 = threading.Thread(target=probe_mlp_inf, args=(probe_mlp_inf_result,))
+
+        # # Start the threads
+        # thread1.start()
+        # thread2.start()
+        
+        
+
+        # if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_mlp():
+        #     self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_mlp_inf_result['post_layernorm_attn_residual'])
+        
+        # # Fully Connected
+        # # hidden_states = full_attn_inf_result['hidden_states']
+        # # residual = hidden_states
         # thread1.join()
         # thread2.join()
-        # Create threads
-        probe_mlp_inf_result = {}
-        full_attn_inf_result = {}
-        thread1 = threading.Thread(target=full_attn_inf, args=(full_attn_inf_result,))
-        thread2 = threading.Thread(target=probe_mlp_inf, args=(probe_mlp_inf_result,))
-
-        # Start the threads
-        thread1.start()
-        thread2.start()
-        
-        
-
-        if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_mlp():
-            self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_mlp_inf_result['post_layernorm_attn_residual'])
-        
-        # Fully Connected
-        # hidden_states = full_attn_inf_result['hidden_states']
-        # residual = hidden_states
-        thread1.join()
-        thread2.join()
-        print('residual device', residual.device)
-        print('q_proj device', self.self_attn.q_proj.weight.device)
+        # print('residual device', residual.device)
+        # print('q_proj device', self.self_attn.q_proj.weight.device)
         # hidden_states = self.input_layernorm(residual)
         # hidden_states, self_attn_weights, present_key_value = self.self_attn(
         #     hidden_states=hidden_states,
@@ -1734,7 +1740,18 @@ class LlamaDecoderLayer(nn.Module):
         # )
         # hidden_states = residual + hidden_states
 
-        hidden_states = full_attn_inf_result['hidden_states']
+        # hidden_states = full_attn_inf_result['hidden_states']
+
+        hidden_states = self.input_layernorm(residual)
+        hidden_states, self_attn_weights, present_key_value = self.self_attn(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_value=past_key_value,
+            output_attentions=output_attentions,
+            use_cache=use_cache,
+        )
+        hidden_states = residual + hidden_states
         residual = hidden_states
         print('hiddenstateshape', hidden_states.shape)
         hidden_states = self.post_attention_layernorm(hidden_states)
@@ -1893,7 +1910,7 @@ class LlamaModel(LlamaPreTrainedModel):
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
         hidden_layers = config.num_hidden_layers
-        hidden_layers = 1
+        # hidden_layers = 1
         self.layers = nn.ModuleList([LlamaDecoderLayer(config, layer_order) for layer_order in range(hidden_layers)])
         self.norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
@@ -1964,7 +1981,6 @@ class LlamaModel(LlamaPreTrainedModel):
 
         # embed positions
         hidden_states = inputs_embeds
-        temp_mlp_residual = inputs_embeds
 
         if self.gradient_checkpointing and self.training:
             if use_cache:

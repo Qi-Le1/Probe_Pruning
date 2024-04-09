@@ -20,93 +20,38 @@ System: ubuntu 20.04
 GPU: NVIDIA GeForce RTX 4090
 '''
 import torch
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-a = torch.rand(4096, 11008, device=device, dtype=torch.float16)
-b = torch.rand(4096, 11008, device=device, dtype=torch.float16)
-a_large = torch.rand(10000, 10000, device=device, dtype=torch.float16)
-b_large = torch.rand(10000, 10000, device=device, dtype=torch.float16)
 
-# Create two CUDA streams
-stream1 = torch.cuda.Stream()
-stream2 = torch.cuda.Stream()
+a = torch.tensor(1, dtype=torch.float16, device='cuda')
+b = a / 1000000000000000
+print('b', b)
+c = a * 1000000000000000
+print('c', c)
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# a = torch.rand(4096, 11008, device=device, dtype=torch.float16)
+# b = torch.rand(4096, 11008, device=device, dtype=torch.float16)
+# a_large = torch.rand(10000, 10000, device=device, dtype=torch.float16)
+# b_large = torch.rand(10000, 10000, device=device, dtype=torch.float16)
 
-import threading
+# # Create two CUDA streams
+# stream1 = torch.cuda.Stream()
+# stream2 = torch.cuda.Stream()
 
-
-
-def func1():
-    # ----test multiply async
-    with torch.cuda.stream(stream1):
-        for i in range(10000):
-            result1 = torch.multiply(a, a)  # a * a
-
-def func2():
-    with torch.cuda.stream(stream2):
-        for i in range(10000):
-            result2 = torch.multiply(b, b)  # b * b
-
-
-# Create threads
-thread1 = threading.Thread(target=func1)
-thread2 = threading.Thread(target=func2)
-
-# Start the threads
-thread1.start()
-thread2.start()
-
-# Wait for both threads to complete
-thread1.join()
-thread2.join()
+# import threading
 
 
 
-torch.cuda.synchronize()
+# def func1():
+#     # ----test multiply async
+#     with torch.cuda.stream(stream1):
+#         for i in range(10000):
+#             result1 = torch.multiply(a, a)  # a * a
+
+# def func2():
+#     with torch.cuda.stream(stream2):
+#         for i in range(10000):
+#             result2 = torch.multiply(b, b)  # b * b
 
 
-time.sleep(5)
-
-def func1():
-    # ----test multiply async
-    with torch.cuda.stream(stream1):
-        for i in range(10000):
-            result1 = torch.multiply(a, a)  # a * a
-
-def func2():
-    with torch.cuda.stream(stream2):
-        for i in range(10000):
-            result2 = torch.multiply(b, b)  # b * b
-
-
-# Create threads
-thread1 = threading.Thread(target=func1)
-thread1.start()
-# thread2 = threading.Thread(target=func2)
-func2()
-
-# Start the threads
-
-# thread2.start()
-
-# Wait for both threads to complete
-thread1.join()
-# thread2.join()
-
-
-
-torch.cuda.synchronize()
-time.sleep(5)
-
-# ----test multiply async
-with torch.cuda.stream(stream1):
-    for i in range(10000):
-        result1 = torch.multiply(a, a)  # a * a
-
-
-with torch.cuda.stream(stream2):
-    for i in range(10000):
-        result2 = torch.multiply(b, b)  # b * b
-
-torch.cuda.synchronize()
 # # Create threads
 # thread1 = threading.Thread(target=func1)
 # thread2 = threading.Thread(target=func2)
@@ -118,39 +63,100 @@ torch.cuda.synchronize()
 # # Wait for both threads to complete
 # thread1.join()
 # thread2.join()
-import time
-time.sleep(5)
-
-# ----test matmul, multiply async
-layer1 = torch.nn.Linear(4096, 11008, device=device)
-layer2 = torch.nn.Linear(11008, 4096, device=device)
-input_tensor = torch.randn(128, 4096, device=device)
-
-def func1():
-    with torch.cuda.stream(stream1):
-        for i in range(10000):
-            result1 = layer2(layer1(input_tensor))  # layer1(input_tensor)
-
-def func2():
-    with torch.cuda.stream(stream2):
-        for i in range(10000):
-            result2 = torch.multiply(b, b)  # b * b
 
 
 
-# Create threads
-thread1 = threading.Thread(target=func1)
-thread2 = threading.Thread(target=func2)
+# torch.cuda.synchronize()
 
-# Start the threads
-thread1.start()
-thread2.start()
 
-# Wait for both threads to complete
-thread1.join()
-thread2.join()
+# time.sleep(5)
 
-torch.cuda.synchronize()
+# def func1():
+#     # ----test multiply async
+#     with torch.cuda.stream(stream1):
+#         for i in range(10000):
+#             result1 = torch.multiply(a, a)  # a * a
+
+# def func2():
+#     with torch.cuda.stream(stream2):
+#         for i in range(10000):
+#             result2 = torch.multiply(b, b)  # b * b
+
+
+# # Create threads
+# thread1 = threading.Thread(target=func1)
+# thread1.start()
+# # thread2 = threading.Thread(target=func2)
+# func2()
+
+# # Start the threads
+
+# # thread2.start()
+
+# # Wait for both threads to complete
+# thread1.join()
+# # thread2.join()
+
+
+
+# torch.cuda.synchronize()
+# time.sleep(5)
+
+# # ----test multiply async
+# with torch.cuda.stream(stream1):
+#     for i in range(10000):
+#         result1 = torch.multiply(a, a)  # a * a
+
+
+# with torch.cuda.stream(stream2):
+#     for i in range(10000):
+#         result2 = torch.multiply(b, b)  # b * b
+
+# torch.cuda.synchronize()
+# # # Create threads
+# # thread1 = threading.Thread(target=func1)
+# # thread2 = threading.Thread(target=func2)
+
+# # # Start the threads
+# # thread1.start()
+# # thread2.start()
+
+# # # Wait for both threads to complete
+# # thread1.join()
+# # thread2.join()
+# import time
+# time.sleep(5)
+
+# # ----test matmul, multiply async
+# layer1 = torch.nn.Linear(4096, 11008, device=device)
+# layer2 = torch.nn.Linear(11008, 4096, device=device)
+# input_tensor = torch.randn(128, 4096, device=device)
+
+# def func1():
+#     with torch.cuda.stream(stream1):
+#         for i in range(10000):
+#             result1 = layer2(layer1(input_tensor))  # layer1(input_tensor)
+
+# def func2():
+#     with torch.cuda.stream(stream2):
+#         for i in range(10000):
+#             result2 = torch.multiply(b, b)  # b * b
+
+
+
+# # Create threads
+# thread1 = threading.Thread(target=func1)
+# thread2 = threading.Thread(target=func2)
+
+# # Start the threads
+# thread1.start()
+# thread2.start()
+
+# # Wait for both threads to complete
+# thread1.join()
+# thread2.join()
+
+# torch.cuda.synchronize()
 
 # # ----test matmul, select indices async
 # layer1 = torch.nn.Linear(80, 80, device=device)

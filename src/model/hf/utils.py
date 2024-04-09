@@ -1,65 +1,76 @@
 import torch
 from config import cfg
 
+def rank_process(x, probe_num, probe_size):
+    if 'bsz' in cfg['probe_info']:
+        l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(1, 2))
+    elif 'seq' in cfg['probe_info']:
+        l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
+    elif 'hd' in cfg['probe_info']:
+        l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 1))
+    print('l2_norms', l2_norms.shape, flush=True)
+    _, indices = torch.topk(l2_norms, probe_num)
+    print('indices', indices.shape, flush=True)
+    sorted_indices = indices.sort()[0]
+    print('sorted_indices', sorted_indices.shape, flush=True)
+    cfg['vertical_indices'] = sorted_indices
+    if 'bsz' in cfg['probe_info']:
+        return x[sorted_indices, :, :], None
+    elif 'seq' in cfg['probe_info']:
+        return x[:, sorted_indices, :], sorted_indices
+    elif 'hd' in cfg['probe_info']:
+        return x[:, :, sorted_indices], sorted_indices
+
+
+def mean_process(x, probe_num, probe_size):
+    if 'bsz' in cfg['probe_info']:
+        probe = torch.mean(x.view(probe_num, probe_size, x.size(-2), x.size(-1)), dim=1)
+    elif 'seq' in cfg['probe_info']:
+        probe = torch.mean(x.view(x.size(-3), probe_num, probe_size, x.size(-1)), dim=2)
+    elif 'hd' in cfg['probe_info']:
+        probe = torch.mean(x.view(x.size(-3), x.size(-2), probe_num, probe_size,), dim=3)
+    return probe
+
+
+
+def absnml_process(x, probe_num, probe_size):
+    abs_x = torch.abs(x).clamp_min_(cfg['data_type_min_positive'])
+    if 'bsz' in cfg['probe_info']:
+        abs_view = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
+        probe = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * (abs_view / abs_view.sum(dim=1, keepdim=True))).sum(dim=1)
+    elif 'seq' in cfg['probe_info']:
+        abs_view = abs_x.view(x.size(-3), probe_num, probe_size, x.size(-1))
+        probe = (x.view(x.size(-3), probe_num, probe_size, x.size(-1)) * (abs_view / abs_view.sum(dim=2, keepdim=True))).sum(dim=2)
+    elif 'hd' in cfg['probe_info']:
+        abs_view = abs_x.view(x.size(-3), x.size(-2), probe_num, probe_size)
+        probe = (x.view(x.size(-3), x.size(-2), probe_num, probe_size) * (abs_view / abs_view.sum(dim=3, keepdim=True))).sum(dim=3)
+    return probe
+
 
 def nml_process(x, probe_num, probe_size):
     # avoid nan proportion
-    
-    # abs_x = torch.clamp(torch.abs(x), min=cfg['data_type_min_positive'])
-    # sum_across_bsz = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1)).sum(dim=1, keepdim=True)
-    # proportion = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1)) / sum_across_bsz
-    # comp_across_bsz = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * proportion).sum(dim=1)
-
-    abs_x = torch.abs(x).clamp_min_(cfg['data_type_min_positive'])
-    abs_view = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
-    # Directly compute the sum across batch size without explicitly forming the proportion tensor
-    # Use broadcasting to avoid explicit creation of the proportion tensor
-    comp_across_bsz = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * (abs_view / abs_view.sum(dim=1, keepdim=True))).sum(dim=1)
+    abs_x = torch.clamp(torch.abs(x), min=1e-6)
+    sum_across_bsz = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1)).sum(dim=1, keepdim=True)
+    proportion = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1)) / sum_across_bsz
+    comp_across_bsz = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * proportion).sum(dim=1)
     return comp_across_bsz
 
 
 
 
-def vertical_process(x, probe_num, probe_size):
-    # abs_x = torch.abs(x).clamp_min_(cfg['data_type_min_positive'])
-    # abs_view = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
-    # # Directly compute the sum across batch size without explicitly forming the proportion tensor
-    # # Use broadcasting to avoid explicit creation of the proportion tensor
-    # comp_across_bsz = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * (abs_view / abs_view.sum(dim=1, keepdim=True))).sum(dim=1)
 
-    l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
-    print('l2_norms', l2_norms.shape, flush=True)
-    # Select top 10% indices based on the L2 norm
-    top_x_percent = int(probe_num / cfg['batch_size'] * len(l2_norms))
-    _, indices = torch.topk(l2_norms, top_x_percent)
-    print('indices', indices.shape, flush=True)
-    sorted_indices = indices.sort()[0]
-    print('sorted_indices', sorted_indices.shape, flush=True)
-    cfg['vertical_indices'] = sorted_indices
-    return x[:, sorted_indices, :]
-
-
-
-
-def mean_process(x, probe_num, probe_size):
-    mean_across_bsz = torch.mean(x.view(probe_num, probe_size, x.size(-2), x.size(-1)), dim=1)
-    return mean_across_bsz
-
-
-
-
-def max_process(x, probe_num, probe_size):
-    # Apply absolute value to x
-    abs_x = torch.abs(x)
-    # Adjust the view to organize the data by probe_num and probe_size
-    reorganized_x = x.view(probe_num, probe_size, x.size(-2), x.size(-1))
-    reorganized_abs_x = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
-    # Use torch.max to get the indices of maximum value across the probe_size dimension
-    _, indices = reorganized_abs_x.max(dim=1, keepdim=True)
-    # Use these indices to gather the original values from reorganized_x
-    max_across_bsz = torch.gather(reorganized_x, 1, indices).squeeze(1)
-    # print('max_across_bsz', max_across_bsz.shape, flush=True)
-    return max_across_bsz
+# def max_process(x, probe_num, probe_size):
+#     # Apply absolute value to x
+#     abs_x = torch.abs(x)
+#     # Adjust the view to organize the data by probe_num and probe_size
+#     reorganized_x = x.view(probe_num, probe_size, x.size(-2), x.size(-1))
+#     reorganized_abs_x = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
+#     # Use torch.max to get the indices of maximum value across the probe_size dimension
+#     _, indices = reorganized_abs_x.max(dim=1, keepdim=True)
+#     # Use these indices to gather the original values from reorganized_x
+#     max_across_bsz = torch.gather(reorganized_x, 1, indices).squeeze(1)
+#     # print('max_across_bsz', max_across_bsz.shape, flush=True)
+#     return max_across_bsz
 
 
 

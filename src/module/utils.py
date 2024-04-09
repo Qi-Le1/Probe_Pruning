@@ -199,7 +199,7 @@ def summarize_info_list(dense_info_list, pruned_info_list, dense_duration, prune
 #     return copy.deepcopy(info_list), duration
 
 
-# def summarize_fix_prune_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, batch_num, logger):
+# def summarize_fix_probe_info_list(dense_info_list, pruned_info_list, dense_duration, pruned_duration, batch_num, logger):
 
 #     print('Summary ---------\n')
 #     dense_total_flops = sum([dense_info_list[i][1] for i in range(len(dense_info_list))])

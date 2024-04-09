@@ -5,6 +5,24 @@ from config import cfg
 
 MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70b']
 
+def find_nearest_divisor(full_size, target_divisor):
+    if full_size % target_divisor == 0:
+        return target_divisor  # Already divisible
+    
+    # Start looking around the target divisor for the nearest valid divisor
+    for i in range(1, full_size):
+        # Check divisors smaller and larger than target_divisor
+        lower = target_divisor - i
+        upper = target_divisor + i
+
+        # Return the nearest valid divisor
+        if lower > 0 and full_size % lower == 0:
+            return lower
+        elif upper <= full_size and full_size % upper == 0:
+            return upper
+
+    raise ValueError("No valid divisor found close to target_divisor")
+
 def process_control():
     print('torch version: ', torch.__version__)
     print('cuda version: ', torch.version.cuda)
@@ -22,7 +40,8 @@ def process_control():
     cfg['data_type'] = torch.float16
     cfg['data_type_max'] = torch.finfo(cfg['data_type']).max
     cfg['data_type_min'] = torch.finfo(cfg['data_type']).min
-    cfg['data_type_min_positive'] = torch.finfo(cfg['data_type']).tiny
+    # cfg['data_type_min_positive'] = torch.finfo(cfg['data_type']).tiny
+    cfg['data_type_min_positive'] = 1e-8
     # This can be implemented dynamically in each layer
     # tc stands for tensor core
     if cfg['data_type'] == torch.float16:
@@ -153,7 +172,7 @@ def process_control():
     
     cfg['calibration_stage'] = False
     # default skip 3 layers
-    cfg['skip_layers'] = -1
+    cfg['skip_layers'] = 2
     if 'skip' in cfg['prune_method']:
         match = re.search(r'skip(\d+)', cfg['prune_method'])
         if match:
@@ -179,6 +198,59 @@ def process_control():
         if 'opt' in cfg['model_name']:
             # reassign in make_hf_model
             cfg[model_name] = {'max_length': None}
+
+        cfg['probe_info'] = cfg['control']['probe_info']
+        if 'probe' not in cfg['prune_method'] and cfg['probe_info'] != 'None':
+            raise ValueError('probe_info is only valid with probe pruning, please set to None')
+        if cfg['probe_info'] != 'None':
+            probe_info_list = cfg['probe_info'].split('-')
+            print('probe_info_list', probe_info_list)
+            if 'llama' in cfg['model_name']:
+                prune_keys = ['q', 'k', 'v', 'gate', 'up']
+            elif 'opt' in cfg['model_name']:
+                prune_keys = ['q', 'k', 'v', 'fc1']
+            
+            probe_generations = ['rank', 'mean', 'absnml']
+            if not any(item in cfg['probe_info'] for item in probe_generations):
+                raise ValueError('probe_info is not valid')
+            
+            for key in prune_keys:
+                # default
+                print(probe_info_list[prune_keys.index(key)+2], probe_info_list[prune_keys.index(key)+2] is None, prune_keys.index(key)+2)
+                cfg[f'{key}_prune'] = probe_info_list[prune_keys.index(key)+2]
+                # cfg[f'{key}_probe_num'] = 1
+                # cfg[f'{key}_probe_size'] = int(cfg['batch_size'] // 1)
+
+                match = re.search(r'\d*\.?\d+', cfg[f'{key}_prune'])
+                float_value = None
+                print('match', match)
+                if match:
+                    float_value = float(match.group(0))
+                else:
+                    float_value = None
+
+                if 'bsz' in cfg['probe_info']:
+                    full_size = cfg['batch_size']
+                elif 'seq' in cfg['probe_info']:
+                    full_size = cfg['seq_len']
+                    # cfg['probe_norm_dim'] = (0, 2)
+                elif 'hd' in cfg['probe_info']:
+                    full_size = cfg[model_name]['hidden_size']
+                    # cfg['probe_norm_dim'] = (0, 1)
+                
+                print('full_size', full_size, float_value, cfg[f'{key}_prune'])
+                if float_value:  # Ensure int_value is not None to avoid division by zero
+                    cfg[f'{key}_probe_num'] = int(float_value * full_size)
+                    cfg[f'{key}_probe_num'] = find_nearest_divisor(full_size, cfg[f'{key}_probe_num'])
+                    probe_size = int(full_size // cfg[f'{key}_probe_num'])
+                    cfg[f'{key}_probe_size'] = probe_size
+                elif float_value is None:
+                    raise ValueError(f'probe ratio is not valid for {key}')
+
+
+            prune_keywords = ['each', 'fill', 'whole']
+            cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), None)
+            cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), None)
         # cfg['opt'] = {'max_length': 128}
     elif cfg['task_name'] in ['ic']:
         cfg['collate_mode'] = 'dict'
@@ -209,45 +281,7 @@ def process_control():
         raise ValueError('Not valid task name')
 
 
-    cfg['probe_info'] = cfg['control']['probe_info']
-    if 'probe' not in cfg['prune_method'] and cfg['probe_info'] != 'None':
-        raise ValueError('probe_info is only valid with probe pruning, please set to None')
-    if cfg['probe_info'] != 'None':
-        probe_info_list = cfg['probe_info'].split('-')
-        print('probe_info_list', probe_info_list)
-        if 'llama' in cfg['model_name']:
-            prune_keys = ['q', 'k', 'v', 'gate', 'up']
-        elif 'opt' in cfg['model_name']:
-            prune_keys = ['q', 'k', 'v', 'fc1']
-        for key in prune_keys:
-            # default
-            cfg[f'{key}_prune'] = probe_info_list[prune_keys.index(key)]
-            cfg[f'{key}_probe_num'] = 1
-            cfg[f'{key}_probe_size'] = int(cfg['batch_size'] // 1)
-
-            match = re.search(r'\d+\.\d+', cfg[f'{key}_prune'])
-            if match:
-                float_value = float(match.group(0))
-            else:
-                float_value = None
-
-            if 'probebsz' in cfg['prune_method']:
-                full_size = cfg['batch_size']
-            elif 'probeseq' in cfg['prune_method']:
-                full_size = cfg['seq_len']
-            elif 'probehd' in cfg['prune_method']:
-                full_size = cfg[model_name]['hidden_size']
-            
-            cfg[f'{key}_probe_num'] = int(float_value * full_size)
-            if int_value:  # Ensure int_value is not None to avoid division by zero
-                probe_size = int(full_size // int_value)
-                # if cfg['batch_size'] % int_value != 0:
-                #     raise ValueError(f'probe_num needs to be divisible by batch size for {key}')
-                cfg[f'{key}_probe_size'] = probe_size
-
-        prune_keywords = ['each', 'fill', 'whole']
-        cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), None)
-        cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), None)
+    
     # cfg['probe_size'] = int(cfg[model_name]['batch_size']['test'] / cfg['probe_num'])
     # if cfg[model_name]['batch_size']['test'] % cfg['probe_num'] != 0:
     #     raise ValueError('probe_num needs to be divisible by batch size')
