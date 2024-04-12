@@ -330,9 +330,9 @@ class Linear(nn.Linear, EriLayer):
                 update_indices = update_indices.to(cur_device)
                 self.scaler_inp[:, update_indices] *= momentum
                 if cfg['calibration_stage'] == True:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 elif cfg['calibration_stage'] == False:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 # denominator = (self.nsamples[update_indices] + )
                 self.scaler_inp[:, update_indices] += (1 - momentum) * norm_squared / batch_size
         else:
@@ -342,7 +342,7 @@ class Linear(nn.Linear, EriLayer):
                 update_indices = update_indices.to(cur_device)
 
                 self.scaler_inp[update_indices] *= momentum
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=(0,1)) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 # print('update_indices', update_indices.shape, flush=True)
                 # print('norm_squared', norm_squared.shape, flush=True)
@@ -375,7 +375,7 @@ class Linear(nn.Linear, EriLayer):
 
                 self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
                 if cfg['calibration_stage'] == True:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
                 elif cfg['calibration_stage'] == False:
                     # if 'coeff' in cfg['prune_method']:
                     #     # Assuming inp is your input tensor
@@ -421,8 +421,8 @@ class Linear(nn.Linear, EriLayer):
                     #     # print('proportion ', proportion, flush=True)
                     #     norm_squared = torch.sum(square_x * proportion, dim=0)
                     # else:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
-                # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                # norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 denominator = (self.nsamples[update_indices] + batch_size)
                 self.scaler_inp[:, update_indices] += norm_squared / denominator
@@ -438,7 +438,7 @@ class Linear(nn.Linear, EriLayer):
                 # print("self.nsamples[update_indices].shape:", self.nsamples[update_indices].shape)
                 # print("batch_size:", batch_size)
                 self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=(0,1)) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
                 # print(f'{self.key}_norm_squared', norm_squared, flush=True)
                 # print('update_indices', update_indices.shape, flush=True)
                 # print('norm_squared', norm_squared.shape, flush=True)

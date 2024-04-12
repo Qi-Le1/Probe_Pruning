@@ -942,7 +942,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
                     if 'normhead' in cfg['prune_method']:
                         reshaped_W_metric = W_metric.reshape(-1, 128)
                         # Calculate the L2 norm for each 128-element vector
-                        W_metric = torch.norm(reshaped_W_metric, p=2, dim=1)
+                        W_metric = torch.linalg.vector_norm(reshaped_W_metric, ord=2, dim=1)
                     else:
                         W_metric = W_metric.reshape(-1, 128).sum(dim=1)
                     # print('W_metric2', W_metric.shape, W_metric, type(W_metric))
@@ -1011,7 +1011,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
             attn_metric = metric_process(mysetting, attn_metric)
             if 'normhead' in cfg['prune_method']:
                 attn_metric = attn_metric.reshape(len(layers), -1, 128)
-                attn_metric = torch.norm(attn_metric, p=2, dim=2)
+                attn_metric = torch.linalg.vector_norm(attn_metric, ord=2, dim=2)
             else:
                 attn_metric = attn_metric.reshape(len(layers), -1, 128).mean(dim=2)
         else:
@@ -1433,7 +1433,7 @@ def prune_magnitude_sp_llama(model, tokenizer, dataloader, device=torch.device("
         
         for name in subset:
             print(f"pruning layer {i} name {name}")
-            W_metric = torch.norm(subset[name].weight.data, dim=0)
+            W_metric = torch.linalg.vector_norm(subset[name].weight.data, dim=0)
             if 'std' in cfg['prune_method']:
                 W_metric = standarlization(W_metric)
             if name == 'self_attn.o_proj':

@@ -24,8 +24,45 @@ import torch
 a = torch.tensor(1, dtype=torch.float16, device='cuda')
 b = a / 1000000000000000
 print('b', b)
+b1 = torch.sqrt(b)
+print('b1', b1)
 c = a * 1000000000000000
 print('c', c)
+
+
+# tensor_3d = torch.randn(4, 5, 6)  # Shape (4, 5, 6)
+# norm1 = torch.linalg.vector_norm(tensor_3d, ord=2, dim=(0,1))
+# norm2 = torch.linalg.matrix_norm(tensor_3d, ord='fro', dim=(0,1))
+# print(norm1, norm2)
+# print(norm1 == norm2)
+# norm3 = torch.linalg.vector_norm(tensor_3d, p=2, dim=(0,1))
+# print(norm3)
+
+
+
+tensor_3d = torch.tensor([65500, 65500], dtype=torch.float16, device='cuda')
+print(tensor_3d)
+norm1 = torch.linalg.vector_norm(tensor_3d, ord=2)
+# norm2 = torch.linalg.matrix_norm(tensor_3d, ord='fro', dim=(0,1))
+print(norm1)
+# print(norm1 == norm2)
+norm3 = torch.clamp(torch.linalg.vector_norm(tensor_3d, ord=2), max=65504)
+print(norm3)
+  # Shape (4, 6
+
+
+a = torch.tensor(5.5, dtype=torch.float16, device='cuda')
+b = torch.tensor(3.5, dtype=torch.float32, device='cuda')
+c = a + b
+print(c, c.dtype)
+
+
+numerator = torch.tensor([0.0])
+denominator = torch.tensor([0.0])
+
+# Performing division that should result in NaN
+result = numerator / (denominator + 1e-6)
+print(result)
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # a = torch.rand(4096, 11008, device=device, dtype=torch.float16)
 # b = torch.rand(4096, 11008, device=device, dtype=torch.float16)
@@ -884,7 +921,7 @@ exit()
 # tensor = torch.clamp(tensor, 0, 10)
 # torch.cuda.nvtx.range_pop()
 # torch.cuda.nvtx.range_push("iteration{}".format(5))
-# tensor = torch.norm(tensor, p=2, dim=(0,1)) ** 2
+# tensor = torch.linalg.vector_norm(tensor, p=2, dim=(0,1)) ** 2
 # torch.cuda.nvtx.range_pop()
 
 # torch.cuda.nvtx.range_pop()
@@ -1274,7 +1311,7 @@ torch.cuda.empty_cache()
 # # layer_info = {'weight': torch.randn(10)}
 
 # # # First piece
-# # sum_squared_norms = torch.sum(torch.norm(h, p=2, dim=1) ** 2, dim=0)
+# # sum_squared_norms = torch.sum(torch.linalg.vector_norm(h, p=2, dim=1) ** 2, dim=0)
 # # average_squared_norm = sum_squared_norms / torch.tensor(bsz, device=h.device, dtype=torch.float)
 # # norm_across_other_dims_first = (torch.sqrt(average_squared_norm.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)
 
@@ -1283,7 +1320,7 @@ torch.cuda.empty_cache()
 # # nsamples = 0
 # # for i in range(bsz):
 # #     scaler_inp *= nsamples / (nsamples + 1)
-# #     temp = torch.norm(h[i], p=2, dim=0) ** 2
+# #     temp = torch.linalg.vector_norm(h[i], p=2, dim=0) ** 2
 # #     scaler_inp +=  temp / (nsamples + 1)
 # #     nsamples += 1
 # # norm_across_other_dims_second = (torch.sqrt(scaler_inp.unsqueeze(0).reshape((1,-1))) * torch.abs(layer_info['weight'])).sum(dim=0)

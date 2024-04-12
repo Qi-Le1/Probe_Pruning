@@ -102,7 +102,6 @@ def get_model_profile(tag, model_prof):
         if not hasattr(module, 'cal_total_flops'):
             temp[1] = 0
         info_list.append(temp)
-        
     return copy.deepcopy(info_list)
 
 

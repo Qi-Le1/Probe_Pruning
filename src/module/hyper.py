@@ -63,14 +63,7 @@ def process_control():
     cfg['prune_hyper'] = float(cfg['control']['prune_hyper'])
     cfg['prune_metric'] = cfg['control']['prune_metric']
     cfg['prune_method'] = cfg['control']['prune_method']
-    if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['prune_method']:
-        match = re.search(r'probefixratio(\d+\.\d+)', cfg['prune_method'])
-        if match:
-            # Convert the matched string to a float
-            float_value = float(match.group(1))
-            cfg['probefixratio'] = float_value 
-        else:
-            float_value = None
+    
           
     cfg['ema_momentum'] = 0.99
     if 'ema' in cfg['prune_method']:
@@ -241,9 +234,13 @@ def process_control():
                 print('full_size', full_size, float_value, cfg[f'{key}_prune'])
                 if float_value:  # Ensure int_value is not None to avoid division by zero
                     cfg[f'{key}_probe_num'] = int(float_value * full_size)
-                    cfg[f'{key}_probe_num'] = find_nearest_divisor(full_size, cfg[f'{key}_probe_num'])
-                    probe_size = int(full_size // cfg[f'{key}_probe_num'])
-                    cfg[f'{key}_probe_size'] = probe_size
+                    if 'rank' in cfg['probe_info']:
+                        probe_size = int(full_size // cfg[f'{key}_probe_num'])
+                        cfg[f'{key}_probe_size'] = probe_size
+                    else:
+                        cfg[f'{key}_probe_num'] = find_nearest_divisor(full_size, cfg[f'{key}_probe_num'])
+                        probe_size = int(full_size // cfg[f'{key}_probe_num'])
+                        cfg[f'{key}_probe_size'] = probe_size
                 elif float_value is None:
                     raise ValueError(f'probe ratio is not valid for {key}')
 
@@ -251,6 +248,17 @@ def process_control():
             prune_keywords = ['each', 'fill', 'whole']
             cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), None)
             cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), None)
+            if cfg['qk_prune_way'] is not None and cfg['vo_prune_way'] is not None:
+                assert cfg['qk_prune_way'] == cfg['vo_prune_way']
+        
+        if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['probe_info']:
+            match = re.search(r'probefixratio(\d+\.\d+)', cfg['probe_info'])
+            if match:
+                # Convert the matched string to a float
+                float_value = float(match.group(1))
+                cfg['probefixratio'] = float_value 
+            else:
+                float_value = None
         # cfg['opt'] = {'max_length': 128}
     elif cfg['task_name'] in ['ic']:
         cfg['collate_mode'] = 'dict'

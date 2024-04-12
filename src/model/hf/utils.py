@@ -2,6 +2,36 @@ import torch
 from config import cfg
 
 def rank_process(x, probe_num, probe_size):
+    if 'optimalseq' in cfg['probe_info']:
+        l2_norms = torch.linalg.vector_norm(x, ord=2, dim=2)
+        # print('l2_norms', l2_norms.shape, l2_norms, flush=True)
+        # Now, l2_norms has shape [bsz, seq], and you want the top-k across all sequences in each batch
+        topk_values, indices = torch.topk(l2_norms, probe_num, dim=1)  # Compute top-k across the sequence dimension
+        # print('topk_values', topk_values, topk_values.shape, flush=True)
+        # print('indices', indices, indices.shape, flush=True)  # Expected shape: [bsz, probe_num]
+
+        sorted_indices = indices.sort(dim=1)[0]
+        # print('sorted_indices', sorted_indices, sorted_indices.shape, flush=True)  # Expected shape: [bsz, probe_num]
+        
+        # Assuming x has shape [bsz, seq, dim]
+        # and sorted_indices has shape [bsz, probe_num]
+
+        # Create a batch index tensor
+        batch_indices = torch.arange(x.size(0)).unsqueeze(1)  # Shape [bsz, 1]
+
+        # Expand batch_indices to match the shape of sorted_indices for broadcasting
+        batch_indices = batch_indices.expand(-1, sorted_indices.size(1))  # Shape [bsz, probe_num]
+        # print('batch_indices', batch_indices, batch_indices.shape, flush=True)
+        # Use advanced indexing to select the sequences
+        selected_sequences = x[batch_indices, sorted_indices, :]  # Shape [bsz, probe_num, dim]
+
+        l2_norms = torch.linalg.vector_norm(selected_sequences, ord=2, dim=2)
+        # print('selected_sequences', selected_sequences.shape, l2_norms)
+        return selected_sequences, sorted_indices
+
+    
+
+
     if 'bsz' in cfg['probe_info']:
         l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(1, 2))
     elif 'seq' in cfg['probe_info']:
@@ -13,14 +43,23 @@ def rank_process(x, probe_num, probe_size):
     print('indices', indices.shape, flush=True)
     sorted_indices = indices.sort()[0]
     print('sorted_indices', sorted_indices.shape, flush=True)
-    cfg['vertical_indices'] = sorted_indices
+    # cfg['vertical_indices'] = sorted_indices
+    # if 'bszseq' in cfg['probe_info']:
+    #     print('here2')
+    #     select = x[:, sorted_indices, :]
+    #     return absnml_process(select, probe_num, probe_size), sorted_indices
+    
     if 'bsz' in cfg['probe_info']:
         return x[sorted_indices, :, :], None
     elif 'seq' in cfg['probe_info']:
+        print('here1')
+        
         return x[:, sorted_indices, :], sorted_indices
     elif 'hd' in cfg['probe_info']:
         return x[:, :, sorted_indices], sorted_indices
 
+def seq_optimal_rank():
+    pass
 
 def mean_process(x, probe_num, probe_size):
     if 'bsz' in cfg['probe_info']:
@@ -44,6 +83,7 @@ def absnml_process(x, probe_num, probe_size):
     elif 'hd' in cfg['probe_info']:
         abs_view = abs_x.view(x.size(-3), x.size(-2), probe_num, probe_size)
         probe = (x.view(x.size(-3), x.size(-2), probe_num, probe_size) * (abs_view / abs_view.sum(dim=3, keepdim=True))).sum(dim=3)
+        print('probe', probe.shape, flush=True)
     return probe
 
 
@@ -126,12 +166,12 @@ def cal_res_hidden_state_diff(hidden_states, residual):
 
 
     #  if self.input_norm_gate_weight is None:
-    #             self.input_norm_gate_weight = torch.norm(self.gate_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
+    #             self.input_norm_gate_weight = torch.linalg.vector_norm(self.gate_proj.weight.data, ord=2, dim=0).reshape(1, 1, -1)
     #         if self.input_norm_up_weight is None:
-    #             self.input_norm_up_weight = torch.norm(self.up_proj.weight.data, p=2, dim=0).reshape(1, 1, -1)
+    #             self.input_norm_up_weight = torch.linalg.vector_norm(self.up_proj.weight.data, ord=2, dim=0).reshape(1, 1, -1)
 
     #         # def cal_sign_agreement_metrix(x_flattened):
-    #         #     strength = torch.norm(x_flattened, p=2, dim=0)
+    #         #     strength = torch.linalg.vector_norm(x_flattened, ord=2, dim=0)
     #         #     # Calculate the number of positions to select (top 10%)
     #         #     top_k = max(int(0.03 * strength.numel()), 1)  # Ensure at least one position is selected
     #         #     # print('top_k', top_k, strength.numel(), strength.shape, flush=True)
@@ -160,7 +200,7 @@ def cal_res_hidden_state_diff(hidden_states, residual):
     #         #     print('sign_agreement_matrix', sign_agreement_matrix, flush=True)
     #         # #     print('top_positions_flat', top_positions_flat, flush=True)
     #         # #     # Normalize
-    #         # #     norm_signs_top_positions_flat = signs_top_positions_flat / (torch.norm(signs_top_positions_flat, p=2, dim=-1, keepdim=True) + 1e-9)
+    #         # #     norm_signs_top_positions_flat = signs_top_positions_flat / (torch.linalg.vector_norm(signs_top_positions_flat, ord=2, dim=-1, keepdim=True) + 1e-9)
     #         # #    # Assuming norm_top_positions_flat is [bsz, top_k]
     #         # #     similarity_matrix = torch.matmul(norm_signs_top_positions_flat, norm_signs_top_positions_flat.transpose(0, 1))
             
@@ -172,7 +212,7 @@ def cal_res_hidden_state_diff(hidden_states, residual):
     #         # cal_sign_agreement_metrix(x_temp_up.view(x_temp_up.size(0), -1))
     #         # x_flattened = x.view(x.size(0), -1) 
     #         def cal_dot_product_matrix(x_flattened):
-    #             strength = torch.norm(x_flattened, p=2, dim=0)
+    #             strength = torch.linalg.vector_norm(x_flattened, ord=2, dim=0)
     #             # Calculate the number of positions to select (top 3% here as per your code)
     #             top_k = max(int(0.03 * strength.numel()), 1)  # Ensure at least one position is selected
     #             top_values, top_indices = torch.topk(strength, k=top_k)
@@ -181,7 +221,7 @@ def cal_res_hidden_state_diff(hidden_states, residual):
                 
     #             # Calculate dot product matrix
     #             # Normalize the vectors to only measure directionality
-    #             # norm_top_positions_flat = top_positions_flat / (torch.norm(top_positions_flat, p=2, dim=-1, keepdim=True) + 1e-9)
+    #             # norm_top_positions_flat = top_positions_flat / (torch.linalg.vector_norm(top_positions_flat, ord=2, dim=-1, keepdim=True) + 1e-9)
                 
     #             # Dot product similarity (using matrix multiplication for efficiency)
     #             # Here, we're effectively doing dot product because the vectors are normalized

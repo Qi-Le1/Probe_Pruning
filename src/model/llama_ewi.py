@@ -245,7 +245,7 @@ class Linear(nn.Linear, EwiLayer):
                 if self.scaler_inp is not None:
                     self.scaler_inp = self.scaler_inp.to(cur_device)
                     self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
-                    self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
+                    self.scaler_inp += torch.linalg.vector_norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
                 # print('self.scaler_inp', self.scaler_inp)
             elif self.prune_metric == "flap":
                 old_baseline_inp = self.baseline_inp

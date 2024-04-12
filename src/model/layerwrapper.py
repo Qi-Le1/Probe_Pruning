@@ -33,7 +33,7 @@ class WrappedGPT:
 
         inp = inp.type(torch.float32)
 
-        self.scaler_row += torch.norm(inp, p=2, dim=1) ** 2  / self.nsamples
+        self.scaler_row += torch.linalg.vector_norm(inp, ord=2, dim=1) ** 2  / self.nsamples
         
     def free(self):
         self.scaler_row = None
@@ -74,7 +74,7 @@ class BiasGPT:
         if self.type == "WIFN":
             inp = inp.type(torch.float32)
             self.scaler_inp *= self.nsamples / (self.nsamples + batch_size)
-            self.scaler_inp += torch.norm(inp, p=2, dim=1) ** 2  / (self.nsamples + batch_size)
+            self.scaler_inp += torch.linalg.vector_norm(inp, ord=2, dim=1) ** 2  / (self.nsamples + batch_size)
         else:
             if self.nsamples == 0:
                 self.fluc_inp = 0

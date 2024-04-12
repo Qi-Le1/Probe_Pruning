@@ -250,8 +250,8 @@ class Linear(nn.Linear, EriLayer):
         if 'probe' in cfg['prune_method']:
             self.baseline_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-                # self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-                self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=torch.float32)
+                self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+                # self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=torch.float32)
             elif self.prune_metric == "flap":
                 self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
             else:
@@ -332,9 +332,9 @@ class Linear(nn.Linear, EriLayer):
     #         update_indices = update_indices.to(cur_device)
     #         self.scaler_inp[:, update_indices] *= momentum
     #         if cfg['calibration_stage'] == True:
-    #             norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+    #             norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=None, max=65504)
     #         elif cfg['calibration_stage'] == False:
-    #             norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
+    #             norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=None, max=65504)
     #         # denominator = (self.nsamples[update_indices] + )
     #         self.scaler_inp[:, update_indices] += (1 - momentum) * norm_squared / batch_size
     #     # else:
@@ -344,7 +344,7 @@ class Linear(nn.Linear, EriLayer):
     #     #         update_indices = update_indices.to(cur_device)
 
     #     #         self.scaler_inp[update_indices] *= momentum
-    #     #         norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=None, max=65504)
+    #     #         norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=(0,1)) ** 2, min=None, max=65504)
     #     #         # print(f'{self.key}_norm_squared', norm_squared, flush=True)
     #     #         # print('update_indices', update_indices.shape, flush=True)
     #     #         # print('norm_squared', norm_squared.shape, flush=True)
@@ -359,109 +359,109 @@ class Linear(nn.Linear, EriLayer):
     #     self.nsamples[update_indices] += batch_size
 
     # # # def update_global_metric_score_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
-    def update_global_metric_score_distribution(self, inp, update_indices):
-        if len(inp.shape) == 2:
-            inp = inp.unsqueeze(0)
-        # batch_size = inp.shape[0] if batch_size is None else batch_size
-        batch_size = inp.shape[0]
-        default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
-        if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
-            raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
-        cur_device = inp.device
+    # def update_global_metric_score_distribution(self, inp, update_indices):
+    #     if len(inp.shape) == 2:
+    #         inp = inp.unsqueeze(0)
+    #     # batch_size = inp.shape[0] if batch_size is None else batch_size
+    #     batch_size = inp.shape[0]
+    #     default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
+    #     if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
+    #         raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
+    #     cur_device = inp.device
 
-        # if 'savemetricseq' in cfg['prune_method']:
-        if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-            self.scaler_inp = self.scaler_inp.to(cur_device)
-            self.nsamples = self.nsamples.to(cur_device)
-            update_indices = update_indices.to(cur_device)
+    #     # if 'savemetricseq' in cfg['prune_method']:
+    #     if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+    #         self.scaler_inp = self.scaler_inp.to(cur_device)
+    #         self.nsamples = self.nsamples.to(cur_device)
+    #         update_indices = update_indices.to(cur_device)
 
-            self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-            if cfg['calibration_stage'] == True:
-                inp = inp.to(torch.float32)
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
-            elif cfg['calibration_stage'] == False:
-                # if 'coeff' in cfg['prune_method']:
-                #     # Assuming inp is your input tensor
-                #     # inp_square = torch.clamp(inp ** 2, min=None, max=65504)
+    #         self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+    #         if cfg['calibration_stage'] == True:
+    #             inp = inp.to(torch.float32)
+    #             norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=None, max=65504)
+    #         elif cfg['calibration_stage'] == False:
+    #             # if 'coeff' in cfg['prune_method']:
+    #             #     # Assuming inp is your input tensor
+    #             #     # inp_square = torch.clamp(inp ** 2, min=None, max=65504)
 
-                #     # # Directly compute the sum of squares once and reuse it
-                #     # sum_inp_square = torch.sum(inp_square, dim=0, keepdim=True) + 1e-10
-                #     # sum_inp_square_clamped = torch.clamp(sum_inp_square, min=None, max=65504)
+    #             #     # # Directly compute the sum of squares once and reuse it
+    #             #     # sum_inp_square = torch.sum(inp_square, dim=0, keepdim=True) + 1e-10
+    #             #     # sum_inp_square_clamped = torch.clamp(sum_inp_square, min=None, max=65504)
 
-                #     # # Calculate ratio, notice that clamping sum_inp_square_clamped again is unnecessary
-                #     # # ratio = inp_square / sum_inp_square_clamped
-                #     # ratio = inp_square / inp_square
-                #     # # print('ratio', ratio.shape, flush=True)
+    #             #     # # Calculate ratio, notice that clamping sum_inp_square_clamped again is unnecessary
+    #             #     # # ratio = inp_square / sum_inp_square_clamped
+    #             #     # ratio = inp_square / inp_square
+    #             #     # # print('ratio', ratio.shape, flush=True)
 
-                #     # # Calculate norm_squared without redundant clamping of sum_inp_square
-                #     # norm_squared = torch.clamp(torch.sum(ratio * inp_square, dim=0), min=None, max=65504)
+    #             #     # # Calculate norm_squared without redundant clamping of sum_inp_square
+    #             #     # norm_squared = torch.clamp(torch.sum(ratio * inp_square, dim=0), min=None, max=65504)
 
-                #     square_x = torch.clamp(torch.square(inp).to(torch.float32), min=None, max=65504)
-                #     sum_across_bsz = torch.clamp(square_x.sum(dim=0, keepdim=True), min=None, max=65504)
-                #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
-                #     proportion = (square_x / (sum_across_bsz + 1e-10)).to(inp.dtype)
-                #     # Check for NaN values
-                #     has_nan = torch.isnan(proportion).any()
+    #             #     square_x = torch.clamp(torch.square(inp).to(torch.float32), min=None, max=65504)
+    #             #     sum_across_bsz = torch.clamp(square_x.sum(dim=0, keepdim=True), min=None, max=65504)
+    #             #     # proportion = abs_x / torch.sum(abs_x, dim=0, keepdim=True)
+    #             #     proportion = (square_x / (sum_across_bsz + 1e-10)).to(inp.dtype)
+    #             #     # Check for NaN values
+    #             #     has_nan = torch.isnan(proportion).any()
 
-                #     # Check for infinite values
-                #     has_inf = torch.isinf(proportion).any()
+    #             #     # Check for infinite values
+    #             #     has_inf = torch.isinf(proportion).any()
 
-                #     if has_nan or has_inf:
-                #         print("proportion contains NaN or infinite values.")
-                #         # print(torch.sort(proportion)[0])
-                #         nan_indices = torch.where(torch.isnan(proportion))
+    #             #     if has_nan or has_inf:
+    #             #         print("proportion contains NaN or infinite values.")
+    #             #         # print(torch.sort(proportion)[0])
+    #             #         nan_indices = torch.where(torch.isnan(proportion))
 
-                #         # Print the indices of NaN values
-                #         print("Indices of NaN values:", nan_indices)
+    #             #         # Print the indices of NaN values
+    #             #         print("Indices of NaN values:", nan_indices)
 
-                #         # Print the NaN values using the indices (optional, as they are known to be NaN)
-                #         print("NaN values at these indices:", square_x[nan_indices],  proportion[nan_indices])
-                #     else:
-                #         # print("proportion does not contain NaN or infinite values.")
-                #         pass
-                #     # print('proportion ', proportion, flush=True)
-                #     # proportion = 10
-                #     # print('proportion ', proportion, flush=True)
-                #     norm_squared = torch.sum(square_x * proportion, dim=0)
-                # else:
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=None, max=65504)
-            # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0), min=None, max=65504)
-            # print(f'{self.key}_norm_squared', norm_squared, flush=True)
-            denominator = (self.nsamples[update_indices] + batch_size)
-            self.scaler_inp[:, update_indices] += norm_squared / denominator
+    #             #         # Print the NaN values using the indices (optional, as they are known to be NaN)
+    #             #         print("NaN values at these indices:", square_x[nan_indices],  proportion[nan_indices])
+    #             #     else:
+    #             #         # print("proportion does not contain NaN or infinite values.")
+    #             #         pass
+    #             #     # print('proportion ', proportion, flush=True)
+    #             #     # proportion = 10
+    #             #     # print('proportion ', proportion, flush=True)
+    #             #     norm_squared = torch.sum(square_x * proportion, dim=0)
+    #             # else:
+    #             norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=None, max=65504)
+    #         # norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0), min=None, max=65504)
+    #         # print(f'{self.key}_norm_squared', norm_squared, flush=True)
+    #         denominator = (self.nsamples[update_indices] + batch_size)
+    #         self.scaler_inp[:, update_indices] += norm_squared / denominator
 
-        # else:
-        #     if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-        #         self.scaler_inp = self.scaler_inp.to(cur_device)
-        #         self.nsamples = self.nsamples.to(cur_device)
-        #         update_indices = update_indices.to(cur_device)
-        #         # print('self.key', self.key, flush=True)
-        #         # print('shape', self.scaler_inp.shape)
-        #         # print("self.scaler_inp[update_indices].shape:", self.scaler_inp[update_indices].shape)
-        #         # print("self.nsamples[update_indices].shape:", self.nsamples[update_indices].shape)
-        #         # print("batch_size:", batch_size)
-        #         self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-        #         norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, min=None, max=65504)
-        #         # print(f'{self.key}_norm_squared', norm_squared, flush=True)
-        #         # print('update_indices', update_indices.shape, flush=True)
-        #         # print('norm_squared', norm_squared.shape, flush=True)
-        #         denominator = (self.nsamples[update_indices] + batch_size)
-        #         self.scaler_inp[update_indices] += norm_squared / denominator
-        #         # print('self.scaler_inp', self.scaler_inp, flush=True)
-        #     elif self.prune_metric == "flap":
-        #         # TODO: update later
-        #         old_baseline_inp = self.baseline_inp
-        #         self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
-        #         self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-        #         self.baseline_inp = self.baseline_inp.to(cur_device)
-        #         old_baseline_inp = old_baseline_inp.to(cur_device)
-        #         if self.nsamples == 0:
-        #             pass
-        #         else:
-        #             self.fluc_inp = self.fluc_inp.to(cur_device)
-        #             self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
-        #             self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
-        self.nsamples[update_indices] += batch_size
+    #     # else:
+    #     #     if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+    #     #         self.scaler_inp = self.scaler_inp.to(cur_device)
+    #     #         self.nsamples = self.nsamples.to(cur_device)
+    #     #         update_indices = update_indices.to(cur_device)
+    #     #         # print('self.key', self.key, flush=True)
+    #     #         # print('shape', self.scaler_inp.shape)
+    #     #         # print("self.scaler_inp[update_indices].shape:", self.scaler_inp[update_indices].shape)
+    #     #         # print("self.nsamples[update_indices].shape:", self.nsamples[update_indices].shape)
+    #     #         # print("batch_size:", batch_size)
+    #     #         self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+    #     #         norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=(0,1)) ** 2, min=None, max=65504)
+    #     #         # print(f'{self.key}_norm_squared', norm_squared, flush=True)
+    #     #         # print('update_indices', update_indices.shape, flush=True)
+    #     #         # print('norm_squared', norm_squared.shape, flush=True)
+    #     #         denominator = (self.nsamples[update_indices] + batch_size)
+    #     #         self.scaler_inp[update_indices] += norm_squared / denominator
+    #     #         # print('self.scaler_inp', self.scaler_inp, flush=True)
+    #     #     elif self.prune_metric == "flap":
+    #     #         # TODO: update later
+    #     #         old_baseline_inp = self.baseline_inp
+    #     #         self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
+    #     #         self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
+    #     #         self.baseline_inp = self.baseline_inp.to(cur_device)
+    #     #         old_baseline_inp = old_baseline_inp.to(cur_device)
+    #     #         if self.nsamples == 0:
+    #     #             pass
+    #     #         else:
+    #     #             self.fluc_inp = self.fluc_inp.to(cur_device)
+    #     #             self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
+    #     #             self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
+    #     self.nsamples[update_indices] += batch_size
 
 
 
@@ -494,12 +494,12 @@ class Linear(nn.Linear, EriLayer):
                 if has_inf:
                     print("Does 'self.scaler_inp111' contain infinite values? Yes")
                 if cfg['calibration_stage'] == True:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-                    # norm_squared = torch.norm(inp, p=2, dim=0) ** 2
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                    # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
 
                 elif cfg['calibration_stage'] == False:
-                    norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-                    # norm_squared = torch.norm(inp, p=2, dim=0) ** 2
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                    # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
                 # denominator = (self.nsamples[update_indices] + )
                 self.scaler_inp[:, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
 
@@ -517,7 +517,7 @@ class Linear(nn.Linear, EriLayer):
                 update_indices = update_indices.to(cur_device)
 
                 self.scaler_inp[update_indices] *= momentum
-                norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, max=cfg['data_type_max'])
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=(0,1)) ** 2, max=cfg['data_type_max'])
                 if cfg['logger_detailed_info'] == True:
                     print(f'{self.key}_inp', inp)
                     print('self.scaler_inp', self.scaler_inp)
@@ -542,70 +542,70 @@ class Linear(nn.Linear, EriLayer):
         # self.nsamples[update_indices] += batch_size
 
     # def update_global_metric_score_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
-    # def update_global_metric_score_distribution(self, inp, update_indices):
-    #     if len(inp.shape) == 2:
-    #         inp = inp.unsqueeze(0)
-    #     # batch_size = inp.shape[0] if batch_size is None else batch_size
-    #     batch_size = inp.shape[0]
-    #     default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
-    #     if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
-    #         raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
-    #     cur_device = inp.device
+    def update_global_metric_score_distribution(self, inp, update_indices):
+        if len(inp.shape) == 2:
+            inp = inp.unsqueeze(0)
+        # batch_size = inp.shape[0] if batch_size is None else batch_size
+        batch_size = inp.shape[0]
+        default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
+        if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
+            raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
+        cur_device = inp.device
 
-    #     if 'probe' in cfg['prune_method']:
-    #         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-    #             self.scaler_inp = self.scaler_inp.to(cur_device)
-    #             self.nsamples = self.nsamples.to(cur_device)
-    #             update_indices = update_indices.to(cur_device)
+        if 'probe' in cfg['prune_method']:
+            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+                self.scaler_inp = self.scaler_inp.to(cur_device)
+                self.nsamples = self.nsamples.to(cur_device)
+                update_indices = update_indices.to(cur_device)
 
-    #             self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+                self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
 
-    #             if cfg['calibration_stage'] == True:
-    #                 # norm_squared = torch.norm(inp, p=2, dim=0) ** 2
-    #                 # inp = inp.type(torch.float32)
-    #                 # norm_squared = torch.clamp(torch.norm(inp, p=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-    #                 norm_squared = torch.norm(inp, p=2, dim=0) ** 2
-    #                 # denominator = (self.nsamples[update_indices] + batch_size)
-    #                 # self.scaler_inp[:, update_indices] += norm_squared / denominator
-    #             elif cfg['calibration_stage'] == False:
-    #                 # norm_squared = torch.norm(inp, p=2, dim=0) ** 2
-    #                 norm_squared = torch.norm(inp, p=2, dim=0) ** 2
-    #             denominator = (self.nsamples[update_indices] + batch_size)
-    #             # self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-    #             self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
-    #             # self.scaler_inp[:, update_indices] += torch.div(norm_squared / denominator)
-    #     else:
-    #         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-    #             self.scaler_inp = self.scaler_inp.to(cur_device)
-    #             self.nsamples = self.nsamples.to(cur_device)
-    #             update_indices = update_indices.to(cur_device)
-    #             # print('self.key', self.key, flush=True)
-    #             # print('shape', self.scaler_inp.shape)
-    #             # print("self.scaler_inp[update_indices].shape:", self.scaler_inp[update_indices].shape)
-    #             # print("self.nsamples[update_indices].shape:", self.nsamples[update_indices].shape)
-    #             # print("batch_size:", batch_size)
-    #             self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-    #             norm_squared = torch.clamp(torch.norm(inp, p=2, dim=(0,1)) ** 2, max=cfg['data_type_max'])
-    #             # print(f'{self.key}_norm_squared', norm_squared, flush=True)
-    #             # print('update_indices', update_indices.shape, flush=True)
-    #             # print('norm_squared', norm_squared.shape, flush=True)
-    #             denominator = (self.nsamples[update_indices] + batch_size)
-    #             self.scaler_inp[update_indices] += norm_squared / denominator
-    #             # print('self.scaler_inp', self.scaler_inp, flush=True)
-    #         elif self.prune_metric == "flap":
-    #             # TODO: update later
-    #             old_baseline_inp = self.baseline_inp
-    #             self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
-    #             self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-    #             self.baseline_inp = self.baseline_inp.to(cur_device)
-    #             old_baseline_inp = old_baseline_inp.to(cur_device)
-    #             if self.nsamples == 0:
-    #                 pass
-    #             else:
-    #                 self.fluc_inp = self.fluc_inp.to(cur_device)
-    #                 self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
-    #                 self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
-    #     self.nsamples[update_indices] += batch_size
+                if cfg['calibration_stage'] == True:
+                    # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
+                    # inp = inp.type(torch.float32)
+                    # norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+                    # denominator = (self.nsamples[update_indices] + batch_size)
+                    # self.scaler_inp[:, update_indices] += norm_squared / denominator
+                elif cfg['calibration_stage'] == False:
+                    # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+                denominator = (self.nsamples[update_indices] + batch_size)
+                # self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
+                # self.scaler_inp[:, update_indices] += torch.div(norm_squared / denominator)
+        else:
+            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+                self.scaler_inp = self.scaler_inp.to(cur_device)
+                self.nsamples = self.nsamples.to(cur_device)
+                update_indices = update_indices.to(cur_device)
+                # print('self.key', self.key, flush=True)
+                # print('shape', self.scaler_inp.shape)
+                # print("self.scaler_inp[update_indices].shape:", self.scaler_inp[update_indices].shape)
+                # print("self.nsamples[update_indices].shape:", self.nsamples[update_indices].shape)
+                # print("batch_size:", batch_size)
+                self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=(0,1)) ** 2, max=cfg['data_type_max'])
+                # print(f'{self.key}_norm_squared', norm_squared, flush=True)
+                # print('update_indices', update_indices.shape, flush=True)
+                # print('norm_squared', norm_squared.shape, flush=True)
+                denominator = (self.nsamples[update_indices] + batch_size)
+                self.scaler_inp[update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
+                # print('self.scaler_inp', self.scaler_inp, flush=True)
+            elif self.prune_metric == "flap":
+                # TODO: update later
+                old_baseline_inp = self.baseline_inp
+                self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
+                self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
+                self.baseline_inp = self.baseline_inp.to(cur_device)
+                old_baseline_inp = old_baseline_inp.to(cur_device)
+                if self.nsamples == 0:
+                    pass
+                else:
+                    self.fluc_inp = self.fluc_inp.to(cur_device)
+                    self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
+                    self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
+        self.nsamples[update_indices] += batch_size
 
     def get_global_input_distribution(self):
         # return mean and std

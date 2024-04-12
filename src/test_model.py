@@ -120,15 +120,15 @@ def runExperiment():
 
 def cal_prune_metric(x, weight, metric_type):
     if 'savemetricseq' in cfg['prune_method']:
-        x = torch.clamp(torch.sum(x, dim=0), min=cfg['data_type_min'], max=cfg['data_type_max'])
-        # x = torch.clamp(torch.norm(x, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
+        x = torch.clamp(torch.sum(x, dim=0),  max=cfg['data_type_max'])
+        # x = torch.clamp(torch.linalg.vector_norm(x, p=2, dim=0) ** 2, min=cfg['data_type_min'], max=cfg['data_type_max'])
     if 'wandasp' in metric_type:
         # probe_out_dim_metric = (torch.sqrt(norm_squared.unsqueeze_(0).reshape((1,-1))) * torch.abs(weight)).sum(dim=0)
         pass
     elif 'flap' in metric_type:
         pass
     elif 'probe' in metric_type:    
-        x = torch.sqrt(((x.unsqueeze(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(min=cfg['data_type_min'], max=cfg['data_type_max']))
+        x = torch.sqrt(((x.unsqueeze(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(max=cfg['data_type_max']))
     return x
 
 def global_determine_ratio(model, if_log=False):
