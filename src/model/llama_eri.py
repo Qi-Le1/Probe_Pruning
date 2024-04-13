@@ -466,6 +466,8 @@ class Linear(nn.Linear, EriLayer):
 
 
     def update_global_metric_score_distribution_ema(self, inp, update_indices, is_probe=False):
+        if cfg['cur_batch_index'] == 0:
+            return
         
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
@@ -543,6 +545,9 @@ class Linear(nn.Linear, EriLayer):
 
     # def update_global_metric_score_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
     def update_global_metric_score_distribution(self, inp, update_indices):
+        if cfg['cur_batch_index'] == 0:
+            return
+        
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
         # batch_size = inp.shape[0] if batch_size is None else batch_size
@@ -752,14 +757,14 @@ class Linear(nn.Linear, EriLayer):
                 # metric_score = self.get_global_metric_score_distribution()
                 # mean_for_all_batches, std_for_all_batches = self.get_global_input_distribution()
             elif cfg['calibration_stage'] == False:
-                if cfg['cur_batch_index'] == 0:
-                    if 'probe' in cfg['prune_method'] and 'hd' in cfg['probe_info'] and ('cal_mlp_probe_out_dim_metric' in kwargs or 'cal_attn_probe_out_dim_metric' in kwargs):
-                        result = F.linear(x, self.weight[:, kwargs['selected_indices']], bias=None)
-                        result = result.to(previous_dtype)
-                        return result
-                    result = F.linear(x, self.weight, bias=None)
-                    result = result.to(previous_dtype)
-                    return result
+                # if cfg['mode'] == 'asyncinter' and cfg['cur_batch_index'] == 0:
+                #     if 'probe' in cfg['prune_method'] and 'hd' in cfg['probe_info'] and ('cal_mlp_probe_out_dim_metric' in kwargs or 'cal_attn_probe_out_dim_metric' in kwargs):
+                #         result = F.linear(x, self.weight[:, kwargs['selected_indices']], bias=None)
+                #         result = result.to(previous_dtype)
+                #         return result
+                #     result = F.linear(x, self.weight, bias=None)
+                #     result = result.to(previous_dtype)
+                #     return result
                 
                 if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
                     # print('zheli')
@@ -866,7 +871,7 @@ class Linear(nn.Linear, EriLayer):
                             # weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
                             # weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
                             weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
-
+                            print('attn weight', weight.shape, flush=True)
                             if self.check_fill_case():
                                 # print('fill', flush=True)
                                 self.out_selected_dim = kwargs['out_dim_indices']

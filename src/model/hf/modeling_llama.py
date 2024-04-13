@@ -48,7 +48,7 @@ from transformers.utils.import_utils import is_torch_fx_available
 from transformers import LlamaConfig
 
 from config import cfg
-from ..pruning_module import HiddenRepresentationPruning, cal_intersection_ratio, cal_prune_metric, cal_calib_prune_metric
+from ..pruning_module import HiddenRepresentationPruning, cal_intersection_ratio, cal_prune_metric, cal_calib_prune_metric, cal_attn_weight_prune_metric
 from module import nearest_even_number
 from torch.nn.functional import cosine_similarity
 from .utils import rank_process, mean_process, absnml_process, cal_res_hidden_state_diff  
@@ -485,9 +485,6 @@ class LlamaMLP(nn.Module):
 
                         if cfg['mode'] == 'sync':
                             probe_out_dim_indices = self.probe_process(x)
-                        elif cfg['mode'] == 'asyncinter':
-                            with torch.cuda.stream(cfg['cuda_stream1']):
-                                _ = self.probe_process(x)
                         elif cfg['mode'] == 'asyncintra':
                             # if not, do full inference
                             if 'post_layernorm_attn_residual' in kwargs:
@@ -588,6 +585,10 @@ class LlamaMLP(nn.Module):
                         else:                   
                             # print('here')      
                             down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+                        
+                        if cfg['mode'] == 'asyncinter':
+                            with torch.cuda.stream(cfg['cuda_stream1']):
+                                _ = self.probe_process(x)
                         # else:
                         #     # up_out = self.up_proj(x)
                         #     up_out = up_out[..., probe_out_dim_indices]
@@ -845,6 +846,8 @@ class LlamaAttention(nn.Module):
         self.probe_qk_out_dim_indices = None
         self.probe_qk_out_dim_indices_for_rope = None 
         self.probe_vo_out_dim_indices = None
+
+        self.attn_weights_indices = None
         # print("cfg['cust_tgt_modules']", cfg['cust_tgt_modules'])
         # if 'probe' in cfg['prune_name'] and 'each' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
         #     self.head_dim = int((1 - cfg['prune_hyper']) * self.head_dim)
@@ -912,10 +915,10 @@ class LlamaAttention(nn.Module):
                 probe, selected_indices = rank_process(hidden_states, cfg['q_probe_num'], cfg['q_probe_size'])
         elif 'mean' in cfg['probe_info']:
             if cfg['q_probe_num'] == cfg['k_probe_num'] and cfg['q_probe_num'] == cfg['v_probe_num']:
-                probe = mean_process(hidden_states, cfg['q_probe_num'], cfg['q_probe_num'])
+                probe = mean_process(hidden_states, cfg['q_probe_num'], cfg['q_probe_size'])
         elif 'absnml' in cfg['probe_info']:
             if cfg['q_probe_num'] == cfg['k_probe_num'] and cfg['q_probe_num'] == cfg['v_probe_num']:
-                probe = absnml_process(hidden_states, cfg['q_probe_num'], cfg['q_probe_num'])
+                probe = absnml_process(hidden_states, cfg['q_probe_num'], cfg['q_probe_size'])
 
         print('attn probe', probe.shape, flush=True)
         self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
@@ -971,25 +974,17 @@ class LlamaAttention(nn.Module):
 
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
         # TODO: fix later
-        if 'delseq' in cfg['prune_method']:
-            if 'wandasp' in cfg['prune_metric']:
-                # becomes self.num_heads, q_len
-                attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.abs(value_states)).sum(axis=(0, -1))
-            elif 'flap' in cfg['prune_metric']:
-                pass
-            elif 'probe' in cfg['prune_metric']:
-                # becomes self.num_heads, q_len
-                # reshape to do element-wise multiplication
-                attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, -1)))
+        # if 'delseq' in cfg['prune_info']:
+        #     if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
+        #         probe_out_dim_metric, comined_probe_out = cal_attn_weight_prune_metric(attn_output, value_states, cfg['prune_metric'], global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution())
+        #     else:
+        #         probe_out_dim_metric, comined_probe_out = cal_attn_weight_prune_metric(attn_output, value_states, cfg['prune_metric'])
 
-            # dont customize the metric for each head
-            # if cfg['prune_metric'] == 'WOF2N' or cfg['prune_metric'] == 'mbWOF2N':
-            #     # becomes self.num_heads, q_len
-            #     attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 1, 2)).reshape((1, 1, -1, 1)) * torch.abs(value_states)).sum(axis=(0, 1, 3))
-            # elif cfg['prune_metric'] == 'WOF2S' or cfg['prune_metric'] == 'mbWOF2S':
-            #     # becomes self.num_heads, q_len
-            #     attn_weights_metric = torch.sqrt((torch.sum(torch.pow(attn_weights, 2), dim=(0, 1, 2)).reshape((1, 1, -1, 1)) * torch.pow(value_states, 2)).sum(axis=(0, 1, 3)))
-            _, attn_weights_indices, _, _ = self.pruning_module.sort_probe_attn_metric(attn_weights_metric, attn_weights.shape[1], 1, cfg['vo_proj_prune'], 'delseq', cfg['tc_multiple'])
+        #     if 'globalratio' in cfg['prune_method']:
+        #         self.attn_weights_indices, _ , _ , _ = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.k_num_heads, cfg['seq_len'], 'each', 'attnweights', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+        #     else:
+        #         # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
+        #         self.attn_weights_indices, _ , _ , _ = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.k_num_heads, cfg['seq_len'], 'each', 'attnweights', cfg['tc_multiple'])
 
 
         # if cfg['k_probe_num'] > cfg['v_probe_num']:
@@ -1016,20 +1011,14 @@ class LlamaAttention(nn.Module):
         else:
             # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
             self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+            if self.probe_vo_out_dim_indices is not None:
+                print('probe_vo_out_dim_indices', self.probe_vo_out_dim_indices.shape, flush=True)
         
         if vo_prune_way is None:
             self.probe_vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
         else:
-            if torch.all(self.o_proj.get_global_metric_score_distribution() == 0):
-                self.probe_vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
-            else:
-                probe_out_dim_metric = cal_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
-                if 'globalratio' in cfg['prune_method']:
-                    self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
-                else:
-                    # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
-                    self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
-        
+            pass
+
         if qk_prune_way is None:
             self.probe_qk_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
             self.probe_qk_out_dim_indices_for_rope = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
@@ -1044,6 +1033,8 @@ class LlamaAttention(nn.Module):
                 self.q_head_dim, self.k_head_dim = self.v_head_dim, self.v_head_dim
                 self.probe_qk_out_dim_indices = self.probe_vo_out_dim_indices
                 self.probe_qk_out_dim_indices_for_rope = self.probe_vo_out_dim_indices_for_rope
+                # print('probe_qk_out_dim_indices', self.probe_qk_out_dim_indices.shape, flush=True)
+                print('self.q_num_heads', self.q_num_heads, flush=True)
 
         self.q_proj.prepare_async_weight(out_dim_indices=self.probe_qk_out_dim_indices)
         self.k_proj.prepare_async_weight(out_dim_indices=self.probe_qk_out_dim_indices)
@@ -1210,9 +1201,6 @@ class LlamaAttention(nn.Module):
                 if 'probe' in cfg['prune_method']:
                     if cfg['mode'] == 'sync':
                         probe_results = self.probe_process(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
-                    elif cfg['mode'] == 'asyncinter':
-                        with torch.cuda.stream(cfg['cuda_stream1']):
-                            probe_results = self.probe_process(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
                     elif cfg['mode'] == 'asyncintra':
                         # if not, do full inference
                         if 'input_layernorm_mlp_residual' in kwargs:
@@ -1223,6 +1211,7 @@ class LlamaAttention(nn.Module):
                     # --------------------------------------
                     #full inference with adding some info to layer input
                     bsz, q_len, _ = hidden_states.size()
+
 
                     query_states = self.q_proj(hidden_states, out_dim_indices=self.probe_qk_out_dim_indices)
                     key_states = self.k_proj(hidden_states, out_dim_indices=self.probe_qk_out_dim_indices)
@@ -1268,41 +1257,28 @@ class LlamaAttention(nn.Module):
                         attn_weights = attn_weights + attention_mask
                         attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
 
-                    prev_attention_weight = attn_weights
+                    prev_attention_weight = attn_weights.clone()
                     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
 
-                    attn_output = torch.matmul(attn_weights, value_states)
-                    if attn_output.size() != (bsz, self.v_num_heads, q_len, self.v_head_dim):
-                        raise ValueError(
-                            f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.v_head_dim)}, but is"
-                            f" {attn_output.size()}"
-                        )
-                    attn_output = attn_output.transpose(1, 2).contiguous()
-                    attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.v_head_dim)
+                    # attn_output = torch.matmul(attn_weights, value_states)
+                    # if attn_output.size() != (bsz, self.v_num_heads, q_len, self.v_head_dim):
+                    #     raise ValueError(
+                    #         f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.v_head_dim)}, but is"
+                    #         f" {attn_output.size()}"
+                    #     )
+                    # attn_output = attn_output.transpose(1, 2).contiguous()
+                    # attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.v_head_dim)
 
-                    probe_out_dim_metric, comined_probe_out = cal_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
-                    self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, 'each', 'vo', cfg['tc_multiple'])
-        
-                    # if 'delseq' in cfg['prune_method']:
-                    #     print('delseq 2', flush=True)
-                    #     # attn_weights = torch.index_select(attn_weights, -1, attn_weights_indices)
-                    #     # value_states = torch.index_select(value_states, -2, attn_weights_indices)
-                    #     # torch.cuda.reset_peak_memory_stats(device="cuda")  # Reset peak memory statistics
-                    #     # before_op_memory_allocated = torch.cuda.memory_allocated("cuda")
-                    #     # start_time = time.time()
+                    # probe_out_dim_metric, comined_probe_out = cal_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
+                    # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, 'each', 'vo', cfg['tc_multiple'])
+                    # print(self.v_num_heads, self.v_head_dim, flush=True)
+                    # if self.probe_vo_out_dim_indices is not None:
+                    #     print(self.probe_vo_out_dim_indices.shape, flush=True)
+                    # value_states = self.v_proj(hidden_states, out_dim_indices=self.probe_vo_out_dim_indices)
+                    # print(value_states.shape, flush=True)
+                    # value_states = value_states.view(bsz, q_len, self.v_num_heads, self.v_head_dim).transpose(1, 2)
 
-                    #     attn_weights_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(2).expand(bsz, self.k_num_heads, q_len, -1)
-                    #     attn_weights = torch.gather(attn_weights, -1, attn_weights_indices_expand)
-                    #     value_states_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(3).expand(bsz, self.v_num_heads, -1, self.v_head_dim)
-                    #     value_states = torch.gather(value_states, -2, value_states_indices_expand)
-
-                        # end_time = time.time()
-                        # elapsed_time = end_time - start_time
-                        # print(f"Elapsed time: {elapsed_time} seconds")  
-                        # after_op_memory_allocated = torch.cuda.memory_allocated("cuda")
-                        # memory_used = after_op_memory_allocated - before_op_memory_allocated
-                        # print(f"Memory used for the operation: {memory_used} bytes")
-
+                    # if 'delseq' in cfg['probe_info'] and cfg['cur_batch_index'] != 0:
                     if 'delseq' in cfg['probe_info']:
                         # temp_attn_weights = attn_weights
                         # attention_mask = attention_mask
@@ -1315,25 +1291,51 @@ class LlamaAttention(nn.Module):
                         summed_mask = converted_mask.sum(dim=(0, 2)) / bsz
                         # print('summed_mask', summed_mask, flush=True)
                         # / torch.sqrt(summed_mask)
-                        attn_weights_metric = (torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1))  * torch.abs(value_states)).sum(axis=(0, -1))
+                        # attn_weights_metric = (torch.clamp(torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)), max=cfg['data_type_max']) * torch.abs(value_states)).sum(axis=(0, -1))
+
+                        # # each head, different seq
+                        # norm_square = torch.clamp(torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) ** 2, max=cfg['data_type_max'])
+                        # attn_weights_metric = torch.sqrt((norm_square * torch.pow(value_states, 2)).sum(axis=(0, -1))).clamp(max=cfg['data_type_max'])
+                        # # attn_weights_metric = (norm_square * torch.pow(value_states, 2)).sum(axis=(0, -1)).clamp(max=cfg['data_type_max'])
+                        # # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                        # _, attn_weights_indices, _, _ = self.pruning_module.sort_probe_attn_metric(attn_weights_metric, attn_weights.shape[1], attn_weights.shape[-1], 'each', 'delseq', cfg['tc_multiple'])
+                        
+                        # # _, attn_weights_indices, _, _ = self.pruning_module.sort_probe_attn_metric(attn_weights_metric, attn_weights.shape[1], self.head_dim, 'each', 'delseq', cfg['tc_multiple'])
+
+                        # attn_weights_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(2).expand(bsz, self.k_num_heads, q_len, -1)
+                        # # attn_weights = torch.gather(attn_weights, -1, attn_weights_indices_expand)
+                        # print('del seq prev_attention_weight', prev_attention_weight.shape, flush=True)
+                        # prev_attention_weight = torch.gather(prev_attention_weight, -1, attn_weights_indices_expand)
+                        # attn_weights = nn.functional.softmax(prev_attention_weight, dim=-1, dtype=torch.float32).to(query_states.dtype)
+                        # value_states_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(3).expand(bsz, self.v_num_heads, -1, self.v_head_dim)
+                        # value_states = torch.gather(value_states, -2, value_states_indices_expand)
+                        # # print('del seq attn_weights', attn_weights.shape, flush=True)
+                        # # print('sel seq value_states', value_states.shape, flush=True)
+                        # sorted_indices, sorted_positions = torch.sort(attn_weights_indices)
 
 
+                        # each head, same seq
+                        norm_square = torch.clamp(torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) ** 2, max=cfg['data_type_max'])
+
+                        # / (converted_mask.sum(dim=(0, 2)) / bsz)
+                        norm_square = torch.clamp(torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) ** 2 , max=cfg['data_type_max'])
+                        attn_weights_metric = torch.sqrt((norm_square * torch.pow(value_states, 2)).sum(axis=(0, -1))).clamp(max=cfg['data_type_max'])
+
+
+                        # norm_square = torch.clamp(torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 1, 2)).reshape((1, 1, -1, 1)) ** 2 , max=cfg['data_type_max'])
+                        # attn_weights_metric = (norm_square * torch.pow(value_states, 2)).sum(axis=(0, -1)).clamp(max=cfg['data_type_max'])
+                        attn_weights_metric = torch.linalg.norm(attn_weights_metric, ord=2, dim=0)
+                        # attn_weights_metric = torch.sum(attn_weights_metric, dim=0).clamp(max=cfg['data_type_max'])
+                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(attn_weights_metric, cfg['tc_multiple'])
                         # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
-                        _, attn_weights_indices, _, _ = self.pruning_module.sort_probe_attn_metric(attn_weights_metric, attn_weights.shape[1], self.k_head_dim, 'each', 'delseq', cfg['tc_multiple'])
-                        attn_weights_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(2).expand(bsz, self.k_num_heads, q_len, -1)
-                        # attn_weights = torch.gather(attn_weights, -1, attn_weights_indices_expand)
-                        prev_attention_weight = torch.gather(prev_attention_weight, -1, attn_weights_indices_expand)
-                        attn_weights = nn.functional.softmax(prev_attention_weight, dim=-1, dtype=torch.float32).to(query_states.dtype)
-                        value_states_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(3).expand(bsz, self.v_num_heads, -1, self.v_head_dim)
-                        value_states = torch.gather(value_states, -2, value_states_indices_expand)
-                        print('attn_weights', attn_weights.shape, flush=True)
-                        print('value_states', value_states.shape, flush=True)
-                        sorted_indices, sorted_positions = torch.sort(attn_weights_indices)
+                        attn_weights = attn_weights[:, :, :, probe_out_dim_indices]
+                        value_states = value_states[:, :, probe_out_dim_indices, :]
+                        
 
-                        # Print the sorted tensor
-                        # print("Sorted tensor:", sorted_indices)
-                        # # If you also want to see the original positions of the elements in the sorted tensor
-                        # print("Original positions in sorted tensor:", sorted_positions)
+
+                    # if 'delseq' in cfg['probe_info'] and cfg['cur_batch_index'] != 0:
+                    #     attn_weights_indices_expand = self.attn_weights_indices.unsqueeze(0).unsqueeze(2).expand(bsz, self.k_num_heads, q_len, -1)
+                    #     value_states_indices_expand = self.attn_weights_indices.unsqueeze(0).unsqueeze(3).expand(bsz, self.v_num_heads, -1, self.v_head_dim)
 
                     attn_output = torch.matmul(attn_weights, value_states)
                     if attn_output.size() != (bsz, self.v_num_heads, q_len, self.v_head_dim):
@@ -1344,11 +1346,12 @@ class LlamaAttention(nn.Module):
                     attn_output = attn_output.transpose(1, 2).contiguous()
                     attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.v_head_dim)
 
-
-
-                    probe_out_dim_metric, comined_probe_out = cal_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
                     attn_output = self.o_proj(attn_output, in_dim_indices=self.probe_vo_out_dim_indices)
 
+                    if cfg['mode'] == 'asyncinter':
+                        with torch.cuda.stream(cfg['cuda_stream1']):
+                            probe_results = self.probe_process(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
+                            
                     if not output_attentions:
                         attn_weights = None
                     
