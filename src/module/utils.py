@@ -35,6 +35,7 @@ def model_forward(model, input, inference_duration, index):
 
 
 def nearest_multiple(num_prune, total, multiple, multiple2=1):
+    return num_prune
     lcm = np.lcm(multiple, multiple2)
     
     # Adjust num_prune to make (total - num_prune) a multiple of the LCM

@@ -1000,7 +1000,9 @@ class HiddenRepresentationPruning(BasePruning):
         elif 'whole' in prune_way:    
             probe_out_dim_metric = probe_out_dim_metric.reshape(num_heads, -1)
             # Sum over the last dimension and take absolute values
-            summed_metrics = torch.abs(probe_out_dim_metric.sum(dim=-1))
+            probe_out_dim_metric = torch.pow(probe_out_dim_metric, 2)
+            summed_metrics = probe_out_dim_metric.sum(dim=-1)
+            summed_metrics = torch.sqrt(summed_metrics)
             # Sort the summed metrics
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
             # print('summed_metricssorted_value', sorted_value)

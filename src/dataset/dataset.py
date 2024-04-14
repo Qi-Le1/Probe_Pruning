@@ -816,6 +816,7 @@ def process_dataset(dataset, tokenizer):
 
                 for i in range(len(correct_labels_extended)):
                     sample_input_ids = model_inputs["input_ids"][i]
+                    
                     # print('sample_input_ids', sample_input_ids)
                     # print('text', inputs[i])
                     sample_attention_mask = model_inputs["attention_mask"][i]
@@ -823,6 +824,7 @@ def process_dataset(dataset, tokenizer):
                     label_attention_mask = labels["attention_mask"][i][1:]
 
                     temp_input = sample_input_ids + label_input_ids
+                    print('len(temp_input)', len(temp_input))
                     temp_attention_mask = sample_attention_mask + label_attention_mask
                     label_ignore_pos = [tokenizer.pad_token_id] * len(sample_input_ids) + [-900] * len(label_input_ids)
                     len_temp_input = len(temp_input)

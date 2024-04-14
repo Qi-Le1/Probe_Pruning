@@ -87,6 +87,31 @@ def absnml_process(x, probe_num, probe_size):
     return probe
 
 
+
+def generate_probe(x, probe_ratio_list, probe_size):
+    for i in range(len(cfg['probe_generation_type'])):
+        probe_type = cfg['probe_generation_type'][i]
+        probe_ratio = probe_ratio_list[i]
+
+        if 'bsz' in probe_type:
+            probe_num = int(x.size(0) * probe_ratio)
+            probe_size = x.size(0) // probe_num
+
+        if probe_type == 'rank':
+            return rank_process(x, probe_num, probe_size)
+        elif probe_type == 'mean':
+            return mean_process(x, probe_num, probe_size)
+        elif probe_type == 'absnml':
+            return absnml_process(x, probe_num, probe_size)
+        elif probe_type == 'nml':
+            return nml_process(x, probe_num, probe_size)
+
+
+
+
+
+
+
 def nml_process(x, probe_num, probe_size):
     # avoid nan proportion
     abs_x = torch.clamp(torch.abs(x), min=1e-6)

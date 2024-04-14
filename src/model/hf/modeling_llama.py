@@ -1328,7 +1328,9 @@ class LlamaAttention(nn.Module):
                         # attn_weights_metric = torch.sum(attn_weights_metric, dim=0).clamp(max=cfg['data_type_max'])
                         probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(attn_weights_metric, cfg['tc_multiple'])
                         # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
-                        attn_weights = attn_weights[:, :, :, probe_out_dim_indices]
+                        # attn_weights = attn_weights[:, :, :, probe_out_dim_indices]
+                        attn_weights = prev_attention_weight[:, :, :, probe_out_dim_indices]
+                        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
                         value_states = value_states[:, :, probe_out_dim_indices, :]
                         
 

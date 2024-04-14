@@ -203,9 +203,10 @@ def process_control():
             elif 'opt' in cfg['model_name']:
                 prune_keys = ['q', 'k', 'v', 'fc1']
             
-            probe_generations = ['rank', 'mean', 'absnml']
-            if not any(item in cfg['probe_info'] for item in probe_generations):
-                raise ValueError('probe_info is not valid')
+            cfg['probe_generation_type'] = probe_info_list[0].split('+')
+            for probe_type in cfg['probe_generation_type']:
+                if probe_type not in ['rank', 'mean', 'absnml']:
+                    raise ValueError('probe_generation_type is not valid')
             
             for key in prune_keys:
                 # default
@@ -222,27 +223,56 @@ def process_control():
                 else:
                     float_value = None
 
-                if 'bsz' in cfg['probe_info']:
-                    full_size = cfg['batch_size']
-                elif 'seq' in cfg['probe_info']:
-                    full_size = cfg['seq_len']
-                    # cfg['probe_norm_dim'] = (0, 2)
-                elif 'hd' in cfg['probe_info']:
-                    full_size = cfg[model_name]['hidden_size']
-                    # cfg['probe_norm_dim'] = (0, 1)
+                float_pattern = re.compile(r'\d*\.?\d+')
+                # Find all matches and convert them to floats
+                floats = [float(match) for match in float_pattern.findall(cfg[f'{key}_prune'])]
+                if not floats:
+                    raise ValueError(f'probe ratio is not valid for {key}, please specify it in probe_info')
+                else:
+                    cfg[f'{key}_probe_ratio'] = floats
+
+
+                # if 'bsz' in cfg['probe_info']:
+                #     full_size = cfg['batch_size']
+                # elif 'seq' in cfg['probe_info']:
+                #     full_size = cfg['seq_len']
+                #     # cfg['probe_norm_dim'] = (0, 2)
+                # elif 'hd' in cfg['probe_info']:
+                #     full_size = cfg[model_name]['hidden_size']
+                #     # cfg['probe_norm_dim'] = (0, 1)
                 
-                print('full_size', full_size, float_value, cfg[f'{key}_prune'])
-                if float_value:  # Ensure int_value is not None to avoid division by zero
-                    cfg[f'{key}_probe_num'] = int(float_value * full_size)
-                    if 'rank' in cfg['probe_info']:
-                        probe_size = int(full_size // cfg[f'{key}_probe_num'])
-                        cfg[f'{key}_probe_size'] = probe_size
-                    else:
-                        cfg[f'{key}_probe_num'] = find_nearest_divisor(full_size, cfg[f'{key}_probe_num'])
-                        probe_size = int(full_size // cfg[f'{key}_probe_num'])
-                        cfg[f'{key}_probe_size'] = probe_size
-                elif float_value is None:
-                    raise ValueError(f'probe ratio is not valid for {key}')
+                # print('full_size', full_size, float_value, cfg[f'{key}_prune'])
+                # if float_value:  # Ensure int_value is not None to avoid division by zero
+                #     cfg[f'{key}_probe_num'] = int(float_value * full_size)
+                #     if 'rank' in cfg['probe_info']:
+                #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
+                #         cfg[f'{key}_probe_size'] = probe_size
+                #     else:
+                #         cfg[f'{key}_probe_num'] = find_nearest_divisor(full_size, cfg[f'{key}_probe_num'])
+                #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
+                #         cfg[f'{key}_probe_size'] = probe_size
+
+                # if 'bsz' in cfg['probe_info']:
+                #     full_size = cfg['batch_size']
+                # elif 'seq' in cfg['probe_info']:
+                #     full_size = cfg['seq_len']
+                #     # cfg['probe_norm_dim'] = (0, 2)
+                # elif 'hd' in cfg['probe_info']:
+                #     full_size = cfg[model_name]['hidden_size']
+                #     # cfg['probe_norm_dim'] = (0, 1)
+                
+                # print('full_size', full_size, float_value, cfg[f'{key}_prune'])
+                # if float_value:  # Ensure int_value is not None to avoid division by zero
+                #     cfg[f'{key}_probe_num'] = int(float_value * full_size)
+                #     if 'rank' in cfg['probe_info']:
+                #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
+                #         cfg[f'{key}_probe_size'] = probe_size
+                #     else:
+                #         cfg[f'{key}_probe_num'] = find_nearest_divisor(full_size, cfg[f'{key}_probe_num'])
+                #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
+                #         cfg[f'{key}_probe_size'] = probe_size
+                # elif float_value is None:
+                #     raise ValueError(f'probe ratio is not valid for {key}')
 
 
             prune_keywords = ['each', 'fill', 'whole']

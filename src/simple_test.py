@@ -19,50 +19,64 @@ CUDA version: 11.7
 System: ubuntu 20.04
 GPU: NVIDIA GeForce RTX 4090
 '''
+import re
 import torch
 
-a = torch.tensor(1, dtype=torch.float16, device='cuda')
-b = a / 1000000000000000
-print('b', b)
-b1 = torch.sqrt(b)
-print('b1', b1)
-c = a * 1000000000000000
-print('c', c)
+input1 = 'each0.1+0.1'
+input2 = 'each'
+input3 = 'each0.1'
+float_pattern = re.compile(r'\d*\.?\d+')
+# Find all matches and convert them to floats
+floats1 = [float(match) for match in float_pattern.findall(input1)]
+floats2 = [float(match) for match in float_pattern.findall(input2)]
+floats3 = [float(match) for match in float_pattern.findall(input3)]
+
+print(floats1, floats2, floats3)
 
 
-# tensor_3d = torch.randn(4, 5, 6)  # Shape (4, 5, 6)
-# norm1 = torch.linalg.vector_norm(tensor_3d, ord=2, dim=(0,1))
-# norm2 = torch.linalg.matrix_norm(tensor_3d, ord='fro', dim=(0,1))
-# print(norm1, norm2)
-# print(norm1 == norm2)
-# norm3 = torch.linalg.vector_norm(tensor_3d, p=2, dim=(0,1))
+
+# a = torch.tensor(1, dtype=torch.float16, device='cuda')
+# b = a / 1000000000000000
+# print('b', b)
+# b1 = torch.sqrt(b)
+# print('b1', b1)
+# c = a * 1000000000000000
+# print('c', c)
+
+
+# # tensor_3d = torch.randn(4, 5, 6)  # Shape (4, 5, 6)
+# # norm1 = torch.linalg.vector_norm(tensor_3d, ord=2, dim=(0,1))
+# # norm2 = torch.linalg.matrix_norm(tensor_3d, ord='fro', dim=(0,1))
+# # print(norm1, norm2)
+# # print(norm1 == norm2)
+# # norm3 = torch.linalg.vector_norm(tensor_3d, p=2, dim=(0,1))
+# # print(norm3)
+
+
+
+# tensor_3d = torch.tensor([65500, 65500], dtype=torch.float16, device='cuda')
+# print(tensor_3d)
+# norm1 = torch.linalg.vector_norm(tensor_3d, ord=2)
+# # norm2 = torch.linalg.matrix_norm(tensor_3d, ord='fro', dim=(0,1))
+# print(norm1)
+# # print(norm1 == norm2)
+# norm3 = torch.clamp(torch.linalg.vector_norm(tensor_3d, ord=2), max=65504)
 # print(norm3)
+#   # Shape (4, 6
 
 
-
-tensor_3d = torch.tensor([65500, 65500], dtype=torch.float16, device='cuda')
-print(tensor_3d)
-norm1 = torch.linalg.vector_norm(tensor_3d, ord=2)
-# norm2 = torch.linalg.matrix_norm(tensor_3d, ord='fro', dim=(0,1))
-print(norm1)
-# print(norm1 == norm2)
-norm3 = torch.clamp(torch.linalg.vector_norm(tensor_3d, ord=2), max=65504)
-print(norm3)
-  # Shape (4, 6
+# a = torch.tensor(5.5, dtype=torch.float16, device='cuda')
+# b = torch.tensor(3.5, dtype=torch.float32, device='cuda')
+# c = a + b
+# print(c, c.dtype)
 
 
-a = torch.tensor(5.5, dtype=torch.float16, device='cuda')
-b = torch.tensor(3.5, dtype=torch.float32, device='cuda')
-c = a + b
-print(c, c.dtype)
+# numerator = torch.tensor([0.0])
+# denominator = torch.tensor([0.0])
 
-
-numerator = torch.tensor([0.0])
-denominator = torch.tensor([0.0])
-
-# Performing division that should result in NaN
-result = numerator / (denominator + 1e-6)
-print(result)
+# # Performing division that should result in NaN
+# result = numerator / (denominator + 1e-6)
+# print(result)
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # a = torch.rand(4096, 11008, device=device, dtype=torch.float16)
 # b = torch.rand(4096, 11008, device=device, dtype=torch.float16)

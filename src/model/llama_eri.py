@@ -706,6 +706,8 @@ class Linear(nn.Linear, EriLayer):
         if cfg['mode'] == 'sync':
             return self.weight
         elif cfg['mode'] == 'asyncinter':
+            if cfg['cur_batch_index'] == 0:
+                return self.weight
             # dont have the prepared weight for current batch
             # sync the stream1
             if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:

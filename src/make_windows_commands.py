@@ -606,7 +606,7 @@ def main():
             controls.extend(CIFAR10_controls_9)
 
             control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['896', '1024'], ['0.7'], 
-                             ['probe'], ['calib-ema'], ['sync'], ['c4-200'], ['None'],
+                             ['probe'], ['calib-ema', 'calib'], ['sync'], ['c4-200'], ['None'],
 
                             ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
