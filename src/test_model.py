@@ -421,7 +421,7 @@ def test(data_loader, model, model_prof, metric, logger):
             print(logger.write('test', metric.metric_name['test']), flush=True)
         model_prof.stop_profile()
 
-        inference_time = model.model.inference_time
+        inference_time = model.model.model.inference_time
         print('inference_time', inference_time)
         for name, module in model.named_modules():
             for attr_name in dir(module):

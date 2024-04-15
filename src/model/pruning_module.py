@@ -632,8 +632,6 @@ def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distrib
         if 'probe' in cfg['prune_method']:
             if global_metric_score_distribution is not None:
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
-                print('norm_probe_out_square ', norm_probe_out_square.dtype)
-                print('global_metric_score_distribution ', global_metric_score_distribution.dtype)
                 global_metric_score_distribution = global_metric_score_distribution.to(probe_out.device)
                 has_nan = torch.isnan(global_metric_score_distribution).any()
                 has_inf = torch.isinf(global_metric_score_distribution).any()
@@ -653,23 +651,8 @@ def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distrib
                     combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
                     # norm_probe_out = torch.sqrt(combined_probe_out)
                 # dynaratio
-                else:
-                    
-                            # pass
-                        
-                    # else:
-  
+                else:  
                     denominator = norm_probe_out_square + global_metric_score_distribution
-                    print('denominator', denominator.dtype)
-                    # global_ratio = norm_probe_out_square / (denominator + 1e-6)
-                    # has_nan = torch.isnan(global_ratio).any()
-                    # has_inf = torch.isinf(global_ratio).any()
-                    # if has_nan:
-                    #     print("Does 'global_ratio' contain NaN values? Yes")
-                    # if has_inf:
-                    #     print("Does 'global_ratio' contain infinite values? Yes")
-                    # # global_metric_score_distribution.to(probe_out.device) / (denominator + 1e-10)
-                    # probe_ratio = 1 - global_ratio
 
                     # avoid nan, nan is always a problem in float16
                     # tend to give the global metric more weight if there is a nan
@@ -682,26 +665,8 @@ def cal_prune_metric(probe_out, weight, metric_type, global_metric_score_distrib
                         print("Does 'probe_ratio' contain infinite values? Yes")
                     # global_metric_score_distribution.to(probe_out.device) / (denominator + 1e-10)
                     global_ratio = 1 - probe_ratio
-                    # print('global_ratio', global_ratio, torch.mean(global_ratio))
-
                     combined_probe_out = global_ratio * global_metric_score_distribution + probe_ratio * norm_probe_out_square
 
-                    # combined_probe_out = torch.max(norm_probe_out_square, global_metric_score_distribution)
-
-                    # Stack the tensors to create a new dimension where a and b are stacked
-                    # stacked = torch.stack((norm_probe_out_square, global_metric_score_distribution), dim=2)
-
-                    # # Apply softmax across the new dimension (dim=2) to merge them
-                    # combined_probe_out = torch.sum(torch.softmax(stacked, dim=2) * stacked, dim=2)
-
-                    # norm_probe_out = torch.sqrt(combined_probe_out)
-
-                    # temp_sort_value, _ = torch.sort(norm_probe_out_square, dim=-1)
-                    # torch.set_printoptions(threshold=5000)
-                    # print('norm_probe_out_square', norm_probe_out_square.shape, temp_sort_value)
-                    # temp_sort_value, _ = torch.sort(global_metric_score_distribution, dim=-1)
-                    # print('global_metric_score_distribution', global_metric_score_distribution.shape, temp_sort_value)
-                    # print('globaratio', global_ratio, torch.mean(global_ratio))
                 print('combined_probe_out', combined_probe_out.shape)
                 combined_probe_out = torch.sum(combined_probe_out, dim=0)
                 probe_out_dim_metric = torch.sqrt(((combined_probe_out.unsqueeze_(0).reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(max=cfg['data_type_max']))
