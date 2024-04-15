@@ -25,7 +25,6 @@ def get_model_profile(tag, model_prof, onlyprobe=False):
     info_list = []
     for name, module in model_prof.model.model.named_modules():
         temp = [name, module.__flops__, module.__params__, module.__macs__, type(module)]
-
         layer_order_matches = re.findall(r'\d+', name)
         if layer_order_matches:  # Check if the list is not empty
             layer_order = int(layer_order_matches[0])  # Convert the first match to an integer
@@ -37,9 +36,11 @@ def get_model_profile(tag, model_prof, onlyprobe=False):
                 continue
 
             if onlyprobe:
-                # when only use probe, dont need to calculate for this 2 layers
-                # just use to match the output shape
-                if 'down_proj' in name or 'o_proj' in name:
+            #     # when only use probe, dont need to calculate for this 2 layers
+            #     # just use to match the output shape
+            #     if 'down_proj' in name or 'o_proj' in name:
+            #         temp = [name, 0, 0, 0, type(module)]
+                if not hasattr(module, 'is_pruned') or module.is_pruned == False:
                     temp = [name, 0, 0, 0, type(module)]
         
         if hasattr(module, 'is_pruned') and module.is_pruned == True:
@@ -64,7 +65,7 @@ def load_dense_model():
     # prune_method
     dense_name_list[8] = 'dense'
     # mode
-    dense_name_list[9] = 'sync'
+    dense_name_list[9] = 'None'
     # calib_info
     dense_name_list[10] = 'None'
     # probe_info

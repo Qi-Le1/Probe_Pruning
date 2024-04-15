@@ -814,8 +814,14 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.6'], 
-                             ['probe'], ['calib-probe-ema'], ['sync'], ['c4-20'], ['bszrank+seqrank-0-0-0-0.1+0.1-0.1+0.1'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0.6'], 
+                             ['probe'], ['calib-probe-ema'], ['sync'], ['c4-200'], ['bszrank+seqrank-0-0-0-0.1+0.1-0.1+0.1', 'bszrank-0-0-0-0.1-0.1', 'seqrank-0-0-0-0.1-0.1'],
+                            ['gate-proj+up-proj+down-proj']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0.6'], 
+                             ['probe'], ['calib', 'calib-ema'], ['asyncinter'], ['c4-200'], ['None'],
                             ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -1017,8 +1023,8 @@ def main():
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0'], 
-                             ['None'], ['dense'], ['sync'], ['None'], ['None'],        
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0'], 
+                             ['None'], ['dense'], ['None'], ['None'], ['None'],        
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)

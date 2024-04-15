@@ -89,8 +89,8 @@ def process_control():
         
 
     cfg['mode'] = cfg['control']['mode']
-    if cfg['mode'] not in ['sync', 'asyncinter', 'asyncintra']:
-        raise ValueError('Not valid mode')
+    # if cfg['mode'] not in ['sync', 'asyncinter', 'asyncintra']:
+    #     raise ValueError('Not valid mode')
     
     if torch.cuda.is_available():
         cfg['cuda_default_stream'] = torch.cuda.default_stream()

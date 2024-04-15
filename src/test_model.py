@@ -375,10 +375,11 @@ def test(data_loader, model, model_prof, metric, logger):
                 input_ = {'target': input['target']}
                 output_ = {'target': output['target'], 'loss': output['loss']}
 
-            metric.add('test', input_, output_)
-            evaluation = metric.evaluate('test', 'batch', input_, output_)
-            print('evaluation_for_batch', evaluation)
-            logger.append(evaluation, 'test', input_size)
+            if cfg['onlyprobe'] == False: 
+                metric.add('test', input_, output_)
+                evaluation = metric.evaluate('test', 'batch', input_, output_)
+                print('evaluation_for_batch', evaluation)
+                logger.append(evaluation, 'test', input_size)
             record_pruing_info(model, logger)
             # break
             if iterate_small_samples:
@@ -411,12 +412,13 @@ def test(data_loader, model, model_prof, metric, logger):
         # torch.cuda.synchronize()
         # inference_duration = time.time() - start_time
         # print('inference_duration', inference_duration)
-        evaluation = metric.evaluate('test', 'full')
-        print('evaluation_for_full', evaluation)
-        logger.append(evaluation, 'test')
-        info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(cfg['epoch'], 100.)]}
-        logger.append(info, 'test')
-        print(logger.write('test', metric.metric_name['test']), flush=True)
+        if cfg['onlyprobe'] == False: 
+            evaluation = metric.evaluate('test', 'full')
+            print('evaluation_for_full', evaluation)
+            logger.append(evaluation, 'test')
+            info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(cfg['epoch'], 100.)]}
+            logger.append(info, 'test')
+            print(logger.write('test', metric.metric_name['test']), flush=True)
         model_prof.stop_profile()
 
         for name, module in model.named_modules():
