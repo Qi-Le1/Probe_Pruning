@@ -215,6 +215,8 @@ def test(data_loader, model, model_prof, metric, logger):
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
         print('inference_duration', inference_duration)
+        inference_time = model.model.model.inference_time
+        print('inference_time', inference_time)
         evaluation = metric.evaluate('test', 'full')
         print('evaluation_for_full', evaluation)
         logger.append(evaluation, 'test')

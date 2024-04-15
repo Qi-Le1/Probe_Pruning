@@ -1820,6 +1820,7 @@ class LlamaModel(LlamaPreTrainedModel):
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
         self.post_init()
+        self.inference_time = 0
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1946,6 +1947,8 @@ class LlamaModel(LlamaPreTrainedModel):
                 torch.cuda.nvtx.range_pop()
                 print(f"layer: {idx}, Elapsed time: {duration} milliseconds")
                 print(f'layerdevice, {decoder_layer.mlp.gate_proj.weight.device}')
+                if idx > cfg['skip_layers']:
+                    self.inference_time += duration
                
             
             
