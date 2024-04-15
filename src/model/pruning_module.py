@@ -506,8 +506,8 @@ def cal_attn_weight_prune_metric(probe_out, weight, metric_type, num_heads, glob
         if 'probe' in cfg['prune_method']:
             if global_metric_score_distribution is not None:
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=(0, 2)).reshape((1, num_heads, -1, 1)) ** 2 / probe_num, max=cfg['data_type_max'])
-                print('norm_probe_out_square ', norm_probe_out_square.dtype)
-                print('global_metric_score_distribution ', global_metric_score_distribution.dtype)
+                # print('norm_probe_out_square ', norm_probe_out_square.dtype)
+                # print('global_metric_score_distribution ', global_metric_score_distribution.dtype)
                 global_metric_score_distribution = global_metric_score_distribution.to(probe_out.device)
                 has_nan = torch.isnan(global_metric_score_distribution).any()
                 has_inf = torch.isinf(global_metric_score_distribution).any()
@@ -534,7 +534,7 @@ def cal_attn_weight_prune_metric(probe_out, weight, metric_type, num_heads, glob
                     # else:
   
                     denominator = norm_probe_out_square + global_metric_score_distribution
-                    print('denominator', denominator.dtype)
+                    # print('denominator', denominator.dtype)
                     # global_ratio = norm_probe_out_square / (denominator + 1e-6)
                     # has_nan = torch.isnan(global_ratio).any()
                     # has_inf = torch.isinf(global_ratio).any()
@@ -546,7 +546,7 @@ def cal_attn_weight_prune_metric(probe_out, weight, metric_type, num_heads, glob
                     # probe_ratio = 1 - global_ratio
 
                     # avoid nan, nan is always a problem in float16
-                    # tend to give the global metric more weight if there is a nan
+                    # add 1e-6 to denominator or set a min value for both tensors
                     probe_ratio = norm_probe_out_square / (denominator + 1e-6)
                     has_nan = torch.isnan(probe_ratio).any()
                     has_inf = torch.isinf(probe_ratio).any()

@@ -5,7 +5,7 @@ from config import cfg
 
 
 
-def rank_process(x, probe_num, probe_size):
+def rank_process(x, probe_num, probe_size, probe_type):
     if 'optimalseq' in cfg['probe_info']:
         l2_norms = torch.linalg.vector_norm(x, ord=2, dim=2)
         # print('l2_norms', l2_norms.shape, l2_norms, flush=True)
@@ -33,53 +33,48 @@ def rank_process(x, probe_num, probe_size):
         # print('selected_sequences', selected_sequences.shape, l2_norms)
         return selected_sequences, sorted_indices
 
-    if 'bsz' in cfg['probe_info']:
+    if 'bsz' in probe_type:
         l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(1, 2))
-    elif 'seq' in cfg['probe_info']:
+    elif 'seq' in probe_type:
         l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
-    elif 'hd' in cfg['probe_info']:
+    elif 'hd' in probe_type:
         l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 1))
-    print('l2_norms', l2_norms.shape, flush=True)
     _, indices = torch.topk(l2_norms, probe_num)
-    print('indices', indices.shape, flush=True)
     sorted_indices = indices.sort()[0]
-    print('sorted_indices', sorted_indices.shape, flush=True)
     # cfg['vertical_indices'] = sorted_indices
     # if 'bszseq' in cfg['probe_info']:
     #     print('here2')
     #     select = x[:, sorted_indices, :]
     #     return absnml_process(select, probe_num, probe_size), sorted_indices
     
-    if 'bsz' in cfg['probe_info']:
+    if 'bsz' in probe_type:
         return x[sorted_indices, :, :], None
-    elif 'seq' in cfg['probe_info']:
-        print('here1')
-        
+    elif 'seq' in probe_type:        
         return x[:, sorted_indices, :], sorted_indices
-    elif 'hd' in cfg['probe_info']:
+    elif 'hd' in probe_type:
         return x[:, :, sorted_indices], sorted_indices
 
 
-def mean_process(x, probe_num, probe_size):
-    if 'bsz' in cfg['probe_info']:
+def mean_process(x, probe_num, probe_size, probe_type):
+    if 'bsz' in probe_type:
         probe = torch.mean(x.view(probe_num, probe_size, x.size(-2), x.size(-1)), dim=1)
-    elif 'seq' in cfg['probe_info']:
+    elif 'seq' in probe_type:
         probe = torch.mean(x.view(x.size(-3), probe_num, probe_size, x.size(-1)), dim=2)
-    elif 'hd' in cfg['probe_info']:
+    elif 'hd' in probe_type:
         probe = torch.mean(x.view(x.size(-3), x.size(-2), probe_num, probe_size,), dim=3)
     return probe
 
 
 
-def absnml_process(x, probe_num, probe_size):
+def absnml_process(x, probe_num, probe_size, probe_type):
     abs_x = torch.abs(x).clamp_min_(cfg['data_type_min_positive'])
-    if 'bsz' in cfg['probe_info']:
+    if 'bsz' in probe_type:
         abs_view = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
         probe = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * (abs_view / abs_view.sum(dim=1, keepdim=True))).sum(dim=1)
-    elif 'seq' in cfg['probe_info']:
+    elif 'seq' in probe_type:
         abs_view = abs_x.view(x.size(-3), probe_num, probe_size, x.size(-1))
         probe = (x.view(x.size(-3), probe_num, probe_size, x.size(-1)) * (abs_view / abs_view.sum(dim=2, keepdim=True))).sum(dim=2)
-    elif 'hd' in cfg['probe_info']:
+    elif 'hd' in probe_type:
         abs_view = abs_x.view(x.size(-3), x.size(-2), probe_num, probe_size)
         probe = (x.view(x.size(-3), x.size(-2), probe_num, probe_size) * (abs_view / abs_view.sum(dim=3, keepdim=True))).sum(dim=3)
         print('probe', probe.shape, flush=True)
@@ -109,12 +104,12 @@ def generate_probe(x, probe_ratio_list):
             if x.size(2) % probe_num != 0:
                 x = x[:, :, :probe_num * probe_size]
 
-        if probe_type == 'rank':
-            x, selected_indices = rank_process(x, probe_num, probe_size)
-        elif probe_type == 'mean':
-            x = mean_process(x, probe_num, probe_size)
-        elif probe_type == 'absnml':
-            x = absnml_process(x, probe_num, probe_size)
+        if 'rank' in probe_type:
+            x, selected_indices = rank_process(x, probe_num, probe_size, probe_type)
+        elif 'mean' in probe_type:
+            x = mean_process(x, probe_num, probe_size, probe_type)
+        elif 'absnml' in probe_type:
+            x = absnml_process(x, probe_num, probe_size, probe_type)
     return x, selected_indices
     
 

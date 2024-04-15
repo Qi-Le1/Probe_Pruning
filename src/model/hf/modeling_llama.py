@@ -358,8 +358,10 @@ class LlamaMLP(nn.Module):
 
         # generate probe
         # rank / mean / absnml
-        if cfg['gate_probe_num'] == cfg['up_probe_num']:
+        if cfg['gate_probe_ratio'] == cfg['up_probe_ratio']:
             probe, selected_indices = generate_probe(x, cfg['gate_probe_ratio'])
+            print('xshape', x.shape, flush=True)
+            print('linearprobeshape', probe.shape, flush=True)
         else:
             raise ValueError('gate_probe_num should be equal to up_probe_num for now')
         
@@ -465,7 +467,9 @@ class LlamaMLP(nn.Module):
                             probe_out_dim_indices, probe_out = self.probe_process(x)
                             if cfg['onlyprobe'] == True:
                                 # match the shape, and will not count the flops for this part
-                                down_proj = self.down_proj(probe_out, in_dim_indices=probe_out_dim_indices)
+                                # down_proj = self.down_proj(probe_out, cal_mlp_probe_out_dim_metric=True)
+                                # if down_proj.shape != (cfg['batch_size'], cfg['seq_len'], self.hidden_size):
+                                down_proj = torch.zeros((cfg['batch_size'], cfg['seq_len'], self.hidden_size), device=x.device, dtype=x.dtype)
                                 return down_proj
                         elif cfg['mode'] == 'asyncintra':
                             # if not, do full inference
@@ -888,7 +892,7 @@ class LlamaAttention(nn.Module):
         bsz, q_len, _ = hidden_states.size()
         # generate probe
         # rank / mean / absnml
-        if cfg['q_probe_num'] == cfg['k_probe_num'] and cfg['q_probe_num'] == cfg['v_probe_num']:
+        if cfg['q_probe_ratio'] == cfg['k_probe_ratio'] and cfg['q_probe_ratio'] == cfg['v_probe_ratio']:
             probe, selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'])
         else:
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
@@ -1174,9 +1178,10 @@ class LlamaAttention(nn.Module):
                     if cfg['mode'] == 'sync':
                         probe_qk_out_dim_indices, probe_qk_out_dim_indices_for_rope, probe_vo_out_dim_indices, attn_weights, attn_output, past_key_value = self.probe_process(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
                         if cfg['onlyprobe'] == True:
-                            attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.v_head_dim)
-                            # match the shape, and will not count the flops for this part
-                            attn_output = self.o_proj(attn_output, in_dim_indices=probe_vo_out_dim_indices)
+                            # attn_output = attn_output.reshape(bsz, q_len, self.num_heads * self.head_dim)
+                            # # match the shape, and will not count the flops for this part
+                            # attn_output = self.o_proj(attn_output, cal_attn_probe_out_dim_metric=True)
+                            attn_output = torch.zeros((cfg['batch_size'], cfg['seq_len'], self.hidden_size), device=hidden_states.device, dtype=hidden_states.dtype)
                             if not output_attentions:
                                 attn_weights = None
                             return attn_output, attn_weights, past_key_value
@@ -1651,7 +1656,7 @@ class LlamaDecoderLayer(nn.Module):
         # )
         # hidden_states = residual + hidden_states
         residual = hidden_states
-        print('hiddenstateshape', hidden_states.shape)
+        # print('hiddenstateshape', hidden_states.shape)
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         if self.check_asyncintra_attention():

@@ -10,7 +10,7 @@ from config import cfg
 import torch
 from collections.abc import Iterable, Sequence, Mapping
 from itertools import repeat
-from module import load
+
 
 KB = 1 << 10
 MB = 1 << 20
@@ -49,7 +49,11 @@ def get_model_profile(tag, model_prof, onlyprobe=False):
     return copy.deepcopy(info_list)
 
 def load_dense_model():
-    result_path = os.path.join('..', 'output', 'result')
+    from .io import load
+    # result_path = os.path.join('..', 'output', 'result')
+
+    current_script_dir = os.path.dirname(__file__)
+    result_path = os.path.join(current_script_dir, '..', 'output', 'result')
     dense_name_list = cfg['model_tag'].split('_')
     # batch_size
     dense_name_list[4] = str(cfg[cfg['model_name']]['batch_size']['test'])
@@ -68,8 +72,10 @@ def load_dense_model():
     # cust_tgt_modules
     dense_name_list[12] = 'None'
     dense_model_path = os.path.join(result_path, '_'.join(dense_name_list))
+    print('result_path', result_path)
     if not os.path.exists(dense_model_path):
         dense_model_path = os.path.join(result_path, 'dense', '_'.join(dense_name_list))
+        print('dense_model_path', dense_model_path)
         if not os.path.exists(dense_model_path):
             return None, None
     dense_res = load(dense_model_path)
@@ -88,7 +94,7 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, onlyprobe_inf
             pruned_probe_flops = sum([onlyprobe_info_list[i][1] for i in range(len(onlyprobe_info_list))])
             pruned_fullinf_flops = pruned_total_flops - pruned_probe_flops
         else:
-            puned_probe_flops = 0
+            pruned_probe_flops = 0
             pruned_fullinf_flops = pruned_total_flops
 
         dataset_size = cfg['dataset_size']['test']
@@ -135,7 +141,7 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, onlyprobe_inf
             'total_FLOPs_ratio_for_pruned_layers': pruned_layer_pruned_total_flops / (pruned_layer_dense_total_flops + 1e-6),
             'fullinf_FLOPs_ratio_for_all_layers': pruned_fullinf_flops / (dense_total_flops + 1e-6),
             'fullinf_FLOPs_ratio_for_pruned_layers': pruned_layer_pruned_fullinf_flops / (pruned_layer_dense_total_flops + 1e-6),
-            'probe_FLOPs_ratio_for_all_layers': puned_probe_flops / (dense_total_flops + 1e-6),
+            'probe_FLOPs_ratio_for_all_layers': pruned_probe_flops / (dense_total_flops + 1e-6),
             'probe_FLOPs_ratio_for_pruned_layers': pruned_layer_pruned_probe_flops / (pruned_layer_dense_total_flops + 1e-6),
         }
 
@@ -152,7 +158,7 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, onlyprobe_inf
         print(f"dense FLOPs ({FLOPS_UNIT[1]}): ", dense_total_flops/FLOPS_UNIT[0], flush=True)
         print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
         print('total_FLOPs_ratio_for_all_layers: ', info['total_FLOPs_ratio_for_all_layers'], flush=True)
-        print("total_FLOPs_ratio_for_pruned_layers", info['FLOPs_ratio_for_pruned_layers'])
+        print("total_FLOPs_ratio_for_pruned_layers", info['total_FLOPs_ratio_for_pruned_layers'])
         print('fullinf_FLOPs_ratio_for_all_layers: ', info['fullinf_FLOPs_ratio_for_all_layers'], flush=True)
         print("fullinf_FLOPs_ratio_for_pruned_layers", info['fullinf_FLOPs_ratio_for_pruned_layers'])
         print('probe_FLOPs_ratio_for_all_layers: ', info['probe_FLOPs_ratio_for_all_layers'], flush=True)
@@ -187,7 +193,6 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, onlyprobe_inf
         print(f'pruned_duration_token_per_second', dataset_size*cfg['seq_len']/pruned_duration, flush=True)
 
         print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
-        print("FLOPs_ratio_for_pruned_layers", info['FLOPs_ratio_for_pruned_layers'])
         print('Summary Finished ---------\n')
         logger.append(info, 'test')
 

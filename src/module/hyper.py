@@ -206,13 +206,13 @@ def process_control():
             
             cfg['probe_generation_type'] = probe_info_list[0].split('+')
             for probe_type in cfg['probe_generation_type']:
-                if probe_type not in ['rank', 'mean', 'absnml']:
+                if not any(term in probe_type for term in ['rank', 'mean', 'absnml']):
                     raise ValueError('probe_generation_type is not valid')
             
             for key in prune_keys:
                 # default
-                print(probe_info_list[prune_keys.index(key)+2], probe_info_list[prune_keys.index(key)+2] is None, prune_keys.index(key)+2)
-                cfg[f'{key}_prune'] = probe_info_list[prune_keys.index(key)+2]
+                print(probe_info_list[prune_keys.index(key)+1], probe_info_list[prune_keys.index(key)+1] is None, prune_keys.index(key)+1)
+                cfg[f'{key}_prune'] = probe_info_list[prune_keys.index(key)+1]
                 # cfg[f'{key}_probe_num'] = 1
                 # cfg[f'{key}_probe_size'] = int(cfg['batch_size'] // 1)
 
