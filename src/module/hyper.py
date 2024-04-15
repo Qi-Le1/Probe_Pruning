@@ -55,6 +55,7 @@ def process_control():
         else:
             cfg['tc_multiple'] = 64
 
+
     cfg['model_name'] = cfg['control']['model_name']
     model_name = cfg['model_name']
     cfg['task_name'] = cfg['control']['task_name']
@@ -325,6 +326,8 @@ def process_control():
     #     raise ValueError('probe_num needs to be divisible by batch size')
 
     cfg['logger_detailed_info'] = False
+    cfg['onlyprobe'] = False
+    cfg['onlyprobeinfo'] = True
     print('cfg: ', cfg)
     return
 

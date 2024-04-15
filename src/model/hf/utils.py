@@ -1,6 +1,10 @@
 import torch
 from config import cfg
 
+
+
+
+
 def rank_process(x, probe_num, probe_size):
     if 'optimalseq' in cfg['probe_info']:
         l2_norms = torch.linalg.vector_norm(x, ord=2, dim=2)
@@ -29,9 +33,6 @@ def rank_process(x, probe_num, probe_size):
         # print('selected_sequences', selected_sequences.shape, l2_norms)
         return selected_sequences, sorted_indices
 
-    
-
-
     if 'bsz' in cfg['probe_info']:
         l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(1, 2))
     elif 'seq' in cfg['probe_info']:
@@ -58,8 +59,6 @@ def rank_process(x, probe_num, probe_size):
     elif 'hd' in cfg['probe_info']:
         return x[:, :, sorted_indices], sorted_indices
 
-def seq_optimal_rank():
-    pass
 
 def mean_process(x, probe_num, probe_size):
     if 'bsz' in cfg['probe_info']:
@@ -87,8 +86,9 @@ def absnml_process(x, probe_num, probe_size):
     return probe
 
 
-
-def generate_probe(x, probe_ratio_list, probe_size):
+def generate_probe(x, probe_ratio_list):
+    # seq rank needs this to combine with the global metric
+    selected_indices = None
     for i in range(len(cfg['probe_generation_type'])):
         probe_type = cfg['probe_generation_type'][i]
         probe_ratio = probe_ratio_list[i]
@@ -96,15 +96,28 @@ def generate_probe(x, probe_ratio_list, probe_size):
         if 'bsz' in probe_type:
             probe_num = int(x.size(0) * probe_ratio)
             probe_size = x.size(0) // probe_num
+            if x.size(0) % probe_num != 0:
+                x = x[:probe_num * probe_size, :, :]
+        elif 'seq' in probe_type:
+            probe_num = int(x.size(1) * probe_ratio)
+            probe_size = x.size(1) // probe_num
+            if x.size(1) % probe_num != 0:
+                x = x[:, :probe_num * probe_size, :]
+        elif 'hd' in probe_type:
+            probe_num = int(x.size(2) * probe_ratio)
+            probe_size = x.size(2) // probe_num
+            if x.size(2) % probe_num != 0:
+                x = x[:, :, :probe_num * probe_size]
 
         if probe_type == 'rank':
-            return rank_process(x, probe_num, probe_size)
+            x, selected_indices = rank_process(x, probe_num, probe_size)
         elif probe_type == 'mean':
-            return mean_process(x, probe_num, probe_size)
+            x = mean_process(x, probe_num, probe_size)
         elif probe_type == 'absnml':
-            return absnml_process(x, probe_num, probe_size)
-        elif probe_type == 'nml':
-            return nml_process(x, probe_num, probe_size)
+            x = absnml_process(x, probe_num, probe_size)
+    return x, selected_indices
+    
+
 
 
 

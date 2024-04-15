@@ -45,10 +45,10 @@ def main():
         runExperiment()
     return
 
-def prepare_cude_events(model):
-    if 'llama-2' in cfg['model_name']:
-        for i in range(model.config.num_hidden_layers):
-            cfg[f'cuda_events_mlp_{i}'] = torch.cuda.Event()
+# def prepare_cude_events(model):
+#     if 'llama-2' in cfg['model_name']:
+#         for i in range(model.config.num_hidden_layers):
+#             cfg[f'cuda_events_mlp_{i}'] = torch.cuda.Event()
         
 
 def runExperiment():
@@ -59,32 +59,9 @@ def runExperiment():
     makedir_exist_ok(result_path)
 
     cfg['epoch'] = 0 
-    dense_name_list = cfg['model_tag'].split('_')
-    # batch_size
-    dense_name_list[4] = str(cfg[cfg['model_name']]['batch_size']['test'])
-    # prune_hyper
-    dense_name_list[6] = '0'
-    # prune_metric
-    dense_name_list[7] = 'None'
-    # prune_method
-    dense_name_list[8] = 'dense'
-    # mode
-    dense_name_list[9] = 'sync'
-    # calib_info
-    dense_name_list[10] = 'None'
-    # probe_info
-    dense_name_list[11] = 'None'
-    # cust_tgt_modules
-    dense_name_list[12] = 'None'
-    dense_model_path = os.path.join(result_path, '_'.join(dense_name_list))
-    if not os.path.exists(dense_model_path):
-        dense_model_path = os.path.join(result_path, 'dense', '_'.join(dense_name_list))
-    dense_res = load(dense_model_path)
-    dense_info_list, dense_duration = dense_res['dense_info_list'], dense_res['dense_duration']
-
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
-    prepare_cude_events(model)
+    # prepare_cude_events(model)
     dataset = process_dataset(dataset, tokenizer)
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
@@ -95,21 +72,26 @@ def runExperiment():
         print('Running Calibration ...')
         calibration_data_loader = make_calibration_dataloader(tokenizer)
         cfg['calibration_stage'] = True
-        print('len(calibration_data_loader)', len(calibration_data_loader['train']))
         run_calibration(model, calibration_data_loader['train'])
         cfg['calibration_stage'] = False
         print('Calibration Done...')
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    # return
     inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
     pruned_info_list = get_model_profile('pruned', model_prof)
+    onlyprobe_info_list = None
+    if 'probe' in cfg['prune_method'] and cfg['onlyprobeinfo'] == True:
+        cfg['onlyprobe'] = True
+        # change mode to sync to measure the probe flops
+        cfg['mode'] = 'sync'
+        inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
+        onlyprobe_info_list = get_model_profile('pruned', model_prof, onlyprobe=True)
+    dense_info_list, dense_duration = summarize_info_list(pruned_info_list, inference_duration, test_logger, onlyprobe_info_list)
     
-    # print('dense_info_list', dense_info_list[0], dense_info_list[1])
-    summarize_info_list(dense_info_list, pruned_info_list, dense_duration, inference_duration, test_logger)
     evaluation = metric.evaluate('test', 'full')
     print('evaluation_for_full', evaluation)
     # thread lock bug
+    test_logger.save(False)
     test_logger.writer = None
     remove_non_picklable_items(cfg)
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
@@ -358,6 +340,7 @@ def test(data_loader, model, model_prof, metric, logger):
 
         # start_time = time.time()
         model_prof.start_profile()
+        model_prof.reset_profile()
         update_model_prof(model_prof)
         torch.cuda.cudart().cudaProfilerStart()
         for i, input in enumerate(data_loader):
