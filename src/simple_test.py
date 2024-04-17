@@ -22,19 +22,38 @@ GPU: NVIDIA GeForce RTX 4090
 import re
 import torch
 
-input1 = 'each0.1+0.1'
-input2 = 'each'
-input3 = 'each0.1'
-float_pattern = re.compile(r'\d*\.?\d+')
-# Find all matches and convert them to floats
-floats1 = [float(match) for match in float_pattern.findall(input1)]
-floats2 = [float(match) for match in float_pattern.findall(input2)]
-floats3 = [float(match) for match in float_pattern.findall(input3)]
+# input1 = 'each0.1+0.1'
+# input2 = 'each'
+# input3 = 'each0.1'
+# float_pattern = re.compile(r'\d*\.?\d+')
+# # Find all matches and convert them to floats
+# floats1 = [float(match) for match in float_pattern.findall(input1)]
+# floats2 = [float(match) for match in float_pattern.findall(input2)]
+# floats3 = [float(match) for match in float_pattern.findall(input3)]
 
-print(floats1, floats2, floats3)
+# print(floats1, floats2, floats3)
+import torch
+
+# Example values for self.in_features and async_in_dim_indices
+in_features = 10  # Just an example, set this to your actual in_features
+async_in_dim_indices = torch.tensor([2, 5, 7], dtype=torch.long).to(device='cuda')  # Example indices to exclude
+
+# Create a tensor of all indices from 0 to in_features - 1
+all_indices = torch.arange(in_features, dtype=torch.long).to(async_in_dim_indices.device)
+
+# Create a mask where we mark indices that are not in async_in_dim_indices
+mask = ~torch.isin(all_indices, async_in_dim_indices)
+
+# Apply the mask to filter out the indices
+pruned_channel_indices = all_indices[mask]
+
+# pruned_channel_indices now contains indices excluding those in async_in_dim_indices
+print(pruned_channel_indices)
 
 
-
+a = torch.tensor(1)
+b = a.reshape(1,-1)
+print(b.shape)
 # a = torch.tensor(1, dtype=torch.float16, device='cuda')
 # b = a / 1000000000000000
 # print('b', b)

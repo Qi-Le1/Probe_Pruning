@@ -40,7 +40,7 @@ from transformers.utils import (
 )
 from transformers import OPTConfig
 from config import cfg
-from ..pruning_module import HiddenRepresentationPruning, cal_prune_metric, cal_calib_prune_metric
+from ..pruning_module import HiddenRepresentationPruning
 from .utils import rank_process, mean_process, absnml_process
 
 logger = logging.get_logger(__name__)

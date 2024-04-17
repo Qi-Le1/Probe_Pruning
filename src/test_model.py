@@ -157,11 +157,11 @@ def global_determine_ratio(model, if_log=False):
         if len(attn_metric_list) > 0:
             attn_metric = torch.stack(attn_metric_list)
             sorted_prune, indices = torch.sort(attn_metric.view(-1))
-            attn_threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
+            attn_threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_ratio'])]
         if len(mlp_metric_list) > 0:
             mlp_metric = torch.stack(mlp_metric_list)
             sorted_prune, indices = torch.sort(mlp_metric.view(-1))
-            mlp_threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
+            mlp_threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_ratio'])]
 
         output_dir = "output/vis"
         os.makedirs(output_dir, exist_ok=True)

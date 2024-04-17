@@ -58,7 +58,7 @@ def load_dense_model():
     dense_name_list = cfg['model_tag'].split('_')
     # batch_size
     dense_name_list[4] = str(cfg[cfg['model_name']]['batch_size']['test'])
-    # prune_hyper
+    # prune_ratio
     dense_name_list[6] = '0'
     # prune_metric
     dense_name_list[7] = 'None'
@@ -341,7 +341,7 @@ def update_model_prof(model_prof):
 #         print(f"PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[2]/TIME_UNIT[0]:.2f} {TIME_UNIT[1]} - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - {sub_pruned_info[4]}", flush=True)
     
 #     if 'unstruct' in cfg['prune_name']:
-#         info['FLOPs_for_pruned_layers'] = cfg['prune_hyper']
+#         info['FLOPs_for_pruned_layers'] = cfg['prune_ratio']
 #     else:
 #         info['FLOPs_for_pruned_layers'] = total_target_used_params / (total_target_params + 1e-6)
     

@@ -322,9 +322,9 @@ def make_hf_model(model_name, sub_model_name=None):
     # print('model.model.layers', model.model.layers)
     model.config.use_cache = False
     print('model.config', model.config)
-    print('padding_side', padding_side)
-    for key, param in model.named_parameters():
-        print(key, param.device)
+    
+    num_hidden_layers = model.config.num_hidden_layers
+    cfg['prune_ratio'] = num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'] 
     return model, tokenizer
 
 

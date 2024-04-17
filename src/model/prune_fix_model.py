@@ -506,11 +506,11 @@ def cal_remove_neuron(args, model):
     hidden_size = model.config.hidden_size
     num_layers = model.config.num_hidden_layers
     if hardcode_struct == "UL-MM":
-        remove_params = cfg['prune_hyper'] * (intermediate_size * hidden_size * 3 + hidden_size * hidden_size * 4)
+        remove_params = cfg['prune_ratio'] * (intermediate_size * hidden_size * 3 + hidden_size * hidden_size * 4)
         remove_head_params = hidden_size * 4 * (args.remove_heads // num_layers) * 128
         return int((remove_params - remove_head_params) / (hidden_size * 3))
     else:
-        remove_params = num_layers * cfg['prune_hyper'] * (intermediate_size * hidden_size * 3 + hidden_size * hidden_size * 4)
+        remove_params = num_layers * cfg['prune_ratio'] * (intermediate_size * hidden_size * 3 + hidden_size * hidden_size * 4)
         remove_head_params = hidden_size * 4 * args.remove_heads * 128
         return int((remove_params - remove_head_params) / (hidden_size * 3))
 
@@ -590,7 +590,7 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
                 W_metric = metric_process(mysetting, W_metric)
                 if hardcode_struct == "UL-UM":
                     W_metric = W_metric.reshape(-1, 128).sum(dim=1)
-                    thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
+                    thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_ratio']*layer.self_attn.num_heads)].cpu()
                     W_mask = (W_metric>=thresh)
                     attn_mask.append(W_mask)
                     compress(i,layer, W_mask, None, None, None, dev, bias=mysetting.add_bias, unstr=False)
@@ -606,7 +606,7 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
                 W_metric = metrics[cfg['prune_metric']](wrapped_layers, subset, name)
                 W_metric = metric_process(mysetting, W_metric)
                 if hardcode_struct == "UL-UM":
-                    thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
+                    thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_ratio'])].cpu()
                     W_mask = (W_metric>=thresh)
                     mlp_mask.append(W_mask)
                     compress(i, layer, None, W_mask, None, None, dev, bias=mysetting.add_bias, unstr=False)
@@ -669,16 +669,16 @@ def prune_flap_llama(model, tokenizer, dataloader, logger_info, device=torch.dev
 
             # print('attn_metric.numel()', attn_metric.numel())
             # print('mlp_metric.numel()', mlp_metric.numel())
-            # print('compression_weight', compression_weight.shape, compression_weight, torch.sum(compression_weight), torch.sum(compression_weight)*(1 - cfg['prune_hyper']) )
-            # print('zzz', torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper']) ))
-            # print('final index', torch.argmin(torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper']) )))
-            # threshold = sorted_prune[torch.argmin(torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_hyper']) ))]
+            # print('compression_weight', compression_weight.shape, compression_weight, torch.sum(compression_weight), torch.sum(compression_weight)*(1 - cfg['prune_ratio']) )
+            # print('zzz', torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_ratio']) ))
+            # print('final index', torch.argmin(torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_ratio']) )))
+            # threshold = sorted_prune[torch.argmin(torch.abs( torch.cumsum(compression_weight, 0) - torch.sum(compression_weight)*(1 - cfg['prune_ratio']) ))]
 
             # flap tends to prune more mlp, adjust the threshold to align with FLOPs summary in the paper
             if len(attn_metric_list) > 0 and len(mlp_metric_list) > 0:
-                threshold = sorted_prune[int(sorted_prune.numel() * (cfg['prune_hyper']-0.02))]
+                threshold = sorted_prune[int(sorted_prune.numel() * (cfg['prune_ratio']-0.02))]
             else:
-                threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
+                threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_ratio'])]
             if len(attn_metric_list) > 0:
                 attn_mask = (attn_metric > threshold)
             if len(mlp_metric_list) > 0:
@@ -877,7 +877,7 @@ def prune_pq_llama(model, tokenizer, dataloader, logger_info, device=torch.devic
     
     pq_p = cfg['pq_p']
     pq_q = cfg['pq_q']
-    eta = cfg['prune_hyper']
+    eta = cfg['prune_ratio']
     pq_beta = cfg['pq_beta']
     pq_gamma = cfg['pq_gamma']
     # print("loading calibdation data")
@@ -1142,7 +1142,7 @@ def prune_probe_llama(model, tokenizer, dataloader, logger_info, device=torch.de
                 else:
                     W_metric = W_metric.reshape(-1, 128).sum(dim=1)    # importance score of each head
                     print('attnW_metric', W_metric.shape, W_metric)
-                    thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
+                    thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_ratio']*layer.self_attn.num_heads)].cpu()
                     W_mask = (W_metric>=thresh)
                     compress(i,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
                 attn_baseline_inp_list.append(wrapped_layers[name].baseline_inp.type(torch.half))
@@ -1151,7 +1151,7 @@ def prune_probe_llama(model, tokenizer, dataloader, logger_info, device=torch.de
                     mlp_metric_list.append(W_metric.cpu())
                 else:
                     print('mlpW_metric', W_metric.shape, W_metric, int(W_metric.numel()))
-                    thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
+                    thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_ratio'])].cpu()
                     W_mask = (W_metric>=thresh)
                     compress(i, layer, None, W_mask, None, None, dev, bias=False, unstr=False)
                 mlp_baseline_inp_list.append(wrapped_layers[name].baseline_inp.type(torch.half))
@@ -1189,7 +1189,7 @@ def prune_probe_llama(model, tokenizer, dataloader, logger_info, device=torch.de
         elif mlp_metric is not None:
             prune_metric = mlp_metric.view(-1)
         sorted_prune, indices = torch.sort(prune_metric)
-        threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
+        threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_ratio'])]
         print('threshold', threshold)
         if len(attn_metric_list) > 0:
             attn_mask = (attn_metric > threshold)
@@ -1284,7 +1284,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
                     else:
                         W_metric = W_metric.reshape(-1, 128).sum(dim=1)    # importance score of each head
                         print('attnW_metric', W_metric.shape, W_metric)
-                        thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
+                        thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_ratio']*layer.self_attn.num_heads)].cpu()
                         W_mask = (W_metric>=thresh)
                         compress(i,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
                     attn_baseline_inp_list.append(wrapped_layers[name].baseline_inp.type(torch.half))
@@ -1310,7 +1310,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
                         mlp_metric_list.append(W_metric.cpu())
                     else:
                         print('mlpW_metric', W_metric.shape, W_metric, int(W_metric.numel()))
-                        thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
+                        thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_ratio'])].cpu()
                         W_mask = (W_metric>=thresh)
                         compress(i, layer, None, W_mask, None, None, dev, bias=False, unstr=False)
                     # mlp_baseline_inp_list.append(wrapped_layers[name].baseline_inp.type(torch.half))
@@ -1328,7 +1328,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
                     else:
                         W_metric = W_metric.reshape(-1, 128).sum(dim=1)    # importance score of each head
                         print('attnW_metric', W_metric.shape, W_metric)
-                        thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
+                        thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_ratio']*layer.self_attn.num_heads)].cpu()
                         W_mask = (W_metric>=thresh)
                         compress(i,layer, W_mask, None, None, None, dev, bias=False, unstr=False)
                     attn_baseline_inp_list.append(wrapped_layers[name].baseline_inp.type(torch.half))
@@ -1337,7 +1337,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
                         mlp_metric_list.append(W_metric.cpu())
                     else:
                         print('mlpW_metric', W_metric.shape, W_metric, int(W_metric.numel()))
-                        thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
+                        thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_ratio'])].cpu()
                         W_mask = (W_metric>=thresh)
                         compress(i, layer, None, W_mask, None, None, dev, bias=False, unstr=False)
                     mlp_baseline_inp_list.append(wrapped_layers[name].baseline_inp.type(torch.half))
@@ -1376,7 +1376,7 @@ def prune_wanda_sp_llama(model, tokenizer, dataloader, logger_info, device=torch
         elif mlp_metric is not None:
             prune_metric = mlp_metric.view(-1)
         sorted_prune, indices = torch.sort(prune_metric)
-        threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_hyper'])]
+        threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_ratio'])]
         print('threshold', threshold)
         if len(attn_metric_list) > 0:
             attn_mask = (attn_metric > threshold)
@@ -1438,11 +1438,11 @@ def prune_magnitude_sp_llama(model, tokenizer, dataloader, device=torch.device("
                 W_metric = standarlization(W_metric)
             if name == 'self_attn.o_proj':
                 W_metric = W_metric.reshape(-1, 128).sum(dim=1) # importance score of each head
-                thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_hyper']*layer.self_attn.num_heads)].cpu()
+                thresh = torch.sort(W_metric.cuda())[0][int(cfg['prune_ratio']*layer.self_attn.num_heads)].cpu()
                 W_mask = (W_metric>=thresh)
                 compress(i,layer, W_mask, None, None, None, device, bias=False, unstr=False)
             else:
-                thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_hyper'])].cpu()
+                thresh = torch.sort(W_metric.cuda())[0][int(W_metric.numel()*cfg['prune_ratio'])].cpu()
                 W_mask = (W_metric>=thresh)
                 compress(i,layer, None, W_mask, None, None, device, bias=False, unstr=False)
             

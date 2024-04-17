@@ -240,30 +240,27 @@ class Linear(nn.Linear, EriLayer):
         if ('o_proj' in self.key or 'down_proj' in self.key) and cfg['mode'] == 'asyncinter':
             self.async_interbatch_in_dim_indices = torch.arange((in_features), device=self.weight.data.device, dtype=torch.int32)
 
-        if 'meanglobalinput' in cfg['prune_method']:
-            self.mean_for_all_batches = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
-            self.variance_for_all_batches = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+
 
         self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
 
-        
-        if 'probe' in cfg['prune_method']:
-            self.baseline_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-                self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-                # self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=torch.float32)
-            elif self.prune_metric == "flap":
-                self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-            else:
-                raise ValueError(f"Unknown pruning method")
+        # set same shape for all baselines for comparison
+        self.baseline_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+        if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+            self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            # self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=torch.float32)
+        elif self.prune_metric == "flap":
+            self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
         else:
-            self.baseline_inp = torch.zeros((in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-                self.scaler_inp = torch.zeros((in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-            elif self.prune_metric == "flap":
-                self.fluc_inp = torch.zeros((in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-            else:
-                raise ValueError(f"Unknown pruning method")
+            raise ValueError(f"Unknown pruning method")
+        # else:
+            # self.baseline_inp = torch.zeros((in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            # if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+            #     self.scaler_inp = torch.zeros((in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            # elif self.prune_metric == "flap":
+            #     self.fluc_inp = torch.zeros((in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            # else:
+            #     raise ValueError(f"Unknown pruning method")
 
 
     # def update_global_input_distribution(self, inp, update_indices):
@@ -477,62 +474,75 @@ class Linear(nn.Linear, EriLayer):
         # if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
         #     raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
         cur_device = inp.device
+        update_indices = update_indices.to(cur_device)
+        self.nsamples = self.nsamples.to(cur_device)
 
         momentum = cfg['ema_momentum']
         print('ema update', self.key, momentum, flush=True)
         # if is_probe and 'compressfillpbmetric' in cfg['prune_method']:
         #     momentum = 1 - ((1 - momentum) / (default_batch_size))
-        if 'probe' in cfg['prune_method']:
-            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-                self.scaler_inp = self.scaler_inp.to(cur_device)
-                print(' self.scaler_inp.to(torch.float16)', self.scaler_inp.dtype, flush=True)
-                # self.nsamples = self.nsamples.to(cur_device)
-                update_indices = update_indices.to(cur_device)
-                self.scaler_inp[:, update_indices] *= momentum
-                has_nan = torch.isnan(self.scaler_inp).any()
-                has_inf = torch.isinf(self.scaler_inp).any()
-                if has_nan:
-                    print("Does 'self.scaler_inp111' contain NaN values? Yes")
-                if has_inf:
-                    print("Does 'self.scaler_inp111' contain infinite values? Yes")
-                if cfg['calibration_stage'] == True:
-                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-                    # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
+        if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+            self.scaler_inp = self.scaler_inp.to(cur_device)
+            print(' self.scaler_inp.to(torch.float16)', self.scaler_inp.dtype, flush=True)
+            # self.nsamples = self.nsamples.to(cur_device)
+            self.scaler_inp[:, update_indices] *= momentum
+            has_nan = torch.isnan(self.scaler_inp).any()
+            has_inf = torch.isinf(self.scaler_inp).any()
+            if has_nan:
+                print("Does 'self.scaler_inp111' contain NaN values? Yes")
+            if has_inf:
+                print("Does 'self.scaler_inp111' contain infinite values? Yes")
+            if cfg['calibration_stage'] == True:
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
 
-                elif cfg['calibration_stage'] == False:
-                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-                    # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
-                # denominator = (self.nsamples[update_indices] + )
-                self.scaler_inp[:, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
+            elif cfg['calibration_stage'] == False:
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
+            # denominator = (self.nsamples[update_indices] + )
+            self.scaler_inp[:, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
 
-                has_nan = torch.isnan(self.scaler_inp).any()
-                has_inf = torch.isinf(self.scaler_inp).any()
-                if has_nan:
-                    print("Does 'self.scaler_inp' contain NaN values? Yes")
-                if has_inf:
-                    print("Does 'self.scaler_inp' contain infinite values? Yes")
-        else:
-            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-                # print('mpomentum', momentum)
-                self.scaler_inp = self.scaler_inp.to(cur_device)
-                # self.nsamples = self.nsamples.to(cur_device)
-                update_indices = update_indices.to(cur_device)
+            has_nan = torch.isnan(self.scaler_inp).any()
+            has_inf = torch.isinf(self.scaler_inp).any()
+            if has_nan:
+                print("Does 'self.scaler_inp' contain NaN values? Yes")
+            if has_inf:
+                print("Does 'self.scaler_inp' contain infinite values? Yes")
+        elif self.prune_metric == "flap":
+            self.baseline_inp = self.baseline_inp.to(cur_device)
+            self.fluc_inp = self.fluc_inp.to(cur_device)
 
-                self.scaler_inp[update_indices] *= momentum
-                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=(0,1)) ** 2, max=cfg['data_type_max'])
-                if cfg['logger_detailed_info'] == True:
-                    print(f'{self.key}_inp', inp)
-                    print('self.scaler_inp', self.scaler_inp)
-                    print(f'{self.key}update_indices', update_indices)
-                    print(f'{self.key}_norm_squared', norm_squared)
-                # print(f'{self.key}_norm_squared', norm_squared, flush=True)
-                # print('update_indices', update_indices.shape, flush=True)
-                # print('norm_squared', norm_squared.shape, flush=True)
-                # denominator = (self.nsamples[update_indices] + batch_size)
-                # print('self.scaler_inp', self.scaler_inp.shape, flush=True)
-                # print('norm_squared', norm_squared.shape, flush=True)
-                # print('update_indices', update_indices.shape, flush=True)
-                self.scaler_inp[update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
+            old_baseline_inp = self.baseline_inp.clone()
+            self.baseline_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+            self.baseline_inp[:, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
+            
+            if torch.all(self.nsamples == 0):
+                pass
+            else:
+                self.fluc_inp[:, update_indices] *= (self.nsamples[update_indices] - 1) / (self.nsamples[update_indices] + batch_size - 1)
+                self.fluc_inp[:, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=(0,1)) / (self.nsamples[update_indices] + batch_size)   # a²+b²+c²...没开根号
+        # else:
+        #     if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+        #         # print('mpomentum', momentum)
+        #         self.scaler_inp = self.scaler_inp.to(cur_device)
+        #         # self.nsamples = self.nsamples.to(cur_device)
+        #         update_indices = update_indices.to(cur_device)
+
+        #         self.scaler_inp[update_indices] *= momentum
+        #         norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=(0,1)) ** 2, max=cfg['data_type_max'])
+        #         if cfg['logger_detailed_info'] == True:
+        #             print(f'{self.key}_inp', inp)
+        #             print('self.scaler_inp', self.scaler_inp)
+        #             print(f'{self.key}update_indices', update_indices)
+        #             print(f'{self.key}_norm_squared', norm_squared)
+        #         # print(f'{self.key}_norm_squared', norm_squared, flush=True)
+        #         # print('update_indices', update_indices.shape, flush=True)
+        #         # print('norm_squared', norm_squared.shape, flush=True)
+        #         # denominator = (self.nsamples[update_indices] + batch_size)
+        #         # print('self.scaler_inp', self.scaler_inp.shape, flush=True)
+        #         # print('norm_squared', norm_squared.shape, flush=True)
+        #         # print('update_indices', update_indices.shape, flush=True)
+        #         self.scaler_inp[update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
 
 
         # else:
@@ -543,79 +553,45 @@ class Linear(nn.Linear, EriLayer):
         # self.async_interbatch_metric_index += 1
         # self.nsamples[update_indices] += batch_size
 
-    # def update_global_metric_score_distribution(self, inp, update_indices, batch_size=None, is_probe=False):
     def update_global_metric_score_distribution(self, inp, update_indices):
         if cfg['cur_batch_index'] == 0:
             return
         
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
-        # batch_size = inp.shape[0] if batch_size is None else batch_size
         batch_size = inp.shape[0]
         default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
         if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
             raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
         cur_device = inp.device
+        update_indices = update_indices.to(cur_device)
+        self.nsamples = self.nsamples.to(cur_device)
 
-        if 'probe' in cfg['prune_method']:
-            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-                self.scaler_inp = self.scaler_inp.to(cur_device)
-                self.nsamples = self.nsamples.to(cur_device)
-                update_indices = update_indices.to(cur_device)
+        if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+            self.scaler_inp = self.scaler_inp.to(cur_device)
 
-                self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+            self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+            if cfg['calibration_stage'] == True:
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+            elif cfg['calibration_stage'] == False:
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+            denominator = (self.nsamples[update_indices] + batch_size)
+            self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
+        elif self.prune_metric == "flap":
+            self.baseline_inp = self.baseline_inp.to(cur_device)
+            self.fluc_inp = self.fluc_inp.to(cur_device)
 
-                if cfg['calibration_stage'] == True:
-                    # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
-                    # inp = inp.type(torch.float32)
-                    # norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
-                    # denominator = (self.nsamples[update_indices] + batch_size)
-                    # self.scaler_inp[:, update_indices] += norm_squared / denominator
-                elif cfg['calibration_stage'] == False:
-                    # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
-                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
-                denominator = (self.nsamples[update_indices] + batch_size)
-                # self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
-                self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
-                # self.scaler_inp[:, update_indices] += torch.div(norm_squared / denominator)
-        else:
-            if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-                self.scaler_inp = self.scaler_inp.to(cur_device)
-                self.nsamples = self.nsamples.to(cur_device)
-                update_indices = update_indices.to(cur_device)
-                # print('self.key', self.key, flush=True)
-                # print('shape', self.scaler_inp.shape)
-                # print("self.scaler_inp[update_indices].shape:", self.scaler_inp[update_indices].shape)
-                # print("self.nsamples[update_indices].shape:", self.nsamples[update_indices].shape)
-                # print("batch_size:", batch_size)
-                self.scaler_inp[update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=(0,1)) ** 2, max=cfg['data_type_max'])
-                # print(f'{self.key}_norm_squared', norm_squared, flush=True)
-                # print('update_indices', update_indices.shape, flush=True)
-                # print('norm_squared', norm_squared.shape, flush=True)
-                denominator = (self.nsamples[update_indices] + batch_size)
-                self.scaler_inp[update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
-                # print('self.scaler_inp', self.scaler_inp, flush=True)
-            elif self.prune_metric == "flap":
-                # TODO: update later
-                old_baseline_inp = self.baseline_inp
-                self.baseline_inp *= self.nsamples / (self.nsamples + batch_size)
-                self.baseline_inp += torch.mean(inp, dim=1) / (self.nsamples + batch_size)
-                self.baseline_inp = self.baseline_inp.to(cur_device)
-                old_baseline_inp = old_baseline_inp.to(cur_device)
-                if self.nsamples == 0:
-                    pass
-                else:
-                    self.fluc_inp = self.fluc_inp.to(cur_device)
-                    self.fluc_inp *= (self.nsamples - 1) / (self.nsamples + batch_size - 1)
-                    self.fluc_inp += torch.sum((inp - self.baseline_inp.unsqueeze(1)) * (inp - old_baseline_inp.unsqueeze(1)), dim=1) / (self.nsamples + batch_size)   # a²+b²+c²...没开根号
+            old_baseline_inp = self.baseline_inp.clone()
+            self.baseline_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+            self.baseline_inp[:, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
+            
+            if torch.all(self.nsamples == 0):
+                pass
+            else:
+                self.fluc_inp[:, update_indices] *= (self.nsamples[update_indices] - 1) / (self.nsamples[update_indices] + batch_size - 1)
+                self.fluc_inp[:, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size)   # a²+b²+c²...没开根号
         self.nsamples[update_indices] += batch_size
 
-    def get_global_input_distribution(self):
-        # return mean and std
-        # print('self.samples_num', self.samples_num, flush=True)
-        return self.mean_for_all_batches, torch.sqrt(self.variance_for_all_batches / (self.samples_num - 1))
         
     def get_global_metric_score_distribution(self):
         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
@@ -665,7 +641,7 @@ class Linear(nn.Linear, EriLayer):
         if self.async_interbatch_weight_index.device != self.weight.device:
             self.async_interbatch_weight_index = self.async_interbatch_weight_index.to(self.weight.device)
         self.async_interbatch_weight_index += 1
-        # print('async_interbatch_weight_index', async_interbatch_weight_index, self.key)
+        print('async_interbatch_weight_index', self.async_interbatch_weight_index, self.key)
         return
     
     def prepare_async_intrabatch_weight(self, **kwargs):
@@ -743,6 +719,7 @@ class Linear(nn.Linear, EriLayer):
     
     # no bias in llama-2
     def forward(self, x: torch.Tensor, **kwargs):
+        print('key', self.key, flush=True)
         with torch.no_grad():
             forward_start_time = time.time()
             previous_dtype = x.dtype
@@ -808,7 +785,20 @@ class Linear(nn.Linear, EriLayer):
                         # torch.cuda.synchronize(cfg['cuda_stream1'])
                     previous_dtype = x.dtype
                     result = F.linear(x, weight, bias=None)
-                    # result = result.to(previous_dtype)
+
+                    if 'o_proj' in self.key or 'down_proj' in self.key:
+                        if 'flap' in cfg['prune_metric'] and 'bias' in cfg['prune_method']:
+                            calib = torch.mean(self.baseline_inp, dim=0)
+                            calib = calib.to(x.device)
+                            # all_indices = torch.arange(self.in_features, dtype=torch.long).to(device=x.device)
+                            async_in_dim_indices = async_in_dim_indices.to(device=x.device)
+                            # print('all_indices', all_indices.dtype, all_indices.shape, all_indices.device, flush=True)
+                            print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, async_in_dim_indices.device, flush=True)
+                            calib[async_in_dim_indices] = 0
+                            # pruned_channel_indices = all_indices[mask]
+                            compensate_bias = F.linear(calib, self.weight, bias=None)
+                            result += compensate_bias
+                    result = result.to(previous_dtype)
                     return result
                 elif cfg['mode'] == 'asyncintra':
                     weight = self.get_weight()
@@ -836,7 +826,20 @@ class Linear(nn.Linear, EriLayer):
                         # torch.cuda.synchronize(cfg['cuda_stream1'])
                     previous_dtype = x.dtype
                     result = F.linear(x, weight, bias=None)
-                    # result = result.to(previous_dtype)
+
+                    if 'o_proj' in self.key or 'down_proj' in self.key:
+                        if 'flap' in cfg['prune_metric']:
+                            calib = torch.mean(self.baseline_inp, dim=0)
+                            calib = calib.to(x.device)
+                            # all_indices = torch.arange(self.in_features, dtype=torch.long).to(device=x.device)
+                            async_in_dim_indices = async_in_dim_indices.to(device=x.device)
+                            # print('all_indices', all_indices.dtype, all_indices.shape, all_indices.device, flush=True)
+                            print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, async_in_dim_indices.device, flush=True)
+                            calib[async_in_dim_indices] = 0
+                            # pruned_channel_indices = all_indices[mask]
+                            compensate_bias = F.linear(calib, self.weight, bias=None)
+                            result += compensate_bias
+                    result = result.to(previous_dtype)
                     return result
                 elif cfg['mode'] == 'sync':
                     weight = self.get_weight()

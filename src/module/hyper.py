@@ -61,7 +61,7 @@ def process_control():
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
     cfg['seq_len'] = int(cfg['control']['seq_len'])
-    cfg['prune_hyper'] = float(cfg['control']['prune_hyper'])
+    cfg['prune_ratio'] = float(cfg['control']['prune_ratio'])
     cfg['prune_metric'] = cfg['control']['prune_metric']
     cfg['prune_method'] = cfg['control']['prune_method']
     
@@ -172,7 +172,8 @@ def process_control():
         if match:
             # Convert the matched string to a float
             int_value = int(match.group(1))
-            cfg['skip_layers'] = int_value  
+            # layer index starts from 0
+            cfg['skip_layers'] = int_value - 1
         else:
             int_value = None
 
@@ -183,6 +184,8 @@ def process_control():
     cfg['pq_beta'] = 0.9
     cfg['pq_gamma'] = 1
     make_data_name()
+    cfg['qk_prune_way'] = 'whole'
+    cfg['vo_prune_way'] = 'whole'
     if cfg['task_name'] in ['clm', 'csr']:
         cfg['collate_mode'] = 'transformer'
         cfg['gpt2'] = {'max_length': 512}
@@ -277,11 +280,12 @@ def process_control():
 
 
             prune_keywords = ['each', 'fill', 'whole']
-            cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), None)
-            cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), None)
+            cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), 'whole')
+            cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), 'whole')
             if cfg['qk_prune_way'] is not None and cfg['vo_prune_way'] is not None:
                 assert cfg['qk_prune_way'] == cfg['vo_prune_way']
         
+
         if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['probe_info']:
             match = re.search(r'probefixratio(\d+\.\d+)', cfg['probe_info'])
             if match:

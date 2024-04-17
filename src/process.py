@@ -629,11 +629,11 @@ def make_df_history(extracted_processed_result_history):
     for exp_name in extracted_processed_result_history:
         control = exp_name.split('_')
         if len(control) == 8:
-            data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules = control
+            data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules = control
             df_name = '_'.join(
-                [data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules])
+                [data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules])
             for k in extracted_processed_result_history[exp_name]:
-                index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules, k])]
+                index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules, k])]
                 df[df_name].append(
                     pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
         else:
@@ -644,16 +644,16 @@ def make_df_history(extracted_processed_result_history):
     for exp_name in extracted_processed_result_history:
         control = exp_name.split('_')
         if len(control) == 8:
-            data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules = control
+            data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules = control
             df_name = '_'.join(
-                [data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules])
+                [data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules])
             for k in extracted_processed_result_history[exp_name]:
                 if 'of_max' in k:
                     continue
                 # print('k', k)
                 if 'duration_per_batch' in k or 'FLOPs_ratio_for_all_layers' in k or 'FLOPs_ratio_for_pruned_layers' in k or \
                     any(metric_name in k for metric_name in metric_name_list):
-                    index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules, k])]
+                    index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules, k])]
                     # a = extracted_processed_result_history[exp_name][k].reshape(1, -1)
                     df_for_xlsx[df_name].append(
                         pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
@@ -698,7 +698,7 @@ def make_vis(df_exp, df_history):
                 'pruned': '-.'
                 }
     marker = {}
-    prune_hypers = [0, 0.001, 0.01, 0.03, 0.05, 0.06, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 9999]
+    prune_ratios = [0, 0.001, 0.01, 0.03, 0.05, 0.06, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 9999]
     linestyle_patterns = {
         0: (0, (5, 5, 4)), 0.001: (6, (1, 1, 1, 1)), 0.01: (0, (2, 2, 2)), 0.03: (5, (5, 1)),
         0.05: (10, (5, 1)), 0.06: (10, (5, 3)), 0.07: (10, (5, 3)), 0.1: (0, (1, 1)),
@@ -724,7 +724,7 @@ def make_vis(df_exp, df_history):
         'llama-2': 31
     }
     for name in prune_names:
-        for hyper in prune_hypers:
+        for hyper in prune_ratios:
             linestyle[f"{name}_{hyper}"] = linestyle_patterns.get(hyper, (0, (1, 1)))
             color[f"{name}_{hyper}"] = color_patterns.get(hyper, 'orange')
 
@@ -1026,7 +1026,7 @@ def make_vis(df_exp, df_history):
         dense_time_vs_total_FLOPs_ratio = [None, None, None]
         prune_time_vs_total_FLOPs_ratio = [None, None, None]
         if len(df_name_list) == 8:
-            data_name, model_name, task_name, batch_size, seq_len, prune_hyper, prune_name, cust_tgt_modules = df_name_list
+            data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules = df_name_list
             performance_metric_max = 100
 
             prune_name_list = prune_name.split('+')
@@ -1062,10 +1062,10 @@ def make_vis(df_exp, df_history):
                 1. norm_across_other_dims distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
                 2. dense_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
                 3. pruned_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
-                2. pq_indices for each prune layer (y is pq_indices, x is all the layers, 1 for each prune_hyper)
-                3. pruned_ratio for each prune layer (y is pruned_ratio, x is all the layers, 1 for each prune_hyper)
-                4. pruned_FLOPs_ratio for each prune layer (y is pruned_FLOPs_ratio, x is all the layers, 1 for each prune_hyper)
-                5. performance vs total_FLOPs_ratio (y is performance, x is total_FLOPs_ratio, all prune_hyper in 1)
+                2. pq_indices for each prune layer (y is pq_indices, x is all the layers, 1 for each prune_ratio)
+                3. pruned_ratio for each prune layer (y is pruned_ratio, x is all the layers, 1 for each prune_ratio)
+                4. pruned_FLOPs_ratio for each prune layer (y is pruned_FLOPs_ratio, x is all the layers, 1 for each prune_ratio)
+                5. performance vs total_FLOPs_ratio (y is performance, x is total_FLOPs_ratio, all prune_ratio in 1)
             '''
 
             pq_indices_order = 0
@@ -1122,15 +1122,15 @@ def make_vis(df_exp, df_history):
 
                     #     key_for_dict = prune_name + prune_metric
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pq',temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pq',temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     draw_str_x_figure(plt, p_values, pq_indices_list, None, key_for_dict, 'P', 'PQ_index')
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-lb',temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-lb',temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     draw_str_x_figure(plt, p_values, lower_bound_list, None, key_for_dict, 'P', 'Lower bound')
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pnorm',temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: p-trend-pnorm',temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     draw_str_x_figure(plt, p_values, return_norm_list, None, key_for_dict, 'P', 'P norm')
 
@@ -1148,15 +1148,15 @@ def make_vis(df_exp, df_history):
                     #         q_values.append(q)
                     #         return_norm_list.append(return_norm)
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-pq',temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-pq',temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     draw_str_x_figure(plt, q_values, pq_indices_list, None, key_for_dict, 'Q', 'PQ_index')
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-lb',temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-lb',temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     draw_str_x_figure(plt, q_values, lower_bound_list, None, key_for_dict, 'Q', 'Lower bound')
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-qnorm',temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: q-trend-qnorm',temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     draw_str_x_figure(plt, q_values, return_norm_list, None, key_for_dict, 'Q', 'Q norm')
 
@@ -1165,9 +1165,9 @@ def make_vis(df_exp, df_history):
                     #     data.sort()
                     #     norm_across_other_dims = data
                     #     temp_norm_across_other_dims_key = temp_key
-                    #     # key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     # key_for_dict = f"{prune_name}_{prune_ratio}"
                     #     x = list(range(len(data)))
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     draw_str_x_figure(plt, x, data, None, key_for_dict, 'varying length', 'norm_across_other_dims')
 
@@ -1175,30 +1175,30 @@ def make_vis(df_exp, df_history):
                         # draw_histogram(plt, data)
                         # zero_num = np.array(data)[np.array(data) == 0].shape[0]
                         # plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
-                        # key_for_dict = f"{prune_name}_{prune_hyper}"
+                        # key_for_dict = f"{prune_name}_{prune_ratio}"
                         # draw_histogram(plt, data)
                         # zero_num = np.array(data)[np.array(data) == 0].shape[0]
                         # plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
                     
                     # # only for y: pq, x: eta
                     # if 'pq_indices_mean' in index:
-                    #     # one prune_hyper for all layers (1 figure the whole model for each prune_hyper)
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:', 'all_layer_pq_indices_mean'])
+                    #     # one prune_ratio for all layers (1 figure the whole model for each prune_ratio)
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:', 'all_layer_pq_indices_mean'])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     x = pq_indices_order
                     #     pq_indices_order += 1
                     #     y = row.tolist()[0]
                     #     print('y', y)
-                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     key_for_dict = f"{prune_name}_{prune_ratio}"
                     #     draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'PQ_index')
 
 
                     # if '_pq_lower_bound_mean' in index:
                     #     if not is_valid_layer_for_detailed_info(index, model_name):
                     #         continue
-                    #     # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+                    #     # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
                     #     cur_temp_key = temp_key.replace('_pq_lower_bound_mean', '_pq_indices_varying_lengths_mean')
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:', cur_temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:', cur_temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     x = int(row.tolist()[0])
                     #     print('lower_bound', x)
@@ -1210,35 +1210,35 @@ def make_vis(df_exp, df_history):
                     #     if not is_valid_layer_for_detailed_info(index, model_name):
                     #         continue
 
-                    #     # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: 3dheatmap', temp_key])
+                    #     # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: 3dheatmap', temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     x = list(range(len(row.tolist())))
                     #     # y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
                     #     y = np.array(row.tolist())
-                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     key_for_dict = f"{prune_name}_{prune_ratio}"
                     #     # draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
                     #     draw_3d_heatmap(plt, fig[fig_name], y, 'd dimension', 'm dimension', 'eta', index)
 
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG:', temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG:', temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     x = list(range(len(row.tolist())))
                     #     y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     key_for_dict = f"{prune_name}_{prune_ratio}"
                     #     draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: lowerbound', temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: lowerbound', temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     x = list(range(len(row.tolist())))
                     #     y = np.array(row.tolist())
                     #     dimension = np.arange(1, len(y) + 1)
                     #     pq_p, pq_q = 1, 2
                     #     lower_bound = dimension * (1 + 0) ** (-pq_q / (pq_q - pq_p)) * ((1 - y) ** (pq_q * pq_p / (pq_q - pq_p)))
-                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     key_for_dict = f"{prune_name}_{prune_ratio}"
                     #     draw_str_x_figure(plt, x, lower_bound, None, key_for_dict, 'vector_length', 'Lower bound')
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: slope_lowerbound', temp_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG: slope_lowerbound', temp_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     x = list(range(len(row.tolist())))
                     #     y = np.array(row.tolist())
@@ -1252,7 +1252,7 @@ def make_vis(df_exp, df_history):
                     #     slopes = dy / dx
                     #     print('slopes', slopes)
                     #     temp_slopes = np.clip(dy / dx, -200, 20)
-                    #     key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     key_for_dict = f"{prune_name}_{prune_ratio}"
                     #     draw_str_x_figure(plt, list(range(len(dx))), temp_slopes, None, key_for_dict, 'vector_length', 'Lower bound slope')
           
                     #     # norm_across_other_dims.sort()
@@ -1290,7 +1290,7 @@ def make_vis(df_exp, df_history):
                     #             second_point = index
                     #             break
                         
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_norm_across_other_dims_key])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: sorted-norm',temp_norm_across_other_dims_key])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     plt.text(first_point, 0, f'first {first_point}', ha='center', va='bottom')
                     #     # plt.show()
@@ -1299,25 +1299,25 @@ def make_vis(df_exp, df_history):
                     #     print('first_point', first_point, 'second_point', second_point)
 
                         # draw_3d_heatmap(plt, fig[fig_name], y, 'd dimension', 'm dimension', 'eta')
-                        # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-                        # fig_name = '_'.join([data_name, model_name, task_name, batch_size,seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: log', temp_key])
+                        # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
+                        # fig_name = '_'.join([data_name, model_name, task_name, batch_size,seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG: log', temp_key])
                         # fig[fig_name] = plt.figure(fig_name)
                         # x = list(range(len(row.tolist())))
                         # y = row.tolist()
                         # y = np.log(y)
                         # y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-                        # key_for_dict = f"{prune_name}_{prune_hyper}"
+                        # key_for_dict = f"{prune_name}_{prune_ratio}"
                         # draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index (log scale)')
 
                     # if 'pruned_FLOPs_ratio_mean' in index:
-                    #     # one prune_hyper for all layers
+                    #     # one prune_ratio for all layers
                     #     if 'wanda' in prune_name:
                     #         continue
 
                     #     if '2048' not in seq_len:
                     #         continue
 
-                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, nsamples, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:','all_layer_pruned_ratio_mean'])
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, nsamples, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode,  cust_tgt_modules, 'FIG:','all_layer_pruned_ratio_mean'])
                     #     fig[fig_name] = plt.figure(fig_name)
                     #     x = pruned_ratio_order
                     #     pruned_ratio_order += 1
@@ -1326,19 +1326,19 @@ def make_vis(df_exp, df_history):
                     #         key_for_dict = 'attn'
                     #     else:
                     #         key_for_dict = 'mlp'
-                    #     # key_for_dict = f"{prune_name}_{prune_hyper}"
+                    #     # key_for_dict = f"{prune_name}_{prune_ratio}"
                     #     draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'Remaining ratio')
 
                         # if not is_valid_layer_for_detailed_info(index, model_name):
                         #     continue
-                        # # one layer for all prune_hyper
+                        # # one layer for all prune_ratio
                         # fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt,  prune_dim, prune_dim_select_mode, cust_tgt_modules, 'FIG:',temp_key])
                         # fig[fig_name] = plt.figure(fig_name)
-                        # x = prune_hyper
+                        # x = prune_ratio
                         # # pruned_ratio_order += 1
                         # y = row.tolist()[0]
-                        # key_for_dict = f"{prune_name}_{prune_hyper}"
-                        # draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_hypers', 'pruned_ratio')
+                        # key_for_dict = f"{prune_name}_{prune_ratio}"
+                        # draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_ratios', 'pruned_ratio')
 
                     # several methods for all layers on 1 plot
                     if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_ratio_for_pruned_layers' in index:
@@ -1353,7 +1353,7 @@ def make_vis(df_exp, df_history):
                                 performance_vs_prunedflops[2] = row.tolist()[0]
                         
                         if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
-                            print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
+                            print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_ratio)
                             fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_pruned_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_prunedflops[2]
@@ -1371,8 +1371,8 @@ def make_vis(df_exp, df_history):
                             # if 'pq' in prune_name:
                             #     key_for_dict = f"Our"
                             # elif 'mag' in prune_name:
-                            #     # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
-                            #     if float(prune_hyper) == 0:
+                            #     # print('prune_ratio', prune_ratio, prune_ratio==0, type(prune_ratio))
+                            #     if float(prune_ratio) == 0:
                             #         key_for_dict = f"Dense"
                             #     else:
                             #         key_for_dict = f"Mag"
@@ -1392,7 +1392,7 @@ def make_vis(df_exp, df_history):
                                 performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
                         
                         if performance_vs_total_FLOPs_ratio[0] is not None and performance_vs_total_FLOPs_ratio[2] is not None:
-                            print('performancevssparsity', performance_vs_total_FLOPs_ratio, flops_metric_name, prune_hyper)
+                            print('performancevssparsity', performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
                             fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules, 'FIG:all_methods_performance_vs_FLOPs_ratio_for_all_layers'])
                             fig[fig_name] = plt.figure(fig_name)
                             x = performance_vs_total_FLOPs_ratio[2]
@@ -1412,8 +1412,8 @@ def make_vis(df_exp, df_history):
                             # if 'pq' in prune_name:
                             #     key_for_dict = f"Our"
                             # elif 'mag' in prune_name:
-                            #     # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
-                            #     if float(prune_hyper) == 0:
+                            #     # print('prune_ratio', prune_ratio, prune_ratio==0, type(prune_ratio))
+                            #     if float(prune_ratio) == 0:
                             #         key_for_dict = f"Dense"
                             #     else:
                             #         key_for_dict = f"Mag"
@@ -1426,10 +1426,10 @@ def make_vis(df_exp, df_history):
                             flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
                             flops_metric_name = flops_metric_name.split('/')[1]
                                            
-                            print('performancevssparsity', performance_vs_total_FLOPs_ratio, flops_metric_name, prune_hyper)
+                            print('performancevssparsity', performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
                             fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, cust_tgt_modules, 'FIG:all_methods_performance_vs_prune_ratio_for_all_layers'])
                             fig[fig_name] = plt.figure(fig_name)
-                            x = float(prune_hyper)
+                            x = float(prune_ratio)
                             
                             y = min(performance_metric_max, row.tolist()[0])
                             yerr = min(performance_metric_max, row_std.tolist()[0])
@@ -1452,8 +1452,8 @@ def make_vis(df_exp, df_history):
                             # if 'pq' in prune_name:
                             #     key_for_dict = f"Our"
                             # elif 'mag' in prune_name:
-                            #     # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
-                            #     if float(prune_hyper) == 0:
+                            #     # print('prune_ratio', prune_ratio, prune_ratio==0, type(prune_ratio))
+                            #     if float(prune_ratio) == 0:
                             #         key_for_dict = f"Dense"
                             #     else:
                             #         key_for_dict = f"Mag"
@@ -1461,7 +1461,7 @@ def make_vis(df_exp, df_history):
     
                     if 'position_distribution_1' in index:
                         layer_number = index.split('/')[1]
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, layer_number, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'position_distribution'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, layer_number, prune_ratio, seq_len, cust_tgt_modules,'FIG:', 'position_distribution'])
                         fig[fig_name] = plt.figure(fig_name)
                         # x = fullinf_vs_optimal_select_mean_intersection_ratio_order
                         # cur_bsz_mean_intersection_ratio_order += 1
@@ -1475,7 +1475,7 @@ def make_vis(df_exp, df_history):
 
 
                     if 'fullinf_vs_optimal_select_mean_intersection_ratio' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'fullinf_vs_optimal_select_mean_intersection_ratio'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_ratio, seq_len, cust_tgt_modules,'FIG:', 'fullinf_vs_optimal_select_mean_intersection_ratio'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = fullinf_vs_optimal_select_mean_intersection_ratio_order
                         # cur_bsz_mean_intersection_ratio_order += 1
@@ -1485,7 +1485,7 @@ def make_vis(df_exp, df_history):
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
 
                     if 'probe_vs_optimal_select_mean_intersection_ratio' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'probe_vs_optimal_select_mean_intersection_ratio'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_ratio, seq_len, cust_tgt_modules,'FIG:', 'probe_vs_optimal_select_mean_intersection_ratio'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = probe_vs_optimal_select_mean_intersection_ratio_order
                         # probe_mean_intersection_ratio += 1
@@ -1496,7 +1496,7 @@ def make_vis(df_exp, df_history):
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
                     
                     if 'probe_vs_fullinf_select_mean_intersection_ratio' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'probe_vs_fullinf_select_mean_intersection_ratio'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_ratio, seq_len, cust_tgt_modules,'FIG:', 'probe_vs_fullinf_select_mean_intersection_ratio'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = probe_vs_fullinf_select_mean_intersection_ratio_order
                         # probe_mean_intersection_ratio += 1
@@ -1507,7 +1507,7 @@ def make_vis(df_exp, df_history):
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
 
                     if 'fullinf_vs_optimal_select_mean_intersection_ratio' in index or 'probe_vs_optimal_select_mean_intersection_ratio' in index or 'probe_vs_fullinf_select_mean_intersection_ratio' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_hyper, seq_len, prune_name, cust_tgt_modules,'FIG:', 'comparison_for_select_diff_intersection_ratio'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_ratio, seq_len, prune_name, cust_tgt_modules,'FIG:', 'comparison_for_select_diff_intersection_ratio'])
                         fig[fig_name] = plt.figure(fig_name)
                         if 'fullinf_vs_optimal_select_mean_intersection_ratio' in index:
                             x = fullinf_vs_optimal_select_mean_intersection_ratio_order
@@ -1526,7 +1526,7 @@ def make_vis(df_exp, df_history):
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
 
                     if 'fullinf_vs_optimal_prune_mean_intersection_ratio' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'fullinf_vs_optimal_prune_mean_intersection_ratio'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_ratio, seq_len, cust_tgt_modules,'FIG:', 'fullinf_vs_optimal_prune_mean_intersection_ratio'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = fullinf_vs_optimal_prune_mean_intersection_ratio_order
                         # cur_bsz_mean_intersection_ratio_order += 1
@@ -1536,7 +1536,7 @@ def make_vis(df_exp, df_history):
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
 
                     if 'probe_vs_optimal_prune_mean_intersection_ratio' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'probe_vs_optimal_prune_mean_intersection_ratio'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_ratio, seq_len, cust_tgt_modules,'FIG:', 'probe_vs_optimal_prune_mean_intersection_ratio'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = probe_vs_optimal_prune_mean_intersection_ratio_order
                         # probe_mean_intersection_ratio += 1
@@ -1547,7 +1547,7 @@ def make_vis(df_exp, df_history):
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
                     
                     if 'probe_vs_fullinf_prune_mean_intersection_ratio' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_hyper, seq_len, cust_tgt_modules,'FIG:', 'probe_vs_fullinf_prune_mean_intersection_ratio'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_ratio, seq_len, cust_tgt_modules,'FIG:', 'probe_vs_fullinf_prune_mean_intersection_ratio'])
                         fig[fig_name] = plt.figure(fig_name)
                         x = probe_vs_fullinf_prune_mean_intersection_ratio_order
                         # probe_mean_intersection_ratio += 1
@@ -1558,7 +1558,7 @@ def make_vis(df_exp, df_history):
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
 
                     if 'fullinf_vs_optimal_prune_mean_intersection_ratio' in index or 'probe_vs_optimal_prune_mean_intersection_ratio' in index or 'probe_vs_fullinf_prune_mean_intersection_ratio' in index:
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_hyper, seq_len, prune_name, cust_tgt_modules,'FIG:', 'comparison_for_prune_diff_intersection_ratio'])
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_ratio, seq_len, prune_name, cust_tgt_modules,'FIG:', 'comparison_for_prune_diff_intersection_ratio'])
                         fig[fig_name] = plt.figure(fig_name)
                         if 'fullinf_vs_optimal_prune_mean_intersection_ratio' in index:
                             x = fullinf_vs_optimal_prune_mean_intersection_ratio_order
@@ -1708,7 +1708,7 @@ if __name__ == '__main__':
 #                 prune_tgt = 'hidden_repr'
 #             else:
 #                 raise ValueError('Not valid prune target')
-#             prune_hyper = prune_name_list[2] if len(prune_name_list) > 2 else '0'
+#             prune_ratio = prune_name_list[2] if len(prune_name_list) > 2 else '0'
 #             prune_dim = prune_name_list[3] if len(prune_name_list) > 3 else '0'
 #             prune_dim_select_mode = prune_name_list[4] if len(prune_name_list) > 4 else 'max'
             
@@ -1731,10 +1731,10 @@ if __name__ == '__main__':
 #                 1. norm_across_other_dims distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
 #                 2. dense_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
 #                 3. pruned_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
-#                 2. pq_indices for each prune layer (y is pq_indices, x is all the layers, 1 for each prune_hyper)
-#                 3. pruned_ratio for each prune layer (y is pruned_ratio, x is all the layers, 1 for each prune_hyper)
-#                 4. pruned_FLOPs_ratio for each prune layer (y is pruned_FLOPs_ratio, x is all the layers, 1 for each prune_hyper)
-#                 5. performance vs total_FLOPs_ratio (y is performance, x is total_FLOPs_ratio, all prune_hyper in 1)
+#                 2. pq_indices for each prune layer (y is pq_indices, x is all the layers, 1 for each prune_ratio)
+#                 3. pruned_ratio for each prune layer (y is pruned_ratio, x is all the layers, 1 for each prune_ratio)
+#                 4. pruned_FLOPs_ratio for each prune layer (y is pruned_FLOPs_ratio, x is all the layers, 1 for each prune_ratio)
+#                 5. performance vs total_FLOPs_ratio (y is performance, x is total_FLOPs_ratio, all prune_ratio in 1)
 #             '''
 
 #             pq_indices_order = 0
@@ -1759,7 +1759,7 @@ if __name__ == '__main__':
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
 #                         # temp_key = index_list[-1]
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         data = row.tolist()
 #                         # draw_bar(plt, bin_edges[:-1], data)
@@ -1775,7 +1775,7 @@ if __name__ == '__main__':
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
 #                         # temp_key = index_list[-1]
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         data = row.tolist()
 #                         # draw_bar(plt, bin_edges[:-1], data)
@@ -1790,10 +1790,10 @@ if __name__ == '__main__':
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
 #                         # temp_key = index_list[-1]
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         data = row.tolist()
-#                         # key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         # key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_histogram(plt, data)
 #                         zero_num = np.array(data)[np.array(data) == 0].shape[0]
 #                         plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
@@ -1802,17 +1802,17 @@ if __name__ == '__main__':
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
 #                         # temp_key = index_list[-1]
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         data = row.tolist()
-#                         # key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         # key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_histogram(plt, data)
 #                         zero_num = np.array(data)[np.array(data) == 0].shape[0]
 #                         plt.text(0, zero_num, f'{zero_num} for x=0', ha='center', va='bottom')
                 
 
 #                     if 'dense_duration_per_batch' in index or 'pruned_duration_per_batch' in index:
-#                         fig_name = '_'.join([data_name, model_name, task_name, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', 'time_cost_per_batch'])
+#                         fig_name = '_'.join([data_name, model_name, task_name, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', 'time_cost_per_batch'])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = batch_size
 #                         y = row.tolist()[0]
@@ -1824,31 +1824,31 @@ if __name__ == '__main__':
 
 #                     # only for y: pq, x: eta
 #                     if 'pq_indices_mean' in index:
-#                         # one prune_hyper for all layers (1 figure the whole model for each prune_hyper)
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', 'all_layer_pq_indices_mean'])
+#                         # one prune_ratio for all layers (1 figure the whole model for each prune_ratio)
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', 'all_layer_pq_indices_mean'])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = pq_indices_order
 #                         pq_indices_order += 1
 #                         y = row.tolist()[0]
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'PQ_index')
 
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
-#                         # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+#                         # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
 #                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
-#                         x = prune_hyper
+#                         x = prune_ratio
 #                         y = row.tolist()[0]
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Eta', 'PQ_index')
 
 #                     if '_pq_lower_bound_mean' in index:
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
-#                         # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
+#                         # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
 #                         cur_temp_key = temp_key.replace('_pq_lower_bound_mean', '_pq_indices_varying_lengths_mean')
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', cur_temp_key])
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', cur_temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = int(row.tolist()[0])
 #                         print('lower_bound', x)
@@ -1857,80 +1857,80 @@ if __name__ == '__main__':
 #                     if "_pq_indices_varying_lengths_mean" in index:
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
-#                         # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+#                         # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = list(range(len(row.tolist())))
 #                         y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index')
 
-#                         # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size,seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG: log', temp_key])
+#                         # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size,seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG: log', temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = list(range(len(row.tolist())))
 #                         y = row.tolist()
 #                         y = np.log(y)
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length', 'PQ_index (log scale)')
 
 #                     if "reversed_pq_indices_varying_lengths" in index:
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
-#                         # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt,  prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+#                         # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt,  prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = list(range(len(row.tolist())))
 #                         y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'vector_length(in reversed sorted)', 'PQ_index')
                     
 #                     if "_pq_indices_ratio" in index:
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
-#                         # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+#                         # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = list(range(len(row.tolist())))
 #                         y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'small part(left) length', 'coefficient')
 
 #                     if f"_p_norm_ratio" in index:
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
-#                         # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt,  prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+#                         # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt,  prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = list(range(len(row.tolist())))
 #                         y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'small part(left) length', 'coefficient')
 
 #                     if f"_q_norm_ratio" in index:
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
-#                         # one layer for all prune_hyper (1 figure each layer for each prune_hyper)
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
+#                         # one layer for all prune_ratio (1 figure each layer for each prune_ratio)
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:', temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = list(range(len(row.tolist())))
 #                         y = np.minimum(np.array(row.tolist()), y_max_in_graph).tolist()
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'small part(left) length', 'coefficient')
 
 #                     if 'pruned_ratio_mean' in index:
-#                         # one prune_hyper for all layers
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:','all_layer_pruned_ratio_mean'])
+#                         # one prune_ratio for all layers
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:','all_layer_pruned_ratio_mean'])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = pruned_ratio_order
 #                         pruned_ratio_order += 1
 #                         y = row.tolist()[0]
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         if 'pq' in prune_name:
 #                             key_for_dict = f"Proposed"
 #                         elif 'mag' in prune_name:
-#                             # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
-#                             if float(prune_hyper) == 0:
+#                             # print('prune_ratio', prune_ratio, prune_ratio==0, type(prune_ratio))
+#                             if float(prune_ratio) == 0:
 #                                 key_for_dict = f"Full model"
 #                             else:
 #                                 key_for_dict = f"State-of-the-art"
@@ -1940,35 +1940,35 @@ if __name__ == '__main__':
 
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
-#                         # one layer for all prune_hyper
+#                         # one layer for all prune_ratio
 #                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt,  prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
-#                         x = prune_hyper
+#                         x = prune_ratio
 #                         # pruned_ratio_order += 1
 #                         y = row.tolist()[0]
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
-#                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_hypers', 'pruned_ratio')
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
+#                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_ratios', 'pruned_ratio')
 
 #                     if 'pruned_FLOPs_ratio_mean' in index:
-#                         # one prune_hyper for all layers
-#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size,seq_len, prune_metric, prune_name, prune_tgt, prune_hyper, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:','all_layer_pruned_FLOPs_ratio_mean'])
+#                         # one prune_ratio for all layers
+#                         fig_name = '_'.join([data_name, model_name, task_name, batch_size,seq_len, prune_metric, prune_name, prune_tgt, prune_ratio, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:','all_layer_pruned_FLOPs_ratio_mean'])
 #                         fig[fig_name] = plt.figure(fig_name)
 #                         x = pruned_FLOPs_ratio_order
 #                         pruned_FLOPs_ratio_order += 1
 #                         y = row.tolist()[0]
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'Layer order', 'pruned_FLOPs_ratio')
 
 #                         if not is_valid_layer_for_detailed_info(index, model_name):
 #                             continue
-#                         # one layer for all prune_hyper
+#                         # one layer for all prune_ratio
 #                         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric,prune_name, prune_tgt, prune_dim, prune_dim_select_mode, batch_integ, multibatch_integ, cust_tgt_modules, 'FIG:',temp_key])
 #                         fig[fig_name] = plt.figure(fig_name)
-#                         x = prune_hyper
+#                         x = prune_ratio
 #                         # pruned_FLOPs_ratio_order += 1
 #                         y = row.tolist()[0]
-#                         key_for_dict = f"{prune_name}_{prune_hyper}"
-#                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_hypers', 'pruned_FLOPs_ratio')
+#                         key_for_dict = f"{prune_name}_{prune_ratio}"
+#                         draw_str_x_figure(plt, x, y, None, key_for_dict, 'prune_ratios', 'pruned_FLOPs_ratio')
                     
                     
 
@@ -1991,7 +1991,7 @@ if __name__ == '__main__':
 #                             fig[fig_name] = plt.figure(fig_name)
 #                             x = performance_vs_total_FLOPs_ratio[1]
 #                             y = performance_vs_total_FLOPs_ratio[0]
-#                             key_for_dict = f"{prune_name}_{prune_hyper}"
+#                             key_for_dict = f"{prune_name}_{prune_ratio}"
 #                             draw_macs_perform_figure(plt, x, y, 0, key_for_dict, 'FLOPs_ratio', total_FLOPs_ratio_metric_name)
 #                             performance_vs_total_FLOPs_ratio = [None, None]
                     
@@ -2011,8 +2011,8 @@ if __name__ == '__main__':
 #                     #         fig[fig_name] = plt.figure(fig_name)
 #                     #         x = performance_vs_total_FLOPs_ratio[1]
 #                     #         y = performance_vs_total_FLOPs_ratio[0]
-#                     #         key_for_dict = f"{prune_name}_{prune_hyper}"
-#                     #         draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'FLOPs_ratio', cur_metric_name)
+#                     #         key_for_dict = f"{prune_name}_{prune_ratio}"
+#                     #         draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_ratio, 'FLOPs_ratio', cur_metric_name)
 #                     #         performance_vs_total_FLOPs_ratio = [None, None]
 #                     # data_name, model_name, task_name, batch_size, prune_name, batch_integ, multibatch_integ, cust_tgt_modules = df_name_list
 #                     # prune_name_list = prune_name.split('-')
@@ -2025,7 +2025,7 @@ if __name__ == '__main__':
 #                     # else:
 #                     #     raise ValueError('Not valid prune target')
 #                     # prune_norm = prune_name_list[2]
-#                     # prune_hyper = prune_name_list[3]
+#                     # prune_ratio = prune_name_list[3]
 #                     # prune_dim = prune_name_list[4]
 #                     # prune_dim_select_mode = prune_name_list[5] if len(prune_name_list) > 5 else 'max'
 
@@ -2047,12 +2047,12 @@ if __name__ == '__main__':
 #                     #         fig[fig_name] = plt.figure(fig_name)
 #                     #         x = performance_vs_prunedflops[1]
 #                     #         y = performance_vs_prunedflops[0]
-#                     #         key_for_dict = f"{prune_name}_{prune_hyper}"
+#                     #         key_for_dict = f"{prune_name}_{prune_ratio}"
 #                     #         if 'pq' in prune_name:
 #                     #             key_for_dict = f"Our"
 #                     #         elif 'mag' in prune_name:
 #                     #             key_for_dict = f"Mag"
-#                     #         draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_hyper, 'Sparsity', cur_metric_name)
+#                     #         draw_macs_perform_figure(plt, x, y, 0, key_for_dict, prune_ratio, 'Sparsity', cur_metric_name)
 #                             # performance_vs_prunedflops = [None, None]
 
 #                     if any(metric_name in index for metric_name in metric_name_list) or 'FLOPs_ratio_for_pruned_layers' in index:
@@ -2067,7 +2067,7 @@ if __name__ == '__main__':
 #                                 performance_vs_prunedflops[2] = row.tolist()[0]
                         
 #                         if performance_vs_prunedflops[0] is not None and performance_vs_prunedflops[2] is not None:
-#                             print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_hyper)
+#                             print('performancevssparsity', performance_vs_prunedflops, flops_metric_name, prune_ratio)
 #                             # print('here1')
 #                             # prune_tgt, 
 #                             # prune_dim, 
@@ -2082,14 +2082,14 @@ if __name__ == '__main__':
 #                             if 'pq' in prune_name:
 #                                 key_for_dict = f"Proposed"
 #                             elif 'mag' in prune_name:
-#                                 # print('prune_hyper', prune_hyper, prune_hyper==0, type(prune_hyper))
-#                                 if float(prune_hyper) == 0:
+#                                 # print('prune_ratio', prune_ratio, prune_ratio==0, type(prune_ratio))
+#                                 if float(prune_ratio) == 0:
 #                                     key_for_dict = f"Full model"
 #                                 else:
 #                                     key_for_dict = f"State-of-the-art"
  
 #                             record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
-#                             # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, prune_hyper, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+#                             # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, prune_ratio, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
 #                             performance_vs_prunedflops = [None, None, None]
 
 

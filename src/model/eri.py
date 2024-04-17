@@ -512,7 +512,7 @@ class BasePruning:
         self.prune_name = cfg['prune_name']
         self.prune_tgt = cfg['prune_tgt']
         self.prune_metric = cfg['prune_metric']
-        self.prune_hyper = cfg['prune_hyper'] 
+        self.prune_ratio = cfg['prune_ratio'] 
         # self.prune_dim = cfg['prune_dim'] 
         self.prune_dim_select_mode = cfg['prune_dim_select_mode'] 
         self.batch_integ = cfg['batch_integ']   
@@ -522,7 +522,7 @@ class BasePruning:
         self.pq_q = cfg['pq_q']
         self.pq_gamma = cfg['pq_gamma']
         self.pq_beta = cfg['pq_beta']
-        self.eta = self.prune_hyper
+        self.eta = self.prune_ratio
 
         if self.batch_integ == 'inter' or self.batch_integ == 'union':
             self.exclude_dim_to_aggregate = 0
@@ -612,7 +612,7 @@ class HiddenRepresentationPruning(BasePruning):
                     elif self.prune_metric == 'IF2N':
                         norm_along_dim_1 = torch.linalg.vector_norm(flattened_h, ord=2, dim=1)
                     _, sorted_indices = torch.sort(norm_along_dim_1, dim=1)
-                    num_indices_to_prune = int(self.prune_hyper * sorted_indices.size(1))
+                    num_indices_to_prune = int(self.prune_ratio * sorted_indices.size(1))
                     # Select the indices to prune (lowest norms)
                     prune_indices = sorted_indices[:, :num_indices_to_prune]
                     mask = torch.ones_like(h, dtype=torch.bool)
@@ -636,7 +636,7 @@ class HiddenRepresentationPruning(BasePruning):
                         # h_norm = h_norm.view(1, -1, 1, 1)
                     metric = layer_info['weight'].abs() * h_norm
                     _, sorted_idx = torch.sort(metric, dim=1) 
-                    pruned_idx = sorted_idx[:,:int(layer_info['weight'].size(1) * self.prune_hyper)] 
+                    pruned_idx = sorted_idx[:,:int(layer_info['weight'].size(1) * self.prune_ratio)] 
                     # layer_info['weight'].scatter_(dim=1, index=pruned_idx, src=0)
                     # pruned_dims
                     # prune_channels_multi_dims
@@ -769,11 +769,11 @@ class HiddenRepresentationPruning(BasePruning):
 
         if 'pqstruct' in self.prune_name:
             prune_channels = self.pq_struct(h, key, layer_info, prune_dim)
-            if self.prune_hyper == 9999:
+            if self.prune_ratio == 9999:
                 return [torch.empty(0)]
             return prune_channels
         elif 'magstruct' in self.prune_name:
-            if self.prune_hyper == 9999:
+            if self.prune_ratio == 9999:
                 return [torch.empty(0)]
             prune_channels = self.mag_struct(h, key, layer_info, prune_dim)
             return prune_channels
@@ -841,8 +841,8 @@ class HiddenRepresentationPruning(BasePruning):
         eta_zero_lower_bound = dimension * (1 + 0) ** (-self.pq_q / (self.pq_q - self.pq_p)) * (1 - pq_indices) ** (self.pq_q * self.pq_p / (self.pq_q - self.pq_p))
         eta_zero_lower_bound = torch.floor(dimension * self.pq_gamma * (1 - eta_zero_lower_bound / dimension))
         # print('sorted_norm', sorted_norm.shape, sorted_norm)
-        if self.prune_hyper == 9999 and cfg['batch_size'] == 1:
-            # print('here', self.prune_hyper)
+        if self.prune_ratio == 9999 and cfg['batch_size'] == 1:
+            # print('here', self.prune_ratio)
             start_time = time.time()
 
             def parallel_cal_varying_length_norm(sorted_norm, norm):
@@ -978,7 +978,7 @@ class HiddenRepresentationPruning(BasePruning):
     #     flattened_h = h.view(h.size(0), -1)
     #     norm_along_dim_1 = torch.linalg.vector_norm(flattened_h, ord=self.prune_norm, dim=1)
     #     _, sorted_indices = torch.sort(norm_along_dim_1, dim=1)
-    #     num_indices_to_prune = int(self.prune_hyper * sorted_indices.size(1))
+    #     num_indices_to_prune = int(self.prune_ratio * sorted_indices.size(1))
     #     # Select the indices to prune (lowest norms)
     #     pruned_indices = sorted_indices[:, :num_indices_to_prune]
     #     return pruned_indices
@@ -1009,7 +1009,7 @@ class HiddenRepresentationPruning(BasePruning):
 
             self.scaler_in += torch.linalg.vector_norm(h, ord=2, dim=dims_to_aggregate)
             norm_across_other_dims = (torch.abs(layer_info['weight']) * self.scaler_in.reshape((1,-1))).mean(axis=1)
-        prune_channels_count = int(self.prune_hyper * h.shape[prune_dim])
+        prune_channels_count = int(self.prune_ratio * h.shape[prune_dim])
         _, sorted_channels = torch.sort(norm_across_other_dims, dim=1)
 
         if sorted_channels.dim() == 0 or sorted_channels.dim() == 1:
@@ -1030,7 +1030,7 @@ class WeightPruning(BasePruning):
         pass
     
     def global_pruning(self, model):
-        if self.prune_hyper == 9999 or self.prune_hyper == 0:
+        if self.prune_ratio == 9999 or self.prune_ratio == 0:
             return
         if len(self.prune_dim) > 1 and self.prune_dim[0] != 1:
             raise ValueError('Not valid prune dim')
@@ -1057,7 +1057,7 @@ class WeightPruning(BasePruning):
                 # Concatenate all weights and convert to a single vector
                 
                 # Rank weights by absolute value and find the threshold for pruning
-                num_weights_to_prune = int(all_weights_vector.numel() * self.prune_hyper) 
+                num_weights_to_prune = int(all_weights_vector.numel() * self.prune_ratio) 
                 print('magunstruct', num_weights_to_prune, all_weights_vector.numel())
                 # threshold = torch.kthvalue(torch.abs(all_weights_vector), num_weights_to_prune).values
                 threshold = sorted_weights[num_weights_to_prune - 1] 
@@ -1131,7 +1131,7 @@ class WeightPruning(BasePruning):
             # print('channel_norms', channel_norms)
             if 'magstruct' in self.prune_name:
                 channel_norms.sort(key=lambda x: x[0])
-                num_channels_to_prune = int(len(channel_norms) * self.prune_hyper) 
+                num_channels_to_prune = int(len(channel_norms) * self.prune_ratio) 
                 pruning_threshold = channel_norms[num_channels_to_prune - 1][0] if num_channels_to_prune > 0 else float('inf')
             elif 'pqstruct' in self.prune_name:
                 norm_p = torch.linalg.vector_norm(norm_across_other_dims, ord=self.pq_p, dim=0)
@@ -1184,7 +1184,7 @@ class WeightPruning(BasePruning):
         torch.cuda.empty_cache()
 
     def local_pruning(self, w, layer_type, layer_info, key, h = None):
-        if self.prune_hyper == 9999 or self.prune_hyper == 0:
+        if self.prune_ratio == 9999 or self.prune_ratio == 0:
             return w, None, None
         # if h and 'wanda' not in self.prune_name:
         #     return h, None, None
@@ -1214,7 +1214,7 @@ class WeightPruning(BasePruning):
                 _, sorted_indices = torch.sort(norm, descending=True)
 
                 # Determine the number of indices to prune
-                num_indices_to_prune = int(self.prune_hyper * sorted_indices.size(0))
+                num_indices_to_prune = int(self.prune_ratio * sorted_indices.size(0))
                 # Select the indices to prune (lowest norms)
                 prune_indices = sorted_indices[:num_indices_to_prune]
                 # Create a mask with the same shape as h, initially set to True
@@ -1240,7 +1240,7 @@ class WeightPruning(BasePruning):
             #         # h_norm = h_norm.view(1, -1, 1, 1)
             #     metric = layer_info['weight'].abs() * h_norm
             #     _, sorted_idx = torch.sort(metric, dim=1) 
-            #     pruned_idx = sorted_idx[:,:int(layer_info['weight'].size(1) * self.prune_hyper)] 
+            #     pruned_idx = sorted_idx[:,:int(layer_info['weight'].size(1) * self.prune_ratio)] 
             #     layer_info['weight'].scatter_(dim=1, index=pruned_idx, src=0)
             #     # pruned_dims
             #     # prune_channels_multi_dims
@@ -1356,7 +1356,7 @@ class WeightPruning(BasePruning):
         elif self.prune_metric == 'WF2N':
             norm_across_other_dims = torch.linalg.vector_norm(w, ord=2, dim=dims_to_aggregate)      
         _, sorted_channels = torch.sort(norm_across_other_dims, dim=0)
-        prune_channels_count = int(self.prune_hyper * w.shape[prune_dim])
+        prune_channels_count = int(self.prune_ratio * w.shape[prune_dim])
         prune_channels = sorted_channels[:int(prune_channels_count)]
         return prune_channels
 
