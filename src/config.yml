@@ -11,7 +11,7 @@ control:
   prune_method: wanda/flap/calib/probe
   mode: sync/asyncinter/asyncintra
   calib_info: None/ds-numsamples
-  probe_info: q-k-v-gate-up
+  prune_info: q-k-v-gate-up
   # prune_name: mag-probe
   cust_tgt_modules: None
 

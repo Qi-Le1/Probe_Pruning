@@ -249,7 +249,7 @@ class Linear(nn.Linear, EriLayer):
         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
             self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
             # self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=torch.float32)
-        elif self.prune_metric == "flap":
+        elif "flap" in self.prune_metric or 'new' in self.prune_metric:
             self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
         else:
             raise ValueError(f"Unknown pruning method")
@@ -508,7 +508,7 @@ class Linear(nn.Linear, EriLayer):
                 print("Does 'self.scaler_inp' contain NaN values? Yes")
             if has_inf:
                 print("Does 'self.scaler_inp' contain infinite values? Yes")
-        elif self.prune_metric == "flap":
+        elif "flap" in self.prune_metric or 'new' in self.prune_metric:
             self.baseline_inp = self.baseline_inp.to(cur_device)
             self.fluc_inp = self.fluc_inp.to(cur_device)
 
@@ -571,13 +571,19 @@ class Linear(nn.Linear, EriLayer):
             self.scaler_inp = self.scaler_inp.to(cur_device)
 
             self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+
+            if 'bias' in self.prune_metric:
+                self.baseline_inp = self.baseline_inp.to(cur_device)
+                self.baseline_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+                self.baseline_inp[:, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
+            
             if cfg['calibration_stage'] == True:
                 norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
             elif cfg['calibration_stage'] == False:
                 norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
             denominator = (self.nsamples[update_indices] + batch_size)
             self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
-        elif self.prune_metric == "flap":
+        elif "flap" in self.prune_metric or 'new' in self.prune_metric:
             self.baseline_inp = self.baseline_inp.to(cur_device)
             self.fluc_inp = self.fluc_inp.to(cur_device)
 
@@ -596,7 +602,7 @@ class Linear(nn.Linear, EriLayer):
     def get_global_metric_score_distribution(self):
         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
             return self.scaler_inp
-        elif self.prune_metric == "flap":
+        elif "flap" in self.prune_metric or 'new' in self.prune_metric:
             return self.fluc_inp
 
 
@@ -737,7 +743,7 @@ class Linear(nn.Linear, EriLayer):
                 # mean_for_all_batches, std_for_all_batches = self.get_global_input_distribution()
             elif cfg['calibration_stage'] == False:
                 # if cfg['mode'] == 'asyncinter' and cfg['cur_batch_index'] == 0:
-                #     if 'probe' in cfg['prune_method'] and 'hd' in cfg['probe_info'] and ('cal_mlp_probe_out_dim_metric' in kwargs or 'cal_attn_probe_out_dim_metric' in kwargs):
+                #     if 'probe' in cfg['prune_method'] and 'hd' in cfg['prune_info'] and ('cal_mlp_probe_out_dim_metric' in kwargs or 'cal_attn_probe_out_dim_metric' in kwargs):
                 #         result = F.linear(x, self.weight[:, kwargs['selected_indices']], bias=None)
                 #         result = result.to(previous_dtype)
                 #         return result
@@ -747,7 +753,7 @@ class Linear(nn.Linear, EriLayer):
                 
                 if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
                     # print('zheli')
-                    if 'hd' in cfg['probe_info']:
+                    if 'hd' in cfg['prune_info']:
                         result = F.linear(x, self.weight[:, kwargs['selected_indices']], bias=None)
                         result = result.to(previous_dtype)
                         return result
@@ -755,7 +761,7 @@ class Linear(nn.Linear, EriLayer):
                     result = result.to(previous_dtype)
                     return result
                 elif 'probe' in cfg['prune_method'] and 'cal_attn_probe_out_dim_metric' in kwargs and kwargs['cal_attn_probe_out_dim_metric'] == True:     
-                    if 'hd' in cfg['probe_info']:
+                    if 'hd' in cfg['prune_info']:
                         result = F.linear(x, self.weight[:, kwargs['selected_indices']], bias=None)
                         return result            
                     result = F.linear(x, self.weight, bias=None)
@@ -787,7 +793,8 @@ class Linear(nn.Linear, EriLayer):
                     result = F.linear(x, weight, bias=None)
 
                     if 'o_proj' in self.key or 'down_proj' in self.key:
-                        if 'flap' in cfg['prune_metric'] and 'bias' in cfg['prune_method']:
+                        # 'flap' in cfg['prune_metric'] and 
+                        if 'bias' in cfg['prune_metric']:
                             calib = torch.mean(self.baseline_inp, dim=0)
                             calib = calib.to(x.device)
                             # all_indices = torch.arange(self.in_features, dtype=torch.long).to(device=x.device)

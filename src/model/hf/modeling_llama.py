@@ -1265,8 +1265,8 @@ class LlamaAttention(nn.Module):
                     # print(value_states.shape, flush=True)
                     # value_states = value_states.view(bsz, q_len, self.v_num_heads, self.v_head_dim).transpose(1, 2)
 
-                    # if 'delseq' in cfg['probe_info'] and cfg['cur_batch_index'] != 0:
-                    if 'delseq' in cfg['probe_info']:
+                    # if 'delseq' in cfg['prune_info'] and cfg['cur_batch_index'] != 0:
+                    if 'delseq' in cfg['prune_info']:
                         # temp_attn_weights = attn_weights
                         # attention_mask = attention_mask
                         # print('attention_mask', attention_mask)
@@ -1322,7 +1322,7 @@ class LlamaAttention(nn.Module):
                         
 
 
-                    # if 'delseq' in cfg['probe_info'] and cfg['cur_batch_index'] != 0:
+                    # if 'delseq' in cfg['prune_info'] and cfg['cur_batch_index'] != 0:
                     #     attn_weights_indices_expand = self.attn_weights_indices.unsqueeze(0).unsqueeze(2).expand(bsz, self.k_num_heads, q_len, -1)
                     #     value_states_indices_expand = self.attn_weights_indices.unsqueeze(0).unsqueeze(3).expand(bsz, self.v_num_heads, -1, self.v_head_dim)
 

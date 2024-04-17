@@ -102,10 +102,10 @@ class HiddenRepresentationPruning(BasePruning):
                 global_metric_score_distribution = global_metric_score_distribution.to(probe_out.device)
 
                 # only for seq rank
-                if selected_indices is not None and 'seqrank' in cfg['probe_info']:
+                if selected_indices is not None and 'seqrank' in cfg['prune_info']:
                     global_metric_score_distribution = global_metric_score_distribution[selected_indices, :]
 
-                if 'probefixratio' in cfg['probe_info']:
+                if 'probefixratio' in cfg['prune_info']:
                     combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
                 # dynaratio, since all nonnegative, no need to abs
                 else:  
@@ -125,6 +125,8 @@ class HiddenRepresentationPruning(BasePruning):
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=(0,1)) ** 2 / probe_num, max=cfg['data_type_max'])
                 probe_out_dim_metric = (torch.sqrt(norm_probe_out_square.reshape((1,-1))) * torch.abs(weight)).sum(dim=0).clamp(max=cfg['data_type_max'])
                 return probe_out_dim_metric
+        # elif 'new' in metric_type:
+
         elif 'flap' in metric_type:
             combined_probe_out = None
             if global_metric_score_distribution is not None:
@@ -133,10 +135,10 @@ class HiddenRepresentationPruning(BasePruning):
                 global_metric_score_distribution = global_metric_score_distribution.to(probe_out.device)
 
                 # only for seq rank
-                if selected_indices is not None and 'seqrank' in cfg['probe_info']:
+                if selected_indices is not None and 'seqrank' in cfg['prune_info']:
                     global_metric_score_distribution = global_metric_score_distribution[selected_indices, :]
 
-                if 'probefixratio' in cfg['probe_info']:
+                if 'probefixratio' in cfg['prune_info']:
                     combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution + (1-cfg['probefixratio']) * probe_variance
                 # dynaratio, weighted by abs
                 else:  
@@ -180,13 +182,13 @@ class HiddenRepresentationPruning(BasePruning):
                     print("Does 'global_metric_score_distribution' contain infinite values? Yes")
 
                 # only for seq rank
-                if selected_indices is not None and 'seqrank' in cfg['probe_info']:
+                if selected_indices is not None and 'seqrank' in cfg['prune_info']:
                     global_metric_score_distribution = global_metric_score_distribution[selected_indices, :]
-                    # elif 'mean' in cfg['probe_info']:
+                    # elif 'mean' in cfg['prune_info']:
                     #     # global_metric_score_distribution = mean_process(global_metric_score_distribution, probe_out.size(1), cfg['seq_len']//probe_out.size(1))
                     #     global_metric_score_distribution = torch.mean(global_metric_score_distribution.view(probe_out.size(1), cfg['seq_len']//probe_out.size(1), global_metric_score_distribution.size(-1)), dim=1)
 
-                if 'probefixratio' in cfg['probe_info']:
+                if 'probefixratio' in cfg['prune_info']:
                     combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
                 # dynaratio, since all nonnegative, no need to abs
                 else:  
@@ -218,6 +220,9 @@ class HiddenRepresentationPruning(BasePruning):
         if 'wandasp' in metric_type:
             calib = torch.sum(calib, dim=0)
             probe_out_dim_metric = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight)).sum(dim=0).clamp(max=cfg['data_type_max'])
+        elif 'new' in metric_type:
+            calib = torch.sum(calib, dim=0)
+            probe_out_dim_metric = torch.sqrt(((calib.reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(max=cfg['data_type_max']))
         elif 'flap' in metric_type:
             calib = torch.sum(calib, dim=0)
             probe_out_dim_metric = (calib * torch.sum(torch.pow(weight, 2), dim=0)).clamp(max=cfg['data_type_max'])
@@ -976,14 +981,14 @@ def cal_attn_weight_prune_metric(probe_out, weight, metric_type, num_heads, glob
                 if has_inf:
                     print("Does 'global_metric_score_distribution' contain infinite values? Yes")
 
-                if 'seq' in cfg['probe_info']:
-                    if 'rank' in cfg['probe_info']:
+                if 'seq' in cfg['prune_info']:
+                    if 'rank' in cfg['prune_info']:
                         global_metric_score_distribution = global_metric_score_distribution[selected_indices, :]
-                    elif 'mean' in cfg['probe_info']:
+                    elif 'mean' in cfg['prune_info']:
                         # global_metric_score_distribution = mean_process(global_metric_score_distribution, probe_out.size(1), cfg['seq_len']//probe_out.size(1))
                         global_metric_score_distribution = torch.mean(global_metric_score_distribution.view(probe_out.size(1), cfg['seq_len']//probe_out.size(1), global_metric_score_distribution.size(-1)), dim=1)
 
-                if 'probefixratio' in cfg['probe_info']:
+                if 'probefixratio' in cfg['prune_info']:
                     combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
                     # norm_probe_out = torch.sqrt(combined_probe_out)
                 # dynaratio
@@ -1058,7 +1063,7 @@ def cal_attn_weight_prune_metric(probe_out, weight, metric_type, num_heads, glob
         #     norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=(0,1)) ** 2 / probe_num,  max=cfg['data_type_max'])
         #     global_metric_score_distribution = global_metric_score_distribution.to(probe_out.device)
         #     if global_metric_score_distribution is not None:
-        #         if 'probefixratio' in cfg['probe_info']:
+        #         if 'probefixratio' in cfg['prune_info']:
         #             combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
         #         else:
         #             denominator = norm_probe_out_square + global_metric_score_distribution
@@ -1082,7 +1087,7 @@ def cal_attn_weight_prune_metric(probe_out, weight, metric_type, num_heads, glob
         #     norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=(0,1)) ** 2 / probe_num,  max=cfg['data_type_max'])
         #     global_metric_score_distribution = global_metric_score_distribution.to(probe_out.device)
         #     if global_metric_score_distribution is not None:
-        #         if 'probefixratio' in cfg['probe_info']:
+        #         if 'probefixratio' in cfg['prune_info']:
         #             combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
         #         else:
         #             denominator = norm_probe_out_square + global_metric_score_distribution

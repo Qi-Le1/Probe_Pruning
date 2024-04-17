@@ -6,7 +6,7 @@ from config import cfg
 
 
 def rank_process(x, probe_num, probe_size, probe_type):
-    if 'optimalseq' in cfg['probe_info']:
+    if 'optimalseq' in cfg['prune_info']:
         l2_norms = torch.linalg.vector_norm(x, ord=2, dim=2)
         # print('l2_norms', l2_norms.shape, l2_norms, flush=True)
         # Now, l2_norms has shape [bsz, seq], and you want the top-k across all sequences in each batch
@@ -42,7 +42,7 @@ def rank_process(x, probe_num, probe_size, probe_type):
     _, indices = torch.topk(l2_norms, probe_num)
     sorted_indices = indices.sort()[0]
     # cfg['vertical_indices'] = sorted_indices
-    # if 'bszseq' in cfg['probe_info']:
+    # if 'bszseq' in cfg['prune_info']:
     #     print('here2')
     #     select = x[:, sorted_indices, :]
     #     return absnml_process(select, probe_num, probe_size), sorted_indices

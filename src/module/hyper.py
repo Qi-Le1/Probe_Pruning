@@ -184,8 +184,7 @@ def process_control():
     cfg['pq_beta'] = 0.9
     cfg['pq_gamma'] = 1
     make_data_name()
-    cfg['qk_prune_way'] = 'whole'
-    cfg['vo_prune_way'] = 'whole'
+    
     if cfg['task_name'] in ['clm', 'csr']:
         cfg['collate_mode'] = 'transformer'
         cfg['gpt2'] = {'max_length': 512}
@@ -196,59 +195,64 @@ def process_control():
             # reassign in make_hf_model
             cfg[model_name] = {'max_length': None}
 
-        cfg['probe_info'] = cfg['control']['probe_info']
-        if 'probe' not in cfg['prune_method'] and cfg['probe_info'] != 'None':
-            raise ValueError('probe_info is only valid with probe pruning, please set to None')
-        if cfg['probe_info'] != 'None':
-            probe_info_list = cfg['probe_info'].split('-')
-            print('probe_info_list', probe_info_list)
+        cfg['qk_prune_way'] = 'whole'
+        cfg['vo_prune_way'] = 'whole'
+
+        cfg['prune_info'] = cfg['control']['prune_info']
+        if cfg['prune_info'] != 'None':
+            prune_info_list = cfg['prune_info'].split('-')
+            print('prune_info_list', prune_info_list)
             if 'llama' in cfg['model_name']:
                 prune_keys = ['q', 'k', 'v', 'gate', 'up']
             elif 'opt' in cfg['model_name']:
                 prune_keys = ['q', 'k', 'v', 'fc1']
             
-            cfg['probe_generation_type'] = probe_info_list[0].split('+')
-            for probe_type in cfg['probe_generation_type']:
-                if not any(term in probe_type for term in ['rank', 'mean', 'absnml']):
-                    raise ValueError('probe_generation_type is not valid')
+            if 'probe' in cfg['prune_method']:
+                cfg['probe_generation_type'] = prune_info_list[-1].split('+')
+                for probe_type in cfg['probe_generation_type']:
+                    if not any(term in probe_type for term in ['rank', 'mean', 'absnml']):
+                        raise ValueError('probe_generation_type is not valid')
             
-            for key in prune_keys:
-                # default
-                print(probe_info_list[prune_keys.index(key)+1], probe_info_list[prune_keys.index(key)+1] is None, prune_keys.index(key)+1)
-                cfg[f'{key}_prune'] = probe_info_list[prune_keys.index(key)+1]
-                # cfg[f'{key}_probe_num'] = 1
-                # cfg[f'{key}_probe_size'] = int(cfg['batch_size'] // 1)
+                for key in prune_keys:
+                    # default
+                    print(prune_info_list[prune_keys.index(key)], prune_info_list[prune_keys.index(key)] is None, prune_keys.index(key))
+                    cfg[f'{key}_prune'] = prune_info_list[prune_keys.index(key)]
+                    # cfg[f'{key}_probe_num'] = 1
+                    # cfg[f'{key}_probe_size'] = int(cfg['batch_size'] // 1)
 
-                match = re.search(r'\d*\.?\d+', cfg[f'{key}_prune'])
-                float_value = None
-                print('match', match)
-                if match:
-                    float_value = float(match.group(0))
-                else:
+                    match = re.search(r'\d*\.?\d+', cfg[f'{key}_prune'])
                     float_value = None
+                    print('match', match)
+                    if match:
+                        float_value = float(match.group(0))
+                    else:
+                        float_value = None
 
-                float_pattern = re.compile(r'\d*\.?\d+')
-                # Find all matches and convert them to floats
-                floats = [float(match) for match in float_pattern.findall(cfg[f'{key}_prune'])]
-                if not floats:
-                    raise ValueError(f'probe ratio is not valid for {key}, please specify it in probe_info')
-                else:
-                    cfg[f'{key}_probe_ratio'] = floats
+                    float_pattern = re.compile(r'\d*\.?\d+')
+                    # Find all matches and convert them to floats
+                    floats = [float(match) for match in float_pattern.findall(cfg[f'{key}_prune'])]
+                    if not floats:
+                        raise ValueError(f'probe ratio is not valid for {key}, please specify it in prune_info')
+                    else:
+                        cfg[f'{key}_probe_ratio'] = floats
+            else:
+                for key in prune_keys:
+                    print(prune_info_list[prune_keys.index(key)], prune_info_list[prune_keys.index(key)] is None, prune_keys.index(key))
+                    cfg[f'{key}_prune'] = prune_info_list[prune_keys.index(key)]
 
-
-                # if 'bsz' in cfg['probe_info']:
+                # if 'bsz' in cfg['prune_info']:
                 #     full_size = cfg['batch_size']
-                # elif 'seq' in cfg['probe_info']:
+                # elif 'seq' in cfg['prune_info']:
                 #     full_size = cfg['seq_len']
                 #     # cfg['probe_norm_dim'] = (0, 2)
-                # elif 'hd' in cfg['probe_info']:
+                # elif 'hd' in cfg['prune_info']:
                 #     full_size = cfg[model_name]['hidden_size']
                 #     # cfg['probe_norm_dim'] = (0, 1)
                 
                 # print('full_size', full_size, float_value, cfg[f'{key}_prune'])
                 # if float_value:  # Ensure int_value is not None to avoid division by zero
                 #     cfg[f'{key}_probe_num'] = int(float_value * full_size)
-                #     if 'rank' in cfg['probe_info']:
+                #     if 'rank' in cfg['prune_info']:
                 #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
                 #         cfg[f'{key}_probe_size'] = probe_size
                 #     else:
@@ -256,19 +260,19 @@ def process_control():
                 #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
                 #         cfg[f'{key}_probe_size'] = probe_size
 
-                # if 'bsz' in cfg['probe_info']:
+                # if 'bsz' in cfg['prune_info']:
                 #     full_size = cfg['batch_size']
-                # elif 'seq' in cfg['probe_info']:
+                # elif 'seq' in cfg['prune_info']:
                 #     full_size = cfg['seq_len']
                 #     # cfg['probe_norm_dim'] = (0, 2)
-                # elif 'hd' in cfg['probe_info']:
+                # elif 'hd' in cfg['prune_info']:
                 #     full_size = cfg[model_name]['hidden_size']
                 #     # cfg['probe_norm_dim'] = (0, 1)
                 
                 # print('full_size', full_size, float_value, cfg[f'{key}_prune'])
                 # if float_value:  # Ensure int_value is not None to avoid division by zero
                 #     cfg[f'{key}_probe_num'] = int(float_value * full_size)
-                #     if 'rank' in cfg['probe_info']:
+                #     if 'rank' in cfg['prune_info']:
                 #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
                 #         cfg[f'{key}_probe_size'] = probe_size
                 #     else:
@@ -280,14 +284,14 @@ def process_control():
 
 
             prune_keywords = ['each', 'fill', 'whole']
-            cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), 'whole')
-            cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), 'whole')
-            if cfg['qk_prune_way'] is not None and cfg['vo_prune_way'] is not None:
-                assert cfg['qk_prune_way'] == cfg['vo_prune_way']
+            cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), None)
+            cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), None)
+            # if cfg['qk_prune_way'] is not None and cfg['vo_prune_way'] is not None:
+            #     assert cfg['qk_prune_way'] == cfg['vo_prune_way']
         
 
-        if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['probe_info']:
-            match = re.search(r'probefixratio(\d+\.\d+)', cfg['probe_info'])
+        if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['prune_info']:
+            match = re.search(r'probefixratio(\d+\.\d+)', cfg['prune_info'])
             if match:
                 # Convert the matched string to a float
                 float_value = float(match.group(1))
