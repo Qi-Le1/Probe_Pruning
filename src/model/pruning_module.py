@@ -120,9 +120,17 @@ class HiddenRepresentationPruning(BasePruning):
                 combined_probe_out = torch.sum(combined_probe_out, dim=0)
                 probe_out_dim_metric = (torch.sqrt(combined_probe_out.reshape((1,-1))) * torch.abs(weight)).sum(dim=0).clamp(max=cfg['data_type_max'])
 
-                if 'norm' in cfg['gate_prune']:
-                    print('yes')
-                    probe_out_dim_metric = torch.linalg.vector_norm((torch.sqrt(combined_probe_out.reshape((1,-1))) * torch.abs(weight)), dim=0).clamp(max=cfg['data_type_max'])
+                if 'normwhole' in cfg['q_prune'] and weight.shape[1] == 4096:
+                    if 'normwhole1' in cfg['q_prune']:
+                        res = (torch.sqrt(combined_probe_out).reshape((1,-1)) * torch.abs(weight)).reshape(4096, 32, 128)
+                    elif 'normwhole2' in cfg['q_prune']:
+                        res = (torch.sqrt(combined_probe_out).reshape((1,-1)) * torch.pow(weight, 2)).reshape(4096, 32, 128)
+                    elif 'normwhole3' in cfg['q_prune']:
+                        res = (combined_probe_out.reshape((1,-1)) * torch.abs(weight)).reshape(4096, 32, 128)
+                    elif 'normwhole4' in cfg['q_prune']:
+                        res = (combined_probe_out.reshape((1,-1)) * torch.pow(weight, 2)).reshape(4096, 32, 128)
+                    print('res', res.shape)
+                    probe_out_dim_metric = torch.linalg.vector_norm(res, ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
                 return probe_out_dim_metric
             else:
                 print('probe_num', probe_num, probe_out.shape)
@@ -250,9 +258,19 @@ class HiddenRepresentationPruning(BasePruning):
                 combined_probe_out = torch.sum(combined_probe_out, dim=0)
                 probe_out_dim_metric = (torch.sqrt(combined_probe_out.reshape((1,-1))) * torch.abs(weight)).sum(dim=0).clamp(max=cfg['data_type_max'])
 
-                if 'norm' in cfg['gate_prune']:
-                    print('yes')
-                    probe_out_dim_metric = torch.linalg.vector_norm((torch.sqrt(combined_probe_out.reshape((1,-1))) * torch.abs(weight)), dim=0).clamp(max=cfg['data_type_max'])
+                if 'norm' in cfg['gate_prune'] and weight.shape[1] == 11008:
+                    if 'norm1' in cfg['gate_prune']:
+                        res = (torch.sqrt(combined_probe_out).reshape((1,-1)) * torch.abs(weight))
+                    elif 'norm2' in cfg['gate_prune']:
+                        res = (torch.sqrt(combined_probe_out).reshape((1,-1)) * torch.pow(weight, 2))
+                    elif 'norm3' in cfg['gate_prune']:
+                        res = (combined_probe_out.reshape((1,-1)) * torch.abs(weight))
+                    elif 'norm4' in cfg['gate_prune']:
+                        res = (combined_probe_out.reshape((1,-1)) * torch.pow(weight, 2))
+                    print('res', res.shape)
+                    probe_out_dim_metric = torch.linalg.vector_norm(res, ord=2, dim=0).clamp(max=cfg['data_type_max'])
+
+                    
                 return probe_out_dim_metric
             else:
                 print('probe_num', probe_num, probe_out.shape)
@@ -353,10 +371,22 @@ class HiddenRepresentationPruning(BasePruning):
                 probe_out_dim_metric = torch.sqrt(((norm_probe_out_square.reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(max=cfg['data_type_max']))
                 return probe_out_dim_metric
             
-    def cal_attn_calib_prune_metric(self, calib, weight, metric_type, prune_way):
+    def cal_attn_calib_prune_metric(self, calib, weight, metric_type):
         if 'wandasp' in metric_type:
             calib = torch.sum(calib, dim=0)
             probe_out_dim_metric = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight)).sum(dim=0).clamp(max=cfg['data_type_max'])
+
+            if 'normwhole' in cfg['q_prune'] and weight.shape[1] == 4096:
+                if 'normwhole1' in cfg['q_prune']:
+                    res = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight)).reshape(4096, 32, 128)
+                elif 'normwhole2' in cfg['q_prune']:
+                    res = (torch.sqrt(calib).reshape((1,-1)) * torch.pow(weight, 2)).reshape(4096, 32, 128)
+                elif 'normwhole3' in cfg['q_prune']:
+                    res = (calib.reshape((1,-1)) * torch.abs(weight)).reshape(4096, 32, 128)
+                elif 'normwhole4' in cfg['q_prune']:
+                    res = (calib.reshape((1,-1)) * torch.pow(weight, 2)).reshape(4096, 32, 128)
+                print('res', res.shape)
+                probe_out_dim_metric = torch.linalg.vector_norm(res, ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
         elif 'new' in metric_type:
             calib = torch.sum(calib, dim=0)
             probe_out_dim_metric = torch.sqrt(((calib.reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(max=cfg['data_type_max']))
@@ -386,6 +416,18 @@ class HiddenRepresentationPruning(BasePruning):
         if 'wandasp' in metric_type:
             calib = torch.sum(calib, dim=0)
             probe_out_dim_metric = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight)).sum(dim=0).clamp(max=cfg['data_type_max'])
+
+            if 'norm' in cfg['gate_prune'] and weight.shape[1] == 11008:
+                if 'norm1' in cfg['gate_prune']:
+                    res = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight))
+                elif 'norm2' in cfg['gate_prune']:
+                    res = (torch.sqrt(calib).reshape((1,-1)) * torch.pow(weight, 2))
+                elif 'norm3' in cfg['gate_prune']:
+                    res = (calib.reshape((1,-1)) * torch.abs(weight))
+                elif 'norm4' in cfg['gate_prune']:
+                    res = (calib.reshape((1,-1)) * torch.pow(weight, 2))
+                print('res', res.shape)
+                probe_out_dim_metric = torch.linalg.vector_norm(res, ord=2, dim=0).clamp(max=cfg['data_type_max'])
         elif 'new' in metric_type:
             calib = torch.sum(calib, dim=0)
             probe_out_dim_metric = torch.sqrt(((calib.reshape((1,-1))) * torch.pow(weight, 2)).sum(dim=0).clamp(max=cfg['data_type_max']))
@@ -399,10 +441,10 @@ class HiddenRepresentationPruning(BasePruning):
             if 'norm' in cfg['gate_prune'] and weight.shape[1] == 11008:
                 print('norm_gate_prune')
                 probe_out_dim_metric = torch.linalg.vector_norm(((calib.reshape((1,-1))) * torch.pow(weight, 2)), dim=0).clamp(max=cfg['data_type_max'])
-            elif 'normwhole' in cfg['q_prune'] and weight.shape[1] == 4096:
-                res = ((calib.reshape((1,-1))) * torch.pow(weight, 2)).reshape(4096, 32, 128)
-                print('res', res.shape)
-                probe_out_dim_metric = torch.linalg.vector_norm(res, ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
+            # elif 'normwhole' in cfg['q_prune'] and weight.shape[1] == 4096:
+            #     res = ((calib.reshape((1,-1))) * torch.pow(weight, 2)).reshape(4096, 32, 128)
+            #     print('res', res.shape)
+            #     probe_out_dim_metric = torch.linalg.vector_norm(res, ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
                 
         print('calib', calib)
         sorted_probe_out_dim_metric, indices = torch.sort(probe_out_dim_metric)
@@ -568,6 +610,14 @@ class HiddenRepresentationPruning(BasePruning):
             # summed_metrics = torch.sqrt(summed_metrics)
             # Sort the summed metrics
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
+
+            # if 'normwhole' not in cfg['q_prune']:
+            #     print('yes')
+            #     probe_out_dim_metric = torch.pow(probe_out_dim_metric, 2)
+            #     summed_metrics = probe_out_dim_metric.sum(dim=-1)
+            #     summed_metrics = torch.sqrt(summed_metrics)
+            #     sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
+
             print('attn summed_metricssorted_value', sorted_value)
             # Determine the number of heads to prune
             if 'pq' in cfg['prune_method']:

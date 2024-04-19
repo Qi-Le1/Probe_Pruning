@@ -180,13 +180,13 @@ class CsrAccuracy:
         # acc_norm = 1.0 if np.argmax(results / completion_len) == gold else 0.0
 
         # accnorm
-        for i in range(input['input_indices'].shape[0]):
-            self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item()/label_length_per_sample[i].item())
-            self.correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
-        # acc
         # for i in range(input['input_indices'].shape[0]):
-        #     self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item())
+        #     self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item()/label_length_per_sample[i].item())
         #     self.correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
+        # acc
+        for i in range(input['input_indices'].shape[0]):
+            self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item())
+            self.correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
 
         # a = 5
     def __call__(self, *args, **kwargs):    

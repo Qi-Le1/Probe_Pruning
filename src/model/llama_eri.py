@@ -486,6 +486,12 @@ class Linear(nn.Linear, EriLayer):
             print(' self.scaler_inp.to(torch.float16)', self.scaler_inp.dtype, flush=True)
             # self.nsamples = self.nsamples.to(cur_device)
             self.scaler_inp[:, update_indices] *= momentum
+
+            if 'bias' in self.prune_metric:
+                self.baseline_inp = self.baseline_inp.to(cur_device)
+                self.baseline_inp[:, update_indices] *= momentum
+                self.baseline_inp[:, update_indices] += (1 - momentum) * (torch.mean(inp, dim=0) / batch_size)
+
             has_nan = torch.isnan(self.scaler_inp).any()
             has_inf = torch.isinf(self.scaler_inp).any()
             if has_nan:

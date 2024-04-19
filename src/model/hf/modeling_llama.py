@@ -386,9 +386,9 @@ class LlamaMLP(nn.Module):
             #     probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
             # else:
             print('key', self.down_proj.key)
-            probe_out_dim_metric = self.pruning_module.cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution(), selected_indices=selected_indices)
+            probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution(), selected_indices=selected_indices)
         else:
-            probe_out_dim_metric = self.pruning_module.cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
+            probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
 
         if 'globalratio' in cfg['prune_method']:
             probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
@@ -457,6 +457,8 @@ class LlamaMLP(nn.Module):
                     # and self.layer_order >= 5
                 # elif cfg['calibration_stage'] == False and self.layer_order >= 5:
                 elif cfg['calibration_stage'] == False:
+                    # if self.layer_order == 31:
+                    #     return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
                     # print('zzz', self.layer_order, flush=True)
                     if 'probe' in cfg['prune_method']:
                         time_start = time.time()
@@ -618,7 +620,7 @@ class LlamaMLP(nn.Module):
                             if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
                                 out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
                             else:
-                                out_dim_metric = self.pruning_module.cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                                out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
                                 if 'globalratio' in cfg['prune_method']:
                                     out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
@@ -649,7 +651,7 @@ class LlamaMLP(nn.Module):
                                 if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
                                     out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
                                 else:
-                                    out_dim_metric = self.pruning_module.cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                                    out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
                                     # out_dim_metric = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
 
                                     if 'globalratio' in cfg['prune_method']:
@@ -683,7 +685,7 @@ class LlamaMLP(nn.Module):
                                 if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
                                     out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
                                 else:
-                                    out_dim_metric = self.pruning_module.cal_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                                    out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
                                     if 'globalratio' in cfg['prune_method']:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
@@ -960,10 +962,10 @@ class LlamaAttention(nn.Module):
         #         probe_out_dim_metric, comined_probe_out = cal_attn_weight_prune_metric(attn_output, value_states, cfg['prune_metric'])
 
         #     if 'globalratio' in cfg['prune_method']:
-        #         self.attn_weights_indices, _ , _ , _ = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.k_num_heads, cfg['seq_len'], 'each', 'attnweights', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+        #         self.attn_weights_indices, _ , _ , _ = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.k_num_heads, cfg['seq_len'], 'each', 'attnweights', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
         #     else:
         #         # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
-        #         self.attn_weights_indices, _ , _ , _ = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.k_num_heads, cfg['seq_len'], 'each', 'attnweights', cfg['tc_multiple'])
+        #         self.attn_weights_indices, _ , _ , _ = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.k_num_heads, cfg['seq_len'], 'each', 'attnweights', cfg['tc_multiple'])
 
 
         # if cfg['k_probe_num'] > cfg['v_probe_num']:
@@ -981,15 +983,15 @@ class LlamaAttention(nn.Module):
         # attn_output = attn_output.reshape(max(cfg['k_probe_num'], cfg['v_probe_num']), q_len, self.hidden_size)
         
         if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
-            probe_out_dim_metric = self.pruning_module.cal_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution(), selected_indices=selected_indices)
+            probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution(), selected_indices=selected_indices)
         else:
-            probe_out_dim_metric = self.pruning_module.cal_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
+            probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
 
         if 'globalratio' in cfg['prune_method']:
-            probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+            probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
         else:
             # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
-            probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+            probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
             if probe_vo_out_dim_indices is not None:
                 print('probe_vo_out_dim_indices', probe_vo_out_dim_indices.shape, flush=True)
         
@@ -1174,7 +1176,8 @@ class LlamaAttention(nn.Module):
                 return self.attention_forward(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
             elif cfg['calibration_stage'] == False :
                 bsz, q_len, _ = hidden_states.size()
-                
+                # if self.layer_order == 31:
+                #     return self.attention_forward(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
                 if 'probe' in cfg['prune_method']:
                     qk_prune_way = cfg['qk_prune_way']
                     vo_prune_way = cfg['vo_prune_way']
@@ -1257,7 +1260,7 @@ class LlamaAttention(nn.Module):
                     # attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.v_head_dim)
 
                     # probe_out_dim_metric, comined_probe_out = cal_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
-                    # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, 'each', 'vo', cfg['tc_multiple'])
+                    # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, 'each', 'vo', cfg['tc_multiple'])
                     # print(self.v_num_heads, self.v_head_dim, flush=True)
                     # if self.probe_vo_out_dim_indices is not None:
                     #     print(self.probe_vo_out_dim_indices.shape, flush=True)
@@ -1284,10 +1287,10 @@ class LlamaAttention(nn.Module):
                         # norm_square = torch.clamp(torch.linalg.vector_norm(attn_weights, ord=2, dim=(0, 2)).reshape((1, self.num_heads, -1, 1)) ** 2, max=cfg['data_type_max'])
                         # attn_weights_metric = torch.sqrt((norm_square * torch.pow(value_states, 2)).sum(axis=(0, -1))).clamp(max=cfg['data_type_max'])
                         # # attn_weights_metric = (norm_square * torch.pow(value_states, 2)).sum(axis=(0, -1)).clamp(max=cfg['data_type_max'])
-                        # # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
-                        # _, attn_weights_indices, _, _ = self.pruning_module.sort_probe_attn_metric(attn_weights_metric, attn_weights.shape[1], attn_weights.shape[-1], 'each', 'delseq', cfg['tc_multiple'])
+                        # # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                        # _, attn_weights_indices, _, _ = self.pruning_module.sort_attn_metric(attn_weights_metric, attn_weights.shape[1], attn_weights.shape[-1], 'each', 'delseq', cfg['tc_multiple'])
                         
-                        # # _, attn_weights_indices, _, _ = self.pruning_module.sort_probe_attn_metric(attn_weights_metric, attn_weights.shape[1], self.head_dim, 'each', 'delseq', cfg['tc_multiple'])
+                        # # _, attn_weights_indices, _, _ = self.pruning_module.sort_attn_metric(attn_weights_metric, attn_weights.shape[1], self.head_dim, 'each', 'delseq', cfg['tc_multiple'])
 
                         # attn_weights_indices_expand = attn_weights_indices.unsqueeze(0).unsqueeze(2).expand(bsz, self.k_num_heads, q_len, -1)
                         # # attn_weights = torch.gather(attn_weights, -1, attn_weights_indices_expand)
@@ -1314,7 +1317,7 @@ class LlamaAttention(nn.Module):
                         attn_weights_metric = torch.linalg.norm(attn_weights_metric, ord=2, dim=0)
                         # attn_weights_metric = torch.sum(attn_weights_metric, dim=0).clamp(max=cfg['data_type_max'])
                         probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(attn_weights_metric, cfg['tc_multiple'])
-                        # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                        # self.probe_vo_out_dim_indices, self.probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
                         # attn_weights = attn_weights[:, :, :, probe_out_dim_indices]
                         attn_weights = prev_attention_weight[:, :, :, probe_out_dim_indices]
                         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
@@ -1423,12 +1426,12 @@ class LlamaAttention(nn.Module):
                                     vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
                                 else:
                                     # TODO: deal with rope
-                                    out_dim_metric = self.pruning_module.cal_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
+                                    out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
                                     if 'globalratio' in cfg['prune_method']:
-                                        vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+                                        vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                     else:
                                         # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
-                                        vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_probe_attn_metric(out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                        vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, v_num_heads, v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, v_num_heads, v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
                             
                             if qk_prune_way is None:
                                 qk_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
@@ -1528,12 +1531,12 @@ class LlamaAttention(nn.Module):
                                     vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
                                 else:
                                     # TODO: deal with rope
-                                    out_dim_metric = self.pruning_module.cal_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
+                                    out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
                                     if 'globalratio' in cfg['prune_method']:
-                                        vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+                                        vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                     else:
                                         # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
-                                        vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_probe_attn_metric(out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                        vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.v_num_heads, self.v_head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
                                         print('vo_out_dim_indices', vo_out_dim_indices.shape, flush=True)
                             if qk_prune_way is None:
