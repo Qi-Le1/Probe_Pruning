@@ -499,11 +499,11 @@ class Linear(nn.Linear, EriLayer):
             if has_inf:
                 print("Does 'self.scaler_inp111' contain infinite values? Yes")
             if cfg['calibration_stage'] == True:
-                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
                 # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
 
             elif cfg['calibration_stage'] == False:
-                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, min=cfg['data_type_min_positive'], max=cfg['data_type_max'])
+                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
                 # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
             # denominator = (self.nsamples[update_indices] + )
             self.scaler_inp[:, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
@@ -514,6 +514,7 @@ class Linear(nn.Linear, EriLayer):
                 print("Does 'self.scaler_inp' contain NaN values? Yes")
             if has_inf:
                 print("Does 'self.scaler_inp' contain infinite values? Yes")
+            pass
         elif "flap" in self.prune_metric or 'new' in self.prune_metric:
             self.baseline_inp = self.baseline_inp.to(cur_device)
             self.fluc_inp = self.fluc_inp.to(cur_device)
@@ -526,7 +527,7 @@ class Linear(nn.Linear, EriLayer):
                 pass
             else:
                 self.fluc_inp[:, update_indices] *= (self.nsamples[update_indices] - 1) / (self.nsamples[update_indices] + batch_size - 1)
-                self.fluc_inp[:, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=(0,1)) / (self.nsamples[update_indices] + batch_size)   # a²+b²+c²...没开根号
+                self.fluc_inp[:, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size)   # a²+b²+c²...没开根号
         # else:
         #     if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
         #         # print('mpomentum', momentum)
@@ -675,7 +676,7 @@ class Linear(nn.Linear, EriLayer):
         if self.async_intrabatch_weight_index.device != self.weight.device:
             self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
         self.async_intrabatch_weight_index += 1
-        # print('async_intrabatch_weight_index', self.async_intrabatch_weight_index, self.key, self.async_intrabatch_weight.shape)
+        print('async_intrabatch_weight_index', self.async_intrabatch_weight_index, self.key, self.async_intrabatch_weight.shape)
         return
 
     
@@ -731,7 +732,7 @@ class Linear(nn.Linear, EriLayer):
     
     # no bias in llama-2
     def forward(self, x: torch.Tensor, **kwargs):
-        print('key', self.key, flush=True)
+        print('forward key', self.key, flush=True)
         with torch.no_grad():
             forward_start_time = time.time()
             previous_dtype = x.dtype
@@ -918,6 +919,20 @@ class Linear(nn.Linear, EriLayer):
                             weight = self.extract_in_dim_weight(weight, kwargs['in_dim_indices'])
 
                         result = F.linear(x, weight, bias=None)
+                        if 'o_proj' in self.key or 'down_proj' in self.key:
+                            # 'flap' in cfg['prune_metric'] and 
+                            if 'bias' in cfg['prune_metric']:
+                                print('bias')
+                                calib = torch.mean(self.baseline_inp, dim=0)
+                                calib = calib.to(x.device)
+                                # all_indices = torch.arange(self.in_features, dtype=torch.long).to(device=x.device)
+                                in_dim_indices = kwargs['in_dim_indices'].to(device=x.device)
+                                # print('all_indices', all_indices.dtype, all_indices.shape, all_indices.device, flush=True)
+                                print('in_dim_indices', in_dim_indices.dtype, in_dim_indices.shape, in_dim_indices.device, flush=True)
+                                calib[in_dim_indices] = 0
+                                # pruned_channel_indices = all_indices[mask]
+                                compensate_bias = F.linear(calib, self.weight, bias=None)
+                                result += compensate_bias
                         result = result.to(previous_dtype)
                         return result
                     else:
@@ -948,6 +963,7 @@ class Linear(nn.Linear, EriLayer):
                         # print('here')
                         result = F.linear(x, weight, bias=None)
                         # print('calibrateresult', result.dtype, result.shape, result, flush=True)
+                    
                     result = result.to(previous_dtype)
                     forward_end_time = time.time()
                     print('forward_time', forward_end_time - forward_start_time, flush=True)

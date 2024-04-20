@@ -217,24 +217,25 @@ def process_control():
                     # default
                     print(prune_info_list[prune_keys.index(key)], prune_info_list[prune_keys.index(key)] is None, prune_keys.index(key))
                     cfg[f'{key}_prune'] = prune_info_list[prune_keys.index(key)]
+                    if cfg[f'{key}_prune'] != 'None':
                     # cfg[f'{key}_probe_num'] = 1
                     # cfg[f'{key}_probe_size'] = int(cfg['batch_size'] // 1)
 
-                    match = re.search(r'\d*\.?\d+', cfg[f'{key}_prune'])
-                    float_value = None
-                    print('match', match)
-                    if match:
-                        float_value = float(match.group(0))
-                    else:
+                        match = re.search(r'\d*\.?\d+', cfg[f'{key}_prune'])
                         float_value = None
+                        print('match', match)
+                        if match:
+                            float_value = float(match.group(0))
+                        else:
+                            float_value = None
 
-                    float_pattern = re.compile(r'\d*\.?\d+')
-                    # Find all matches and convert them to floats
-                    floats = [float(match) for match in float_pattern.findall(cfg[f'{key}_prune'])]
-                    if not floats:
-                        raise ValueError(f'probe ratio is not valid for {key}, please specify it in prune_info')
-                    else:
-                        cfg[f'{key}_probe_ratio'] = floats
+                        float_pattern = re.compile(r'\d*\.?\d+')
+                        # Find all matches and convert them to floats
+                        floats = [float(match) for match in float_pattern.findall(cfg[f'{key}_prune'])]
+                        if not floats:
+                            raise ValueError(f'probe ratio is not valid for {key}, please specify it in prune_info')
+                        else:
+                            cfg[f'{key}_probe_ratio'] = floats
             else:
                 for key in prune_keys:
                     print(prune_info_list[prune_keys.index(key)], prune_info_list[prune_keys.index(key)] is None, prune_keys.index(key))

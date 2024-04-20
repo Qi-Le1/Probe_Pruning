@@ -25,11 +25,11 @@ def get_model_profile(tag, model_prof, onlyprobe=False):
     info_list = []
     for name, module in model_prof.model.model.named_modules():
         temp = [name, module.__flops__, module.__params__, module.__macs__, type(module)]
-        layer_order_matches = re.findall(r'\d+', name)
-        if layer_order_matches:  # Check if the list is not empty
-            layer_order = int(layer_order_matches[0])  # Convert the first match to an integer
-            if layer_order <= cfg['skip_layers']:
-                continue
+        # layer_order_matches = re.findall(r'\d+', name)
+        # if layer_order_matches:  # Check if the list is not empty
+        #     layer_order = int(layer_order_matches[0])  # Convert the first match to an integer
+        #     if layer_order <= cfg['skip_layers']:
+        #         continue
 
         if 'llama' in cfg['model_name']: 
             if 'model.embed_tokens.weight' in name or 'model.norm.weight' in name or 'lm_head.weight' in name:
@@ -49,10 +49,7 @@ def get_model_profile(tag, model_prof, onlyprobe=False):
         info_list.append(temp)
     return copy.deepcopy(info_list)
 
-def load_dense_model():
-    from .io import load
-    # result_path = os.path.join('..', 'output', 'result')
-
+def check_dense_model():
     current_script_dir = os.path.dirname(__file__)
     result_path = os.path.join(current_script_dir, '..', 'output', 'result')
     dense_name_list = cfg['model_tag'].split('_')
@@ -73,18 +70,28 @@ def load_dense_model():
     # cust_tgt_modules
     dense_name_list[12] = 'None'
     dense_model_path = os.path.join(result_path, '_'.join(dense_name_list))
-    print('result_path', result_path)
     if not os.path.exists(dense_model_path):
         dense_model_path = os.path.join(result_path, 'dense', '_'.join(dense_name_list))
-        print('dense_model_path', dense_model_path)
         if not os.path.exists(dense_model_path):
-            return None, None
+            return None
+        else:
+            return dense_model_path
+    else:
+        return dense_model_path
+    
+
+def load_dense_model():    
+    from .io import load
+    dense_model_path = check_dense_model()
+    if dense_model_path is None:
+        return None, None
     dense_res = load(dense_model_path)
     dense_info_list, dense_duration = dense_res['dense_info_list'], dense_res['dense_duration']
     return dense_info_list, dense_duration
     
 def summarize_info_list(pruned_info_list, pruned_duration, logger, onlyprobe_info_list):
     # total = fullinf + probe
+    # for asyncintra, the info has the dirty write issue because we open 2 streams, check sync model for the correct info
 
     dense_info_list, dense_duration = load_dense_model()
     print('Summary ---------\n')

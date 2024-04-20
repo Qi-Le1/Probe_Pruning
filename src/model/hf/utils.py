@@ -104,6 +104,7 @@ def generate_probe(x, probe_ratio_list):
             if x.size(2) % probe_num != 0:
                 x = x[:, :, :probe_num * probe_size]
 
+        print('probe_num', probe_num, 'probe_size', probe_size, flush=True)
         if 'rank' in probe_type:
             x, temp_selected_indices = rank_process(x, probe_num, probe_size, probe_type)
             if temp_selected_indices is not None:
@@ -112,6 +113,7 @@ def generate_probe(x, probe_ratio_list):
             x = mean_process(x, probe_num, probe_size, probe_type)
         elif 'absnml' in probe_type:
             x = absnml_process(x, probe_num, probe_size, probe_type)
+        print('generated probe', selected_indices, flush=True)
     return x, selected_indices
     
 

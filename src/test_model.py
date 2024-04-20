@@ -13,7 +13,7 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward, remove_non_picklable_items
+    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward, remove_non_picklable_items, check_dense_model
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 import matplotlib.pyplot as plt
 
@@ -45,10 +45,10 @@ def main():
         runExperiment()
     return
 
-# def prepare_cude_events(model):
-#     if 'llama-2' in cfg['model_name']:
-#         for i in range(model.config.num_hidden_layers):
-#             cfg[f'cuda_events_mlp_{i}'] = torch.cuda.Event()
+def prepare_cude_events(model):
+    if 'llama-2' in cfg['model_name']:
+        for i in range(model.config.num_hidden_layers):
+            cfg[f'cuda_events_mlp_{i}'] = torch.cuda.Event()
         
 
 def runExperiment():
@@ -57,11 +57,12 @@ def runExperiment():
     torch.cuda.manual_seed(cfg['seed'])
     result_path = os.path.join('output', 'result')
     makedir_exist_ok(result_path)
-
+    if check_dense_model() is None:
+        print('No dense model found, will not print out the dense model info')
     cfg['epoch'] = 0 
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     model, tokenizer = make_model(cfg['model_name'])
-    # prepare_cude_events(model)
+    prepare_cude_events(model)
     dataset = process_dataset(dataset, tokenizer)
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
