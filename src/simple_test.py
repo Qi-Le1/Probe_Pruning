@@ -34,26 +34,124 @@ import torch
 # print(floats1, floats2, floats3)
 import torch
 
-# Example values for self.in_features and async_in_dim_indices
-in_features = 10  # Just an example, set this to your actual in_features
-async_in_dim_indices = torch.tensor([2, 5, 7], dtype=torch.long).to(device='cuda')  # Example indices to exclude
+import matplotlib.pyplot as plt
+import numpy as np
 
-# Create a tensor of all indices from 0 to in_features - 1
-all_indices = torch.arange(in_features, dtype=torch.long).to(async_in_dim_indices.device)
+import matplotlib.pyplot as plt
+import numpy as np
 
-# Create a mask where we mark indices that are not in async_in_dim_indices
-mask = ~torch.isin(all_indices, async_in_dim_indices)
+# Generating example data
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 
-# Apply the mask to filter out the indices
-pruned_channel_indices = all_indices[mask]
+# Data setup
+# Generate arrays of pruning ratios from 0.1 to 1.0, incrementing by 0.1
+# mlp_prune_ratio = np.arange(0.1, 1.1, 0.1)
+# attention_prune_ratio = np.arange(0.1, 1.1, 0.1)
 
-# pruned_channel_indices now contains indices excluding those in async_in_dim_indices
-print(pruned_channel_indices)
+# # Weights
+# mlp_weight = 0.7
+# attention_weight = 0.3
+
+# # Calculate the total pruning ratio using the formula you provided
+# # np.outer is used here to apply the multiplication across all combinations of mlp_prune_ratio and attention_prune_ratio
+# total_pruning_ratio = np.empty((10, 10))
 
 
-a = torch.tensor(1)
-b = a.reshape(1,-1)
-print(b.shape)
+# for i in range(len(mlp_prune_ratio)):
+#     for j in range(len(attention_prune_ratio)):
+#         total_pruning_ratio[i, j] = mlp_weight * mlp_prune_ratio[i] + attention_weight * attention_prune_ratio[j]
+
+
+# # Print the resulting 10x10 matrix
+# print("Total Pruning Ratio Matrix:")
+# print(total_pruning_ratio)
+
+# # Display the total pruning ratio matrix
+# print("Total Pruning Ratio Matrix:")
+# print(total_pruning_ratio)
+
+# # Generating perplexity for demonstration
+# perplexity = 100 / total_pruning_ratio
+
+# # Creating the heatmap
+# plt.figure(figsize=(10, 8))
+# ax = sns.heatmap(total_pruning_ratio, annot=perplexity, fmt=".1f", cmap="viridis", xticklabels=np.round(mlp_prune_ratio,1), yticklabels=np.round(attention_prune_ratio,1))
+# ax.set_xlabel('MLP Prune Ratio')
+# ax.set_ylabel('Attention Prune Ratio')
+# ax.set_title('Total Pruning Ratio with Perplexity Annotations')
+# plt.show()
+
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Data setup
+mlp_prune_ratio = np.arange(0.1, 1.1, 0.1)
+attention_prune_ratio = np.arange(0.1, 1.1, 0.1)
+
+# Weights
+mlp_weight = 0.7
+attention_weight = 0.3
+
+# Calculate the total pruning ratio
+total_pruning_ratio = np.empty((10, 10))
+for i in range(len(mlp_prune_ratio)):
+    for j in range(len(attention_prune_ratio)):
+        total_pruning_ratio[i, j] = mlp_weight * mlp_prune_ratio[i] + attention_weight * attention_prune_ratio[j]
+
+# Generating perplexity for demonstration
+perplexity = 100 / total_pruning_ratio
+
+# Creating the heatmap
+plt.figure(figsize=(10, 8))
+ax = sns.heatmap(total_pruning_ratio, annot=perplexity, fmt=".1f", cmap="Reds", 
+                 xticklabels=np.round(mlp_prune_ratio,1), yticklabels=np.round(attention_prune_ratio,1))
+
+# Adjust the x and y axis to range from 0 to 1
+ax.set_xticklabels(np.round(mlp_prune_ratio,1))
+ax.set_yticklabels(np.round(attention_prune_ratio[::-1],1))  # Reverse the yticklabels for inversion
+
+ax.set_xlabel('MLP Prune Ratio')
+ax.set_ylabel('Attention Prune Ratio')
+ax.set_title('Total Pruning Ratio with Perplexity Annotations')
+
+# Invert the y-axis to have 1 at the top
+ax.invert_yaxis()
+
+plt.show()
+
+plt.close('all')
+
+
+
+
+
+
+
+# # Example values for self.in_features and async_in_dim_indices
+# in_features = 10  # Just an example, set this to your actual in_features
+# async_in_dim_indices = torch.tensor([2, 5, 7], dtype=torch.long).to(device='cuda')  # Example indices to exclude
+
+# # Create a tensor of all indices from 0 to in_features - 1
+# all_indices = torch.arange(in_features, dtype=torch.long).to(async_in_dim_indices.device)
+
+# # Create a mask where we mark indices that are not in async_in_dim_indices
+# mask = ~torch.isin(all_indices, async_in_dim_indices)
+
+# # Apply the mask to filter out the indices
+# pruned_channel_indices = all_indices[mask]
+
+# # pruned_channel_indices now contains indices excluding those in async_in_dim_indices
+# print(pruned_channel_indices)
+
+
+# a = torch.tensor(1)
+# b = a.reshape(1,-1)
+# print(b.shape)
 # a = torch.tensor(1, dtype=torch.float16, device='cuda')
 # b = a / 1000000000000000
 # print('b', b)

@@ -61,10 +61,25 @@ def process_control():
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
     cfg['seq_len'] = int(cfg['control']['seq_len'])
+    # further update prune_ratio in make_model to match the mean prune ratio
     cfg['prune_ratio'] = float(cfg['control']['prune_ratio'])
+    cfg['mean_prune_ratio'] = float(cfg['control']['prune_ratio'])
+
+
     cfg['prune_metric'] = cfg['control']['prune_metric']
     cfg['prune_method'] = cfg['control']['prune_method']
-    
+    prune_ratio_list = cfg['control']['prune_ratio'].split('+')
+    if len(prune_ratio_list) == 1:
+        cfg['prune_ratio'] = float(prune_ratio_list[0])
+        cfg['mean_prune_ratio'] = float(prune_ratio_list[0])
+    elif len(prune_ratio_list) == 2:
+        # only use this for grid search, first for attn, second for mlp
+        cfg['prune_ratio'] = prune_ratio_list
+        cfg['mean_prune_ratio'] = prune_ratio_list
+        if 'gridsearch' not in cfg['prune_method']:
+            raise ValueError('prune_ratio is not valid')
+    else:
+        raise ValueError('prune_ratio is not valid')
           
     cfg['ema_momentum'] = 0.99
     if 'ema' in cfg['prune_method']:
@@ -79,7 +94,7 @@ def process_control():
     
     cfg['resinfo_ratio'] = 0.1
     if 'resinfo' in cfg['prune_method']:
-        match = re.search(r'resinfo(\d+\.\d+)', cfg['prune_method'])
+        match = re.search(r'resinfo(\d+(?:\.\d+)?)', cfg['prune_method'])
         if match:
             # Convert the matched string to a float
             float_value = float(match.group(1))
@@ -168,7 +183,7 @@ def process_control():
     # default skip 3 layers
     cfg['skip_layers'] = 2
     if 'skip' in cfg['prune_method']:
-        match = re.search(r'skip(\d+)', cfg['prune_method'])
+        match = re.search(r'skip(-?\d+)', cfg['prune_method'])
         if match:
             # Convert the matched string to a float
             int_value = int(match.group(1))
@@ -336,7 +351,8 @@ def process_control():
 
     cfg['logger_detailed_info'] = False
     cfg['onlyprobe'] = False
-    cfg['onlyprobeinfo'] = True
+    # cfg['onlyprobeinfo'] = True
+    cfg['onlyprobeinfo'] = False
     print('cfg: ', cfg)
     return
 
@@ -552,6 +568,34 @@ TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
 TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING = {
     "llama": ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"],
     'opt': ["k_proj", "v_proj", "q_proj", "fc1"]
+}
+
+# determine by the grid search
+TRANSFORMERS_MODELS_TO_GRID_SEARCH_RATIO = {
+    "llama": {
+        '128': {
+            '0.1': {'o_proj': 0.1, 'down_proj': 0.1},
+            '0.2': {'o_proj': 0.2, 'down_proj': 0.2},
+            '0.3': {'o_proj': 0.3, 'down_proj': 0.3},
+            '0.4': {'o_proj': 0.4, 'down_proj': 0.4},
+            '0.5': {'o_proj': 0.5, 'down_proj': 0.5},
+            '0.6': {'o_proj': 0.6, 'down_proj': 0.6},
+            '0.7': {'o_proj': 0.7, 'down_proj': 0.7},
+            '0.8': {'o_proj': 0.8, 'down_proj': 0.8},
+        }
+    },
+    "opt": {
+        '128': {
+            '0.1': {'o_proj': 0.1, 'down_proj': 0.1},
+            '0.2': {'o_proj': 0.2, 'down_proj': 0.2},
+            '0.3': {'o_proj': 0.3, 'down_proj': 0.3},
+            '0.4': {'o_proj': 0.4, 'down_proj': 0.4},
+            '0.5': {'o_proj': 0.5, 'down_proj': 0.5},
+            '0.6': {'o_proj': 0.6, 'down_proj': 0.6},
+            '0.7': {'o_proj': 0.7, 'down_proj': 0.7},
+            '0.8': {'o_proj': 0.8, 'down_proj': 0.8},
+        }
+    }
 }
 
 

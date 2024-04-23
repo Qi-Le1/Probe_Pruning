@@ -324,7 +324,9 @@ def make_hf_model(model_name, sub_model_name=None):
     print('model.config', model.config)
     
     num_hidden_layers = model.config.num_hidden_layers
-    cfg['prune_ratio'] = num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'] 
+    if 'gridsearch' not in cfg['prune_method']:
+        cfg['prune_ratio'] = num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'] 
+    print('cfg[prune_ratio]', cfg['prune_ratio'])
     return model, tokenizer
 
 

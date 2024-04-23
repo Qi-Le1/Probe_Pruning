@@ -125,8 +125,8 @@ class LlamaRMSNorm(nn.Module):
         hidden_states = hidden_states.to(torch.float32)
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        print(self.weight.device)
-        print(hidden_states.device)
+        # print(self.weight.device)
+        # print(hidden_states.device)
         return self.weight * hidden_states.to(input_dtype)
 
 
@@ -253,10 +253,12 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, unsqueeze_dim=1):
     Returns:
         `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
     """
+    # print('position_ids', position_ids, flush=True)
     cos = cos[position_ids].unsqueeze(unsqueeze_dim)
     sin = sin[position_ids].unsqueeze(unsqueeze_dim)
     # print('apply_rotary_pos_emb_cos', cos.shape, flush=True)
-    # print('apply_rotary_pos_emb_sin', sin.shape, flush=True)
+    # # print('apply_rotary_pos_emb_sin', sin.shape, flush=True)
+    # print('rotaryqshape', q.shape, flush=True)
     # print('cos', cos.shape, cos, flush=True)
     # a = q*cos
     # b = rotate_half(q) * sin
@@ -264,7 +266,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, unsqueeze_dim=1):
     # print('apply_rotary_pos_emb_b', b.shape, flush=True)
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
-    # print('q_embed', q_embed.shape, q_embed, flush=True)
+    # print('q_embed', q_embed.shape, flush=True)
     return q_embed, k_embed
 
 
@@ -353,7 +355,7 @@ class LlamaMLP(nn.Module):
         self.prev = None
     
     # kwargs['post_attn_residual'],
-    def probe_process(self, x):
+    def probe_process(self, x, **kwargs):
         # 1. generate probe
         # 2. run matrix multiplication
         # 3. calculate score
@@ -362,7 +364,11 @@ class LlamaMLP(nn.Module):
         # generate probe
         # rank / mean / absnml
         if cfg['gate_probe_ratio'] == cfg['up_probe_ratio']:
-            probe, selected_indices = generate_probe(x, cfg['gate_probe_ratio'])
+            if 'norm' in cfg['prune_method']:
+                temp = kwargs['norm']
+            else:
+                temp = None
+            probe, selected_indices = generate_probe(x, cfg['gate_probe_ratio'], temp)
             print('xshape', x.shape, flush=True)
             print('linearprobeshape', probe.shape, flush=True)
         else:
@@ -380,6 +386,12 @@ class LlamaMLP(nn.Module):
         else:
             up_out = self.up_proj(x)
 
+        # if 'mean' in cfg['prune_metric'] and 'seqrank' in cfg['prune_info']:
+        #     baseline_inp = self.down_proj.baseline_inp
+        #     probe_out = gate_out * up_out
+        #     probe[:, ~selected_indices, :] = baseline_inp[~selected_indices]
+        #     pass
+        # else:
         probe_out = gate_out * up_out
         # probe_out = torch.randn(1, cfg['seq_len'], 11008, dtype=torch.float16, device=probe_gate.device)
 
@@ -393,7 +405,7 @@ class LlamaMLP(nn.Module):
         else:
             probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
 
-        if 'globalratio' in cfg['prune_method']:
+        if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
             probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
         else:
             probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
@@ -469,7 +481,7 @@ class LlamaMLP(nn.Module):
                         
 
                         if cfg['mode'] == 'sync':
-                            probe_out_dim_indices, probe_out = self.probe_process(x)
+                            probe_out_dim_indices, probe_out = self.probe_process(x, **kwargs)
                             if cfg['onlyprobe'] == True:
                                 # match the shape, and will not count the flops for this part
                                 # down_proj = self.down_proj(probe_out, cal_mlp_probe_out_dim_metric=True)
@@ -625,7 +637,7 @@ class LlamaMLP(nn.Module):
                             else:
                                 out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
-                                if 'globalratio' in cfg['prune_method']:
+                                if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
                                     out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                 else:
                                     out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
@@ -657,7 +669,7 @@ class LlamaMLP(nn.Module):
                                     out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
                                     # out_dim_metric = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
 
-                                    if 'globalratio' in cfg['prune_method']:
+                                    if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                     else:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
@@ -690,7 +702,7 @@ class LlamaMLP(nn.Module):
                                 else:
                                     out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
-                                    if 'globalratio' in cfg['prune_method']:
+                                    if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                     else:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
@@ -826,7 +838,7 @@ class LlamaAttention(nn.Module):
 
         self.layer_order = layer_order
 
-
+        
         # self.q_num_heads = None 
         # self.k_num_heads = None
         # self.v_num_heads = None
@@ -900,7 +912,17 @@ class LlamaAttention(nn.Module):
         # generate probe
         # rank / mean / absnml
         if cfg['q_probe_ratio'] == cfg['k_probe_ratio'] and cfg['q_probe_ratio'] == cfg['v_probe_ratio']:
-            probe, selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'])
+            # temp = self.post_attention_layernorm(hidden_states)
+            if 'norm' in cfg['prune_method']:
+                # temp = kwargs['norm'](hidden_states)
+                # self.test_layernorm = LlamaRMSNorm(self.config.hidden_size, eps=self.config.rms_norm_eps)
+                # self.test_layernorm = self.test_layernorm.to(hidden_states.device)
+                # print('self.test_layernorm', self.test_layernorm.weight, 'inputnorm', kwargs['norm'].weight, flush=True)
+                # temp = self.test_layernorm(hidden_states)
+                temp = kwargs['norm']
+            else:
+                temp = None
+            probe, selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], temp)
             bsz, q_len, _ = probe.size()
         else:
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
@@ -930,12 +952,14 @@ class LlamaAttention(nn.Module):
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-2]
         cos, sin = self.rotary_emb(value_states, seq_len=cfg['seq_len'])
+        # cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
         # print('cos', cos.shape, flush=True)
 
         # print('position_ids', position_ids, position_ids.shape, position_ids[:, selected_indices], flush=True)
         if q_len != cfg['seq_len']:
             # print('yes')
             query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids[:, selected_indices])
+            # query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids[:, :kv_seq_len])
         else:
             # print('no')
             query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
@@ -986,7 +1010,7 @@ class LlamaAttention(nn.Module):
         #     else:
         #         probe_out_dim_metric, comined_probe_out = cal_attn_weight_prune_metric(attn_output, value_states, cfg['prune_metric'])
 
-        #     if 'globalratio' in cfg['prune_method']:
+        #     if 'flapratio' in cfg['prune_method']:
         #         self.attn_weights_indices, _ , _ , _ = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.k_num_heads, cfg['seq_len'], 'each', 'attnweights', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
         #     else:
         #         # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
@@ -1012,13 +1036,13 @@ class LlamaAttention(nn.Module):
         else:
             probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
 
-        if 'globalratio' in cfg['prune_method']:
+        if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
             probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
         else:
             # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
             probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
-            if probe_vo_out_dim_indices is not None:
-                print('probe_vo_out_dim_indices', probe_vo_out_dim_indices.shape, flush=True)
+            # if probe_vo_out_dim_indices is not None:
+                # print('probe_vo_out_dim_indices', probe_vo_out_dim_indices.shape, flush=True)
         
         if vo_prune_way is None:
             probe_vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
@@ -1040,7 +1064,7 @@ class LlamaAttention(nn.Module):
                 probe_qk_out_dim_indices = probe_vo_out_dim_indices
                 probe_qk_out_dim_indices_for_rope = probe_vo_out_dim_indices_for_rope
                 # print('probe_qk_out_dim_indices', self.probe_qk_out_dim_indices.shape, flush=True)
-                print('self.q_num_heads', self.q_num_heads, flush=True)
+                # print('self.q_num_heads', self.q_num_heads, flush=True)
 
         self.q_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
         self.k_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
@@ -1451,7 +1475,7 @@ class LlamaAttention(nn.Module):
                                 else:
                                     # TODO: deal with rope
                                     out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
-                                    if 'globalratio' in cfg['prune_method']:
+                                    if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
                                         vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                     else:
                                         # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
@@ -1478,6 +1502,8 @@ class LlamaAttention(nn.Module):
                             self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
                             self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
                             self.o_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
+                    else:
+                        raise ValueError('please use asyncinter for calib+ema')
                     return attn_output, attn_weights, past_key_value
                 elif 'calib' in cfg['prune_method'] or 'flap' in cfg['prune_method'] or 'wandasp' in cfg['prune_method']:
 
@@ -1558,7 +1584,7 @@ class LlamaAttention(nn.Module):
                                 else:
                                     # TODO: deal with rope
                                     out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
-                                    if 'globalratio' in cfg['prune_method']:
+                                    if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
                                         vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                     else:
                                         # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
@@ -1694,10 +1720,11 @@ class LlamaDecoderLayer(nn.Module):
                     past_key_value=past_key_value,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
+                    # norm=residual,
+                    norm=residual
                 )
                 hidden_states = residual + hidden_states
                 result_dict['hidden_states'] = hidden_states
-                print("full_attn_inf Thread completed and added 'hidden_states'")
             except Exception as e:
                 print(f"Error in full_attn_inf: {e}")
                 traceback.print_exc() 
@@ -1728,6 +1755,14 @@ class LlamaDecoderLayer(nn.Module):
 
 
         hidden_states = full_attn_inf_result['hidden_states']
+
+        # self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+        # print('no------norm')
+        # print('self.layer_order', self.layer_order, flush=True)
+        # print('no------norm self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
+        # print('no------norm self.attn_l1_diff_percentage', self.attn_l1_diff_percentage, flush=True)
+        # print('no------norm self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
+        
         residual = hidden_states
         if self.check_asyncintra_attention():
             # wait until the main stream is done
@@ -1741,13 +1776,13 @@ class LlamaDecoderLayer(nn.Module):
             print('self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
             print('self.attn_l1_diff_percentage', self.attn_l1_diff_percentage, flush=True)
             print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
+            
 
         def full_mlp_inf(result_dict, hidden_states):
             try:
                 hidden_states = self.post_attention_layernorm(hidden_states)
-                hidden_states = self.mlp(hidden_states)
+                hidden_states = self.mlp(hidden_states, norm=residual)
                 result_dict['hidden_states'] = hidden_states
-                print("full_mlp_inf Thread completed and added 'hidden_states'")
             except Exception as e:
                 print(f"Error in full_mlp_inf: {e}")
                 traceback.print_exc() 
@@ -1766,9 +1801,10 @@ class LlamaDecoderLayer(nn.Module):
                             past_key_value=past_key_value,
                             output_attentions=output_attentions,
                             use_cache=use_cache,
-                            input_layernorm_mlp_residual=input_layernorm_mlp_residual
+                            input_layernorm_mlp_residual=input_layernorm_mlp_residual,
                         )
-                        result_dict['input_layernorm_mlp_residual'] = input_layernorm_mlp_residual
+                        if 'resinfo' in cfg['prune_method']: 
+                            result_dict['input_layernorm_mlp_residual'] = input_layernorm_mlp_residual
                     except Exception as e:
                         print(f"Error in probe_attn_inf: {e}")
                         traceback.print_exc() 
@@ -1802,13 +1838,13 @@ class LlamaDecoderLayer(nn.Module):
             print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
             print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
             print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
+            # self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+            # print('no------norm')
+            # print('no------normself.layer_order', self.layer_order, flush=True)
+            # print('no------normself.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
+            # print('no------normelf.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
+            # print('no------normself.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
-        if cfg['mode'] == 'sync':
-            self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(self.input_layernorm(hidden_states), self.input_layernorm(residual))
-            print('self.layer_order', self.layer_order, flush=True)
-            print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
-            print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
-            print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
         outputs = (hidden_states,)
 
         if output_attentions:
@@ -1941,7 +1977,9 @@ class LlamaModel(LlamaPreTrainedModel):
 
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
+
         self.padding_idx = config.pad_token_id
+
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
@@ -2004,7 +2042,19 @@ class LlamaModel(LlamaPreTrainedModel):
             position_ids = position_ids.unsqueeze(0)
 
         if inputs_embeds is None:
+            pad_mask = input_ids == cfg['pad_token_id'] 
+            is_no_padding = (~pad_mask).all()
+
+            # if there is padding, need to correct the ratio for updating the calibration info
+            if is_no_padding == False:
+                cfg['pad_mask'] = pad_mask
+                cfg['pad_mask_denominator'] = torch.sum(~cfg['pad_mask'], dim=0).unsqueeze(1) + 1e-6
+            else:
+                cfg['pad_mask'] = None
+                cfg['pad_mask_denominator'] = None
+            print('pad_mask', cfg['pad_mask'], flush=True)
             inputs_embeds = self.embed_tokens(input_ids)
+
 
         if getattr(self.config, "_flash_attn_2_enabled", False):
             # 2d mask is passed through the layers
@@ -2026,15 +2076,13 @@ class LlamaModel(LlamaPreTrainedModel):
                 )
                 use_cache = False
 
-
-        
-            
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
 
         torch.cuda.synchronize(cfg['cuda_default_stream']) 
+        torch.set_printoptions(threshold=10000, precision=4)
         # torch.cuda.nvtx.range_push("layer start".format(idx))
         for idx, decoder_layer in enumerate(self.layers):
             if output_hidden_states:
@@ -2069,6 +2117,7 @@ class LlamaModel(LlamaPreTrainedModel):
                     next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) else None,
                 )
 
+                # print('layer_outputs', idx, layer_outputs[0])
                 # Record the end time
                 # stop_event.record()
 
@@ -2079,7 +2128,7 @@ class LlamaModel(LlamaPreTrainedModel):
                 # elapsed_time_ms = start_event.elapsed_time(stop_event)
         
                
-                print(f'layerdevice, {decoder_layer.mlp.gate_proj.weight.device}')
+                # print(f'layerdevice, {decoder_layer.mlp.gate_proj.weight.device}')
             
 
             # print('layer_outputs', layer_outputs, flush=True)
@@ -2114,7 +2163,7 @@ class LlamaModel(LlamaPreTrainedModel):
             #                 else:
             #                     out_dim_metric = cal_calib_prune_metric(cur_mlp.down_proj.get_global_metric_score_distribution(), cur_mlp.down_proj.weight.data, cfg['prune_metric'])
 
-            #                     if 'globalratio' in cfg['prune_method']:
+            #                     if 'flapratio' in cfg['prune_method']:
             #                         out_dim_indices, prune_out_dim_indices = cur_mlp.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=cur_mlp.down_proj.pruning_ratio)
             #                     else:
             #                         out_dim_indices, prune_out_dim_indices = cur_mlp.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])

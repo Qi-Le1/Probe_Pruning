@@ -246,10 +246,10 @@ class Linear(nn.Linear, EriLayer):
 
         # set same shape for all baselines for comparison
         self.baseline_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-        if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+        if 'wandasp' in self.prune_metric:
             self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
             # self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=torch.float32)
-        elif "flap" in self.prune_metric or 'new' in self.prune_metric:
+        elif "flap" in self.prune_metric:
             self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
         else:
             raise ValueError(f"Unknown pruning method")
@@ -478,16 +478,20 @@ class Linear(nn.Linear, EriLayer):
         self.nsamples = self.nsamples.to(cur_device)
 
         momentum = cfg['ema_momentum']
-        print('ema update', self.key, momentum, flush=True)
+        # print('ema update', self.key, momentum, flush=True)
         # if is_probe and 'compressfillpbmetric' in cfg['prune_method']:
         #     momentum = 1 - ((1 - momentum) / (default_batch_size))
-        if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+        if 'wandasp' in self.prune_metric:
             self.scaler_inp = self.scaler_inp.to(cur_device)
-            print(' self.scaler_inp.to(torch.float16)', self.scaler_inp.dtype, flush=True)
             # self.nsamples = self.nsamples.to(cur_device)
             self.scaler_inp[:, update_indices] *= momentum
 
             if 'bias' in self.prune_metric:
+                self.baseline_inp = self.baseline_inp.to(cur_device)
+                self.baseline_inp[:, update_indices] *= momentum
+                self.baseline_inp[:, update_indices] += (1 - momentum) * (torch.mean(inp, dim=0) / batch_size)
+            
+            if 'mean' in self.prune_metric:
                 self.baseline_inp = self.baseline_inp.to(cur_device)
                 self.baseline_inp[:, update_indices] *= momentum
                 self.baseline_inp[:, update_indices] += (1 - momentum) * (torch.mean(inp, dim=0) / batch_size)
@@ -500,13 +504,23 @@ class Linear(nn.Linear, EriLayer):
                 print("Does 'self.scaler_inp111' contain infinite values? Yes")
             if cfg['calibration_stage'] == True:
                 norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+                self.scaler_inp[:, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
                 # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
 
             elif cfg['calibration_stage'] == False:
-                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
-                # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
-            # denominator = (self.nsamples[update_indices] + )
-            self.scaler_inp[:, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
+                if cfg['pad_mask'] is not None:
+                    inp[cfg['pad_mask']] = 0
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+                    # denominator = torch.sum(~cfg['pad_mask'], dim=0).unsqueeze(1) + 1e-6
+                    # print('denominator', denominator, flush=True)
+                    # norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
+                    # denominator = (self.nsamples[update_indices] + )
+                    # self.scaler_inp[:, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
+                    self.scaler_inp[:, update_indices] += (1 - momentum) * torch.clamp(norm_squared / cfg['pad_mask_denominator'], max=cfg['data_type_max'])
+                else:
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+                    self.scaler_inp[:, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
+                    
 
             has_nan = torch.isnan(self.scaler_inp).any()
             has_inf = torch.isinf(self.scaler_inp).any()
@@ -580,6 +594,11 @@ class Linear(nn.Linear, EriLayer):
             self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
 
             if 'bias' in self.prune_metric:
+                self.baseline_inp = self.baseline_inp.to(cur_device)
+                self.baseline_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+                self.baseline_inp[:, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
+            
+            if 'mean' in self.prune_metric:
                 self.baseline_inp = self.baseline_inp.to(cur_device)
                 self.baseline_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
                 self.baseline_inp[:, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
@@ -732,7 +751,7 @@ class Linear(nn.Linear, EriLayer):
     
     # no bias in llama-2
     def forward(self, x: torch.Tensor, **kwargs):
-        print('forward key', self.key, flush=True)
+        # print('forward key', self.key, flush=True)
         with torch.no_grad():
             forward_start_time = time.time()
             previous_dtype = x.dtype
@@ -890,7 +909,7 @@ class Linear(nn.Linear, EriLayer):
                             # weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
                             # weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
                             weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
-                            print('attn weight', weight.shape, flush=True)
+                            # print('attn weight', weight.shape, flush=True)
                             if self.check_fill_case():
                                 # print('fill', flush=True)
                                 self.out_selected_dim = kwargs['out_dim_indices']
