@@ -768,9 +768,16 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5', '0.7'], 
+            #                  ['wandasp', 'flap', 'wandaspbias'], ['calib-ema-probe'], ['sync', 'asyncintra'], ['c4-2000'], ['0.1normwhole1-0.1normwhole1-0.1normwhole1-0.1norm1-0.1norm1-bszrank', '0.1normwhole2-0.1normwhole2-0.1normwhole2-0.1norm2-0.1norm2-bszrank',
+            #                                                                        '0.1normwhole3-0.1normwhole3-0.1normwhole3-0.1norm3-0.1norm3-bszrank', '0.1normwhole4-0.1normwhole4-0.1normwhole4-0.1norm4-0.1norm4-bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+
             control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5', '0.7'], 
-                             ['wandasp', 'flap', 'wandaspbias'], ['calib-ema-probe'], ['sync', 'asyncintra'], ['c4-2000'], ['0.1normwhole1-0.1normwhole1-0.1normwhole1-0.1norm1-0.1norm1-bszrank', '0.1normwhole2-0.1normwhole2-0.1normwhole2-0.1norm2-0.1norm2-bszrank',
-                                                                                   '0.1normwhole3-0.1normwhole3-0.1normwhole3-0.1norm3-0.1norm3-bszrank', '0.1normwhole4-0.1normwhole4-0.1normwhole4-0.1norm4-0.1norm4-bszrank'],
+                             ['wandasp', ], ['calib-ema-probe'], ['sync', 'asyncintra'], ['c4-2000'], ['0.1hole-0.1whole-0.1whole-0.1-0.1-bszrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
