@@ -86,7 +86,8 @@ def make_dataset(data_name, subset_name=None, verbose=True):
     elif data_name in ['c4']:
         # please follow the instruction here: https://huggingface.co/datasets/allenai/c4
         dataset_['train'] = load_dataset('json', data_files={'train': 'data/c4/c4-train.00000-of-01024.json.gz'}, split='train[:10%]')
-        dataset_['test'] = load_dataset('json', data_files={'validation': 'data/c4/c4-validation.00000-of-00008.json.gz'}, split='validation[:10%]')
+        # dataset_['test'] = load_dataset('json', data_files={'validation': 'data/c4/c4-validation.00000-of-00008.json.gz'}, split='validation[:10%]')
+        dataset_['test'] = load_dataset('json', data_files={'train': 'data/c4/c4-train.00000-of-01024.json.gz'}, split='train[:10%]')
         # Randomly sample 128 examples
         # dataset_['train'] = dataset_['train'].train_test_split(test_size=cfg['calibration_nsamples'], seed=cfg['seed'])["test"]
     # piqa: piqa
@@ -279,10 +280,7 @@ def make_calibration_dataloader(tokenizer):
         dataset = make_dataset('c4')
         dataset = process_calibration_dataset(dataset, tokenizer, 'c4')
 
-    if 'fixprune' in cfg['prune_method']:
-        data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'], batch_size={'train': 1})
-    else:
-        data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     return data_loader
 
 def collate(input):
@@ -290,24 +288,22 @@ def collate(input):
         input[k] = torch.stack(input[k], 0)
     return input
 
-processed_calibrate_sample_num = 0
+
 def process_calibration_dataset(dataset, tokenizer, dataset_name):
     if cfg['task_name'] in ['clm', 'csr']:
+        processed_calibrate_sample_num = 0
         if dataset_name == 'c4':
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
 
             def preprocess_function(examples):   
-                global processed_calibrate_sample_num
+                nonlocal processed_calibrate_sample_num
                 model_inputs = {
                     'input_ids': [],
                     'attention_mask': [],
                     'labels': []
                 }
                 inputs = examples['text']
-                if cfg['calibration_nsamples'] == 'all':
-                    raise ValueError('Too many calibration samples for c4')
-                print('input', len(inputs))
                 if processed_calibrate_sample_num >= cfg['calibration_nsamples']:
                     return model_inputs
                 for _ in range(cfg['calibration_nsamples']):
@@ -322,10 +318,7 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                     processed_calibrate_sample_num += 1
                     if processed_calibrate_sample_num > cfg['calibration_nsamples']:
                         return model_inputs
-                    # i = 1
-                    # i = random.randint(0, trainenc.input_ids.shape[1] - max_length - 1)
                     i = torch.randint(0, trainenc.input_ids.shape[1] - max_length, (1,)).item()
-                    print('icalib', i)
                     j = i + max_length
                     inp = trainenc.input_ids[0][i:j]
                     tar = inp.clone()
@@ -351,7 +344,7 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
             def preprocess_function_test(examples):   
-                global processed_calibrate_sample_num
+                nonlocal processed_calibrate_sample_num
                 all_text = "\n\n".join(examples['text'])
 
                 model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
@@ -359,9 +352,6 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                 attention_mask = model_inputs['attention_mask'][0]
 
                 num_samples = len(input_ids) // max_length
-                if cfg['calibration_nsamples'] == 'all':
-                    cfg['calibration_nsamples'] = num_samples
-                    print('cfg[calibration_nsamples]', cfg['calibration_nsamples'])
                 input_chunks = []
                 mask_chunks = []
                 for i in range(cfg['calibration_nsamples']):
@@ -403,26 +393,69 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
                 desc="Running tokenizer on dataset",
                 keep_in_memory=True,
             )
-            # processed_dataset['test'] = dataset['test'].map(
-            #     preprocess_function,
-            #     batched=True,
-            #     num_proc=1,
-            #     remove_columns=dataset["test"].column_names,
-            #     load_from_cache_file=False,
-            #     desc="Running tokenizer on sampled dataset",
-            #     keep_in_memory=True,
-            # )
     else:
         raise ValueError('Not valid task name')
     return processed_dataset
 
-processed_wikitext_sample_num = 0
+
 def process_dataset(dataset, tokenizer):
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'csr']:
+    processed_c4_sample_num = 0
+    if cfg['task_name'] in ['clm', 'csr']:
         text_column = cfg['text_column']
         label_column = cfg['label_column']
-        if cfg['data_name'] == 'wikitext':
+        if cfg['data_name'] == 'c4':
+            max_length = cfg[cfg['model_name']]['max_length']
+            # enter here only for dense model c4 flops info
+            # fix 2000 samples for gridsearch
+            cfg['calibration_nsamples'] = 2000
+            print('max_length', max_length)
 
+            def preprocess_function(examples):   
+                nonlocal processed_c4_sample_num
+                model_inputs = {
+                    'input_ids': [],
+                    'attention_mask': [],
+                    'labels': []
+                }
+                inputs = examples['text']
+                if processed_c4_sample_num >= cfg['calibration_nsamples']:
+                    return model_inputs
+                for _ in range(cfg['calibration_nsamples']):
+                    while True:
+                        # i = random.randint(0, len(inputs) - 1)
+                        i = torch.randint(0, len(inputs), (1,)).item()
+                        # i = 1
+                        trainenc = tokenizer(inputs[i], return_tensors='pt')
+                        # print('trainenc.input_ids.shape[1]', trainenc.input_ids.shape[1])
+                        if trainenc.input_ids.shape[1] > max_length:
+                            break
+                    processed_c4_sample_num += 1
+                    if processed_c4_sample_num > cfg['calibration_nsamples']:
+                        return model_inputs
+                    i = torch.randint(0, trainenc.input_ids.shape[1] - max_length, (1,)).item()
+                    j = i + max_length
+                    inp = trainenc.input_ids[0][i:j]
+                    tar = inp.clone()
+                    tar[:-1] = -100
+                    model_inputs['input_ids'].append(inp)
+                    model_inputs['attention_mask'].append(trainenc.attention_mask[0][i:j])
+                    # print('trainenc.attention_mask[0][i:j]shapoe', trainenc.attention_mask[0][i:j].shape)
+                    model_inputs['labels'].append(tar)
+                return model_inputs
+
+            processed_dataset = {}
+            processed_dataset['test'] = dataset['test'].map(
+                preprocess_function,
+                batched=True,
+                batch_size=356317,
+                num_proc=1,
+                remove_columns=dataset["test"].column_names,
+                load_from_cache_file=False,
+                desc="Running tokenizer on sampled dataset",
+                keep_in_memory=True,
+            )
+            processed_calibrate_sample_num = 0
+        elif cfg['data_name'] == 'wikitext':
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
             def preprocess_function_test(examples):   
@@ -1431,8 +1464,6 @@ def process_dataset(dataset, tokenizer):
         processed_dataset = dataset
         cfg['data_size'] = {k: len(processed_dataset[k]) for k in processed_dataset}
         cfg['target_size'] = processed_dataset['train'].target_size
-    elif cfg['task_name'] in ['t2i']:
-        processed_dataset = dataset
     else:
         raise ValueError('Not valid task name')
     return processed_dataset

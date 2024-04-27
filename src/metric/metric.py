@@ -9,36 +9,12 @@ from module import recur
 
 def make_metric(metric_name, tokenizer):
     if cfg['task_name'] == 'clm':
-        if cfg['data_name'] in ['dolly']:
-            pivot = -float('inf')
-            pivot_direction = 'up'
-            pivot_name = 'ROUGE'
-            metric_name['train'].extend(['Perplexity'])
-            metric_name['test'].extend(['ROUGE'])
-        elif cfg['data_name'] in ['wikitext']:
+        if cfg['data_name'] in ['wikitext', 'c4']:
             pivot = float('inf')
             pivot_direction = 'down'
             pivot_name = 'Perplexity'
             metric_name['train'].extend(['Perplexity'])
             metric_name['test'].extend(['Perplexity'])
-        else:
-            raise ValueError('Not valid data name')
-    elif cfg['task_name'] == 's2s':
-        if cfg['data_name'] in ['fpb', 'wikisql', 'samsum', 'e2enlg', 'webnlg', 'dart']:
-            pivot = -float('inf')
-            pivot_direction = 'up'
-            pivot_name = 'ROUGE'
-            for k in metric_name:
-                metric_name[k].extend(['Accuracy'])
-            metric_name['test'].extend(['ROUGE'])
-        else:
-            raise ValueError('Not valid data name')
-    elif cfg['task_name'] == 'sc':
-        if cfg['data_name'] in ['glue']:
-            pivot = -float('inf')
-            pivot_direction = 'up'
-            pivot_name = 'GLUE'
-            metric_name['test'].extend(['GLUE'])
         else:
             raise ValueError('Not valid data name')
     elif cfg['task_name'] == 'ic':
@@ -47,13 +23,6 @@ def make_metric(metric_name, tokenizer):
         pivot_name = 'Accuracy'
         for k in metric_name:
             metric_name[k].extend(['Accuracy'])
-    elif cfg['task_name'] == 't2i':
-        if cfg['data_name'] in ['dreambooth']:
-            pivot = float('inf')
-            pivot_direction = 'down'
-            pivot_name = 'Loss'
-        else:
-            raise ValueError('Not valid data name')
     elif cfg['task_name'] == 'csr':
         if cfg['data_name'] in ['boolq', 'piqa', 'siqa', 'arc', 'aec','hellaswag', 'winogrande', 'obqa']:
             pivot = -float('inf')

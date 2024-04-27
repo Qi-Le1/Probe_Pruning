@@ -19,7 +19,6 @@ from typing import List, Optional, Tuple, Union
 from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING
 from functools import reduce
 
-from .pruning_module import HiddenRepresentationPruning, WeightPruning
 
 class LlamaEriModel(torch.nn.Module):
     def __init__(self, model):
@@ -44,11 +43,9 @@ class LlamaEriModel(torch.nn.Module):
 
         in_features = getattr(target, 'in_features', None)
         out_features = getattr(target, 'out_features', None)
-        pruning_module = HiddenRepresentationPruning(cfg, key,target.weight.device, in_features, out_features)
         
         kwargs = {
             "prune_metric": cfg['prune_metric'],
-            "pruning_module": pruning_module,
             "key": key,
             "fan_in_fan_out": False,
             "dev": target.weight.device,
@@ -189,7 +186,6 @@ class EriLayer:
         self.cal_total_flops = True
 
         self.prune_metric = kwargs['prune_metric']
-        self.pruning_module = kwargs['pruning_module']
         self.key = kwargs['key']
 
         self.pruning_channel_ratio = []
@@ -198,13 +194,11 @@ class EriLayer:
         pass
         
     def extract_in_dim_weight(self, weight, indices):
-
         return weight[:, indices.to(self.weight.device)]
         # return torch.index_select(weight, dim=1, index=indices.to(self.weight.device))
            
         
     def extract_out_dim_weight(self, weight, indices):
-        
         return weight[indices.to(self.weight.device), :]
         # return torch.index_select(weight, dim=0, index=indices.to(self.weight.device))
         
@@ -248,7 +242,6 @@ class Linear(nn.Linear, EriLayer):
         self.baseline_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
         if 'wandasp' in self.prune_metric:
             self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-            # self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=torch.float32)
         elif "flap" in self.prune_metric:
             self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
         else:
@@ -588,7 +581,7 @@ class Linear(nn.Linear, EriLayer):
         update_indices = update_indices.to(cur_device)
         self.nsamples = self.nsamples.to(cur_device)
 
-        if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+        if 'wandasp' in self.prune_metric:
             self.scaler_inp = self.scaler_inp.to(cur_device)
 
             self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
@@ -609,7 +602,7 @@ class Linear(nn.Linear, EriLayer):
                 norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
             denominator = (self.nsamples[update_indices] + batch_size)
             self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
-        elif "flap" in self.prune_metric or 'new' in self.prune_metric:
+        elif "flap" in self.prune_metric:
             self.baseline_inp = self.baseline_inp.to(cur_device)
             self.fluc_inp = self.fluc_inp.to(cur_device)
 
@@ -626,9 +619,10 @@ class Linear(nn.Linear, EriLayer):
 
         
     def get_global_metric_score_distribution(self):
-        if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
+        if 'wandasp' in self.prune_metric:
+            print('wandareturn')
             return self.scaler_inp
-        elif "flap" in self.prune_metric or 'new' in self.prune_metric:
+        elif "flap" in self.prune_metric:
             return self.fluc_inp
 
 
@@ -796,6 +790,7 @@ class Linear(nn.Linear, EriLayer):
         
                 if cfg['mode'] == 'asyncinter':
                     weight = self.get_weight()
+                    print('weight', weight.dtype, weight.shape, self.key, flush=True)
                     if 'o_proj' in self.key or 'down_proj' in self.key:
                         # torch.cuda.synchronize(cfg['cuda_default_stream'])
                         update_time = time.time()
@@ -955,33 +950,7 @@ class Linear(nn.Linear, EriLayer):
                         result = result.to(previous_dtype)
                         return result
                     else:
-                        # only prune input in each layer
-                        if 'traditional' in cfg['prune_method']:
-                            x, pruned_dim, preserve_channels = self.pruning_module.batch_pruning(x, self.layer_type, linear_layer_info, self.key, self.is_prune_out_dim)
-                            weight = self.extract_in_weight(input_dim, pruned_dim, preserve_channels, self.layer_type)
-                        else:
-                            weight = weight
-                        
-                    if 'flap' in cfg['prune_metric']:
-                        # all_channels = torch.arange(self.in_features, dtype=preserve_channels.dtype, device=preserve_channels.device)
-                        # mask = all_channels[preserve_channels]
-                        # mean_x = torch.mean(x, dim=1)
-                        # flap = (x - mean_x) * 
-                        # output_bias = ((mean_inp * ~mask.to(self.weight.data.device)) @ self.weight.data.T)
-                        # result = F.linear(x, weight, bias=output_bias)
-                        pass
-                    else:
-                        # print('calibrateinput', x.dtype, x.shape, x, flush=True)
-                        # print('calibrateweight', weight.dtype, weight.shape, weight, flush=True)
-                        # for i in range(x.shape[-2]):
-                        #     print(x[:, i, :])
-                        # x = x.to(torch.float32)
-                        # weight = weight.to(torch.float32)
-                        # print('calibrateinput 2', x.dtype, x.shape, x, flush=True)
-                        # print('calibrateweight 2', weight.dtype, weight.shape, weight, flush=True)
-                        # print('here')
                         result = F.linear(x, weight, bias=None)
-                        # print('calibrateresult', result.dtype, result.shape, result, flush=True)
                     
                     result = result.to(previous_dtype)
                     forward_end_time = time.time()

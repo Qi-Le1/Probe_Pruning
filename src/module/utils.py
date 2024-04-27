@@ -65,7 +65,7 @@ def check_dense_model():
     dense_name_list[9] = 'None'
     # calib_info
     dense_name_list[10] = 'None'
-    # probe_info
+    # prune_info
     dense_name_list[11] = 'None'
     # cust_tgt_modules
     dense_name_list[12] = 'None'
@@ -89,11 +89,11 @@ def load_dense_model():
     dense_info_list, dense_duration = dense_res['dense_info_list'], dense_res['dense_duration']
     return dense_info_list, dense_duration
     
-def summarize_info_list(pruned_info_list, pruned_duration, logger, onlyprobe_info_list):
+def summarize_info_list(pruned_info_list, pruned_duration, logger, dataset_size, onlyprobe_info_list=None):
     # total = fullinf + probe
-    # for asyncintra, the info has the dirty write issue because we open 2 streams, check sync model for the correct info
-
+    # for asyncintra, the info has the dirty write issue because we open 2 streams, check sync mode for the correct info
     dense_info_list, dense_duration = load_dense_model()
+
     print('Summary ---------\n')
     if dense_info_list is not None and pruned_info_list is not None:
         dense_total_flops = sum([dense_info_list[i][1] for i in range(len(dense_info_list))])
@@ -105,10 +105,7 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, onlyprobe_inf
             pruned_probe_flops = 0
             pruned_fullinf_flops = pruned_total_flops
 
-        dataset_size = cfg['dataset_size']['test']
-        print('dataset_size', dataset_size)
         info = {}
-        
         pruned_layer_dense_total_flops = 0
         pruned_layer_pruned_total_flops = 0
         pruned_layer_pruned_fullinf_flops = 0
@@ -175,9 +172,6 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, onlyprobe_inf
         logger.append(info, 'test')
     else:
         pruned_total_flops = sum([pruned_info_list[i][1] for i in range(len(pruned_info_list))])
-
-        dataset_size = cfg['dataset_size']['test']
-        print('dataset_size', dataset_size)
         info = {}
         
         pruned_layer_pruned_total_flops = 0

@@ -48,7 +48,7 @@ from transformers.utils.import_utils import is_torch_fx_available
 from transformers import LlamaConfig
 
 from config import cfg
-from ..pruning_module import HiddenRepresentationPruning, cal_intersection_ratio
+from ..pruning_module import HiddenRepresentationPruning
 from module import nearest_even_number
 from torch.nn.functional import cosine_similarity
 from .utils import generate_probe, cal_res_hidden_state_diff  
@@ -339,7 +339,7 @@ class LlamaMLP(nn.Module):
         self.layer_order = layer_order
         self.custom_duration = 0
         # self.cal_total_flops = True
-        self.pruning_module = HiddenRepresentationPruning(cfg, f'llama_mlp_{layer_order}')
+        self.pruning_module = HiddenRepresentationPruning(cfg, f'llama_mlp_{layer_order}', config)
         self.running_mean = None
 
         self.probe_out_dim_indices = None
@@ -405,7 +405,7 @@ class LlamaMLP(nn.Module):
         else:
             probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'])
 
-        if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
+        if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
             probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
         else:
             probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
@@ -637,7 +637,7 @@ class LlamaMLP(nn.Module):
                             else:
                                 out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
-                                if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
+                                if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
                                     out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                 else:
                                     out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
@@ -669,7 +669,7 @@ class LlamaMLP(nn.Module):
                                     out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
                                     # out_dim_metric = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
 
-                                    if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
+                                    if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                     else:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
@@ -690,8 +690,6 @@ class LlamaMLP(nn.Module):
                     elif 'calib' in cfg['prune_method'] or 'flap' in cfg['prune_method'] or 'wandasp' in cfg['prune_method']:
                         # no ema or runningmean
                         bsz, _, _ = x.shape
-                        time_start = time.time()
-
                         if cfg['mode'] == 'asyncinter':
                             down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
@@ -702,7 +700,7 @@ class LlamaMLP(nn.Module):
                                 else:
                                     out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
 
-                                    if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
+                                    if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                     else:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
@@ -713,19 +711,6 @@ class LlamaMLP(nn.Module):
                         else:
                             raise ValueError('Invalid mode')
                         
-                        # if self.cur_batch % 5 == 0:
-                        #     if self.cur_batch == 0:
-                        #         self.prev = probe_out_dim_indices
-                        #     else:
-                        #         set_first = set(self.prev.cpu().numpy())
-                        #         set_second = set(probe_out_dim_indices.cpu().numpy())
-                        #         intersection = set_first.intersection(set_second)
-                        #         intersection_ratio = len(intersection) / len(set_first)
-                        #         print(self.layer_order, 'intersection_ratio', intersection_ratio, flush=True)
-                        #         self.prev = probe_out_dim_indices
-                        # self.cur_batch += 1
-                        custom_duration = time.time() - time_start
-                        # print('fll_batch_duration', custom_duration, flush=True)
                         return down_proj
                     # elif 'runningmean' in cfg['prune_method'] and ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']):
                     #     bsz, _, _ = x.shape
@@ -1036,7 +1021,7 @@ class LlamaAttention(nn.Module):
         else:
             probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
 
-        if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
+        if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
             probe_vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
         else:
             # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
@@ -1475,7 +1460,7 @@ class LlamaAttention(nn.Module):
                                 else:
                                     # TODO: deal with rope
                                     out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
-                                    if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
+                                    if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
                                         vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                     else:
                                         # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
@@ -1581,15 +1566,17 @@ class LlamaAttention(nn.Module):
                             else:
                                 if torch.all(self.o_proj.get_global_metric_score_distribution() == 0):
                                     vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                                    print('here0')
                                 else:
                                     # TODO: deal with rope
                                     out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
-                                    if 'flapratio' in cfg['prune_method'] or 'ppratio' in cfg['prune_method']:
+                                    if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
+                                        print('here1')
                                         vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                     else:
                                         # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
                                         vo_out_dim_indices, probe_vo_out_dim_indices_for_rope, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
-
+                                        print('here2')
                                         print('vo_out_dim_indices', vo_out_dim_indices.shape, flush=True)
                             if qk_prune_way is None:
                                 qk_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
@@ -1991,7 +1978,6 @@ class LlamaModel(LlamaPreTrainedModel):
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
         self.post_init()
-        self.inference_time = 0
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -2179,7 +2165,6 @@ class LlamaModel(LlamaPreTrainedModel):
         # torch.cuda.nvtx.range_pop()
         print(f"layer: {idx}, Elapsed time: {duration} milliseconds")
         print(f'layerdevice, {decoder_layer.mlp.gate_proj.weight.device}')
-        self.inference_time += duration
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer

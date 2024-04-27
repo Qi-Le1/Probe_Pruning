@@ -117,12 +117,14 @@ def make_hf_model(model_name, sub_model_name=None):
         else:
             model = AutoModelForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'],
                                                          device_map=device_map)
-    elif cfg['task_name'] == 's2s':
-        model = AutoModelForSeq2SeqLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], device_map=device_map)
     elif cfg['task_name'] == 'csr':  # Assuming 'csr' stands for common sense reasoning
         if 'llama' in model_name:
+            config = AutoConfig.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'])
+            num_hidden_layers = config.num_hidden_layers
+            if 'gridsearch' not in cfg['prune_method']:
+                cfg['prune_ratio'] = num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'] 
             # "Training Llama in float16 is not recommended and known to produce nan, as such the model should be trained in bfloat16.""
-            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'],  torch_dtype=torch.float16, device_map=device_map)
+            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'],  config=config, torch_dtype=torch.float16, device_map=device_map)
             # to fit flap and simplify for flops comparision
         elif 'opt' in model_name:
             model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'], torch_dtype=torch.float16, device_map=device_map)
@@ -323,10 +325,6 @@ def make_hf_model(model_name, sub_model_name=None):
     model.config.use_cache = False
     print('model.config', model.config)
     
-    num_hidden_layers = model.config.num_hidden_layers
-    if 'gridsearch' not in cfg['prune_method']:
-        cfg['prune_ratio'] = num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'] 
-    print('cfg[prune_ratio]', cfg['prune_ratio'])
     return model, tokenizer
 
 
