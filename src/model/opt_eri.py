@@ -19,7 +19,7 @@ from typing import List, Optional, Tuple, Union
 from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING
 from functools import reduce
 
-from .pruning_module import HiddenRepresentationPruning, WeightPruning
+from .pruning_module import HiddenRepresentationPruning
 
 class OPTEriModel(torch.nn.Module):
     def __init__(self, model):

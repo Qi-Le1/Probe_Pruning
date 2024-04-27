@@ -61,10 +61,20 @@ def process_control():
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
     cfg['seq_len'] = int(cfg['control']['seq_len'])
-    cfg['prune_ratio'] = float(cfg['control']['prune_ratio'])
+    
     cfg['prune_metric'] = cfg['control']['prune_metric']
     cfg['prune_method'] = cfg['control']['prune_method']
-    
+    prune_ratio_list = cfg['control']['prune_ratio'].split('-')
+    if len(prune_ratio_list) == 1:
+        # further update prune_ratio in make_model to match the mean prune ratio
+        cfg['prune_ratio'] = float(prune_ratio_list[0])
+        # cfg['mean_prune_ratio'] = float(prune_ratio_list[0])
+    elif len(prune_ratio_list) == 2 and 'gridsearch' in cfg['prune_method']:
+        # only use this for grid search, first ratio for attn, second ratio for mlp
+        cfg['prune_ratio'] = [float(x) for x in prune_ratio_list]
+        # cfg['mean_prune_ratio'] = [float(x) for x in prune_ratio_list]
+    else:
+        raise ValueError('prune_ratio is not valid')
           
     cfg['ema_momentum'] = 0.99
     if 'ema' in cfg['prune_method']:
@@ -79,7 +89,7 @@ def process_control():
     
     cfg['resinfo_ratio'] = 0.1
     if 'resinfo' in cfg['prune_method']:
-        match = re.search(r'resinfo(\d+\.\d+)', cfg['prune_method'])
+        match = re.search(r'resinfo(\d+(?:\.\d+)?)', cfg['prune_method'])
         if match:
             # Convert the matched string to a float
             float_value = float(match.group(1))
@@ -87,11 +97,7 @@ def process_control():
         else:
             float_value = None
         
-
     cfg['mode'] = cfg['control']['mode']
-    # if cfg['mode'] not in ['sync', 'asyncinter', 'asyncintra']:
-    #     raise ValueError('Not valid mode')
-    
     if torch.cuda.is_available():
         cfg['cuda_default_stream'] = torch.cuda.default_stream()
         # cfg['cuda_stream1'] = torch.cuda.Stream(priority=1)
@@ -103,56 +109,8 @@ def process_control():
     if cfg['calib_info'] != 'None':
         calib_info_list = cfg['calib_info'].split('-')
         cfg['calibration_dataset'] = calib_info_list[0]
-        cfg['calibration_nsamples'] = calib_info_list[1]
-        # set all to all samples in the calibration dataset
-        if cfg['calibration_nsamples'] != 'all':
-            cfg['calibration_nsamples'] = int(cfg['calibration_nsamples']) 
+        cfg['calibration_nsamples'] = int(calib_info_list[1])
 
-    
-    # prune_name_list = cfg['control']['prune_name'].split('+')
-
-    # cfg['prune_name'] = prune_name_list[0]
-    # cfg['prune_metric'] = None
-    # cfg['probe_num'] = 1
-    # prune_name_sub_list = cfg['prune_name'].split('-')
-    # if len(prune_name_sub_list) > 1:
-    #     cfg['prune_method'] = prune_name_sub_list[1]
-    #     cfg['prune_metric'] = prune_name_sub_list[2]
-
-    #     if 'svd' in cfg['prune_method']:
-    #         match = re.search(r'svd(\d+\.\d+)', cfg['prune_metric'])
-    #         if match:
-    #             # Convert the matched string to a float
-    #             float_value = float(match.group(1))
-    #         else:
-    #             float_value = None  # Or some default value or error handling
-    #         cfg['svd_ratio'] = float_value
-
-        
-
-    #     if 'multiprobe' in cfg['prune_method']:
-    #         match = re.search(r'multiprobe(\d+)', cfg['prune_method'])
-    #         if match:
-    #             # Convert the matched string to a float
-    #             int_value = int(match.group(1))
-    #         else:
-    #             int_value = None
-            
-    #         cfg['probe_num'] = int_value   
-            # cfg['probe_size'] = 
-
-        # if 'async' in cfg['prune_method']:
-        #     match = re.search(r'async(\d+\.\d+)', cfg['prune_method'])
-        #     if match:
-        #         # Convert the matched string to a float
-        #         float_value = float(match.group(1))
-        #     else:
-        #         float_value = None
-            
-        #     cfg['asyncratio'] = float_value   
-
-    # else:
-    #     cfg['prune_method'] = ''
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
@@ -168,7 +126,7 @@ def process_control():
     # default skip 3 layers
     cfg['skip_layers'] = 2
     if 'skip' in cfg['prune_method']:
-        match = re.search(r'skip(\d+)', cfg['prune_method'])
+        match = re.search(r'skip(-?\d+)', cfg['prune_method'])
         if match:
             # Convert the matched string to a float
             int_value = int(match.group(1))
@@ -241,55 +199,6 @@ def process_control():
                     print(prune_info_list[prune_keys.index(key)], prune_info_list[prune_keys.index(key)] is None, prune_keys.index(key))
                     cfg[f'{key}_prune'] = prune_info_list[prune_keys.index(key)]
 
-                # if 'bsz' in cfg['prune_info']:
-                #     full_size = cfg['batch_size']
-                # elif 'seq' in cfg['prune_info']:
-                #     full_size = cfg['seq_len']
-                #     # cfg['probe_norm_dim'] = (0, 2)
-                # elif 'hd' in cfg['prune_info']:
-                #     full_size = cfg[model_name]['hidden_size']
-                #     # cfg['probe_norm_dim'] = (0, 1)
-                
-                # print('full_size', full_size, float_value, cfg[f'{key}_prune'])
-                # if float_value:  # Ensure int_value is not None to avoid division by zero
-                #     cfg[f'{key}_probe_num'] = int(float_value * full_size)
-                #     if 'rank' in cfg['prune_info']:
-                #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
-                #         cfg[f'{key}_probe_size'] = probe_size
-                #     else:
-                #         cfg[f'{key}_probe_num'] = find_nearest_divisor(full_size, cfg[f'{key}_probe_num'])
-                #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
-                #         cfg[f'{key}_probe_size'] = probe_size
-
-                # if 'bsz' in cfg['prune_info']:
-                #     full_size = cfg['batch_size']
-                # elif 'seq' in cfg['prune_info']:
-                #     full_size = cfg['seq_len']
-                #     # cfg['probe_norm_dim'] = (0, 2)
-                # elif 'hd' in cfg['prune_info']:
-                #     full_size = cfg[model_name]['hidden_size']
-                #     # cfg['probe_norm_dim'] = (0, 1)
-                
-                # print('full_size', full_size, float_value, cfg[f'{key}_prune'])
-                # if float_value:  # Ensure int_value is not None to avoid division by zero
-                #     cfg[f'{key}_probe_num'] = int(float_value * full_size)
-                #     if 'rank' in cfg['prune_info']:
-                #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
-                #         cfg[f'{key}_probe_size'] = probe_size
-                #     else:
-                #         cfg[f'{key}_probe_num'] = find_nearest_divisor(full_size, cfg[f'{key}_probe_num'])
-                #         probe_size = int(full_size // cfg[f'{key}_probe_num'])
-                #         cfg[f'{key}_probe_size'] = probe_size
-                # elif float_value is None:
-                #     raise ValueError(f'probe ratio is not valid for {key}')
-
-
-            prune_keywords = ['each', 'fill', 'whole']
-            cfg['qk_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['q_prune']), None)
-            cfg['vo_prune_way'] = next((keyword for keyword in prune_keywords if keyword in cfg['v_prune']), None)
-            # if cfg['qk_prune_way'] is not None and cfg['vo_prune_way'] is not None:
-            #     assert cfg['qk_prune_way'] == cfg['vo_prune_way']
-        
 
         if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['prune_info']:
             match = re.search(r'probefixratio(\d+\.\d+)', cfg['prune_info'])
@@ -318,25 +227,17 @@ def process_control():
     if model_name not in cfg:
         cfg[model_name] = {}
     cfg[model_name]['shuffle'] = {'train': False, 'test': False}
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'csr']:
+    if cfg['task_name'] in ['clm', 'csr']:
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
     elif cfg['task_name'] in ['ic']:
-        cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
-    elif cfg['task_name'] in ['t2i']:
-        cfg['collate_mode'] = 'dreambooth'
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
     else:
         raise ValueError('Not valid task name')
 
-
-    
-    # cfg['probe_size'] = int(cfg[model_name]['batch_size']['test'] / cfg['probe_num'])
-    # if cfg[model_name]['batch_size']['test'] % cfg['probe_num'] != 0:
-    #     raise ValueError('probe_num needs to be divisible by batch size')
-
     cfg['logger_detailed_info'] = False
     cfg['onlyprobe'] = False
-    cfg['onlyprobeinfo'] = True
+    # cfg['onlyprobeinfo'] = True
+    cfg['onlyprobeinfo'] = False
     print('cfg: ', cfg)
     return
 
@@ -353,10 +254,14 @@ def make_data_name():
         cfg['data_name'] = 'arc_challenge'
     elif cfg['data_name'] == 'arceasy':
         cfg['data_name'] = 'arc_easy'
-    if cfg['python_file'] == 'test_dense_harness_model.py':
-        return
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'csr', 't2i']:
+    if cfg['task_name'] in ['clm', 'csr']:
         data_name_dict = {
+            'c4': {'data_name': 'c4',
+                          'subset_name_dict': {'none': {'subset_name': None,
+                                                   'text_column': None,
+                                                   'label_column': None}
+                                           }                       
+                         },
             # https://huggingface.co/datasets/wikitext
             'wikitext': {'data_name': 'wikitext',
                           'subset_name_dict': {'2v1': {'subset_name': 'wikitext-2-raw-v1',
@@ -429,79 +334,14 @@ def make_data_name():
                               'label_column': 'hardcode'},    
                         },                        
             },
-            # Dataset: https://github.com/google/dreambooth
-            # DreamBooth paper: https://arxiv.org/pdf/2208.12242.pdf
-            'dreambooth': {'data_name': 'DreamBooth',
-                           'subset_name_dict': {
-                               'backpack': {'subset_name': 'backpack',
-                                            'class': 'backpack',
-                                            'category': 'object'},
-                               'backpack_dog': {'subset_name': 'backpack_dog',
-                                                'class': 'backpack',
-                                                'category': 'object'},
-                               'bear_plushie': {'subset_name': 'bear_plushie',
-                                                'class': 'stuffed animal',
-                                                'category': 'toy'},
-                               'berry_bowl': {'subset_name': 'berry_bowl',
-                                              'class': 'bowl',
-                                              'category': 'object'},
-                               'can': {'subset_name': 'can', 'class': 'can', 'category': 'object'},
-                               'candle': {'subset_name': 'candle', 'class': 'candle', 'category': 'object'},
-                               'cat': {'subset_name': 'cat', 'class': 'cat', 'category': 'live object'},
-                               'cat2': {'subset_name': 'cat2', 'class': 'cat', 'category': 'live object'},
-                               'clock': {'subset_name': 'clock', 'class': 'clock', 'category': 'object'},
-                               'colorful_sneaker': {'subset_name': 'colorful_sneaker',
-                                                    'class': 'sneaker',
-                                                    'category': 'object'},
-                               'dog': {'subset_name': 'dog', 'class': 'dog', 'category': 'live object'},
-                               'dog2': {'subset_name': 'dog2', 'class': 'dog', 'category': 'live object'},
-                               'dog3': {'subset_name': 'dog3', 'class': 'dog', 'category': 'live object'},
-                               'dog5': {'subset_name': 'dog5', 'class': 'dog', 'category': 'live object'},
-                               'dog6': {'subset_name': 'dog6', 'class': 'dog', 'category': 'live object'},
-                               'dog7': {'subset_name': 'dog7', 'class': 'dog', 'category': 'live object'},
-                               'dog8': {'subset_name': 'dog8', 'class': 'dog', 'category': 'live object'},
-                               'duck_toy': {'subset_name': 'duck_toy', 'class': 'toy', 'category': 'toy'},
-                               'fancy_boot': {'subset_name': 'fancy_boot',
-                                              'class': 'boot',
-                                              'category': 'object'},
-                               'grey_sloth_plushie': {'subset_name': 'grey_sloth_plushie',
-                                                      'class': 'stuffed animal',
-                                                      'category': 'toy'},
-                               'monster_toy': {'subset_name': 'monster_toy',
-                                               'class': 'toy',
-                                               'category': 'toy'},
-                               'pink_sunglasses': {'subset_name': 'pink_sunglasses',
-                                                   'class': 'glasses',
-                                                   'category': 'accessory'},
-                               'poop_emoji': {'subset_name': 'poop_emoji',
-                                              'class': 'toy',
-                                              'category': 'toy'},
-                               'rc_car': {'subset_name': 'rc_car', 'class': 'toy', 'category': 'toy'},
-                               'red_cartoon': {'subset_name': 'red_cartoon',
-                                               'class': 'cartoon',
-                                               'category': 'object'},
-                               'robot_toy': {'subset_name': 'robot_toy', 'class': 'toy', 'category': 'toy'},
-                               'shiny_sneaker': {'subset_name': 'shiny_sneaker',
-                                                 'class': 'sneaker',
-                                                 'category': 'object'},
-                               'teapot': {'subset_name': 'teapot', 'class': 'teapot', 'category': 'object'},
-                               'vase': {'subset_name': 'vase', 'class': 'vase', 'category': 'object'},
-                               'wolf_plushie': {'subset_name': 'wolf_plushie',
-                                                'class': 'stuffed animal',
-                                                'category': 'toy'}}
-                           }
         }
-        if cfg['data_name'] == 'dreambooth':
-            cfg['unique_id'] = 'sks'
-            cfg['unique_class'] = data_name_dict[cfg['data_name']]['subset_name_dict'][cfg['subset_name']]['class']
-        else:
-            cfg['hf_data_name'] = data_name_dict[cfg['data_name']]['data_name']
-            cfg['hf_subset_name'] = data_name_dict[cfg['data_name']]['subset_name_dict'][
-                cfg['subset_name']]['subset_name']
-            cfg['text_column'] = data_name_dict[cfg['data_name']]['subset_name_dict'][
-                cfg['subset_name']]['text_column']
-            cfg['label_column'] = data_name_dict[cfg['data_name']]['subset_name_dict'][
-                cfg['subset_name']]['label_column']
+        cfg['hf_data_name'] = data_name_dict[cfg['data_name']]['data_name']
+        cfg['hf_subset_name'] = data_name_dict[cfg['data_name']]['subset_name_dict'][
+            cfg['subset_name']]['subset_name']
+        cfg['text_column'] = data_name_dict[cfg['data_name']]['subset_name_dict'][
+            cfg['subset_name']]['text_column']
+        cfg['label_column'] = data_name_dict[cfg['data_name']]['subset_name_dict'][
+            cfg['subset_name']]['label_column']
     return
 
 
@@ -552,6 +392,34 @@ TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
 TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING = {
     "llama": ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"],
     'opt': ["k_proj", "v_proj", "q_proj", "fc1"]
+}
+
+# determine by the grid search
+TRANSFORMERS_MODELS_TO_GRID_SEARCH_RATIO = {
+    "llama": {
+        '128': {
+            '0.1': {'o_proj': 0.1, 'down_proj': 0.1},
+            '0.2': {'o_proj': 0.2, 'down_proj': 0.2},
+            '0.3': {'o_proj': 0.3, 'down_proj': 0.3},
+            '0.4': {'o_proj': 0.4, 'down_proj': 0.4},
+            '0.5': {'o_proj': 0.5, 'down_proj': 0.5},
+            '0.6': {'o_proj': 0.6, 'down_proj': 0.6},
+            '0.7': {'o_proj': 0.7, 'down_proj': 0.7},
+            '0.8': {'o_proj': 0.8, 'down_proj': 0.8},
+        }
+    },
+    "opt": {
+        '128': {
+            '0.1': {'o_proj': 0.1, 'down_proj': 0.1},
+            '0.2': {'o_proj': 0.2, 'down_proj': 0.2},
+            '0.3': {'o_proj': 0.3, 'down_proj': 0.3},
+            '0.4': {'o_proj': 0.4, 'down_proj': 0.4},
+            '0.5': {'o_proj': 0.5, 'down_proj': 0.5},
+            '0.6': {'o_proj': 0.6, 'down_proj': 0.6},
+            '0.7': {'o_proj': 0.7, 'down_proj': 0.7},
+            '0.8': {'o_proj': 0.8, 'down_proj': 0.8},
+        }
+    }
 }
 
 

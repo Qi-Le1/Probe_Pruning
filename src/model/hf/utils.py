@@ -4,49 +4,53 @@ from config import cfg
 
 
 
+def rank_process(x, probe_num, probe_size, probe_type, residual):
+    # if 'optimalseq' in cfg['prune_info']:
+    #     l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=2)
+    #     # print('l2_norms', l2_norms.shape, l2_norms, flush=True)
+    #     # Now, l2_norms has shape [bsz, seq], and you want the top-k across all sequences in each batch
+    #     topk_values, indices = torch.topk(l2_norms, probe_num, dim=1)  # Compute top-k across the sequence dimension
+    #     # print('topk_values', topk_values, topk_values.shape, flush=True)
+    #     # print('indices', indices, indices.shape, flush=True)  # Expected shape: [bsz, probe_num]
 
-def rank_process(x, probe_num, probe_size, probe_type):
-    if 'optimalseq' in cfg['prune_info']:
-        l2_norms = torch.linalg.vector_norm(x, ord=2, dim=2)
-        # print('l2_norms', l2_norms.shape, l2_norms, flush=True)
-        # Now, l2_norms has shape [bsz, seq], and you want the top-k across all sequences in each batch
-        topk_values, indices = torch.topk(l2_norms, probe_num, dim=1)  # Compute top-k across the sequence dimension
-        # print('topk_values', topk_values, topk_values.shape, flush=True)
-        # print('indices', indices, indices.shape, flush=True)  # Expected shape: [bsz, probe_num]
-
-        sorted_indices = indices.sort(dim=1)[0]
-        # print('sorted_indices', sorted_indices, sorted_indices.shape, flush=True)  # Expected shape: [bsz, probe_num]
+    #     sorted_indices = indices.sort(dim=1)[0]
+    #     print('sorted_indices', sorted_indices, sorted_indices.shape, flush=True)  # Expected shape: [bsz, probe_num]
+    #     # print('sorted_indices', sorted_indices, sorted_indices.shape, flush=True)  # Expected shape: [bsz, probe_num]
         
-        # Assuming x has shape [bsz, seq, dim]
-        # and sorted_indices has shape [bsz, probe_num]
+    #     # Assuming x has shape [bsz, seq, dim]
+    #     # and sorted_indices has shape [bsz, probe_num]
 
-        # Create a batch index tensor
-        batch_indices = torch.arange(x.size(0)).unsqueeze(1)  # Shape [bsz, 1]
+    #     # Create a batch index tensor
+    #     batch_indices = torch.arange(x.size(0)).unsqueeze(1)  # Shape [bsz, 1]
 
-        # Expand batch_indices to match the shape of sorted_indices for broadcasting
-        batch_indices = batch_indices.expand(-1, sorted_indices.size(1))  # Shape [bsz, probe_num]
-        # print('batch_indices', batch_indices, batch_indices.shape, flush=True)
-        # Use advanced indexing to select the sequences
-        selected_sequences = x[batch_indices, sorted_indices, :]  # Shape [bsz, probe_num, dim]
+    #     # Expand batch_indices to match the shape of sorted_indices for broadcasting
+    #     batch_indices = batch_indices.expand(-1, sorted_indices.size(1))  # Shape [bsz, probe_num]
+    #     # print('batch_indices', batch_indices, batch_indices.shape, flush=True)
+    #     # Use advanced indexing to select the sequences
+    #     selected_sequences = x[batch_indices, sorted_indices, :]  # Shape [bsz, probe_num, dim]
 
-        l2_norms = torch.linalg.vector_norm(selected_sequences, ord=2, dim=2)
-        # print('selected_sequences', selected_sequences.shape, l2_norms)
-        return selected_sequences, sorted_indices
+    #     l2_norms = torch.linalg.vector_norm(selected_sequences, ord=2, dim=2)
+    #     # print('selected_sequences', selected_sequences.shape, l2_norms)
+    #     return selected_sequences, sorted_indices
 
-    if 'bsz' in probe_type:
-        l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(1, 2))
-    elif 'seq' in probe_type:
-        l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
-    elif 'hd' in probe_type:
-        l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 1))
-    _, indices = torch.topk(l2_norms, probe_num)
+    if residual is not None:
+        if 'bsz' in probe_type:
+            l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(1, 2))
+        elif 'seq' in probe_type:
+            l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(0, 2))
+        elif 'hd' in probe_type:
+            l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(0, 1))
+    else:
+        if 'bsz' in probe_type:
+            l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(1, 2))
+        elif 'seq' in probe_type:
+            l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
+        elif 'hd' in probe_type:
+            l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 1))
+
+    values, indices = torch.topk(l2_norms, probe_num)
     sorted_indices = indices.sort()[0]
-    # cfg['vertical_indices'] = sorted_indices
-    # if 'bszseq' in cfg['prune_info']:
-    #     print('here2')
-    #     select = x[:, sorted_indices, :]
-    #     return absnml_process(select, probe_num, probe_size), sorted_indices
-    
+
     if 'bsz' in probe_type:
         return x[sorted_indices, :, :], None
     elif 'seq' in probe_type:        
@@ -58,12 +62,11 @@ def rank_process(x, probe_num, probe_size, probe_type):
 def mean_process(x, probe_num, probe_size, probe_type):
     if 'bsz' in probe_type:
         probe = torch.mean(x.view(probe_num, probe_size, x.size(-2), x.size(-1)), dim=1)
-    elif 'seq' in probe_type:
-        probe = torch.mean(x.view(x.size(-3), probe_num, probe_size, x.size(-1)), dim=2)
-    elif 'hd' in probe_type:
-        probe = torch.mean(x.view(x.size(-3), x.size(-2), probe_num, probe_size,), dim=3)
+    # elif 'seq' in probe_type:
+    #     probe = torch.mean(x.view(x.size(-3), probe_num, probe_size, x.size(-1)), dim=2)
+    # elif 'hd' in probe_type:
+    #     probe = torch.mean(x.view(x.size(-3), x.size(-2), probe_num, probe_size,), dim=3)
     return probe
-
 
 
 def absnml_process(x, probe_num, probe_size, probe_type):
@@ -71,19 +74,45 @@ def absnml_process(x, probe_num, probe_size, probe_type):
     if 'bsz' in probe_type:
         abs_view = abs_x.view(probe_num, probe_size, x.size(-2), x.size(-1))
         probe = (x.view(probe_num, probe_size, x.size(-2), x.size(-1)) * (abs_view / abs_view.sum(dim=1, keepdim=True))).sum(dim=1)
-    elif 'seq' in probe_type:
-        abs_view = abs_x.view(x.size(-3), probe_num, probe_size, x.size(-1))
-        probe = (x.view(x.size(-3), probe_num, probe_size, x.size(-1)) * (abs_view / abs_view.sum(dim=2, keepdim=True))).sum(dim=2)
-    elif 'hd' in probe_type:
-        abs_view = abs_x.view(x.size(-3), x.size(-2), probe_num, probe_size)
-        probe = (x.view(x.size(-3), x.size(-2), probe_num, probe_size) * (abs_view / abs_view.sum(dim=3, keepdim=True))).sum(dim=3)
-        print('probe', probe.shape, flush=True)
+    # elif 'seq' in probe_type:
+    #     abs_view = abs_x.view(x.size(-3), probe_num, probe_size, x.size(-1))
+    #     probe = (x.view(x.size(-3), probe_num, probe_size, x.size(-1)) * (abs_view / abs_view.sum(dim=2, keepdim=True))).sum(dim=2)
+    # elif 'hd' in probe_type:
+    #     abs_view = abs_x.view(x.size(-3), x.size(-2), probe_num, probe_size)
+    #     probe = (x.view(x.size(-3), x.size(-2), probe_num, probe_size) * (abs_view / abs_view.sum(dim=3, keepdim=True))).sum(dim=3)
+    #     print('probe', probe.shape, flush=True)
     return probe
 
 
-def generate_probe(x, probe_ratio_list):
-    # seq rank needs this to combine with the global metric
+def cut_extra_dim(x, probe_type, probe_num, probe_size, residual):
+    if 'bsz' in probe_type:
+        if x.size(0) % probe_num != 0:
+            x = x[:probe_num * probe_size, :, :]
+            if residual is not None:
+                residual = residual[:probe_num * probe_size, :, :]
+    elif 'seq' in probe_type:
+        if x.size(1) % probe_num != 0:
+            x = x[:, :probe_num * probe_size, :]
+            if residual is not None:
+                residual = residual[:, :probe_num * probe_size, :]
+    elif 'hd' in probe_type:
+        if x.size(2) % probe_num != 0:
+            x = x[:, :, :probe_num * probe_size]
+            if residual is not None:
+                residual = residual[:, :, :probe_num * probe_size]
+    return x, residual
+
+def generate_probe(x, probe_ratio_list, residual=None):
+    # seq rank needs selected_indices to combine with the global metric
     selected_indices = None
+    pad_mask = cfg['pad_mask']
+
+    if pad_mask is not None:
+        if residual is not None:
+            residual[pad_mask] = 0
+        else:
+            x[pad_mask] = 0
+
     for i in range(len(cfg['probe_generation_type'])):
         probe_type = cfg['probe_generation_type'][i]
         probe_ratio = probe_ratio_list[i]
@@ -91,22 +120,19 @@ def generate_probe(x, probe_ratio_list):
         if 'bsz' in probe_type:
             probe_num = int(x.size(0) * probe_ratio)
             probe_size = x.size(0) // probe_num
-            if x.size(0) % probe_num != 0:
-                x = x[:probe_num * probe_size, :, :]
         elif 'seq' in probe_type:
             probe_num = int(x.size(1) * probe_ratio)
             probe_size = x.size(1) // probe_num
-            if x.size(1) % probe_num != 0:
-                x = x[:, :probe_num * probe_size, :]
         elif 'hd' in probe_type:
             probe_num = int(x.size(2) * probe_ratio)
             probe_size = x.size(2) // probe_num
-            if x.size(2) % probe_num != 0:
-                x = x[:, :, :probe_num * probe_size]
+        
+        # might need to cut extra dim to use view()
+        if 'mean' in probe_type or 'absnml' in probe_type:
+            x, residual = cut_extra_dim(x, probe_type, probe_num, probe_size, residual)
 
-        print('probe_num', probe_num, 'probe_size', probe_size, flush=True)
         if 'rank' in probe_type:
-            x, temp_selected_indices = rank_process(x, probe_num, probe_size, probe_type)
+            x, temp_selected_indices = rank_process(x, probe_num, probe_size, probe_type, residual)
             if temp_selected_indices is not None:
                 selected_indices = temp_selected_indices
         elif 'mean' in probe_type:
