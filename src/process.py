@@ -32,483 +32,6 @@ exp = [str(x) for x in list(range(num_experiments))]
 
 
 
-def make_controls(control_name):
-    control_names = []
-    for i in range(len(control_name)):
-        control_names.extend(list('_'.join(x) for x in itertools.product(*control_name[i])))
-    # controls = [exp] + data_names + model_names + [control_names]
-    controls = [exp] + [control_names]
-    controls = list(itertools.product(*controls))
-    return controls
-
-
-def make_control_list(file):
-    controls = []
-    if file == 'wikitext-probe':
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-fill-each', 'mag-probe-fill-each-delseq'],
-        #         ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probembsz-fill-each-delseq'],
-        #             ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probe-fill-each', 'mag-probembsz-fill-each-delseq'],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None', 'mag-probembsz-None-None', 'mag-probembszmseq-None-None'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each-onlyvo', 'mag-probembsz-fill-each-delseq-onlyvo'],
-        #         ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembszwandasp-fill-each', 'mag-probembszwandasp-fill-each-delseq'],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0', '0.1', '0.2', '0.3', '0.4', '0.5'], ['pq-probe-None-None-low', 'pq-probembsz-None-None-low', 'pq-probembszmseq-None-None-low'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0','0.1', '0.2', '0.3', '0.4', '0.5'], ['pq-probembsz-fill-fill-low'],
-        #         ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probeoptim-fill-each'],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['512'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None', 'mag-probembszkeepseq-None-None', 'mag-probekeepseq-None-None'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024', '2048'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probe-None-None', 'mag-probembszkeepseq-None-None', 'mag-probekeepseq-None-None'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6'], ['mag-probembsz-fill-each-onlyvo', 'mag-probenmlmbsz-fill-each-onlyvo'],
-        #             ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6'], ['mag-probembsz-fill-each-onlyqk', 'mag-probenmlmbsz-fill-each-onlyqk'],
-        #         ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.6', '0.7', '0.8', '0.9', '0.95'], ['mag-probeoptim-fill-each-onlyvo'],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.6', '0.7', '0.8', '0.9', '0.95'], ['mag-probeoptim-None-None'],
-        #         ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-        # controls.extend(CIFAR10_controls_9)
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0','0.1', '0.2', '0.3', '0.4', '0.5'], ['pq-probembszwandasp-fill-fill-low'],
-        #         ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probekeepseq-None-None', 'mag-probekeepseqmbsz-None-None'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1', '2', '4', '6', '8'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probe-None-None', 'mag-probembszkeepseq-None-None'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['1', '2', '4', '6', '8', '10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probe-None-None', 'mag-probembszkeepseq-None-None'],
-        #             ['fc1+fc2']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        # 'mag-probestdmbszkeepseq-None-None', 'mag-probelogmbszkeepseq-None-None'
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512', '1024',], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'], ['mag-probenmlmbszkeepseq-None-None', ],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '512'], ['0.3', '0.4', '0.5', '0.6'], ['mag-probembszkeepseq-None-None'],
-        #             ['gate-proj+up-proj+down-proj', 'gate-proj+down-proj', 'up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50', '200'], ['128', '512', '1024'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], ['mag-probe-None-None'],
-        #             ['down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['2048'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], ['mag-probeoptim-fill-each'],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128', '1024'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7'], ['mag-runningmean-probe-None-None'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '100'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probesvd0.01-None-None', 'mag-probesvd0.05-None-None', 'mag-probesvd0.07-None-None'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['2048'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], ['mag-probe-None-None'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all', mag-probe0.9runningmean
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-        #                      ['mag-probe0.9calib-probe-None-None+wikivalid-all', 'mag-probe0.9calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None', 
-        #                       'mag-probe0.9runningmean-probe-None-None', 'mag-probe0.9runningmeanfillpbmetric-probe-None-None', 'mag-probe0.9calibrunningmean-probe-None-None+wikitest-all'],
-        #                     ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-        #                     ['mag-probe0.9runningmean-probe-None-None', 'mag-probe0.9calib-probe-None-None+wikivalid-all', 
-        #                     'mag-probe0.9calib-probe-None-None+wikitest-all', 'mag-probe-probe-None-None'],
-        #                 ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-        #                  ['mag-nmlprobe0.9calib-probe-None-None+wikivalid-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all',
-        #                   'mag-nmlprobe0.9runningmean-probe-None-None', 'mag-nmlprobe0.9runningmeanfillpbmetric-probe-None-None', 'mag-probe-probe-None-None', 'mag-probefullinf-probe-None-None', 'mag-fullinfprobe0.9calib-probe-None-None+wikitest-all'],
-        #                 ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.7'], 
-        #                      ['mag-probeintersect-probe-None-None+wikitest-all'],
-        #                     ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-        #                  ['mag-probe0.9runningmean-probe-None-None', 'mag-probe0.9calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None',
-        #                  'mag-probe0.9calib-probe-None-None+wikitest-all', 'mag-probefullinf-probe-None-None', 'mag-fullinfprobe0.1calib-probe-None-None+wikitest-all'],
-        #                 ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-        #                      ['mag-nmlprobe0.9calib-probe-None-None+wikivalid-all', 'mag-nmlprobe0.9calib-probe-None-None+wikitest-all', 'mag-runningmean-probe-None-None', 'mag-calib-probe-None-None+wikivalid-all', 'mag-calib-probe-None-None+wikitest-all',
-        #                       'mag-nmlprobe0.9runningmean-probe-None-None', 'mag-nmlprobe0.9runningmeanfillpbmetric-probe-None-None', 
-        #                       'mag-probe-probe-None-None', 'mag-probefullinf-probe-None-None', 'mag-fullinfprobe0.9calib-probe-None-None+wikitest-all',
-        #                       'mag-nmlprobe0.7calib-probe-None-None+wikivalid-all', 'mag-pcabszseqprobe0.9calib-probe-None-None+wikivalid-all',
-        #                       'mag-twoprobe0.9calib-probe-None-None+wikivalid-all', 'mag-fullinfprobe0.1calib-probe-None-None+wikitest-all',
-        #                       ],
-        #                     ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['50'], ['128'], ['0.1'], 
-        #                      ['mag-gauexpcalib-probe-None-None+wikivalid-all'
-        #                       ],
-        #                     ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-                             [
-                                 'mag-calib-probe-None-None+c4-2000',
-                            'mag-calibema0.99-probe-None-None+c4-2000',
-
-                            # async probe with full inf fill and no clib (totally last round)
-                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseq-probe-None-None+c4-2000',
-                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000',
-
-                            # async probe with full inf fill
-                            'mag-nmlhalfsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlhalfsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-
-                            # async probe with different momentum
-                            'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-
-                            # async multi probe
-                            'mag-nmlsquareasync0.0multiproble2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.0multiproble5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseq-probe-None-None+c4-2000',
-
-                            # 对比一下不加calib
-                            'mag-nmlmultiprobe5probesavemetricseq-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe2probesavemetricseq-probe-None-None+c4-2000',
-   
-                            # 验证当前的epoch multiprobe
-                            'mag-fullinfprobe-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            ],
-                            ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-    elif file == 'wikitext-baseline':
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
-        #             ['o-proj','down-proj', 'o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp+128', 'mag-flap+128'],
-        #             ['o-proj','down-proj', 'o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp-maintain+128', 'mag-flap-maintain+128'],
-        #             ['o-proj', 'down-proj', 'o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-wandasp-cascadeattn+128', 'mag-flap-cascadeattn+128'],
-        #         ['o-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-        pass
-
-    elif file == 'zeroshot-probe':
-        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-None-None'],
-        #             ['gate-proj+up-proj+down-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probe-fill-each', 'mag-probe-fill-each-delseq'],
-        #         ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probembsz-fill-each-delseq'],
-        #             ['q-proj+k-proj+v-proj+o-proj']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        # control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], ['mag-probembsz-fill-each', 'mag-probe-fill-each', 'mag-probembsz-fill-each-delseq'],
-        #             ['default']]]
-        # CIFAR10_controls_9 = make_controls( control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9'], 
-                             [
-                            
-                            'mag-calib-probe-None-None+c4-2000',
-                            'mag-calibema0.99-probe-None-None+c4-2000',
-                            # async probe with full inf fill and no clib (totally last round)
-                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseq-probe-None-None+c4-2000',
-                            'mag-nmlhalfsquareasync0.0multiproble10probesavemetricseqema0.99calib-probe-None-None+c4-2000',
-
-                            # # async probe with full inf fill
-                            'mag-nmlhalfsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlhalfsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-
-                            # async probe with different momentum
-                            'mag-nmlsquareasync0.0probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.3probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.8probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-
-                            # async multi probe
-                            'mag-nmlsquareasync0.0multiproble2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.0multiproble5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlsquareasync0.0multiproble10probedynaratiosavemetricseq-probe-None-None+c4-2000',
-
-                            # 对比一下不加calib
-                            'mag-nmlmultiprobe5probesavemetricseq-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe2probesavemetricseq-probe-None-None+c4-2000',
-   
-                            # 验证当前的epoch multiprobe
-                            'mag-fullinfprobe-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe10probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe5probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe2probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            'mag-nmlmultiprobe1probedynaratiosavemetricseqema0.99calib-probe-None-None+c4-2000',
-                            ],
-
-                            ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
-    elif file == 'zeroshot-baseline':
-        control_name = [[['boolq', 'piqa', 'arc-e', 'arc-c', 'hellaswag', 'winogrande', 'obqa-main'], ['llama-2-7b'], ['csr'], ['10'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], [ 'mag-wandasp+128','mag-flap+128'],
-                    ['o-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['10', '50'], ['128'], ['0.1', '0.2', '0.3', '0.4', '0.5'], [ 'mag-wandasp+128','mag-flap+128'],
-                    ['o-proj+down-proj', 'o-proj', 'down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-    return controls
-
-def make_dense_controls(file):
-    controls = []
-    if file == 'dense':
-        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['10'], ['128'], ['0'], [f'dense'],
-                        ['None']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa-main'], ['llama-2-7b', 'llama-2-13b'], ['csr'], ['10'], ['128'], ['0'], ['dense'],
-                        ['None']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50'], ['512', '1024'], ['0'], ['dense'],
-                    ['None']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['wikitext-2v1'], [ 'opt-13b'], ['clm'], ['10'], ['128', '512', '1024'], ['0'], ['dense'],
-                    ['None']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-    return controls
-
-def main():
-    global result_path, final_result_path, vis_path, num_experiments, exp
-    vis_path = './output/vis/{}'.format(args['type'])
-
-    print(f"type: {args['type']}")    
-    files = args['type'].split('_')
-    processed_result_exp, processed_result_history = {}, {}
-    for file in files:
-        if file == 'wikitext-probe':
-            num_experiments = 1
-        elif file == 'wikitext-baseline':
-            num_experiments = 2
-        elif file == 'zeroshot-probe':
-            num_experiments = 1
-        elif file == 'zeroshot-baseline':
-            num_experiments = 2
-        else:
-            raise ValueError('Not valid type')
-        exp = [str(x) for x in list(range(num_experiments))]
-        controls = make_control_list(file)
-        result_path = './output/result/{}'.format(file)
-        process_result(controls, processed_result_exp, processed_result_history)
-
-    # get dense model result
-    num_experiments = 2
-    exp = [str(x) for x in list(range(num_experiments))]
-    controls = make_dense_controls('dense')
-    result_path = './output/result/{}'.format('dense')
-    process_result(controls, processed_result_exp, processed_result_history)
-
-    final_result_path = './output/result/{}'.format(args['type'])
-    makedir_exist_ok(final_result_path)
-    # with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
-    #     json.dump(processed_result_exp, fp, indent=2)
-    extracted_processed_result_history = {}
-    extract_processed_result(extracted_processed_result_history, processed_result_history, [])
-    df_history = make_df_history(extracted_processed_result_history)
-    df_exp = {}
-    make_vis(df_exp, df_history)
-    return
-
-
-def process_result(controls, processed_result_exp, processed_result_history):
-    for control in controls:
-        model_tag = '_'.join(control)
-        check_missing_files(list(control), model_tag, processed_result_exp, processed_result_history)
-    print(f'\n----- check missing {result_path} files done\n')
-    for control in controls:
-        model_tag = '_'.join(control)
-        extract_result(list(control), model_tag, processed_result_exp, processed_result_history)
-    # if processed_result_exp:
-    #     summarize_result(processed_result_exp)
-    if processed_result_history:
-        summarize_result(processed_result_history, None)
-    return 
-
-
-def check_missing_files(control, model_tag, processed_result_exp, processed_result_history):
-    # print('check_missing_files', control)
-    if len(control) == 1:
-        exp_idx = exp.index(control[0])
-        base_result_path_i = os.path.join(result_path, '{}'.format(model_tag))
-        if os.path.exists(base_result_path_i):
-            # base_result = load(base_result_path_i)
-            pass
-        else:
-            print('Missing {}'.format(base_result_path_i))
-    else:
-        if control[1] not in processed_result_exp:
-            processed_result_exp[control[1]] = {}
-            processed_result_history[control[1]] = {}
-        check_missing_files([control[0]] + control[2:], model_tag, processed_result_exp[control[1]],
-                       processed_result_history[control[1]])
-    return
-
-def extract_result(control, model_tag, processed_result_exp, processed_result_history):
-    if len(control) == 1:
-        exp_idx = exp.index(control[0])
-        base_result_path_i = os.path.join(result_path, '{}'.format(model_tag))
-
-        # print('result_path', result_path)
-        # print('base_result_path_i', base_result_path_i)
-        # for entry in os.listdir(result_path):
-        #     print('entry', entry)
-        # print('here', os.path.exists(base_result_path_i))
-        if os.path.exists(base_result_path_i):
-            base_result = load(base_result_path_i)                
-            for k in base_result['logger']['test'].history:
-                if args['detail'].lower() == 'false':
-                    # if 'FLOPs_ratio_for_pruned_layers' not in k:
-                    #     continue
-                    if 'pq_indices_varying_lengths' in k:
-                        continue
-                    if 'norm_across_other_dims' in k:
-                        continue
-                # print('k', k)
-                metric_name = k
-                if metric_name not in processed_result_history:
-                    # processed_result_exp[metric_name] = {'exp': [None for _ in range(num_experiments)]}
-                    processed_result_history[metric_name] = {'history': [None for _ in range(num_experiments)]}
-
-                # processed_result_exp[metric_name]['exp'][exp_idx] = base_result['logger']['test'].mean[k]
-                processed_result_history[metric_name]['history'][exp_idx] = base_result['logger']['test'].history[k]
-        else:
-            print('Missing {}'.format(base_result_path_i))
-    else:
-        if control[1] not in processed_result_exp:
-            processed_result_exp[control[1]] = {}
-            processed_result_history[control[1]] = {}
-        extract_result([control[0]] + control[2:], model_tag, processed_result_exp[control[1]],
-                       processed_result_history[control[1]])
-    return
-
 # for standard error
 def cal_se(std, sample_nums):
     return std / np.sqrt(sample_nums)
@@ -520,77 +43,121 @@ def cut_decimal(decimal):
     decimal = float(decimal)
     return format(decimal, '.2f')
 
+def make_controls(control_name):
+    control_names = []
+    for i in range(len(control_name)):
+        control_names.extend(list('_'.join(x) for x in itertools.product(*control_name[i])))
+    controls = [exp] + [control_names]
+    controls = list(itertools.product(*controls))
+    return controls
+
+
+def make_control_list(file):
+    controls = []
+    if file == 'c4-gridsearch':
+        interval_values = np.arange(0, 1, 0.1)
+        interval_pairs = [f"{x:.1f}-{y:.1f}" for x in interval_values for y in interval_values]
+
+        control_name = [[['c4'], ['llama-2-7b'], ['clm'], ['10'], ['128'], interval_pairs, 
+                            ['ppwandasp'], ['calib-gridsearch'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    return controls
+
+
+def main():
+    global result_path, final_result_path, vis_path, num_experiments, exp
+    file = args['type']
+    vis_path = './output/vis/{}'.format(file)
+    final_result_path = './output/result/{}'.format(file)
+    makedir_exist_ok(vis_path)
+    makedir_exist_ok(final_result_path)
+
+    controls = make_control_list(file)
+    processed_result_history = {}
+    process_result(controls, processed_result_history)
+    
+    # with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
+    #     json.dump(processed_result_exp, fp, indent=2)
+    extracted_processed_result_history = {}
+    extract_processed_result(extracted_processed_result_history, processed_result_history, [])
+    df_history = make_df_history(extracted_processed_result_history)
+    make_vis(df_history)
+    return
+
+def check_missing_files(control, model_tag, processed_result_history):
+    if len(control) == 1:
+        exp_idx = exp.index(control[0])
+        base_result_path_i = os.path.join(result_path, '{}'.format(model_tag))
+        if os.path.exists(base_result_path_i):
+            pass
+        else:
+            print('Missing {}'.format(base_result_path_i))
+    else:
+        if control[1] not in processed_result_history:
+            processed_result_history[control[1]] = {}
+        check_missing_files([control[0]] + control[2:], model_tag, processed_result_history[control[1]])
+    return
+
+def extract_result(control, model_tag, processed_result_history):
+    if len(control) == 1:
+        exp_idx = exp.index(control[0])
+        base_result_path_i = os.path.join(result_path, '{}'.format(model_tag))
+
+        if os.path.exists(base_result_path_i):
+            base_result = load(base_result_path_i)                
+            for k in base_result['logger']['test'].history:
+                if k not in processed_result_history:
+                    processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
+                processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
+        else:
+            print('Missing {}'.format(base_result_path_i))
+    else:
+        if control[1] not in processed_result_history:
+            processed_result_history[control[1]] = {}
+        extract_result([control[0]] + control[2:], model_tag, processed_result_history[control[1]])
+    return
+
 def summarize_result(processed_result, key):
-    # print(f'processed_result: {processed_result}')
-    if 'exp' in processed_result:
-        pivot = 'exp'
-        processed_result[pivot] = np.stack(processed_result[pivot], axis=0)
-        processed_result['mean'] = np.mean(processed_result[pivot], axis=0).item()
-        # processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=0).item(), len(processed_result[pivot]))
-        processed_result['std'] = np.std(processed_result[pivot], axis=0).item()
-        processed_result['max'] = np.max(processed_result[pivot], axis=0).item()
-        processed_result['min'] = np.min(processed_result[pivot], axis=0).item()
-        processed_result['argmax'] = np.argmax(processed_result[pivot], axis=0).item()
-        processed_result['argmin'] = np.argmin(processed_result[pivot], axis=0).item()
-        processed_result[pivot] = processed_result[pivot].tolist()
-    elif 'history' in processed_result:
+    if 'history' in processed_result:
         pivot = 'history'
-        filter_length = []
+        results = []
         for i in range(len(processed_result[pivot])):
             x = processed_result[pivot][i]
-            if len(x) < 800:
-                # print(f'len(x): {len(x)}')
-                pass
-            # if len(x) > 500:
-            #     continue
-            # print()
-            # filter_length.append(x)
-            # if len(x) > 10100:
-            #     filter_length.append(x[800:])
-            # else:
-            filter_length.append(x)
-            # elif len(processed_result[pivot][i]) == 801:
-            #     filter_length.append(x[:800])
-            # else:
-            #     filter_length.append(x + [x[-1]] * (800 - len(x)))
-        # print(processed_result[pivot])
+            results.append(x)
 
-        temp_length = []
-        for item in filter_length:
-            temp_length.append(len(item))
-        # if len(filter_length) > 0:
-        processed_result[pivot] = filter_length
-        a = copy.deepcopy(processed_result[pivot])
+        processed_result[pivot] = results
         processed_result[pivot] = np.stack(processed_result[pivot], axis=0)
         processed_result['mean'] = np.mean(processed_result[pivot], axis=0)
-        # TODO: for inference
-        # if 'Perplexity' in key:
-        #     print('mean', processed_result[pivot], cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot])))
-        # processed_result['se'] = cal_se(np.std(processed_result[pivot], axis=0), len(processed_result[pivot]))
         processed_result['std'] = np.std(processed_result[pivot], axis=0)
-        processed_result['max'] = np.max(processed_result[pivot], axis=1)
-        processed_result['min'] = np.min(processed_result[pivot], axis=1)
-        b = np.max(processed_result[pivot], axis=1)
-        processed_result['mean_of_max'] = np.mean(np.max(processed_result[pivot], axis=1))
-        processed_result['std_of_max'] = np.std(np.max(processed_result[pivot], axis=1))
-        processed_result['argmax'] = np.argmax(processed_result[pivot], axis=0)
-        processed_result['argmin'] = np.argmin(processed_result[pivot], axis=0)
+        processed_result['se'] = cal_se(processed_result['std'], len(processed_result[pivot]))
         processed_result[pivot] = processed_result[pivot].tolist()
+        # processed_result['max'] = np.max(processed_result[pivot], axis=1)
+        # processed_result['min'] = np.min(processed_result[pivot], axis=1)
+        # processed_result['mean_of_max'] = np.mean(np.max(processed_result[pivot], axis=1))
+        # processed_result['std_of_max'] = np.std(np.max(processed_result[pivot], axis=1))
+        # processed_result['argmax'] = np.argmax(processed_result[pivot], axis=0)
+        # processed_result['argmin'] = np.argmin(processed_result[pivot], axis=0)
     else:
         for k, v in processed_result.items():
-            # print(f'key {k}')
-            # print(f'value length {len(v)}')
-            # if 'norm_across_other_dims' in k:
-            #     print('kkkk', k)
-            #     continue
-            # if 'pq_indices_varying_lengths' in k:
-            #     continue
-            # if 'norm_across_other_dims' in k:
-            #     continue
-            # print('k', k)
             summarize_result(v, k)
         return
     return
+
+
+def process_result(controls, processed_result_history):
+    for control in controls:
+        model_tag = '_'.join(control)
+        check_missing_files(list(control), model_tag, processed_result_history)
+    print(f'\n----- check missing {result_path} files done\n')
+    for control in controls:
+        model_tag = '_'.join(control)
+        extract_result(list(control), model_tag, processed_result_history)
+    if processed_result_history:
+        summarize_result(processed_result_history, None)
+    return 
+
 
 
 def extract_processed_result(extracted_processed_result, processed_result, control):
@@ -600,11 +167,9 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
         if exp_name not in extracted_processed_result:
             extracted_processed_result[exp_name] = defaultdict()
         
-        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = np.round(processed_result['mean'], 3)
-        extracted_processed_result[exp_name]['{}_std'.format(metric_name)] = np.round(processed_result['std'], 3)
-
-        extracted_processed_result[exp_name]['{}_mean_of_max'.format(metric_name)] = np.round(processed_result['mean_of_max'], 3)
-        extracted_processed_result[exp_name]['{}_std_of_max'.format(metric_name)] = np.round(processed_result['std_of_max'], 3)
+        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = np.round(processed_result['mean'], 2)
+        extracted_processed_result[exp_name]['{}_std'.format(metric_name)] = np.round(processed_result['std'], 2)
+        extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = np.round(processed_result['se'], 2)
     else:
         for k, v in processed_result.items():
             extract_processed_result(extracted_processed_result, v, control + [k])
@@ -626,12 +191,15 @@ def write_xlsx(path, df, startrow=0):
 
 def make_df_history(extracted_processed_result_history):
     df = defaultdict(list)
+    df_for_xlsx = defaultdict(list)
     for exp_name in extracted_processed_result_history:
         control = exp_name.split('_')
-        if len(control) == 8:
-            data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules = control
+        if len(control) == 12:
+            data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_metric, prune_method, mode,\
+            calib_info, prune_info, cust_tgt_modules = control
             df_name = '_'.join(
-                [data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules])
+                [data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_metric, prune_method, mode,\
+            calib_info, prune_info, cust_tgt_modules])
             for k in extracted_processed_result_history[exp_name]:
                 index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules, k])]
                 df[df_name].append(
@@ -639,7 +207,7 @@ def make_df_history(extracted_processed_result_history):
         else:
             raise ValueError('Not valid control')
 
-    df_for_xlsx = defaultdict(list)
+    
     metric_name_list = ['test/Rouge', 'test/ROUGE', 'test/GLUE', 'test/Accuracy', 'test/Perplexity', 'test/CsrAccuracy']
     for exp_name in extracted_processed_result_history:
         control = exp_name.split('_')
@@ -654,7 +222,6 @@ def make_df_history(extracted_processed_result_history):
                 if 'duration_per_batch' in k or 'FLOPs_ratio_for_all_layers' in k or 'FLOPs_ratio_for_pruned_layers' in k or \
                     any(metric_name in k for metric_name in metric_name_list):
                     index_name = ['_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_name, cust_tgt_modules, k])]
-                    # a = extracted_processed_result_history[exp_name][k].reshape(1, -1)
                     df_for_xlsx[df_name].append(
                         pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
         else:
@@ -679,7 +246,7 @@ def label_exists(plt, label):
 #     'CIFAR100': 90,
 # }
 
-def make_vis(df_exp, df_history):
+def make_vis(df_history):
     color = {
             # '0', '0.05', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0', '999'
              'PQ': 'orange',

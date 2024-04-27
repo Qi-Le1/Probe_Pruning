@@ -126,11 +126,11 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, dataset_size,
                 pruned_layer_pruned_probe_flops += pruned_layer_probe_flops
 
             print(f"Dense: {sub_dense_info[0]} - {sub_dense_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_dense_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - typemodule: {sub_dense_info[4]}", flush=True)
-            print(f"Total PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - typemodule: {sub_pruned_info[4]}", flush=True)
-            print(f"Total Pruned FLOPs ratio: {sub_pruned_info[1]/(sub_dense_info[1] + 1e-6)}", flush=True)
+            print(f"Total after PRUNED : {sub_pruned_info[0]} - {sub_pruned_info[1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {sub_pruned_info[3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - typemodule: {sub_pruned_info[4]}", flush=True)
+            print(f"Total after Pruned FLOPs ratio: {sub_pruned_info[1]/(sub_dense_info[1] + 1e-6)}", flush=True)
             if onlyprobe_info_list is not None:
-                print(f"Probe PRUNED : {onlyprobe_info_list[i][0]} - {onlyprobe_info_list[i][1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {onlyprobe_info_list[i][3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - typemodule: {onlyprobe_info_list[i][4]}", flush=True)
-                print(f"Probe Pruned FLOPs ratio: {onlyprobe_info_list[i][1]/(sub_dense_info[1] + 1e-6)}", flush=True)
+                print(f"Probe after PRUNED : {onlyprobe_info_list[i][0]} - {onlyprobe_info_list[i][1]/FLOPS_UNIT[0]:.2f} {FLOPS_UNIT[1]}Flops - {onlyprobe_info_list[i][3]/NUM_PARAMETER_UNIT[0]:.2f} {NUM_PARAMETER_UNIT[1]} parameters - typemodule: {onlyprobe_info_list[i][4]}", flush=True)
+                print(f"Probe afterPruned FLOPs ratio: {onlyprobe_info_list[i][1]/(sub_dense_info[1] + 1e-6)}", flush=True)
         
         info = {
             'dense_total_FLOPs': dense_total_flops,

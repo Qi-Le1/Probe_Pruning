@@ -65,7 +65,7 @@ def runExperiment():
     print('Calibration Done...')
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
-    inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
+    inference_duration = test(calibration_data_loader['train'], model, model_prof, metric, test_logger)
     pruned_info_list = get_model_profile('pruned', model_prof)
     dataset_size = cfg['dataset_size']['test']
     dense_info_list, dense_duration = summarize_info_list(pruned_info_list, inference_duration, test_logger, dataset_size)

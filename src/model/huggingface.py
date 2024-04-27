@@ -124,7 +124,7 @@ def make_hf_model(model_name, sub_model_name=None):
             if 'gridsearch' not in cfg['prune_method']:
                 cfg['prune_ratio'] = num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'] 
             # "Training Llama in float16 is not recommended and known to produce nan, as such the model should be trained in bfloat16.""
-            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'],  config=config, torch_dtype=torch.float16, device_map=device_map)
+            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'],  torch_dtype=torch.float16, device_map=device_map)
             # to fit flap and simplify for flops comparision
         elif 'opt' in model_name:
             model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'], torch_dtype=torch.float16, device_map=device_map)
@@ -313,18 +313,8 @@ def make_hf_model(model_name, sub_model_name=None):
                 torch.cuda.empty_cache()
                 layer.self_attn.num_key_value_heads = num_heads
                 layer.self_attn.num_key_value_groups = 1
-    # for attr in dir(model):
-    #     if not attr.startswith('__'):
-    #         print(f"{attr} = {getattr(model, attr)}")
-    # if hasattr(model, "model"):
-    #     for attr in dir(model.model):
-    #         if not attr.startswith('__'):
-    #             print(f"model.{attr} = {getattr(model.model, attr)}")
-    
-    # print('model.model.layers', model.model.layers)
+
     model.config.use_cache = False
-    print('model.config', model.config)
-    
     return model, tokenizer
 
 

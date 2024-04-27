@@ -804,7 +804,7 @@ class LlamaAttention(nn.Module):
         # self.default_head_dim = self.hidden_size // self.default_num_heads
         # self.default_num_key_value_heads = config.num_key_value_heads
 
-        self.pruning_module = HiddenRepresentationPruning(cfg, f'llama_attention_{layer_order}')
+        self.pruning_module = HiddenRepresentationPruning(cfg, f'llama_attention_{layer_order}', config)
 
         if (self.head_dim * self.num_heads) != self.hidden_size:
             raise ValueError(

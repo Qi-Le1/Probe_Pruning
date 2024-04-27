@@ -1428,27 +1428,7 @@ def main():
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
-    elif file == 'test_dense_model_gridsearch':
-        controls = []
-        script_name = [[f'{filename}.py']]
-        if 'clm' in data:
-            control_name = [[['c4'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0'], 
-                             ['None'], ['dense'], ['None'], ['c4-2000'], ['None'],
-                            ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.55-0.55'], 
-                             ['ppwandasp'], ['calib-gridsearch'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
-
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5-0.5'], 
-                             ['ppwandasp'], ['calib-gridsearch'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
 
     elif file == 'test_fix_pruned_model': 
         controls = []
