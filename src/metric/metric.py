@@ -43,11 +43,6 @@ def Loss(output):
     return loss
 
 
-# def Perplexity(output):
-#     ppl = torch.exp(output).item()
-#     return ppl
-
-
 def Accuracy(output, target, topk=1):
     with torch.no_grad():
         if target.dtype != torch.int64:
@@ -75,15 +70,7 @@ class Perplexity:
         return
        
     def __call__(self, *args, **kwargs):
-        # print('self.loss_list', self.loss_list, torch.tensor(self.loss_list))
-        # print('Perplexity', torch.mean(torch.tensor(self.loss_list)))
-        # print('res', torch.exp(torch.mean(torch.tensor(self.loss_list))))
-        # print('0', self.loss_list)
-        # print('a', np.array(self.loss_list).mean())
-        # print('res', torch.exp(torch.tensor(np.array(self.loss_list).mean())))
         return torch.exp(torch.tensor(np.array(self.loss_list).mean())).item()
-        # return torch.exp(torch.mean(torch.tensor(self.loss_list))).item()
-
 
 class CsrAccuracy:
     def __init__(self):
@@ -94,23 +81,6 @@ class CsrAccuracy:
         pass
     
     def add(self, input, output):
-        # generate = output['generate'].detach().cpu()
-        # scores = output['scores']
-        # target = input['target'].detach().cpu()
-
-        # generate = generate[:, -cfg['max_new_tokens']:]
-        # def tuple_of_tensors_to_tensor(tuple_of_tensors):
-        #     return torch.stack(list(tuple_of_tensors), dim=0)
-        
-        # scores = tuple_of_tensors_to_tensor(scores)
-        # scores = scores.view(generate.shape[0], -1, scores.shape[-1]).detach().cpu()
-        # a = scores.shape
-        # scores = scores[:, -cfg['max_new_tokens']:, :]
-        # # scores = F.log_softmax(scores, dim=-1)
-        # target[target < 0] = cfg['pad_token_id']
-        # target = target[:, -cfg['max_new_tokens']:]
-
-        # non_pad_mask = target != cfg['pad_token_id']
         lm_logits = output['target']
         labels = input['target']
 
@@ -119,34 +89,15 @@ class CsrAccuracy:
         shift_logits = lm_logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
 
-        label_length_per_sample = torch.sum(shift_labels != -100, dim=1)
-
-        seq_len = shift_logits.size(1)
-        # print('shift_logits', shift_logits)
-        # print('shift_labels', shift_labels)
-        # shift_logits = F.log_softmax(shift_logits, dim=-1)
-        # inplen = shift_logits.size(1)
-        # contlen = shift_labels.size(1)
-        # logits = logits[inplen - contlen : inplen].unsqueeze(
-        #     0
-        # ) 
 
         loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-        # print('loss', loss, loss.shape)
         loss = loss.view(bsz, -1)
-        # print('loss after view', loss, loss.shape)
         loss_per_sample = loss.sum(dim=1)
-        # print('loss_per_sample', loss_per_sample)
 
         loss_fct = torch.nn.CrossEntropyLoss(reduction='mean')
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         self.average.append(loss.item())
-        print('loss persample', loss.item())
-        # print('CsrAccuracy', loss_per_sample)
-
-        # completion_len = np.array([float(len(i)) for i in doc["choices"]])
-        # acc_norm = 1.0 if np.argmax(results / completion_len) == gold else 0.0
 
         # accnorm
         # for i in range(input['input_indices'].shape[0]):
@@ -157,65 +108,18 @@ class CsrAccuracy:
             self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item())
             self.correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
 
-        # a = 5
     def __call__(self, *args, **kwargs):    
-        # print('self.output_for_one_question', self.output_for_one_question)
-        # print('self.correct_labels_for_one_question', self.correct_labels_for_one_question)
         total_acc = 0
         for key in self.output_for_one_question:
             # argmin for positive loss
             acc = 1 if np.argmin(self.output_for_one_question[key]) == self.correct_labels_for_one_question[key][0] else 0
             total_acc += acc
 
-        
         ppl = np.exp(np.mean(self.average))
         print('pplforcsr', ppl)
 
         return (total_acc / len(self.output_for_one_question)) * 100
 
-class ROUGE:
-    def __init__(self, tokenizer, split_metric):
-        self.split_metric = split_metric
-        self.metric = evaluate.load('rouge')
-        self.tokenizer = tokenizer
-
-    def decode(self, generate, target):
-        generate = generate[:, -cfg['max_new_tokens']:]
-        target[target < 0] = cfg['pad_token_id']
-        generate = self.tokenizer.batch_decode(generate.detach().cpu().numpy(), skip_special_tokens=True)
-        target = self.tokenizer.batch_decode(target.detach().cpu().numpy(), skip_special_tokens=True)
-        return generate, target
-
-    def add(self, input, output):
-        generate = output['generate']
-        target = input['target']
-        generate, target = self.decode(generate, target)
-        self.metric.add_batch(predictions=generate, references=target)
-        return
-
-    def __call__(self, *args, **kwargs):
-        rouge = self.metric.compute()['rougeL']
-        return rouge
-
-class GLUE:
-    def __init__(self, subset_name):
-        self.metric = evaluate.load('glue', subset_name)
-        self.subset_name = subset_name
-
-    def add(self, input, output):
-        if self.subset_name in ['stsb']:
-            predictions = output['target']
-        else:
-            predictions = output['target'].argmax(dim=-1)
-        references = input['target']
-        self.metric.add_batch(predictions=predictions, references=references)
-        return
-
-    def __call__(self, *args, **kwargs):
-        glue = self.metric.compute()
-        metric_name = list(glue.keys())[0]
-        glue = glue[metric_name]
-        return glue
     
 class Metric:
     def __init__(self, metric_name, pivot, pivot_direction, pivot_name, tokenizer):
@@ -233,18 +137,6 @@ class Metric:
                     # metric[split][m] = {'mode': 'batch', 'metric': (lambda input,
                     #                                                        output: recur(Perplexity, output['loss']))}
                     metric[split][m] = {'mode': 'full', 'metric': Perplexity()}
-                elif m == 'Accuracy':
-                    metric[split][m] = {'mode': 'batch',
-                                        'metric': (
-                                            lambda input, output: recur(Accuracy, output['target'], input['target']))}
-                elif m == 'RMSE':
-                    metric[split][m] = {'mode': 'batch',
-                                        'metric': (
-                                            lambda input, output: recur(RMSE, output['target'], input['target']))}
-                elif m == 'ROUGE':
-                    metric[split][m] = {'mode': 'full', 'metric': ROUGE(tokenizer, cfg['split_metric'])}
-                elif m == 'GLUE':
-                    metric[split][m] = {'mode': 'full', 'metric': GLUE(cfg['hf_subset_name'])}
                 elif m == 'CsrAccuracy':
                     metric[split][m] = {'mode': 'full', 'metric': CsrAccuracy()}
                 else:
