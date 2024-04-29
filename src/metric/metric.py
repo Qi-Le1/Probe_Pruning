@@ -24,12 +24,13 @@ def make_metric(metric_name, tokenizer):
         for k in metric_name:
             metric_name[k].extend(['Accuracy'])
     elif cfg['task_name'] == 'csr':
-        if cfg['data_name'] in ['boolq', 'piqa', 'siqa', 'arc', 'aec','hellaswag', 'winogrande', 'obqa']:
+        if cfg['data_name'] in ['boolq', 'piqa', 'siqa', 'arc', 'hellaswag', 'winogrande', 'obqa']:
             pivot = -float('inf')
             pivot_direction = 'up'
             pivot_name = 'Accuracy'
             for k in metric_name:
                 metric_name[k].extend(['CsrAccuracy'])
+                metric_name[k].extend(['CsrAccuracyNorm'])
         else:
             raise ValueError('Not valid data name')
     else:
@@ -74,8 +75,8 @@ class Perplexity:
 
 class CsrAccuracy:
     def __init__(self):
-        self.output_for_one_question = defaultdict(list)
-        self.correct_labels_for_one_question = defaultdict(list)
+        self.acc_output_for_one_question = defaultdict(list)
+        self.acc_correct_labels_for_one_question = defaultdict(list)
 
         self.average = []
         pass
@@ -88,7 +89,7 @@ class CsrAccuracy:
         
         shift_logits = lm_logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
-
+        label_length_per_sample = torch.sum(shift_labels != -100, dim=1)
 
         loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
@@ -99,27 +100,70 @@ class CsrAccuracy:
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         self.average.append(loss.item())
 
-        # accnorm
-        # for i in range(input['input_indices'].shape[0]):
-        #     self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item()/label_length_per_sample[i].item())
-        #     self.correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
+        
         # acc
         for i in range(input['input_indices'].shape[0]):
-            self.output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item())
-            self.correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
+            self.acc_output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item())
+            self.acc_correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
+        
 
     def __call__(self, *args, **kwargs):    
         total_acc = 0
-        for key in self.output_for_one_question:
+        for key in self.acc_output_for_one_question:
             # argmin for positive loss
-            acc = 1 if np.argmin(self.output_for_one_question[key]) == self.correct_labels_for_one_question[key][0] else 0
+            acc = 1 if np.argmin(self.acc_output_for_one_question[key]) == self.acc_correct_labels_for_one_question[key][0] else 0
             total_acc += acc
 
         ppl = np.exp(np.mean(self.average))
         print('pplforcsr', ppl)
 
-        return (total_acc / len(self.output_for_one_question)) * 100
+        return (total_acc / len(self.acc_output_for_one_question)) * 100
 
+
+class CsrAccuracyNorm:
+    def __init__(self):
+        self.acc_norm_output_for_one_question = defaultdict(list)
+        self.acc_norm_correct_labels_for_one_question = defaultdict(list)
+
+        self.average = []
+        pass
+    
+    def add(self, input, output):
+        lm_logits = output['target']
+        labels = input['target']
+
+        bsz = lm_logits.size(0)
+        
+        shift_logits = lm_logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        label_length_per_sample = torch.sum(shift_labels != -100, dim=1)
+
+        loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        loss = loss.view(bsz, -1)
+        loss_per_sample = loss.sum(dim=1)
+
+        loss_fct = torch.nn.CrossEntropyLoss(reduction='mean')
+        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        self.average.append(loss.item())
+        
+        # accnorm
+        print('accnorm')
+        for i in range(input['input_indices'].shape[0]):
+            self.acc_norm_output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item()/label_length_per_sample[i].item())
+            self.acc_norm_correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
+
+    def __call__(self, *args, **kwargs):    
+        total_acc = 0
+        for key in self.acc_norm_output_for_one_question:
+            # argmin for positive loss
+            acc = 1 if np.argmin(self.acc_norm_output_for_one_question[key]) == self.acc_norm_correct_labels_for_one_question[key][0] else 0
+            total_acc += acc
+
+        ppl = np.exp(np.mean(self.average))
+        print('pplforcsr', ppl)
+
+        return (total_acc / len(self.acc_norm_output_for_one_question)) * 100
     
 class Metric:
     def __init__(self, metric_name, pivot, pivot_direction, pivot_name, tokenizer):
@@ -139,6 +183,8 @@ class Metric:
                     metric[split][m] = {'mode': 'full', 'metric': Perplexity()}
                 elif m == 'CsrAccuracy':
                     metric[split][m] = {'mode': 'full', 'metric': CsrAccuracy()}
+                elif m == 'CsrAccuracyNorm':
+                    metric[split][m] = {'mode': 'full', 'metric': CsrAccuracyNorm()}
                 else:
                     raise ValueError('Not valid metric name')
         return metric

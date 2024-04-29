@@ -50,29 +50,42 @@ class HiddenRepresentationPruning():
             return cfg['prune_ratio']
     
 
-    def cal_attn_prune_metric(self, probe_out, weight, metric_type, global_metric_score_distribution=None, selected_indices=None):
+    def cal_attn_prune_metric(self, probe_out, weight, metric_type, bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=None):
         probe_num = probe_out.size(0)
         if 'ppwandasp' in metric_type:
             combined_probe_out = None
             if global_metric_score_distribution is not None:
+                if seq_selected_indices is not None:
+                    cur_global_metric_score_distribution = global_metric_score_distribution[seq_selected_indices, :]
+                else:
+                    cur_global_metric_score_distribution = global_metric_score_distribution
+
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
-                global_metric_score_distribution = global_metric_score_distribution.to(probe_out.device)
+                cur_global_metric_score_distribution = cur_global_metric_score_distribution.to(probe_out.device)
 
                 # only for seq rank
-                if selected_indices is not None and 'seqrank' in cfg['prune_info']:
-                    global_metric_score_distribution = global_metric_score_distribution[selected_indices, :]
+                if cfg['pad_mask'] is not None:
+                    pass
+                    # if bsz_selected_indices is not None:
+                    #     cfg['pad_mask'][bsz_selected_indices]
+                    #     global_metric_score_distribution = global_metric_score_distribution[bsz_selected_indices, :]
+                
 
                 if 'probefixratio' in cfg['prune_info']:
-                    combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
+                    combined_probe_out = cfg['probefixratio'] * cur_global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
                 # dynaratio, since all nonnegative, no need to abs
                 else:  
-                    denominator = norm_probe_out_square + global_metric_score_distribution
+                    denominator = norm_probe_out_square + cur_global_metric_score_distribution
 
                     # avoid nan, nan is always a problem in float16
                     # tend to give the global metric more weight if there is a nan
                     probe_ratio = norm_probe_out_square / (denominator + 1e-6)
                     global_ratio = 1 - probe_ratio
-                    combined_probe_out = global_ratio * global_metric_score_distribution + probe_ratio * norm_probe_out_square
+                    combined_probe_out = global_ratio * cur_global_metric_score_distribution + probe_ratio * norm_probe_out_square
+
+                if 'shengxiaseq' in cfg['prune_method']:
+                    global_metric_score_distribution[seq_selected_indices, :] = combined_probe_out
+                    combined_probe_out = global_metric_score_distribution
 
                 combined_probe_out = torch.sum(combined_probe_out, dim=0).clamp(max=cfg['data_type_max'])
                 probe_out_dim_metric = torch.linalg.vector_norm((combined_probe_out.reshape((1,-1)) * torch.pow(weight, 2)).reshape(4096, 32, 128), ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
@@ -143,29 +156,34 @@ class HiddenRepresentationPruning():
                 return probe_out_dim_metric
 
     
-    def cal_mlp_prune_metric(self, probe_out, weight, metric_type, global_metric_score_distribution=None, selected_indices=None):
+    def cal_mlp_prune_metric(self, probe_out, weight, metric_type, bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=None):
         probe_num = probe_out.size(0)
         if 'ppwandasp' in metric_type:
             combined_probe_out = None
             if global_metric_score_distribution is not None:
-                norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
-                global_metric_score_distribution = global_metric_score_distribution.to(probe_out.device)
+                if seq_selected_indices is not None:
+                    cur_global_metric_score_distribution = global_metric_score_distribution[seq_selected_indices, :]
+                else:
+                    cur_global_metric_score_distribution = global_metric_score_distribution
 
-                # only for seq rank
-                if selected_indices is not None and 'seqrank' in cfg['prune_info']:
-                    global_metric_score_distribution = global_metric_score_distribution[selected_indices, :]
+                norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
+                cur_global_metric_score_distribution = cur_global_metric_score_distribution.to(probe_out.device)
 
                 if 'probefixratio' in cfg['prune_info']:
-                    combined_probe_out = cfg['probefixratio'] * global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
+                    combined_probe_out = cfg['probefixratio'] * cur_global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
                 # dynaratio, since all nonnegative, no need to abs
                 else:  
-                    denominator = norm_probe_out_square + global_metric_score_distribution
+                    denominator = norm_probe_out_square + cur_global_metric_score_distribution
                     # avoid nan, nan is always a problem in float16
                     # tend to give the global metric more weight if there is a nan
                     probe_ratio = norm_probe_out_square / (denominator + 1e-6)
                     global_ratio = 1 - probe_ratio
-                    combined_probe_out = global_ratio * global_metric_score_distribution + probe_ratio * norm_probe_out_square
+                    combined_probe_out = global_ratio * cur_global_metric_score_distribution + probe_ratio * norm_probe_out_square
 
+                if 'shengxiaseq' in cfg['prune_method']:
+                    global_metric_score_distribution[seq_selected_indices, :] = combined_probe_out
+                    combined_probe_out = global_metric_score_distribution
+                    
                 combined_probe_out = torch.sum(combined_probe_out, dim=0).clamp(max=cfg['data_type_max'])
                 probe_out_dim_metric = torch.linalg.vector_norm((combined_probe_out.reshape((1,-1)) * torch.pow(weight, 2)), ord=2, dim=0).clamp(max=cfg['data_type_max'])
                 return probe_out_dim_metric
@@ -303,7 +321,7 @@ class HiddenRepresentationPruning():
             heads_to_preserve = sorted_indices[num_prune_heads:]
             full_indices_to_preserve = (torch.arange(head_dim, device=probe_out_dim_metric.device) + heads_to_preserve.unsqueeze(1) * head_dim).view(-1)
             num_heads = num_heads - num_prune_heads
-            return full_indices_to_preserve, None, num_heads, head_dim
+            return full_indices_to_preserve, num_heads, head_dim
         else:
             raise NotImplementedError
 

@@ -104,7 +104,7 @@ def run_calibration(model, data_loader):
         model.eval()
         for i, input in enumerate(data_loader):
             print('calibration', i, input['input_ids'].shape, flush=True)
-            # if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+            cfg['cur_batch_seq_len'] = input['input_ids'].size(-1)
             # now, the wikitext and c4 datsets used for calibration are clm tasks
             input_size = input['labels'].size(0)
             input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -122,13 +122,6 @@ def run_calibration(model, data_loader):
         elif 'gridratio' in cfg['prune_method']:
             pruning_module = HiddenRepresentationPruning(cfg, 'gridratio')
             pruning_module.grid_ratio(model)
-        # elif 'gridsearch' in cfg['prune_method']:
-        #     pruning_module = HiddenRepresentationPruning(cfg, 'gridsearch')
-        #     pruning_module.grid_search(model)
-            # global_determine_ratio(model, if_log=False)
-            # global_determine_ratio(model, if_log=True)
-            # raise ValueError('Global Determine Ratio Done...')
-        # raise ValueError('Calibration Done...')
     return
 
 
@@ -142,53 +135,17 @@ def test(data_loader, model, model_prof, metric, logger):
         inference_duration = 0
 
         # warm up pytorch
-        data_loader_iter = iter(data_loader)
-        input = next(data_loader_iter)
-        cfg['cur_batch_index'] += 1
-        if cfg['task_name'] in ['s2s', 'sc', 'clm']:
-            input_size = input['labels'].size(0)
-            input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
-                    'labels': input['labels']}
-            input = to_device(input, cfg['device'])
-            output = model(**input)
-            input_ = {'target': input['labels']}
-            output_ = {'target': output['logits'], 'loss': output['loss']}
-        elif cfg['task_name'] in ['csr']:
-            input_size = input['labels'].size(0)
-            input_indices = input['input_indices']
-            correct_labels = input['correct_labels']
-            # print('input', input)
-            input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
-                    'labels': input['labels']}
-            input = to_device(input, cfg['device'])
-            output = model(**input)
-            input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
-            output_ = {'target': output['logits'], 'loss': output['loss']}
-        else:
-            input = collate(input)
-            input_size = input['data'].size(0)
-            input = to_device(input, cfg['device'])
-            output = model(**input)
-            input_ = {'target': input['target']}
-            output_ = {'target': output['target'], 'loss': output['loss']}
-        torch.cuda.synchronize()
-
-        # start_time = time.time()
-        model_prof.start_profile()
-        model_prof.reset_profile()
-        update_model_prof(model_prof)
-        torch.cuda.cudart().cudaProfilerStart()
-        for i, input in enumerate(data_loader):
+        with torch.cuda.stream(cfg['cuda_default_stream']):
+            data_loader_iter = iter(data_loader)
+            input = next(data_loader_iter)
             cfg['cur_batch_index'] += 1
-            
-            # if cfg['logger_detailed_info']:
-            print('cur_batch_index', cfg['cur_batch_index'])
+            cfg['cur_batch_seq_len'] = input['input_ids'].size(-1)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output, inference_duration = model_forward(model, input, inference_duration, i)
+                output = model(**input)
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             elif cfg['task_name'] in ['csr']:
@@ -199,77 +156,126 @@ def test(data_loader, model, model_prof, metric, logger):
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
-                output, inference_duration = model_forward(model, input, inference_duration, i)
+                output = model(**input)
                 input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             else:
                 input = collate(input)
                 input_size = input['data'].size(0)
                 input = to_device(input, cfg['device'])
-                output, inference_duration = model_forward(model, input, inference_duration, i)
+                output = model(**input)
                 input_ = {'target': input['target']}
                 output_ = {'target': output['target'], 'loss': output['loss']}
+            torch.cuda.synchronize()
 
+            # start_time = time.time()
+            model_prof.start_profile()
+            model_prof.reset_profile()
+            update_model_prof(model_prof)
+            torch.cuda.cudart().cudaProfilerStart()
+            for i, input in enumerate(data_loader):
+                cfg['cur_batch_index'] += 1
+                print('cur_batch_index', cfg['cur_batch_index'])
+
+                pad_mask = input['input_ids'] == cfg['pad_token_id'] 
+                no_padding = (~pad_mask).all()
+                # if there is padding, need to zero out the padding token
+                if no_padding == False:
+                    cfg['pad_mask'] = pad_mask
+                    # avoid overflow
+                    cfg['pad_mask_denominator'] = torch.sum(~cfg['pad_mask'], dim=0).unsqueeze(1) + 1e-6
+                else:
+                    cfg['pad_mask'] = None
+                    cfg['pad_mask_denominator'] = None
+                
+                cfg['cur_batch_seq_len'] = input['input_ids'].size(-1)
+                if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+                    input_size = input['labels'].size(0)
+                    input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                            'labels': input['labels']}
+                    input = to_device(input, cfg['device'])
+                    output, inference_duration = model_forward(model, input, inference_duration, i)
+                    input_ = {'target': input['labels']}
+                    output_ = {'target': output['logits'], 'loss': output['loss']}
+                elif cfg['task_name'] in ['csr']:
+                    input_size = input['labels'].size(0)
+                    input_indices = input['input_indices']
+                    correct_labels = input['correct_labels']
+                    # print('input', input)
+                    input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                            'labels': input['labels']}
+                    input = to_device(input, cfg['device'])
+                    output, inference_duration = model_forward(model, input, inference_duration, i)
+                    input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
+                    output_ = {'target': output['logits'], 'loss': output['loss']}
+                else:
+                    input = collate(input)
+                    input_size = input['data'].size(0)
+                    input = to_device(input, cfg['device'])
+                    output, inference_duration = model_forward(model, input, inference_duration, i)
+                    input_ = {'target': input['target']}
+                    output_ = {'target': output['target'], 'loss': output['loss']}
+
+                if cfg['onlyprobe'] == False: 
+                    metric.add('test', input_, output_)
+                    evaluation = metric.evaluate('test', 'batch', input_, output_)
+                    print('evaluation_for_batch', evaluation)
+                    logger.append(evaluation, 'test', input_size)
+                # record_pruing_info(model, logger)
+                # break
+                if iterate_small_samples:
+                    if i == 100:
+                        break
+                for name, module in model.named_modules():
+                    for attr_name in dir(module):
+                        # Check if the attribute name contains 'mean_intersection_ratio'
+                        if 'mean_intersection_ratio' in attr_name:
+                            # Retrieve the attribute value
+                            attr_value = getattr(module, attr_name)
+                            # Print the module name and attribute name
+                            # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
+                            # Append the attribute to the logger
+                            logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+                
+                # if i == 50:
+                # if i == 100:
+                #     break
+                # if i == 10:
+                #     break
+                # break
+                if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
+                    batch_time = (time.time() - start_time) / (i + 1)
+                    exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
+                    info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
+                    print('running_info', info)
+                # if i == 3:
+                #     break
+            # torch.cuda.synchronize()
+            # inference_duration = time.time() - start_time
+            # print('inference_duration', inference_duration)
             if cfg['onlyprobe'] == False: 
-                metric.add('test', input_, output_)
-                evaluation = metric.evaluate('test', 'batch', input_, output_)
-                print('evaluation_for_batch', evaluation)
-                logger.append(evaluation, 'test', input_size)
-            # record_pruing_info(model, logger)
-            # break
-            if iterate_small_samples:
-                if i == 100:
-                    break
+                evaluation = metric.evaluate('test', 'full')
+                print('evaluation_for_full', evaluation)
+                logger.append(evaluation, 'test')
+                info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(cfg['epoch'], 100.)]}
+                logger.append(info, 'test')
+                print(logger.write('test', metric.metric_name['test']), flush=True)
+            model_prof.stop_profile()
+
             for name, module in model.named_modules():
                 for attr_name in dir(module):
                     # Check if the attribute name contains 'mean_intersection_ratio'
-                    if 'mean_intersection_ratio' in attr_name:
+                    if 'position_distribution' in attr_name:
                         # Retrieve the attribute value
                         attr_value = getattr(module, attr_name)
-                        # Print the module name and attribute name
-                        # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
-                        # Append the attribute to the logger
-                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-            
-            # if i == 50:
-            # if i == 100:
-            #     break
-            # if i == 10:
-            #     break
-            # break
-            if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
-                batch_time = (time.time() - start_time) / (i + 1)
-                exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
-                info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
-                print('running_info', info)
-            # if i == 3:
-            #     break
-        # torch.cuda.synchronize()
-        # inference_duration = time.time() - start_time
-        # print('inference_duration', inference_duration)
-        if cfg['onlyprobe'] == False: 
-            evaluation = metric.evaluate('test', 'full')
-            print('evaluation_for_full', evaluation)
-            logger.append(evaluation, 'test')
-            info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(cfg['epoch'], 100.)]}
-            logger.append(info, 'test')
-            print(logger.write('test', metric.metric_name['test']), flush=True)
-        model_prof.stop_profile()
+                        if len(attr_value) > 0:
+                            # Print the module name and attribute name
+                            # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
+                            # Append the attribute to the logger
+                            logger.append({f'{name}_{attr_name}': attr_value}, 'test')
 
-        for name, module in model.named_modules():
-            for attr_name in dir(module):
-                # Check if the attribute name contains 'mean_intersection_ratio'
-                if 'position_distribution' in attr_name:
-                    # Retrieve the attribute value
-                    attr_value = getattr(module, attr_name)
-                    if len(attr_value) > 0:
-                        # Print the module name and attribute name
-                        # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
-                        # Append the attribute to the logger
-                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-
-        print("Debug 12.2: Test logger created", flush=True)
-        torch.cuda.cudart().cudaProfilerStop()
+            print("Debug 12.2: Test logger created", flush=True)
+            torch.cuda.cudart().cudaProfilerStop()
     return inference_duration
 
 

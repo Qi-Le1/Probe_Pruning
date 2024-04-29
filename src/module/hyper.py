@@ -5,24 +5,6 @@ from config import cfg
 
 MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70b']
 
-def find_nearest_divisor(full_size, target_divisor):
-    if full_size % target_divisor == 0:
-        return target_divisor  # Already divisible
-    
-    # Start looking around the target divisor for the nearest valid divisor
-    for i in range(1, full_size):
-        # Check divisors smaller and larger than target_divisor
-        lower = target_divisor - i
-        upper = target_divisor + i
-
-        # Return the nearest valid divisor
-        if lower > 0 and full_size % lower == 0:
-            return lower
-        elif upper <= full_size and full_size % upper == 0:
-            return upper
-
-    raise ValueError("No valid divisor found close to target_divisor")
-
 def process_control():
     print('torch version: ', torch.__version__)
     print('cuda version: ', torch.version.cuda)
@@ -61,9 +43,21 @@ def process_control():
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
     cfg['seq_len'] = int(cfg['control']['seq_len'])
-    
     cfg['prune_metric'] = cfg['control']['prune_metric']
     cfg['prune_method'] = cfg['control']['prune_method']
+
+    if 'default' in cfg['prune_method']:
+        if 'flap' in cfg['prune_method']:
+            cfg['prune_method'] += '-calib'
+            cfg['prune_method'] += 'flapratio'
+            cfg['prune_method'] += 'bias'
+        elif 'wandasp' in cfg['prune_method']:
+            cfg['prune_method'] += 'calib'
+        elif 'probe' in cfg['prune_method']:
+            cfg['prune_method'] += 'calib'
+            cfg['prune_method'] += 'ema'
+            cfg['prune_method'] += 'respick'
+
     prune_ratio_list = cfg['control']['prune_ratio'].split('-')
     if len(prune_ratio_list) == 1:
         # further update prune_ratio in make_model to match the mean prune ratio
@@ -100,9 +94,9 @@ def process_control():
     cfg['mode'] = cfg['control']['mode']
     if torch.cuda.is_available():
         cfg['cuda_default_stream'] = torch.cuda.default_stream()
-        # cfg['cuda_stream1'] = torch.cuda.Stream(priority=1)
+        # if 'asyncintra' in cfg['mode']:
+        #     cfg['cuda_default_stream'] = torch.cuda.Stream()
         cfg['cuda_stream1'] = torch.cuda.Stream()
-        cfg['cuda_stream2'] = torch.cuda.Stream()
     else:
         raise ValueError('No cuda device available')
 
@@ -251,10 +245,10 @@ def make_data_name():
     else:
         cfg['data_name'] = data_name_list[0]
         cfg['subset_name'] = 'none'
-    if cfg['data_name'] == 'arcchallenge':
-        cfg['data_name'] = 'arc_challenge'
-    elif cfg['data_name'] == 'arceasy':
-        cfg['data_name'] = 'arc_easy'
+    # if cfg['data_name'] == 'arcchallenge':
+    #     cfg['data_name'] = 'arc_challenge'
+    # elif cfg['data_name'] == 'arceasy':
+    #     cfg['data_name'] = 'arc_easy'
     if cfg['task_name'] in ['clm', 'csr']:
         data_name_dict = {
             'c4': {'data_name': 'c4',

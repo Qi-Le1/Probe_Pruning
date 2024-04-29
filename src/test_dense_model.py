@@ -160,6 +160,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
+            break
         print('inference_duration', inference_duration)
         evaluation = metric.evaluate('test', 'full')
         print('evaluation_for_full', evaluation)

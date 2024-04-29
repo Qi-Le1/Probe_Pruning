@@ -266,7 +266,7 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
                                         worker_init_fn=np.random.seed(cfg['seed']), drop_last=True)
         cfg['num_steps'][k] = len(data_loader[k])
         cfg['dataset_size'][k] = len(dataset[k])
-        print('dataset_size', k, cfg['dataset_size'][k] * batch_size_)
+        print(f"{'tag'}_dataset_size", k, cfg['dataset_size'][k])
     return data_loader
 
 def make_calibration_dataloader(tokenizer):
@@ -536,12 +536,12 @@ def process_dataset(dataset, tokenizer):
                 input_indices = []
                 for i in range(batch_size):
                     cur_correct_label = 0 if yesno(targets[i]) == 'yes' else 1
-                    inputs.extend([f"{examples['passage'][i]}\nQuestion: {examples['question'][i]}\nAnswer:"])
+                    inputs.extend([f"{examples['passage'][i]}\nQuestion: {examples['question'][i]}?\nAnswer:"])
                     labels.extend([' yes'])
                     correct_labels_extended.extend([cur_correct_label])
                     input_indices.extend([i])
 
-                    inputs.extend([f"{examples['passage'][i]}\nQuestion: {examples['question'][i]}\nAnswer:"])
+                    inputs.extend([f"{examples['passage'][i]}\nQuestion: {examples['question'][i]}?\nAnswer:"])
                     labels.extend([' no'])
                     correct_labels_extended.extend([cur_correct_label])
                     input_indices.extend([i])
@@ -559,6 +559,7 @@ def process_dataset(dataset, tokenizer):
                     label_attention_mask = labels["attention_mask"][i][1:]
 
                     temp_input = sample_input_ids + label_input_ids
+                    print('len(temp_input)', len(temp_input))
                     temp_attention_mask = sample_attention_mask + label_attention_mask
                     label_ignore_pos = [tokenizer.pad_token_id] * len(sample_input_ids) + [-900] * len(label_input_ids)
                     len_temp_input = len(temp_input)
@@ -1178,6 +1179,7 @@ def process_dataset(dataset, tokenizer):
                     label_attention_mask = labels["attention_mask"][i][1:]
 
                     temp_input = sample_input_ids + label_input_ids
+                    print('len(temp_input)', len(temp_input))
                     temp_attention_mask = sample_attention_mask + label_attention_mask
                     label_ignore_pos = [tokenizer.pad_token_id] * len(sample_input_ids) + [-900] * len(label_input_ids)
                     len_temp_input = len(temp_input)
@@ -1259,179 +1261,6 @@ def process_dataset(dataset, tokenizer):
                 inputs = [(f"{' '.join([f'{col}: {examples[col][i]}' for col in text_column])}") for i in
                           range(batch_size)]
                 targets = [str(x) for x in examples[label_column]]
-
-                # Tokenizing inputs and targets
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                labels = tokenizer(targets, max_length=max_length, padding="max_length", truncation=True,
-                                   return_tensors="pt")
-
-                # Replace pad token id with -100
-                labels = labels["input_ids"]
-                labels[labels == tokenizer.pad_token_id] = -100
-
-                model_inputs["labels"] = labels
-
-                return model_inputs
-
-            processed_dataset = dataset.map(
-                preprocess_function,
-                batched=True,
-                num_proc=1,
-                remove_columns=dataset["train"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-            )
-            cfg['max_new_tokens'] = max_length
-        elif cfg['data_name'] == 'samsum':
-            '''
-            {'id': '13818513', 'summary': 'Amanda baked cookies and will bring Jerry some tomorrow.', 
-            'dialogue': "Amanda: I baked cookies. Do you want some?\r\nJerry: Sure!\r\nAmanda: I'll bring you tomorrow :-)"}
-            '''
-            max_length = cfg[cfg['model_name']]['max_length']
-
-            def preprocess_function(examples):
-                inputs = examples[text_column]
-                targets = examples[label_column]
-
-                # Tokenizing inputs and targets
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                labels = tokenizer(targets, max_length=max_length, padding="max_length", truncation=True,
-                                   return_tensors="pt")
-
-                # Replace pad token id with -100
-                labels = labels["input_ids"]
-                labels[labels == tokenizer.pad_token_id] = -100
-
-                model_inputs["labels"] = labels
-
-                return model_inputs
-
-            processed_dataset = dataset.map(
-                preprocess_function,
-                batched=True,
-                num_proc=1,
-                remove_columns=dataset["train"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-            )
-            cfg['max_new_tokens'] = max_length
-        elif cfg['data_name'] == 'e2enlg':
-            '''
-            {'human_reference': 'The Vaults pub near Café Adriatic has a 5 star rating.  Prices start at £30.',
-            'meaning_representation': 'name[The Vaults], eatType[pub], priceRange[more than £30], customer rating[5 out of 5], near[Café Adriatic]'}
-            '''
-            max_length = cfg[cfg['model_name']]['max_length']
-
-            def preprocess_function(examples):
-                inputs = examples[text_column]
-                targets = examples[label_column]
-
-                # Tokenizing inputs and targets
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                labels = tokenizer(targets, max_length=max_length, padding="max_length", truncation=True,
-                                   return_tensors="pt")
-
-                # Replace pad token id with -100
-                labels = labels["input_ids"]
-                labels[labels == tokenizer.pad_token_id] = -100
-
-                model_inputs["labels"] = labels
-
-                return model_inputs
-
-            processed_dataset = dataset.map(
-                preprocess_function,
-                batched=True,
-                num_proc=1,
-                remove_columns=dataset["train"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-            )
-            cfg['max_new_tokens'] = max_length
-        elif cfg['data_name'] == 'webnlg':
-            '''
-            {'2017_test_category': '',
-            'category': 'Politician',
-            'eid': 'Id10',
-            'lex': {'comment': ['good', 'good', 'good'],
-                    'lid': ['Id1', 'Id2', 'Id3'],
-                    'text': ['World War II had Chiang Kai-shek as a commander and United States Army soldier Abner W. Sibal.',
-                            'Abner W. Sibal served in the United States Army during the Second World War and during that war Chiang Kai-shek was one of the commanders.',
-                            'Abner W. Sibal, served in the United States Army and fought in World War II, one of the commanders of which, was Chiang Kai-shek.']},
-            'modified_triple_sets': {'mtriple_set': [['Abner_W._Sibal | battle | World_War_II',
-                                                    'World_War_II | commander | Chiang_Kai-shek',
-                                                    'Abner_W._Sibal | militaryBranch | United_States_Army']]},
-            'original_triple_sets': {'otriple_set': [['Abner_W._Sibal | battles | World_War_II', 'World_War_II | commander | Chiang_Kai-shek', 'Abner_W._Sibal | branch | United_States_Army'],
-                                                    ['Abner_W._Sibal | militaryBranch | United_States_Army',
-                                                    'Abner_W._Sibal | battles | World_War_II',
-                                                    'World_War_II | commander | Chiang_Kai-shek']]},
-            'shape': '(X (X) (X (X)))',
-            'shape_type': 'mixed',
-            'size': 3}
-            '''
-            max_length = cfg[cfg['model_name']]['max_length']
-
-            def preprocess_function(examples):
-                inputs = []
-                targets = []
-                for i in range(len(examples[label_column])):
-                    entry = examples[label_column][i]
-                    comment_list, text_list = entry['comment'], entry['text']
-                    temp_triples = ''
-                    for j in range(len(examples['modified_triple_sets'][i]['mtriple_set'])):
-                        if j > 0:
-                            temp_triples += ' ; '
-                        temp_triples += ' - '.join(examples['modified_triple_sets'][i]['mtriple_set'][j])
-                    for comment, text in zip(comment_list, text_list):
-                        if comment == 'good':
-                            inputs.append(f"category: {examples['category'][i]}, mtriple_set: {temp_triples}")
-                            targets.append(text)
-
-                # Tokenizing inputs and targets
-                model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
-                                         return_tensors="pt")
-                labels = tokenizer(targets, max_length=max_length, padding="max_length", truncation=True,
-                                   return_tensors="pt")
-
-                # Replace pad token id with -100
-                labels = labels["input_ids"]
-                labels[labels == tokenizer.pad_token_id] = -100
-
-                model_inputs["labels"] = labels
-
-                return model_inputs
-
-            processed_dataset = dataset.map(
-                preprocess_function,
-                batched=True,
-                num_proc=1,
-                remove_columns=dataset["train"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-            )
-            cfg['max_new_tokens'] = max_length
-        elif cfg['data_name'] == 'dart':
-            '''
-            {'annotations': {'source': ['WikiTableQuestions_mturk'],
-            'text': ['First Clearing\tbased on Callicoon, New York and location at On NYS 52 1 Mi. Youngsville']},
-            'subtree_was_extended': False,
-            'tripleset': [['First Clearing', 'LOCATION', 'On NYS 52 1 Mi. Youngsville'],
-            ['On NYS 52 1 Mi. Youngsville', 'CITY_OR_TOWN', 'Callicoon, New York']]}
-            '''
-            max_length = cfg[cfg['model_name']]['max_length']
-
-            def preprocess_function(examples):
-                batch_size = len(examples['annotations'])
-
-                inputs = [
-                    f"source: {examples['annotations'][i]['source'][0]}, tripleset: {' ; '.join([' - '.join(triple) for triple in examples['tripleset'][i]])}"
-                    for i in range(batch_size)
-                ]
-                # text list length is always 1
-                targets = [examples['annotations'][i]['text'][0] for i in range(batch_size)]
 
                 # Tokenizing inputs and targets
                 model_inputs = tokenizer(inputs, max_length=max_length, padding="max_length", truncation=True,
