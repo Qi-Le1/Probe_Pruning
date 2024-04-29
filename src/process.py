@@ -18,13 +18,13 @@ import collections
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 parser = argparse.ArgumentParser(description='analyze_data')
-parser.add_argument('--type', default='dp', type=str)
+parser.add_argument('--file', default='dp', type=str)
 parser.add_argument('--detail', default='False', type=str)
 args = vars(parser.parse_args())
 
 save_format = 'png'
 # result_path = './output/result'
-result_path = f"./output/result/{args['type']}"
+result_path = f"./output/result/{args['file']}"
 vis_path = './output/vis/{}'.format(save_format)
 
 num_experiments = 1
@@ -64,24 +64,24 @@ def make_control_list(file):
         interval_values = np.arange(0, 1, 0.1)
         interval_pairs = [f"{x:.1f}-{y:.1f}" for x in interval_values for y in interval_values]
 
-        # control_name = [[['c4'], ['llama-2-7b'], ['clm'], ['10'], ['128'], interval_pairs, 
-        #                     ['ppwandasp'], ['calib-gridsearch'], ['asyncinter'], ['c4-2000'], ['None'],
-        #                 ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
-
-
-        control_name = [[['c4'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.0-0.0'], 
+        control_name = [[['c4'], ['llama-2-7b'], ['clm'], ['10'], ['128'], interval_pairs, 
                             ['ppwandasp'], ['calib-gridsearch'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
+
+
+        # control_name = [[['c4'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.0-0.0'], 
+        #                     ['ppwandasp'], ['calib-gridsearch'], ['asyncinter'], ['c4-2000'], ['None'],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
     return controls
 
 
 def main():
     global result_path, final_result_path, vis_path, num_experiments, exp
-    file = args['type']
+    file = args['file']
     vis_path = './output/vis/{}'.format(file)
     makedir_exist_ok(vis_path)
 
@@ -209,7 +209,7 @@ def make_df_history(extracted_processed_result_history):
             data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_metric, prune_method, mode,\
             calib_info, prune_info, cust_tgt_modules = control
             df_name = '_'.join(
-                [model_name])
+                control)
             for k in extracted_processed_result_history[exp_name]:
                 index_name = ['_'.join(control + [k])]
                 df[df_name].append(
@@ -217,13 +217,12 @@ def make_df_history(extracted_processed_result_history):
                 
                 if 'fullinf_FLOPs_ratio_for_all_layers' in k or 'probe_FLOPs_ratio_for_all_layers' in k or \
                     any(metric_name in k for metric_name in metric_name_list):
-                    index_name = ['_'.join(control)]
                     df_for_xlsx[df_name].append(
                         pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
         else:
             raise ValueError('Not valid control')
 
-    write_xlsx(f"{result_path}/result_history.xlsx", df_for_xlsx)
+    write_xlsx(f"{result_path}/{args['file']}_result.xlsx", df_for_xlsx)
     return df
 
 
@@ -404,12 +403,14 @@ def make_vis(df_history):
     
     
     for df_name in df_history:
-        performance_vs_total_FLOPs_ratio = [None, None, None]
+        loss_performance_vs_total_FLOPs_ratio = [None, None, None]
+        ppl_performance_vs_total_FLOPs_ratio = [None, None, None]
         performance_vs_prunedflops = [None, None, None]
         dense_time_vs_total_FLOPs_ratio = [None, None, None]
         prune_time_vs_total_FLOPs_ratio = [None, None, None]
 
         df_name_list = df_name.split('_')
+        # print('df_name_list', df_name_list, len(df_name_list))
         if len(df_name_list) == 12:
             data_name, model_name, task_name, batch_size, seq_len, prune_ratio, prune_metric, prune_method, mode,\
             calib_info, prune_info, cust_tgt_modules = df_name_list
@@ -450,36 +451,67 @@ def make_vis(df_history):
                 cur_item = temp[i]
                 cur_se_item = temp[i+1]
                 for ((index, row), (index_std, row_std)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
+                    # print('index before', index)
                     if 'mean' not in index:
                         continue
                     
                     index_list = index.split('/')
                     temp_key = index_list[-1]
 
-                    if 'gridsearch' in prune_method and (any(metric_name in index for metric_name in metric_name_list) or 'fullinf_FLOPs_ratio_for_all_layers' in index):
+                    # print('index', index)
+                    if 'gridsearch' in prune_method and ('Loss' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
                         if any(metric_name in index for metric_name in metric_name_list):
                             flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
                             flops_metric_name = flops_metric_name.split('/')[1]
-                            if performance_vs_total_FLOPs_ratio[0] is None:
-                                performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
-                                performance_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                            if loss_performance_vs_total_FLOPs_ratio[0] is None:
+                                loss_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
+                                loss_performance_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
                         elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
-                            if performance_vs_total_FLOPs_ratio[2] is None:
-                                performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
+                            if loss_performance_vs_total_FLOPs_ratio[2] is None:
+                                loss_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
 
                         
-                        if performance_vs_total_FLOPs_ratio[0] is not None and performance_vs_total_FLOPs_ratio[2] is not None:
-                            print('performancevssparsity', performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
+                        if loss_performance_vs_total_FLOPs_ratio[0] is not None and loss_performance_vs_total_FLOPs_ratio[2] is not None:
+                            print('performancevssparsity', loss_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
                             fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
-                            calib_info, prune_info, cust_tgt_modules, 'FIG:fullinf_FLOPs_ratio_for_all_layers'])
+                            calib_info, prune_info, cust_tgt_modules, 'FIG:Loss_fullinf_FLOPs_ratio_for_all_layers'])
                             fig[fig_name] = plt.figure(fig_name)
-                            x = performance_vs_total_FLOPs_ratio[2]
-                            y = performance_vs_total_FLOPs_ratio[0]
-                            yerr = performance_vs_total_FLOPs_ratio[1]
-                            key_for_dict = f"{prune_ratio}"
+                            x = loss_performance_vs_total_FLOPs_ratio[2]
+                            y = loss_performance_vs_total_FLOPs_ratio[0]
+                            yerr = loss_performance_vs_total_FLOPs_ratio[1]
+                            prune_ratio_list = prune_ratio.split('-')
+                            key_for_dict = f"{prune_ratio_list[0]}"
                             record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                            print('loss_performance_vs_total_FLOPs_ratio', loss_performance_vs_total_FLOPs_ratio)
                             # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
-                            performance_vs_total_FLOPs_ratio = [None, None, None]
+                            loss_performance_vs_total_FLOPs_ratio = [None, None, None]
+                    
+                    if 'gridsearch' in prune_method and ('Perplexity' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
+                        if any(metric_name in index for metric_name in metric_name_list):
+                            flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                            flops_metric_name = flops_metric_name.split('/')[1]
+                            if ppl_performance_vs_total_FLOPs_ratio[0] is None:
+                                ppl_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
+                                ppl_performance_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                        elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
+                            if ppl_performance_vs_total_FLOPs_ratio[2] is None:
+                                ppl_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
+
+                        
+                        if ppl_performance_vs_total_FLOPs_ratio[0] is not None and ppl_performance_vs_total_FLOPs_ratio[2] is not None:
+                            print('performancevssparsity', ppl_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
+                            calib_info, prune_info, cust_tgt_modules, 'FIG:Perplexity_fullinf_FLOPs_ratio_for_all_layers'])
+                            fig[fig_name] = plt.figure(fig_name)
+                            x = ppl_performance_vs_total_FLOPs_ratio[2]
+                            y = ppl_performance_vs_total_FLOPs_ratio[0]
+                            yerr = ppl_performance_vs_total_FLOPs_ratio[1]
+                            prune_ratio_list = prune_ratio.split('-')
+                            key_for_dict = f"{prune_ratio_list[0]}"
+                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                            print('ppl_performance_vs_total_FLOPs_ratio', ppl_performance_vs_total_FLOPs_ratio)
+                            # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                            ppl_performance_vs_total_FLOPs_ratio = [None, None, None]
 
                     
         
@@ -520,7 +552,7 @@ def make_vis(df_history):
         FIG_NAME = fig_name.split('FIG:')[-1]
         data_name = fig_name_list[0]
         model_name = fig_name_list[1]
-        vis_path = os.path.join('output', 'vis', '{}'.format(save_format), args['type'], data_name, model_name, FIG_NAME)
+        vis_path = os.path.join('output', 'vis', '{}'.format(save_format), args['file'], data_name, model_name, FIG_NAME)
         fig_path = '{}/{}.{}'.format(vis_path, fig_name, save_format)
         makedir_exist_ok(vis_path)
         plt.savefig(fig_path, dpi=400, bbox_inches='tight', pad_inches=0)

@@ -297,10 +297,10 @@ class HiddenRepresentationPruning():
             summed_metrics = torch.clamp(probe_out_dim_metric.sum(dim=-1), max=cfg['data_type_max'])
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
             num_prune_heads = int(prune_ratio * num_heads)
-            num_prune_heads = nearest_multiple(head_dim * num_prune_heads, probe_out_dim_metric.numel(), multiple, head_dim) // head_dim
+            # must be multiple of head_dim
+            # num_prune_heads = nearest_multiple(head_dim * num_prune_heads, probe_out_dim_metric.numel(), multiple, head_dim) // head_dim
             # Select the heads to prune
             heads_to_preserve = sorted_indices[num_prune_heads:]
-            print('num_prune_heads', num_prune_heads)
             full_indices_to_preserve = (torch.arange(head_dim, device=probe_out_dim_metric.device) + heads_to_preserve.unsqueeze(1) * head_dim).view(-1)
             num_heads = num_heads - num_prune_heads
             return full_indices_to_preserve, None, num_heads, head_dim
@@ -312,10 +312,8 @@ class HiddenRepresentationPruning():
             prune_ratio = pruning_ratio if pruning_ratio is not None else self.mlp_prune_ratio
         else:
             prune_ratio = pruning_ratio if pruning_ratio is not None else self.prune_ratio
-        print('mlp prune_ratio', prune_ratio)
         sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
         num_prune = int(prune_ratio * probe_out_dim_metric.shape[0])
-        print('mlp num_prune', num_prune)
         num_prune = nearest_multiple(num_prune, probe_out_dim_metric.shape[0], multiple)
         return sorted_indices[num_prune:], sorted_indices[:num_prune]
     

@@ -102,6 +102,7 @@ def process_control():
         cfg['cuda_default_stream'] = torch.cuda.default_stream()
         # cfg['cuda_stream1'] = torch.cuda.Stream(priority=1)
         cfg['cuda_stream1'] = torch.cuda.Stream()
+        cfg['cuda_stream2'] = torch.cuda.Stream()
     else:
         raise ValueError('No cuda device available')
 

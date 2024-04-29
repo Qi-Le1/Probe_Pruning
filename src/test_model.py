@@ -116,7 +116,7 @@ def run_calibration(model, data_loader):
             if iterate_small_samples:
                 if i == 100:
                     break
-        if 'flapratio' in cfg['prune_method']:
+        if 'flapratio' in cfg['prune_method'] or 'flap' in cfg['prune_method']:
             pruning_module = HiddenRepresentationPruning(cfg, 'flapratio')
             pruning_module.flap_ratio(model)
         elif 'gridratio' in cfg['prune_method']:
@@ -256,8 +256,6 @@ def test(data_loader, model, model_prof, metric, logger):
             print(logger.write('test', metric.metric_name['test']), flush=True)
         model_prof.stop_profile()
 
-        inference_time = model.model.model.inference_time
-        print('inference_time', inference_time)
         for name, module in model.named_modules():
             for attr_name in dir(module):
                 # Check if the attribute name contains 'mean_intersection_ratio'

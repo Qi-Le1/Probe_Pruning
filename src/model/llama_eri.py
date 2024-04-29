@@ -306,7 +306,11 @@ class Linear(nn.Linear, EriLayer):
                 pass
             else:
                 self.fluc_inp[:, update_indices] *= (self.nsamples[update_indices] - 1) / (self.nsamples[update_indices] + batch_size - 1)
-                self.fluc_inp[:, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size)   # a²+b²+c²...没开根号
+                # flaps github code is not matching the paper formula: https://github.com/CASIA-IVA-Lab/FLAP
+                # If bsz is 1, it is not variance between the average of current batch channel and the average of channel.
+                # It is the sum of the variance between each element in the channel and the average of the channel.
+                # We follow their github code
+                self.fluc_inp[:, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size)  
         self.nsamples[update_indices] += batch_size
 
         
@@ -349,7 +353,6 @@ class Linear(nn.Linear, EriLayer):
         if self.async_interbatch_weight_index.device != self.weight.device:
             self.async_interbatch_weight_index = self.async_interbatch_weight_index.to(self.weight.device)
         self.async_interbatch_weight_index += 1
-        print('async_interbatch_weight_index', self.async_interbatch_weight_index, self.key)
         return
     
     def prepare_async_intrabatch_weight(self, **kwargs):
@@ -371,7 +374,6 @@ class Linear(nn.Linear, EriLayer):
         if self.async_intrabatch_weight_index.device != self.weight.device:
             self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
         self.async_intrabatch_weight_index += 1
-        print('async_intrabatch_weight_index', self.async_intrabatch_weight_index, self.key, self.async_intrabatch_weight.shape)
         return
 
     
@@ -472,17 +474,15 @@ class Linear(nn.Linear, EriLayer):
         
                 if cfg['mode'] == 'asyncinter':
                     weight = self.get_weight()
-                    print('weight', weight.dtype, weight.shape, self.key, flush=True)
+                    # print('weight', weight.dtype, weight.shape, self.key, flush=True)
                     if 'o_proj' in self.key or 'down_proj' in self.key:
                         # torch.cuda.synchronize(cfg['cuda_default_stream'])
                         update_time = time.time()
                         # with torch.cuda.stream(cfg['cuda_stream1']):
                         update_time = time.time()
                         async_in_dim_indices = self.get_async_in_dim_indices()
-                        # wait in gpu until the operations before o_proj or down_proj are done
-                        # cfg['cuda_stream1'].wait_event(kwargs['cur_event'])
-                        if cfg['logger_detailed_info'] == True:
-                            print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, flush=True)
+
+
                         if 'runningmean' in cfg['prune_method']:
                             self.update_global_metric_score_distribution(x, async_in_dim_indices)    
                         elif 'ema' in cfg['prune_method']:
@@ -587,21 +587,21 @@ class Linear(nn.Linear, EriLayer):
                             # weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
                             weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
                             # print('attn weight', weight.shape, flush=True)
-                            if self.check_fill_case():
-                                # print('fill', flush=True)
-                                self.out_selected_dim = kwargs['out_dim_indices']
+                            # if self.check_fill_case():
+                            #     # print('fill', flush=True)
+                            #     self.out_selected_dim = kwargs['out_dim_indices']
                         else:
                             # weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
                             # weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
                             weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
 
                         result = F.linear(x, weight, bias=None)
-                        if 'attn' in self.key:
-                            if self.check_fill_case():
-                                # print('fill', flush=True)
-                                refilling_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
-                                refilling_output[..., self.out_selected_dim] = result
-                                result = refilling_output
+                        # if 'attn' in self.key:
+                        #     if self.check_fill_case():
+                        #         # print('fill', flush=True)
+                        #         refilling_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
+                        #         refilling_output[..., self.out_selected_dim] = result
+                        #         result = refilling_output
                         result = result.to(previous_dtype)
                         return result
                     elif 'in_dim_indices' in kwargs:

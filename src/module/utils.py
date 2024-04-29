@@ -217,18 +217,12 @@ def model_forward(model, input, inference_duration, index):
     return output, inference_duration
 
 
-def nearest_multiple(num_prune, total, multiple, multiple2=1):
-    return num_prune
-    lcm = np.lcm(multiple, multiple2)
-    
-    # Adjust num_prune to make (total - num_prune) a multiple of the LCM
-    remain = (total - num_prune) % lcm
+def nearest_multiple(num_prune, total, multiple):
+    remain = (total - num_prune) % multiple
     if remain == 0:
-        # If already a multiple of LCM, no adjustment needed
         return num_prune
     else:
-        # Adjust num_prune to the nearest value where (total - num_prune) is a multiple of LCM
-        adjusted_prune = num_prune + remain
+        adjusted_prune = num_prune - (multiple - remain)
         return adjusted_prune
 
 def nearest_even_number(value):
