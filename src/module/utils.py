@@ -137,10 +137,10 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, dataset_size,
             'Pruned_total_FLOPs': pruned_total_flops,
             'dense_duration': dense_duration,
             'dense_duration_per_sample': dense_duration/dataset_size,
-            'dense_duration_token_per_second': dataset_size*cfg['seq_len']/dense_duration,
+            'dense_duration_token_per_second': dataset_size*cfg['max_seq_len']/dense_duration,
             'pruned_duration': pruned_duration,
             'pruned_duration_per_sample': pruned_duration/dataset_size,
-            'pruned_duration_token_per_second': dataset_size*cfg['seq_len']/pruned_duration,
+            'pruned_duration_token_per_second': dataset_size*cfg['max_seq_len']/pruned_duration,
             'pruned_duration_cost_per_sample': (pruned_duration - dense_duration)/(dataset_size),
             'total_FLOPs_ratio_for_all_layers': pruned_total_flops / (dense_total_flops + 1e-6),
             'total_FLOPs_ratio_for_pruned_layers': pruned_layer_pruned_total_flops / (pruned_layer_dense_total_flops + 1e-6),
@@ -157,8 +157,8 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, dataset_size,
         print(f"Pruned inference time ({TIME_UNIT[1]}) per sample: ", pruned_duration/TIME_UNIT[0]/(dataset_size), flush=True)
         print(f"Inference time diff ({TIME_UNIT[1]}): ", (pruned_duration - dense_duration), flush=True)
         print(f"Inference time diff ({TIME_UNIT[1]}) per sample: ", (pruned_duration - dense_duration)/(dataset_size), flush=True)
-        print(f'dense_duration_token_per_second', dataset_size*cfg['seq_len']/dense_duration, flush=True)
-        print(f'pruned_duration_token_per_second', dataset_size*cfg['seq_len']/pruned_duration, flush=True)
+        print(f'dense_duration_token_per_second', dataset_size*cfg['max_seq_len']/dense_duration, flush=True)
+        print(f'pruned_duration_token_per_second', dataset_size*cfg['max_seq_len']/pruned_duration, flush=True)
 
         print(f"dense FLOPs ({FLOPS_UNIT[1]}): ", dense_total_flops/FLOPS_UNIT[0], flush=True)
         print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
@@ -187,12 +187,12 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, dataset_size,
             'Pruned_total_FLOPs': pruned_total_flops,
             'pruned_duration': pruned_duration,
             'pruned_duration_per_sample': pruned_duration/dataset_size,
-            'pruned_duration_token_per_second': dataset_size*cfg['seq_len']/pruned_duration,
+            'pruned_duration_token_per_second': dataset_size*cfg['max_seq_len']/pruned_duration,
         }
 
         print(f"Pruned inference time ({TIME_UNIT[1]}): ", pruned_duration/TIME_UNIT[0], flush=True)
         print(f"Pruned inference time ({TIME_UNIT[1]}) per sample: ", pruned_duration/TIME_UNIT[0]/(dataset_size), flush=True)
-        print(f'pruned_duration_token_per_second', dataset_size*cfg['seq_len']/pruned_duration, flush=True)
+        print(f'pruned_duration_token_per_second', dataset_size*cfg['max_seq_len']/pruned_duration, flush=True)
 
         print(f"Pruned FLOPs ({FLOPS_UNIT[1]}): ", pruned_total_flops/FLOPS_UNIT[0], flush=True)
         print('Summary Finished ---------\n')

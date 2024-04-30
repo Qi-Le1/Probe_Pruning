@@ -103,8 +103,6 @@ def run_calibration(model, data_loader):
     with torch.no_grad():
         model.eval()
         for i, input in enumerate(data_loader):
-            print('calibration', i, input['input_ids'].shape, flush=True)
-            cfg['cur_batch_seq_len'] = input['input_ids'].size(-1)
             # now, the wikitext and c4 datsets used for calibration are clm tasks
             input_size = input['labels'].size(0)
             input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -125,6 +123,20 @@ def run_calibration(model, data_loader):
     return
 
 
+def generate_pad_tokens(input):
+    pad_tokens = input['input_ids'] == cfg['pad_token_id'] 
+    no_padding = (~pad_tokens).all()
+    # if there is padding, need to zero out the padding token
+    if no_padding == False:
+        cfg['pad_tokens'] = pad_tokens
+        # cfg['non_pad_tokens'] = ~pad_tokens.to(cfg['data_type'])
+        # avoid overflow
+        cfg['pad_tokens_denominator'] = torch.sum(~cfg['pad_tokens'], dim=0).unsqueeze(1) + 1e-6
+    else:
+        cfg['pad_tokens'] = None
+        # cfg['non_pad_tokens'] = None
+        cfg['pad_tokens_denominator'] = None
+    return
 
 def test(data_loader, model, model_prof, metric, logger):
     start_time = time.time()
@@ -138,8 +150,8 @@ def test(data_loader, model, model_prof, metric, logger):
         with torch.cuda.stream(cfg['cuda_default_stream']):
             data_loader_iter = iter(data_loader)
             input = next(data_loader_iter)
+            generate_pad_tokens(input)
             cfg['cur_batch_index'] += 1
-            cfg['cur_batch_seq_len'] = input['input_ids'].size(-1)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -176,19 +188,9 @@ def test(data_loader, model, model_prof, metric, logger):
             for i, input in enumerate(data_loader):
                 cfg['cur_batch_index'] += 1
                 print('cur_batch_index', cfg['cur_batch_index'])
-
-                pad_mask = input['input_ids'] == cfg['pad_token_id'] 
-                no_padding = (~pad_mask).all()
-                # if there is padding, need to zero out the padding token
-                if no_padding == False:
-                    cfg['pad_mask'] = pad_mask
-                    # avoid overflow
-                    cfg['pad_mask_denominator'] = torch.sum(~cfg['pad_mask'], dim=0).unsqueeze(1) + 1e-6
-                else:
-                    cfg['pad_mask'] = None
-                    cfg['pad_mask_denominator'] = None
-                
+                generate_pad_tokens(input)
                 cfg['cur_batch_seq_len'] = input['input_ids'].size(-1)
+                print('cur_batch_seq_len', cfg['cur_batch_seq_len'])
                 if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                     input_size = input['labels'].size(0)
                     input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],

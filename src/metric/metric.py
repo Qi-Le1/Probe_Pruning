@@ -77,9 +77,7 @@ class CsrAccuracy:
     def __init__(self):
         self.acc_output_for_one_question = defaultdict(list)
         self.acc_correct_labels_for_one_question = defaultdict(list)
-
         self.average = []
-        pass
     
     def add(self, input, output):
         lm_logits = output['target']
@@ -100,7 +98,6 @@ class CsrAccuracy:
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         self.average.append(loss.item())
 
-        
         # acc
         for i in range(input['input_indices'].shape[0]):
             self.acc_output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item())
@@ -116,7 +113,6 @@ class CsrAccuracy:
 
         ppl = np.exp(np.mean(self.average))
         print('pplforcsr', ppl)
-
         return (total_acc / len(self.acc_output_for_one_question)) * 100
 
 
@@ -124,10 +120,8 @@ class CsrAccuracyNorm:
     def __init__(self):
         self.acc_norm_output_for_one_question = defaultdict(list)
         self.acc_norm_correct_labels_for_one_question = defaultdict(list)
-
         self.average = []
-        pass
-    
+        
     def add(self, input, output):
         lm_logits = output['target']
         labels = input['target']
@@ -148,7 +142,6 @@ class CsrAccuracyNorm:
         self.average.append(loss.item())
         
         # accnorm
-        print('accnorm')
         for i in range(input['input_indices'].shape[0]):
             self.acc_norm_output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item()/label_length_per_sample[i].item())
             self.acc_norm_correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())

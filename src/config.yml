@@ -5,7 +5,7 @@ control:
   model_name: bart
   task_name: s2s
   batch_size: 8
-  seq_len: 128
+  max_seq_len: 128
   prune_ratio: 0.1
   prune_metric: probe/flap/wanda
   prune_method: wanda/flap/calib/probe

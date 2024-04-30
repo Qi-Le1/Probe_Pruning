@@ -42,21 +42,21 @@ def process_control():
     model_name = cfg['model_name']
     cfg['task_name'] = cfg['control']['task_name']
     cfg['batch_size'] = int(cfg['control']['batch_size'])
-    cfg['seq_len'] = int(cfg['control']['seq_len'])
+    cfg['max_seq_len'] = int(cfg['control']['max_seq_len'])
     cfg['prune_metric'] = cfg['control']['prune_metric']
     cfg['prune_method'] = cfg['control']['prune_method']
 
     if 'default' in cfg['prune_method']:
         if 'flap' in cfg['prune_method']:
             cfg['prune_method'] += '-calib'
-            cfg['prune_method'] += 'flapratio'
-            cfg['prune_method'] += 'bias'
+            cfg['prune_method'] += '-flapratio'
+            cfg['prune_method'] += '-bias'
         elif 'wandasp' in cfg['prune_method']:
-            cfg['prune_method'] += 'calib'
+            cfg['prune_method'] += '-calib'
         elif 'probe' in cfg['prune_method']:
-            cfg['prune_method'] += 'calib'
-            cfg['prune_method'] += 'ema'
-            cfg['prune_method'] += 'respick'
+            cfg['prune_method'] += '-calib'
+            cfg['prune_method'] += '-ema'
+            cfg['prune_method'] += '-respick'
 
     prune_ratio_list = cfg['control']['prune_ratio'].split('-')
     if len(prune_ratio_list) == 1:
@@ -140,13 +140,11 @@ def process_control():
     
     if cfg['task_name'] in ['clm', 'csr']:
         cfg['collate_mode'] = 'transformer'
-        cfg['gpt2'] = {'max_length': 512}
+        cfg['gpt2'] = {'max_length': cfg['max_seq_len']}
         if 'llama' in cfg['model_name']:
-            # reassign in make_hf_model
-            cfg[model_name] = {'max_length': None, 'hidden_size': 4096}
+            cfg[model_name] = {'max_length': cfg['max_seq_len'] , 'hidden_size': 4096}
         if 'opt' in cfg['model_name']:
-            # reassign in make_hf_model
-            cfg[model_name] = {'max_length': None}
+            cfg[model_name] = {'max_length': cfg['max_seq_len'] }
 
         cfg['qk_prune_way'] = 'whole'
         cfg['vo_prune_way'] = 'whole'

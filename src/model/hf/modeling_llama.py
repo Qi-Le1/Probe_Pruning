@@ -49,7 +49,6 @@ from transformers import LlamaConfig
 
 from config import cfg
 from ..pruning_module import HiddenRepresentationPruning
-from module import nearest_even_number
 from torch.nn.functional import cosine_similarity
 from .utils import generate_probe, cal_res_hidden_state_diff  
 '''
@@ -330,6 +329,7 @@ class LlamaMLP(nn.Module):
 
         # generate probe
         # rank / mean / absnml
+        cur_batch_seq_len = x.size(1)
         if cfg['gate_probe_ratio'] == cfg['up_probe_ratio']:
             if 'respick' in cfg['prune_method']:
                 inforank = kwargs['respick']
@@ -343,11 +343,7 @@ class LlamaMLP(nn.Module):
 
         # calculate score
         if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
-            # TODO if 'saveseqdim' in cfg['prune_method']:
-            #     probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
-            # else:
-            print('key', self.down_proj.key)
-            probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution())
+            probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.down_proj.get_global_metric_score_distribution(cur_batch_seq_len))
         else:
             probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices)
 
@@ -394,7 +390,7 @@ class LlamaMLP(nn.Module):
                             probe_out_dim_indices, probe_out = self.probe_process(x, **kwargs)
                             if cfg['onlyprobe'] == True:
                                 # match the shape, and will not count the flops for this part
-                                down_proj = torch.zeros((cfg['batch_size'], cfg['seq_len'], self.hidden_size), device=x.device, dtype=x.dtype)
+                                down_proj = torch.zeros((cfg['batch_size'], cfg['max_seq_len'], self.hidden_size), device=x.device, dtype=x.dtype)
                                 return down_proj
                         elif cfg['mode'] == 'asyncintra':
                             # if not, do full inference
@@ -548,7 +544,7 @@ class LlamaAttention(nn.Module):
             self.rotary_emb = LlamaRotaryEmbedding(
                 self.num_heads,
                 self.head_dim,
-                max_position_embeddings=cfg['seq_len'],
+                max_position_embeddings=cfg['max_seq_len'],
                 base=self.rope_theta,
             )
         else:
@@ -580,21 +576,18 @@ class LlamaAttention(nn.Module):
         # 3. calculate score
         # 4. extract metric
 
-        
-        # generate probe
-        # rank / mean / absnml
+        cur_batch_seq_len = hidden_states.size(1)
+        # generate probe: rank
         if cfg['q_probe_ratio'] == cfg['k_probe_ratio'] and cfg['q_probe_ratio'] == cfg['v_probe_ratio']:
             if 'respick' in cfg['prune_method']:
                 inforank = kwargs['respick']
             else:
                 inforank = None
             probe, bsz_selected_indices, seq_selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], inforank)
-            bsz, q_len, _ = probe.size()
         else:
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
-
-        # print('attn probe', probe.shape, flush=True)
-        # print('print(selected_indices.dtype)', selected_indices, selected_indices.dtype, flush=True)
+        
+        bsz, q_len, _ = probe.size()
         self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
         self.q_head_dim, self.k_head_dim, self.v_head_dim = self.head_dim, self.head_dim, self.head_dim
 
@@ -617,25 +610,24 @@ class LlamaAttention(nn.Module):
         kv_seq_len = key_states.shape[-2]
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-2]
-        cos, sin = self.rotary_emb(value_states, seq_len=cfg['seq_len'])
+        cos, sin = self.rotary_emb(value_states, seq_len=cur_batch_seq_len)
 
-        if q_len != cfg['seq_len']:
-            query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids[:, selected_indices])
+        if q_len != cur_batch_seq_len:
+            query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids[:, seq_selected_indices])
         else:
             query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-        # print('query_states', query_states.shape, attn_weights, flush=True)
-        # print('key_states', key_states.shape, flush=True)
-        # print('attn_weights', attn_weights.shape, flush=True)
-        # print('attn_weights', attn_weights.shape, query_states.shape,flush=True)
         if attn_weights.size() != (key_states.shape[0], self.num_heads, q_len, kv_seq_len):
             raise ValueError(
                 f"Attention weights should be of size {(key_states.shape[0], self.num_heads, q_len, kv_seq_len)}, but is"
                 f" {attn_weights.size()}"
             )
 
-        probe_attn_mask = attention_mask[:key_states.shape[0], :, :q_len, :kv_seq_len]
+        if bsz_selected_indices is None:
+            probe_attn_mask = attention_mask[:key_states.shape[0], :, :q_len, :kv_seq_len]
+        else:
+            probe_attn_mask = attention_mask[bsz_selected_indices, :, :q_len, :kv_seq_len]
         if probe_attn_mask is not None:
             if probe_attn_mask.size() != (key_states.shape[0], 1, q_len, kv_seq_len):
                 raise ValueError(
@@ -656,7 +648,7 @@ class LlamaAttention(nn.Module):
         attn_output = attn_output.reshape(key_states.shape[0], q_len, self.hidden_size)
         
         if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
-            probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution())
+            probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution(cur_batch_seq_len))
         else:
             probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices)
 
@@ -834,7 +826,7 @@ class LlamaAttention(nn.Module):
                         probe_qk_out_dim_indices, probe_vo_out_dim_indices, attn_weights, attn_output, past_key_value = self.probe_process(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
                         # calculate probe's FLOPs
                         if cfg['onlyprobe'] == True:
-                            attn_output = torch.zeros((cfg['batch_size'], cfg['seq_len'], self.hidden_size), device=hidden_states.device, dtype=hidden_states.dtype)
+                            attn_output = torch.zeros((cfg['batch_size'], cfg['max_seq_len'], self.hidden_size), device=hidden_states.device, dtype=hidden_states.dtype)
                             if not output_attentions:
                                 attn_weights = None
                             return attn_output, attn_weights, past_key_value

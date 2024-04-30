@@ -125,6 +125,8 @@ def test(data_loader, model, model_prof, metric, logger):
             cfg['cur_batch_index'] += 1
             print('cur_batch_index', cfg['cur_batch_index'])
             torch.cuda.nvtx.range_push("iteration{}".format(i))
+            cfg['cur_batch_seq_len'] = input['input_ids'].size(-1)
+            print('cur_batch_seq_len', cfg['cur_batch_seq_len'])
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -160,7 +162,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
-            break
+            # break
         print('inference_duration', inference_duration)
         evaluation = metric.evaluate('test', 'full')
         print('evaluation_for_full', evaluation)

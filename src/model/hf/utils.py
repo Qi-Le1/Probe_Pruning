@@ -1,8 +1,9 @@
+import math
 import torch
 from config import cfg
 
 
-def rank_process(x, probe_num, probe_size, probe_type, residual):
+def rank_process(x, probe_num, probe_type, residual):
     if residual is not None:
         if 'bsz' in probe_type:
             l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(1, 2))
@@ -14,8 +15,18 @@ def rank_process(x, probe_num, probe_size, probe_type, residual):
         elif 'seq' in probe_type:
             l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
 
+    sorted_values = torch.sort(l2_norms).values
+    print('sorted_values', sorted_values, flush=True)
     values, indices = torch.topk(l2_norms, probe_num)
-    sorted_indices = indices.sort()[0]
+    # print('values', values, flush=True)
+    # sorted_indices = indices.sort()[0]
+    
+    # Apply softmax to the L2 norms to convert them into probabilities
+    probabilities = torch.softmax(l2_norms, dim=0)
+
+    # Draw 'probe_num' samples according to the softmax probabilities
+    sampled_indices = torch.multinomial(probabilities, probe_num, replacement=False)
+    sorted_indices = sampled_indices.sort()[0]
 
     if 'bsz' in probe_type:
         return x[sorted_indices, :, :], sorted_indices
@@ -27,29 +38,31 @@ def generate_probe(x, probe_ratio_list, residual=None):
     # seq rank needs selected_indices to combine with the global metric
     bsz_selected_indices = None
     seq_selected_indices = None
-    pad_mask = cfg['pad_mask']
+    pad_tokens = cfg['pad_tokens']
 
-    if pad_mask is not None:
+    if pad_tokens is not None:
         if residual is not None:
-            residual[pad_mask] = 0
+            residual[pad_tokens] = 0
         else:
-            x[pad_mask] = 0
+            x[pad_tokens] = 0
 
     for i in range(len(cfg['probe_generation_type'])):
         probe_type = cfg['probe_generation_type'][i]
         probe_ratio = probe_ratio_list[i]
 
         if 'bsz' in probe_type:
-            probe_num = int(x.size(0) * probe_ratio)
+            probe_num = math.ceil(x.size(0) * probe_ratio)
         elif 'seq' in probe_type:
-            probe_num = int(x.size(1) * probe_ratio)
+            probe_num = math.ceil(x.size(1) * probe_ratio)
 
         if 'rank' in probe_type:
             x, selected_indices = rank_process(x, probe_num, probe_type, residual)
             if 'bsz' in probe_type:
                 bsz_selected_indices = selected_indices
+                print('bsz_selected_indices', bsz_selected_indices, flush=True)
             elif 'seq' in probe_type:
                 seq_selected_indices = selected_indices
+                print('seq_selected_indices', seq_selected_indices, flush=True)
         else:
             raise NotImplementedError
     return x, bsz_selected_indices, seq_selected_indices
@@ -134,13 +147,13 @@ def generate_probe(x, probe_ratio_list, residual=None):
 #     # seq rank needs selected_indices to combine with the global metric
 #     bsz_selected_indices = None
 #     seq_selected_indices = None
-#     pad_mask = cfg['pad_mask']
+#     pad_tokens = cfg['pad_tokens']
 
-#     if pad_mask is not None:
+#     if pad_tokens is not None:
 #         if residual is not None:
-#             residual[pad_mask] = 0
+#             residual[pad_tokens] = 0
 #         else:
-#             x[pad_mask] = 0
+#             x[pad_tokens] = 0
 
 #     for i in range(len(cfg['probe_generation_type'])):
 #         probe_type = cfg['probe_generation_type'][i]

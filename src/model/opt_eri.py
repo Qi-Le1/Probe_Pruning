@@ -236,9 +236,6 @@ class Linear(nn.Linear, EriLayer):
         self.prune_metric = cfg['prune_metric']
 
         self.samples_num = torch.zeros((in_features), device=self.weight.data.device)
-        if 'meanglobalinput' in cfg['prune_method']:
-            self.mean_for_all_batches = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
-            self.variance_for_all_batches = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
 
         self.baseline_inp = torch.zeros((in_features), device=self.weight.data.device)
         if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
@@ -250,11 +247,11 @@ class Linear(nn.Linear, EriLayer):
         self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
         
         if 'savemetricseq' in cfg['prune_method']:
-            self.baseline_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+            self.baseline_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device)
             if 'wandasp' in self.prune_metric or 'probe' in self.prune_metric:
-                self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+                self.scaler_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device)
             elif self.prune_metric == "flap":
-                self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device)
+                self.fluc_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device)
             else:
                 raise ValueError(f"Unknown pruning method {self.prune_name}")
         self.position_distribution_1 = []

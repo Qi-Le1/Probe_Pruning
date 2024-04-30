@@ -208,11 +208,11 @@ class Linear(nn.Linear, EriLayer):
 
         self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
         # set same shape for all baselines for comparison
-        self.baseline_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+        self.baseline_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
         if 'wandasp' in self.prune_metric:
-            self.scaler_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            self.scaler_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
         elif "flap" in self.prune_metric:
-            self.fluc_inp = torch.zeros((cfg['seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            self.fluc_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
         else:
             raise ValueError(f"Unknown pruning method")
 
@@ -225,6 +225,7 @@ class Linear(nn.Linear, EriLayer):
             raise ValueError(f"Input shape {inp.shape} is not supported. Please provide a 3D tensor.")
  
         batch_size = inp.shape[0]
+        seq_len = inp.shape[1]
         momentum = cfg['ema_momentum']
         cur_device = inp.device
         update_indices = update_indices.to(cur_device)
@@ -236,27 +237,30 @@ class Linear(nn.Linear, EriLayer):
 
             if 'bias' in cfg['prune_method']:
                 self.baseline_inp = self.baseline_inp.to(cur_device)
-                self.baseline_inp[:cfg['cur_batch_seq_len'], update_indices] *= momentum
-                self.baseline_inp[:cfg['cur_batch_seq_len'], update_indices] += (1 - momentum) * (torch.mean(inp, dim=0) / batch_size)
+                self.baseline_inp[:seq_len, update_indices] *= momentum
+                self.baseline_inp[:seq_len, update_indices] += (1 - momentum) * (torch.mean(inp, dim=0) / batch_size)
 
             if cfg['calibration_stage'] == True:
                 norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
-                self.scaler_inp[:cfg['cur_batch_seq_len'], update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
+                self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
             elif cfg['calibration_stage'] == False:
-                if cfg['pad_mask'] is not None:
-                    inp[cfg['pad_mask']] = 0
+                if cfg['pad_tokens'] is not None:
+                    cfg['pad_tokens'] = cfg['pad_tokens'].to(cur_device)
+                    cfg['pad_tokens_denominator'] = cfg['pad_tokens_denominator'].to(cur_device)
+                    inp[cfg['pad_tokens']] = 0
                     norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
-                    self.scaler_inp[:cfg['cur_batch_seq_len'], update_indices] += (1 - momentum) * torch.clamp(norm_squared / cfg['pad_mask_denominator'], max=cfg['data_type_max'])
+                    # self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / cfg['pad_tokens_denominator'], max=cfg['data_type_max'])
+                    self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
                 else:
                     norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
-                    self.scaler_inp[:cfg['cur_batch_seq_len'], update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
+                    self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
         elif "flap" in self.prune_metric:
             self.baseline_inp = self.baseline_inp.to(cur_device)
             self.fluc_inp = self.fluc_inp.to(cur_device)
 
             old_baseline_inp = self.baseline_inp.clone()
-            self.baseline_inp[:cfg['cur_batch_seq_len'], update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-            self.baseline_inp[:cfg['cur_batch_seq_len'], update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
+            self.baseline_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+            self.baseline_inp[:seq_len, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
             
             if torch.all(self.nsamples == 0):
                 pass
@@ -314,11 +318,11 @@ class Linear(nn.Linear, EriLayer):
         self.nsamples[update_indices] += batch_size
 
         
-    def get_global_metric_score_distribution(self):
+    def get_global_metric_score_distribution(self, cur_seq_len=None):
         if 'wandasp' in self.prune_metric:
-            return self.scaler_inp[:cfg['cur_batch_seq_len']]
+            return self.scaler_inp if cur_seq_len is None else self.scaler_inp[:cur_seq_len]
         elif "flap" in self.prune_metric:
-            return self.fluc_inp[:cfg['cur_batch_seq_len']]
+            return self.fluc_inp if cur_seq_len is None else self.fluc_inp[:cur_seq_len]
         else:
             raise ValueError(f"Unknown pruning metric")
 
