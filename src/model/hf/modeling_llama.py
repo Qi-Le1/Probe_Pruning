@@ -577,6 +577,7 @@ class LlamaAttention(nn.Module):
         # 4. extract metric
 
         cur_batch_seq_len = hidden_states.size(1)
+        print('cur_batch_seq_len', cur_batch_seq_len, flush=True)
         # generate probe: rank
         if cfg['q_probe_ratio'] == cfg['k_probe_ratio'] and cfg['q_probe_ratio'] == cfg['v_probe_ratio']:
             if 'respick' in cfg['prune_method']:
@@ -586,7 +587,134 @@ class LlamaAttention(nn.Module):
             probe, bsz_selected_indices, seq_selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], inforank)
         else:
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
+        # bsz, q_len, _ = probe.size()
+        # # print('attn probe', probe.shape, flush=True)
+        # # print('print(selected_indices.dtype)', selected_indices, selected_indices.dtype, flush=True)
+        # self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
+        # self.q_head_dim, self.k_head_dim, self.v_head_dim = self.head_dim, self.head_dim, self.head_dim
+
+        # # copy orignal code and modify a little bit for probe pruning
+        # # currently does not implement for group attention, but it should work too
+        # query_states = self.q_proj(probe, cal_attn_probe_out_dim_metric=True)   
+        # key_states = self.k_proj(probe, cal_attn_probe_out_dim_metric=True)
+        # value_states = self.v_proj(probe, cal_attn_probe_out_dim_metric=True)
+        # # print('query_states', query_states.shape, flush=True)
+        # # key_states = repeat_kv(key_states, self.num_key_value_groups)
+        # # value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+        # qk_prune_way = cfg['qk_prune_way']
+        # vo_prune_way = cfg['vo_prune_way']
+
+        # query_states = query_states.view(query_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        # key_states = key_states.view(key_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        # value_states = value_states.view(value_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # kv_seq_len = key_states.shape[-2]
+        # if past_key_value is not None:
+        #     kv_seq_len += past_key_value[0].shape[-2]
+        # cos, sin = self.rotary_emb(value_states, seq_len=cfg['max_seq_len'])
+        # # cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+        # # print('cos', cos.shape, flush=True)
+
+        # # print('position_ids', position_ids, position_ids.shape, position_ids[:, selected_indices], flush=True)
+        # if q_len != cfg['max_seq_len']:
+        #     print('yes')
+        #     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids[:, seq_selected_indices])
+        #     # query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids[:, :kv_seq_len])
+        # else:
+        #     # print('no')
+        #     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+
+        # # key_states = repeat_kv(key_states, self.num_key_value_groups)
+        # # value_states = repeat_kv(value_states, self.num_key_value_groups)
+        # # print('query_states', query_states.shape, query_states, flush=True)
+        # # print('key_states', key_states.shape, key_states, flush=True)
+        # # print(torch.clamp(torch.matmul(query_states, key_states.transpose(2, 3)), max=cfg['data_type_max']))
+        # temp = torch.matmul(query_states, key_states.transpose(2, 3))
+        # has_nan = torch.isnan(temp).any()
+        # has_inf = torch.isinf(temp).any()
+        # if has_nan:
+        #     print("Does 'temp' contain NaN values? Yes")
+        # if has_inf:
+        #     print("Does 'temp' contain infinite values? Yes")
+        # attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+        # # print('query_states', query_states.shape, attn_weights, flush=True)
+        # # print('key_states', key_states.shape, flush=True)
+        # # print('attn_weights', attn_weights.shape, flush=True)
+        # # print('attn_weights', attn_weights.shape, query_states.shape,flush=True)
+        # if attn_weights.size() != (key_states.shape[0], self.num_heads, q_len, kv_seq_len):
+        #     raise ValueError(
+        #         f"Attention weights should be of size {(key_states.shape[0], self.num_heads, q_len, kv_seq_len)}, but is"
+        #         f" {attn_weights.size()}"
+        #     )
+
+        # # print('attention_mask', attention_mask.shape, flush=True)
+        # probe_attn_mask = attention_mask[:key_states.shape[0], :, :q_len, :kv_seq_len]
+        # # print('probe_attn_mask', probe_attn_mask.shape, flush=True)
+        # if probe_attn_mask is not None:
+        #     if probe_attn_mask.size() != (key_states.shape[0], 1, q_len, kv_seq_len):
+        #         raise ValueError(
+        #             f"Attention mask should be of size {(key_states.shape[0], 1, q_len, kv_seq_len)}, but is {probe_attn_mask.size()}"
+        #         )
+        #     # print('0', )
+        #     # print('0.5', )
+        #     attn_weights = attn_weights + probe_attn_mask
+        #     # print('attn_weights', attn_weights.shape, attn_weights, flush=True)
+        #     # print('1', )
+        #     attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
+        #     # print('2')
+        # attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+
+        # attn_output = torch.matmul(attn_weights, value_states)
+        # if attn_output.size() != (key_states.shape[0], self.v_num_heads, q_len, self.v_head_dim):
+        #     raise ValueError(
+        #         f"`attn_output` should be of size {(key_states.shape[0], self.v_num_heads, q_len, self.v_head_dim)}, but is"
+        #         f" {attn_output.size()}"
+        #     )
+
+        # attn_output = attn_output.transpose(1, 2).contiguous()
+        # attn_output = attn_output.reshape(key_states.shape[0], q_len, self.hidden_size)
         
+        # if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
+        #     # probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution(), selected_indices=selected_indices)
+        #     probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution(cur_batch_seq_len))
+        # else:
+        #     probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
+
+        # if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
+        #     probe_vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+        # else:
+        #     # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
+        #     probe_vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+        #     # if probe_vo_out_dim_indices is not None:
+        #         # print('probe_vo_out_dim_indices', probe_vo_out_dim_indices.shape, flush=True)
+        
+        # if vo_prune_way is None:
+        #     probe_vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+        # else:
+        #     pass
+
+        # if qk_prune_way is None:
+        #     probe_qk_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+        #     probe_qk_out_dim_indices_for_rope = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+        #     # print('probe_qk_out_dim_indices', probe_qk_out_dim_indices, flush=True)
+        # else:
+            
+        #     # TODO: fix later, selfqk
+        #     if 'selfqk' in qk_prune_way:
+        #         pass
+        #     else:
+        #         self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
+        #         self.q_head_dim, self.k_head_dim = self.v_head_dim, self.v_head_dim
+        #         probe_qk_out_dim_indices = probe_vo_out_dim_indices
+        #         # probe_qk_out_dim_indices_for_rope = probe_vo_out_dim_indices_for_rope
+        #         # print('probe_qk_out_dim_indices', self.probe_qk_out_dim_indices.shape, flush=True)
+        #         # print('self.q_num_heads', self.q_num_heads, flush=True)
+
+        # self.q_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
+        # self.k_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
+        # self.v_proj.prepare_async_weight(out_dim_indices=probe_vo_out_dim_indices)
+        # self.o_proj.prepare_async_weight(in_dim_indices=probe_vo_out_dim_indices)
         bsz, q_len, _ = probe.size()
         self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
         self.q_head_dim, self.k_head_dim, self.v_head_dim = self.head_dim, self.head_dim, self.head_dim
@@ -628,6 +756,7 @@ class LlamaAttention(nn.Module):
             probe_attn_mask = attention_mask[:key_states.shape[0], :, :q_len, :kv_seq_len]
         else:
             probe_attn_mask = attention_mask[bsz_selected_indices, :, :q_len, :kv_seq_len]
+        # probe_attn_mask = attention_mask[:key_states.shape[0], :, :q_len, :kv_seq_len]
         if probe_attn_mask is not None:
             if probe_attn_mask.size() != (key_states.shape[0], 1, q_len, kv_seq_len):
                 raise ValueError(

@@ -230,11 +230,10 @@ class Linear(nn.Linear, EriLayer):
         cur_device = inp.device
         update_indices = update_indices.to(cur_device)
         self.nsamples = self.nsamples.to(cur_device)
+        self.scaler_inp = self.scaler_inp.to(cur_device)
 
         if 'wandasp' in self.prune_metric:
-            self.scaler_inp = self.scaler_inp.to(cur_device)
-            self.scaler_inp[:, update_indices] *= momentum
-
+            self.scaler_inp[:seq_len, update_indices] *= momentum
             if 'bias' in cfg['prune_method']:
                 self.baseline_inp = self.baseline_inp.to(cur_device)
                 self.baseline_inp[:seq_len, update_indices] *= momentum
@@ -246,11 +245,11 @@ class Linear(nn.Linear, EriLayer):
             elif cfg['calibration_stage'] == False:
                 if cfg['pad_tokens'] is not None:
                     cfg['pad_tokens'] = cfg['pad_tokens'].to(cur_device)
-                    cfg['pad_tokens_denominator'] = cfg['pad_tokens_denominator'].to(cur_device)
+                    cfg['nonpad_tokens_denominator'] = cfg['nonpad_tokens_denominator'].to(cur_device)
                     inp[cfg['pad_tokens']] = 0
                     norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
-                    # self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / cfg['pad_tokens_denominator'], max=cfg['data_type_max'])
-                    self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
+                    self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / cfg['nonpad_tokens_denominator'], max=cfg['data_type_max'])
+                    # self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
                 else:
                     norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
                     self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
@@ -265,56 +264,68 @@ class Linear(nn.Linear, EriLayer):
             if torch.all(self.nsamples == 0):
                 pass
             else:
-                self.fluc_inp[:, update_indices] *= (self.nsamples[update_indices] - 1) / (self.nsamples[update_indices] + batch_size - 1)
-                self.fluc_inp[:, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size) 
+                self.fluc_inp[:seq_len, update_indices] *= (self.nsamples[update_indices] - 1) / (self.nsamples[update_indices] + batch_size - 1)
+                self.fluc_inp[:seq_len, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:seq_len, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:seq_len, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size) 
 
     def update_global_metric_score_distribution(self, inp, update_indices):
         if cfg['cur_batch_index'] == 0:
             return
         
         if len(inp.shape) == 2:
-            inp = inp.unsqueeze(0)
+            raise ValueError(f"Input shape {inp.shape} is not supported. Please provide a 3D tensor.")
+        
         batch_size = inp.shape[0]
-        default_batch_size = cfg[cfg['model_name']]['batch_size']['test']
-        if batch_size > default_batch_size or inp.shape[0] > default_batch_size:
-            raise ValueError(f"Batch size {batch_size} is larger than the default batch size {default_batch_size}")
+        seq_len = inp.shape[1]
         cur_device = inp.device
         update_indices = update_indices.to(cur_device)
         self.nsamples = self.nsamples.to(cur_device)
-
+        self.scaler_inp = self.scaler_inp.to(cur_device)
         if 'wandasp' in self.prune_metric:
-            self.scaler_inp = self.scaler_inp.to(cur_device)
-
-            self.scaler_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+            
 
             if 'bias' in cfg['prune_method']:
                 self.baseline_inp = self.baseline_inp.to(cur_device)
-                self.baseline_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-                self.baseline_inp[:, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
+                self.baseline_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+                self.baseline_inp[:seq_len, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
                         
             if cfg['calibration_stage'] == True:
+                self.scaler_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
                 norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+                denominator = (self.nsamples[update_indices] + batch_size)
+                self.scaler_inp[:seq_len, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
             elif cfg['calibration_stage'] == False:
-                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
-            denominator = (self.nsamples[update_indices] + batch_size)
-            self.scaler_inp[:, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
+                if cfg['pad_tokens'] is not None:
+                    cfg['pad_tokens'] = cfg['pad_tokens'].to(cur_device)
+                    cfg['nonpad_tokens_denominator'] = cfg['nonpad_tokens_denominator'].to(cur_device)
+                    inp[cfg['pad_tokens']] = 0
+                    self.scaler_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + cfg['nonpad_tokens_denominator'])
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+                    denominator = (self.nsamples[update_indices] + cfg['nonpad_tokens_denominator'])
+                    self.scaler_inp[:seq_len, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
+                else:
+                    self.scaler_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+                    norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+                    denominator = (self.nsamples[update_indices] + batch_size)
+                    self.scaler_inp[:seq_len, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
+
+
         elif "flap" in self.prune_metric:
             self.baseline_inp = self.baseline_inp.to(cur_device)
             self.fluc_inp = self.fluc_inp.to(cur_device)
 
             old_baseline_inp = self.baseline_inp.clone()
-            self.baseline_inp[:, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-            self.baseline_inp[:, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
+            self.baseline_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
+            self.baseline_inp[:seq_len, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
             
             if torch.all(self.nsamples == 0):
                 pass
             else:
-                self.fluc_inp[:, update_indices] *= (self.nsamples[update_indices] - 1) / (self.nsamples[update_indices] + batch_size - 1)
+                self.fluc_inp[:seq_len, update_indices] *= (self.nsamples[update_indices] - 1) / (self.nsamples[update_indices] + batch_size - 1)
                 # flaps github code is not matching the paper formula: https://github.com/CASIA-IVA-Lab/FLAP
                 # If bsz is 1, it is not variance between the average of current batch channel and the average of channel.
                 # It is the sum of the variance between each element in the channel and the average of the channel.
                 # We follow their github code
-                self.fluc_inp[:, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size)  
+                self.fluc_inp[:seq_len, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:seq_len, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:seq_len, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size)  
         self.nsamples[update_indices] += batch_size
 
         

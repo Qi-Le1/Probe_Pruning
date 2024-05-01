@@ -131,11 +131,11 @@ def generate_pad_tokens(input):
         cfg['pad_tokens'] = pad_tokens
         # cfg['non_pad_tokens'] = ~pad_tokens.to(cfg['data_type'])
         # avoid overflow
-        cfg['pad_tokens_denominator'] = torch.sum(~cfg['pad_tokens'], dim=0).unsqueeze(1) + 1e-6
+        cfg['nonpad_tokens_denominator'] = torch.sum(~cfg['pad_tokens'], dim=0).unsqueeze(1) + 1e-3
     else:
         cfg['pad_tokens'] = None
         # cfg['non_pad_tokens'] = None
-        cfg['pad_tokens_denominator'] = None
+        cfg['nonpad_tokens_denominator'] = None
     return
 
 def test(data_loader, model, model_prof, metric, logger):

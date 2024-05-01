@@ -193,8 +193,8 @@ def process_control():
                     cfg[f'{key}_prune'] = prune_info_list[prune_keys.index(key)]
 
 
-        if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['prune_info']:
-            match = re.search(r'probefixratio(\d+\.\d+)', cfg['prune_info'])
+        if 'probe' in cfg['prune_method'] and 'probefixratio' in cfg['prune_method']:
+            match = re.search(r'probefixratio(\d+\.\d+)', cfg['prune_method'])
             if match:
                 # Convert the matched string to a float
                 float_value = float(match.group(1))

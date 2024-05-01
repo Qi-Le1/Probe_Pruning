@@ -843,50 +843,96 @@ def process_dataset(dataset, tokenizer):
                 tokenizer.truncation_side = 'right'
                 labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
 
-                for i in range(len(correct_labels_extended)):
-                    sample_input_ids = model_inputs["input_ids"][i]
-                    
-                    # print('sample_input_ids', sample_input_ids)
-                    # print('text', inputs[i])
-                    sample_attention_mask = model_inputs["attention_mask"][i]
-                    label_input_ids = labels["input_ids"][i][1:]
-                    label_attention_mask = labels["attention_mask"][i][1:]
+                batch_size = cfg['batch_size']
+                for batch_index in range(0, len(correct_labels_extended), batch_size):
+                    # Determine the batch boundaries
+                    batch_end = min(batch_index + batch_size, len(correct_labels_extended))
 
-                    temp_input = sample_input_ids + label_input_ids
-                    print('len(temp_input)', len(temp_input))
-                    temp_attention_mask = sample_attention_mask + label_attention_mask
-                    label_ignore_pos = [tokenizer.pad_token_id] * len(sample_input_ids) + [-900] * len(label_input_ids)
-                    len_temp_input = len(temp_input)
+                    # Initialize a variable to track the maximum length of sequences in this batch
+                    max_length_in_batch = 0
 
-                    if len_temp_input >= max_length:
-                        temp_input = temp_input[-max_length:]
-                        temp_attention_mask = temp_attention_mask[-max_length:]
-                        label_ignore_pos = label_ignore_pos[-max_length:]
-                    else:
-                        temp_input = temp_input + [tokenizer.pad_token_id] * (max_length - len_temp_input)
-                        temp_attention_mask = temp_attention_mask + [0] * (max_length - len_temp_input)
-                        label_ignore_pos = label_ignore_pos + [tokenizer.pad_token_id] * (max_length - len_temp_input)
-                    
-                    model_inputs["input_ids"][i] = temp_input
-                    model_inputs["attention_mask"][i] = temp_attention_mask
+                    # First pass: calculate the maximum length in this batch
+                    for i in range(batch_index, batch_end):
+                        sample_input_ids = model_inputs["input_ids"][i]
+                        sample_attention_mask = model_inputs["attention_mask"][i]
+                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                        label_attention_mask = labels["attention_mask"][i][1:]
 
-                    temp_label = [None for _ in range(max_length)]
-                    index_for_label = 0
-                    for j in range(len(label_ignore_pos)):
-                        cur_ele = label_ignore_pos[j]
-                        if cur_ele == tokenizer.pad_token_id:
-                            temp_label[j] = -100
+                        # Combine the current input ids and label input ids
+                        temp_input = sample_input_ids + label_input_ids
+                        max_length_in_batch = max(max_length_in_batch, len(temp_input))
+
+                    # Second pass: adjust sequences to the max length in this batch
+                    for i in range(batch_index, batch_end):
+                        sample_input_ids = model_inputs["input_ids"][i]
+                        sample_attention_mask = model_inputs["attention_mask"][i]
+                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                        label_attention_mask = labels["attention_mask"][i][1:]
+
+                        temp_input = sample_input_ids + label_input_ids
+                        print('len(temp_input)', len(temp_input))
+                        temp_attention_mask = sample_attention_mask + label_attention_mask
+                        temp_label = [-100] * len(sample_input_ids) + label_input_ids
+
+                        # Truncate or pad sequences based on the batch's maximum length
+                        if len(temp_input) > max_length_in_batch:
+                            temp_input = temp_input[-max_length_in_batch:]
+                            temp_attention_mask = temp_attention_mask[-max_length_in_batch:]
+                            temp_label = temp_label[-max_length_in_batch:]
                         else:
-                            temp_label[j] = label_input_ids[index_for_label]
-                            index_for_label += 1
-                    labels["input_ids"][i] = temp_label
-                    # labels["input_ids"][i] = copy.deepcopy(model_inputs["input_ids"][i])
-                    # labels["input_ids"][i] = [-100] * (len(sample_input_ids)+1)
-                    model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
-                    model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
-                    labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
-                    # input_indices[i] = torch.tensor(input_indices[i])
-                    # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
+                            padding_length = max_length_in_batch - len(temp_input)
+                            temp_input += [tokenizer.pad_token_id] * padding_length
+                            temp_attention_mask += [0] * padding_length
+                            temp_label += [-100] * padding_length
+
+                        # Update the model inputs and labels
+                        model_inputs["input_ids"][i] = torch.tensor(temp_input[-max_length:])
+                        model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask[-max_length:])
+                        labels["input_ids"][i] = torch.tensor(temp_label[-max_length:])
+                # for i in range(len(correct_labels_extended)):
+                #     sample_input_ids = model_inputs["input_ids"][i]
+                    
+                #     # print('sample_input_ids', sample_input_ids)
+                #     # print('text', inputs[i])
+                #     sample_attention_mask = model_inputs["attention_mask"][i]
+                #     label_input_ids = labels["input_ids"][i][1:]
+                #     label_attention_mask = labels["attention_mask"][i][1:]
+
+                #     temp_input = sample_input_ids + label_input_ids
+                #     print('len(temp_input)', len(temp_input))
+                #     temp_attention_mask = sample_attention_mask + label_attention_mask
+                #     label_ignore_pos = [tokenizer.pad_token_id] * len(sample_input_ids) + [-900] * len(label_input_ids)
+                #     len_temp_input = len(temp_input)
+
+                #     if len_temp_input >= max_length:
+                #         temp_input = temp_input[-max_length:]
+                #         temp_attention_mask = temp_attention_mask[-max_length:]
+                #         label_ignore_pos = label_ignore_pos[-max_length:]
+                #     else:
+                #         temp_input = temp_input + [tokenizer.pad_token_id] * (max_length - len_temp_input)
+                #         temp_attention_mask = temp_attention_mask + [0] * (max_length - len_temp_input)
+                #         label_ignore_pos = label_ignore_pos + [tokenizer.pad_token_id] * (max_length - len_temp_input)
+                    
+                #     model_inputs["input_ids"][i] = temp_input
+                #     model_inputs["attention_mask"][i] = temp_attention_mask
+
+                #     temp_label = [None for _ in range(max_length)]
+                #     index_for_label = 0
+                #     for j in range(len(label_ignore_pos)):
+                #         cur_ele = label_ignore_pos[j]
+                #         if cur_ele == tokenizer.pad_token_id:
+                #             temp_label[j] = -100
+                #         else:
+                #             temp_label[j] = label_input_ids[index_for_label]
+                #             index_for_label += 1
+                #     labels["input_ids"][i] = temp_label
+                #     # labels["input_ids"][i] = copy.deepcopy(model_inputs["input_ids"][i])
+                #     # labels["input_ids"][i] = [-100] * (len(sample_input_ids)+1)
+                #     model_inputs["input_ids"][i] = torch.tensor(model_inputs["input_ids"][i][-max_length:])
+                #     model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
+                #     labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
+                #     # input_indices[i] = torch.tensor(input_indices[i])
+                #     # correct_labels_extended[i] = torch.tensor(correct_labels_extended[i])
 
                 model_inputs["labels"] = labels["input_ids"]
                 model_inputs['input_indices'] = input_indices
@@ -1237,10 +1283,9 @@ def process_dataset(dataset, tokenizer):
                             temp_attention_mask += [0] * padding_length
                             temp_label += [-100] * padding_length
 
-                        # Update the model inputs and labels
-                        model_inputs["input_ids"][i] = torch.tensor(temp_input)
-                        model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask)
-                        labels["input_ids"][i] = torch.tensor(temp_label)
+                        model_inputs["input_ids"][i] = torch.tensor(temp_input[-max_length:])
+                        model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask[-max_length:])
+                        labels["input_ids"][i] = torch.tensor(temp_label[-max_length:])
 
 
 

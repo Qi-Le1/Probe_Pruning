@@ -19,14 +19,14 @@ def rank_process(x, probe_num, probe_type, residual):
     print('sorted_values', sorted_values, flush=True)
     values, indices = torch.topk(l2_norms, probe_num)
     # print('values', values, flush=True)
-    # sorted_indices = indices.sort()[0]
+    sorted_indices = indices.sort()[0]
     
     # Apply softmax to the L2 norms to convert them into probabilities
-    probabilities = torch.softmax(l2_norms, dim=0)
+    # probabilities = torch.softmax(l2_norms, dim=0)
 
-    # Draw 'probe_num' samples according to the softmax probabilities
-    sampled_indices = torch.multinomial(probabilities, probe_num, replacement=False)
-    sorted_indices = sampled_indices.sort()[0]
+    # # Draw 'probe_num' samples according to the softmax probabilities
+    # sampled_indices = torch.multinomial(probabilities, probe_num, replacement=False)
+    # sorted_indices = sampled_indices.sort()[0]
 
     if 'bsz' in probe_type:
         return x[sorted_indices, :, :], sorted_indices
@@ -62,7 +62,7 @@ def generate_probe(x, probe_ratio_list, residual=None):
                 print('bsz_selected_indices', bsz_selected_indices, flush=True)
             elif 'seq' in probe_type:
                 seq_selected_indices = selected_indices
-                print('seq_selected_indices', seq_selected_indices, flush=True)
+                # print('seq_selected_indices', seq_selected_indices, flush=True)
         else:
             raise NotImplementedError
     return x, bsz_selected_indices, seq_selected_indices
