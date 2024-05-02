@@ -32,10 +32,6 @@ class OPTEriModel(torch.nn.Module):
         self._find_and_replace(prune_name)
         mark_no_trainable(self.model)        
         return
-    
-    def _check_quantization_dependency(self):
-        loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
-        loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
 
     def _create_new_module(self, prune_name, target, key):
         bias = hasattr(target, "bias") and target.bias is not None
@@ -85,7 +81,6 @@ class OPTEriModel(torch.nn.Module):
         return new_module
 
     def _find_and_replace(self, prune_name):
-        self._check_quantization_dependency()
         is_target_modules_in_base_model = False
         key_list = [key for key, _ in self.model.named_modules()]
         for key, module in self.model.named_modules():

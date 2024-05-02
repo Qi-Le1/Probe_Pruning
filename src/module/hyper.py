@@ -5,6 +5,22 @@ from config import cfg
 
 MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70b']
 
+def list_available_gpus():
+    # Check if CUDA is available
+    if torch.cuda.is_available():
+        # Get the number of GPUs available
+        num_gpus = torch.cuda.device_count()
+        print(f"Number of CUDA Devices: {num_gpus}")
+        
+        # List each GPU
+        for i in range(num_gpus):
+            print(f"Device {i}: {torch.cuda.get_device_name(i)}")
+            # Additional details can be printed if needed
+            print(f"  Memory Allocated: {torch.cuda.memory_allocated(i)} bytes")
+            print(f"  Memory Cached: {torch.cuda.memory_reserved(i)} bytes")
+    else:
+        print("CUDA is not available. No GPU detected.")
+
 def process_control():
     print('torch version: ', torch.__version__)
     print('cuda version: ', torch.version.cuda)
@@ -19,6 +35,7 @@ def process_control():
     except Exception as e:
         print(f"An error occurred: {e}")
     cfg['gpu_name'] = gpu_name
+    list_available_gpus()
     cfg['data_type'] = torch.float16
     cfg['data_type_max'] = torch.finfo(cfg['data_type']).max
     cfg['data_type_min'] = torch.finfo(cfg['data_type']).min
@@ -73,7 +90,6 @@ def process_control():
     cfg['ema_momentum'] = 0.99
     if 'ema' in cfg['prune_method']:
         match = re.search(r'ema(\d+\.\d+)', cfg['prune_method'])
-        print('match', match)
         if match:
             # Convert the matched string to a float
             float_value = float(match.group(1))
@@ -152,7 +168,6 @@ def process_control():
         cfg['prune_info'] = cfg['control']['prune_info']
         if cfg['prune_info'] != 'None':
             prune_info_list = cfg['prune_info'].split('-')
-            print('prune_info_list', prune_info_list)
             if 'llama' in cfg['model_name']:
                 prune_keys = ['q', 'k', 'v', 'gate', 'up']
             elif 'opt' in cfg['model_name']:
@@ -166,15 +181,11 @@ def process_control():
             
                 for key in prune_keys:
                     # default
-                    print(prune_info_list[prune_keys.index(key)], prune_info_list[prune_keys.index(key)] is None, prune_keys.index(key))
                     cfg[f'{key}_prune'] = prune_info_list[prune_keys.index(key)]
                     if cfg[f'{key}_prune'] != 'None':
-                    # cfg[f'{key}_probe_num'] = 1
-                    # cfg[f'{key}_probe_size'] = int(cfg['batch_size'] // 1)
 
                         match = re.search(r'\d*\.?\d+', cfg[f'{key}_prune'])
                         float_value = None
-                        print('match', match)
                         if match:
                             float_value = float(match.group(0))
                         else:
@@ -189,7 +200,6 @@ def process_control():
                             cfg[f'{key}_probe_ratio'] = floats
             else:
                 for key in prune_keys:
-                    print(prune_info_list[prune_keys.index(key)], prune_info_list[prune_keys.index(key)] is None, prune_keys.index(key))
                     cfg[f'{key}_prune'] = prune_info_list[prune_keys.index(key)]
 
 
@@ -201,7 +211,6 @@ def process_control():
                 cfg['probefixratio'] = float_value 
             else:
                 float_value = None
-        # cfg['opt'] = {'max_length': 128}
     elif cfg['task_name'] in ['ic']:
         cfg['collate_mode'] = 'dict'
         data_shape = {'MNIST': [1, 28, 28], 'FashionMNIST': [1, 28, 28], 'SVHN': [3, 32, 32], 'CIFAR10': [3, 32, 32],
@@ -237,16 +246,11 @@ def process_control():
 
 def make_data_name():
     data_name_list = cfg['control']['data_name'].split('-')
-    print('data_name_list', data_name_list)
     if len(data_name_list) == 2:
         cfg['data_name'], cfg['subset_name'] = data_name_list
     else:
         cfg['data_name'] = data_name_list[0]
         cfg['subset_name'] = 'none'
-    # if cfg['data_name'] == 'arcchallenge':
-    #     cfg['data_name'] = 'arc_challenge'
-    # elif cfg['data_name'] == 'arceasy':
-    #     cfg['data_name'] = 'arc_easy'
     if cfg['task_name'] in ['clm', 'csr']:
         data_name_dict = {
             'c4': {'data_name': 'c4',
@@ -262,6 +266,12 @@ def make_data_name():
                                                    'label_column': None}
                                            }                       
                          },
+            'ptb': {'data_name': 'ptb_text_only',
+                          'subset_name_dict': {'none': {'subset_name': None,
+                                                   'text_column': ['sentence'],
+                                                   'label_column': None}
+                                           }                       
+            },
             # piqa: piqa
             # boolq: boolq , 
             # arc-e: arc-easy 
@@ -322,7 +332,7 @@ def make_data_name():
             # https://huggingface.co/datasets/openbookqa
             'obqa': {'data_name': 'openbookqa',
                     'subset_name_dict': {
-                        'main': {'subset_name': 'main',
+                        'none': {'subset_name': 'main',
                               'text_column': ['hardcode'],
                               'label_column': 'hardcode'},    
                         },                        

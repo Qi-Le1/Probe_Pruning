@@ -125,8 +125,6 @@ def test(data_loader, model, model_prof, metric, logger):
             cfg['cur_batch_index'] += 1
             print('cur_batch_index', cfg['cur_batch_index'])
             torch.cuda.nvtx.range_push("iteration{}".format(i))
-            cfg['cur_batch_seq_len'] = input['input_ids'].size(-1)
-            print('cur_batch_seq_len', cfg['cur_batch_seq_len'])
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],

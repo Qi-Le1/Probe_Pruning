@@ -9,7 +9,7 @@ from module import recur
 
 def make_metric(metric_name, tokenizer):
     if cfg['task_name'] == 'clm':
-        if cfg['data_name'] in ['wikitext', 'c4']:
+        if cfg['data_name'] in ['wikitext', 'c4', 'ptb']:
             pivot = float('inf')
             pivot_direction = 'down'
             pivot_name = 'Perplexity'

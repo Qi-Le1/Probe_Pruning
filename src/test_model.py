@@ -17,11 +17,8 @@ from module import save, to_device, process_control, resume, makedir_exist_ok, \
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 import matplotlib.pyplot as plt
 
-iterate_small_samples = False
-# iterate_small_samples = True
 
 cudnn.benchmark = False
-# torch.use_deterministic_algorithms(True)
 parser = argparse.ArgumentParser(description='cfg')
 for k in cfg:
     exec('parser.add_argument(\'--{0}\', default=cfg[\'{0}\'], type=type(cfg[\'{0}\']))'.format(k))
@@ -40,11 +37,6 @@ def main():
         runExperiment()
     return
 
-# def prepare_cude_events(model):
-#     if 'llama-2' in cfg['model_name']:
-#         for i in range(model.config.num_hidden_layers):
-#             cfg[f'cuda_events_mlp_{i}'] = torch.cuda.Event()
-        
 
 def runExperiment():
     cfg['seed'] = int(cfg['model_tag'].split('_')[0])
@@ -111,19 +103,14 @@ def run_calibration(model, data_loader):
             output = model(**input)
             input_ = {'target': input['labels']}
             output_ = {'target': output['logits'], 'loss': output['loss']}
-            if iterate_small_samples:
-                if i == 100:
-                    break
-        if 'flapratio' in cfg['prune_method'] or 'flap' in cfg['prune_method']:
+
+        if 'flapratio' in cfg['prune_method']:
             pruning_module = HiddenRepresentationPruning(cfg, 'flapratio')
             pruning_module.flap_ratio(model)
-        elif 'gridratio' in cfg['prune_method']:
-            pruning_module = HiddenRepresentationPruning(cfg, 'gridratio')
-            pruning_module.grid_ratio(model)
     return
 
 
-def generate_pad_tokens(input):
+def identify_pad_tokens(input):
     pad_tokens = input['input_ids'] == cfg['pad_token_id'] 
     no_padding = (~pad_tokens).all()
     # if there is padding, need to zero out the padding token
@@ -150,9 +137,9 @@ def test(data_loader, model, model_prof, metric, logger):
         with torch.cuda.stream(cfg['cuda_default_stream']):
             data_loader_iter = iter(data_loader)
             input = next(data_loader_iter)
-            generate_pad_tokens(input)
+            identify_pad_tokens(input)
             cfg['cur_batch_index'] += 1
-            if cfg['task_name'] in ['s2s', 'sc', 'clm']:
+            if cfg['task_name'] in ['clm']:
                 input_size = input['labels'].size(0)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
@@ -188,9 +175,7 @@ def test(data_loader, model, model_prof, metric, logger):
             for i, input in enumerate(data_loader):
                 cfg['cur_batch_index'] += 1
                 print('cur_batch_index', cfg['cur_batch_index'])
-                generate_pad_tokens(input)
-                cfg['cur_batch_seq_len'] = input['input_ids'].size(-1)
-                print('cur_batch_seq_len', cfg['cur_batch_seq_len'])
+                identify_pad_tokens(input)
                 if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                     input_size = input['labels'].size(0)
                     input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
@@ -223,11 +208,7 @@ def test(data_loader, model, model_prof, metric, logger):
                     evaluation = metric.evaluate('test', 'batch', input_, output_)
                     print('evaluation_for_batch', evaluation)
                     logger.append(evaluation, 'test', input_size)
-                # record_pruing_info(model, logger)
-                # break
-                if iterate_small_samples:
-                    if i == 100:
-                        break
+
                 for name, module in model.named_modules():
                     for attr_name in dir(module):
                         # Check if the attribute name contains 'mean_intersection_ratio'
@@ -276,7 +257,6 @@ def test(data_loader, model, model_prof, metric, logger):
                             # Append the attribute to the logger
                             logger.append({f'{name}_{attr_name}': attr_value}, 'test')
 
-            print("Debug 12.2: Test logger created", flush=True)
             torch.cuda.cudart().cudaProfilerStop()
     return inference_duration
 

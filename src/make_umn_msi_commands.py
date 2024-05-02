@@ -181,11 +181,53 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5'], 
-                             ['ppwandasp'], ['probe-calib-respick-ema-probefixratio0.8','probe-calib-respick-ema-probefixratio0.9', 'probe-default'], ['sync'], ['c4-2000'], ['0.5-0.5-0.5-0.5-0.5-seqrank', '0.5-0.5-0.5-0.5-0.5-bszrank'],
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5'], 
+            #                  ['ppwandasp'], ['probe-calib-respick-ema-probefixratio0.8','probe-calib-respick-ema-probefixratio0.9', 'probe-default'], ['sync'], ['c4-2000'], ['0.5-0.5-0.5-0.5-0.5-seqrank', '0.5-0.5-0.5-0.5-0.5-bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.4', '0.5'], 
+            #                  ['flap'], ['flap-default-skip-1'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['ptb'], ['llama-2-7b'], ['clm'], ['10', '20'], ['128'], ['0.5'], 
+            #                  ['ppwandasp'], ['probe-calib-ema-respick', 'probe-calib-ema'], ['sync'], ['c4-2000'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '20'], ['128'], ['0.4'], 
+            #                  ['ppwandasp'], ['probe-calib-ema-respick'], ['sync'], ['c4-2000'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['128'], ['0.6'], 
+            #                  ['ppwandasp'], ['probe-calib-ema-respick'], ['sync'], ['c4-20'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['128'], ['0.6'], 
+                             ['ppwandasp'], ['probe'], ['sync'], ['c4-20'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.6'], 
+            #                  ['ppwandasp'], ['probe-calib-ema'], ['asyncintra'], ['c4-2000'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '20'], ['1024'], ['0.6'], 
+            #                  ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5'], 
             #                  ['ppwandasp'], ['probe-calib-respick-ema-probefixratio0.1', 'probe-calib-respick-ema-probefixratio0.2', 'probe-calib-respick-ema-probefixratio0.3'
@@ -461,11 +503,17 @@ def main():
         controls = []
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['2048'], ['0'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0'], 
                              ['None'], ['dense'], ['None'], ['None'], ['None'],        
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0.6'], 
+            #                  ['ppwandasp'], ['probe-calib-ema-respick'], ['sync'], ['c4-2000'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10', '50', '100', '200'], ['256', '1024'], ['0'], 
             #                  ['None'], ['dense'], ['sync'], ['None'], ['None'],        
@@ -713,13 +761,15 @@ def main():
         s += f'#SBATCH --nodes={task_parallel_num}\n'
         s += f'#SBATCH --ntasks={task_parallel_num}\n'
         # s += '#SBATCH --cpus-per-task=2'
-        s += '#SBATCH --gres=gpu:a100:1\n'
+        # s += '#SBATCH --gres=gpu:a100:1\n'
+        s += '#SBATCH --gres=gpu:a100:2\n'
         s += '#SBATCH --partition=a100-4\n'
+        # s += '#SBATCH --partition=jd-4a100\n'
         s += f'#SBATCH --mem={temp_mem}gb\n'
         # s += '#SBATCH --mail-type=ALL \n'
         # s += '#SBATCH --mail-user=le000288@umn.edu\n'
-        s += f'#SBATCH -o {res_path}/{filename}_%j.out\n'
-        s += f'#SBATCH -e {res_path}/{filename}_%j.err\n'
+        s += f'#SBATCH -o {res_path}/%j_{filename}.out\n'
+        s += f'#SBATCH -e {res_path}/%j_{filename}.err\n'
         s += '\n'
         s += f'cd /home/aanwar/le000288/{code_folder}/src\n'
         s += '\n'

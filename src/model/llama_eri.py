@@ -16,7 +16,7 @@ from config import cfg
 from math import prod
 from .model import init_param, mse_loss
 from typing import List, Optional, Tuple, Union
-from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING
+from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING, check_skip_layers
 from functools import reduce
 
 
@@ -32,10 +32,6 @@ class LlamaEriModel(torch.nn.Module):
         mark_no_trainable(self.model)        
         return
     
-    def _check_quantization_dependency(self):
-        loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
-        loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
-
     def _create_new_module(self, target, key):
         bias = hasattr(target, "bias") and target.bias is not None
         loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
@@ -82,11 +78,8 @@ class LlamaEriModel(torch.nn.Module):
         return new_module
 
     def _find_and_replace(self):
-        self._check_quantization_dependency()
         is_target_modules_in_base_model = False
         key_list = [key for key, _ in self.model.named_modules()]
-        for key, module in self.model.named_modules():
-            print('key: ', key, type(module), flush=True)
         # return
         target_modules = _get_target_modules(cfg)
         print('target_modules: ', target_modules)
@@ -97,13 +90,8 @@ class LlamaEriModel(torch.nn.Module):
             if not _check_target_module_exists(target_modules, key):
                 continue
             
-            layer_order_matches = re.findall(r'\d+', key)
-            if layer_order_matches:  # Check if the list is not empty
-                layer_order = int(layer_order_matches[0])  # Convert the first match to an integer
-                if layer_order <= cfg['skip_layers']:
-                    continue
-            else:
-                raise ValueError(f"Layer order not found in the layer key {key}")
+            if check_skip_layers(key):
+                continue
 
             print('Replaced Layer Keys', key, flush=True)
 
@@ -279,10 +267,10 @@ class Linear(nn.Linear, EriLayer):
         cur_device = inp.device
         update_indices = update_indices.to(cur_device)
         self.nsamples = self.nsamples.to(cur_device)
-        self.scaler_inp = self.scaler_inp.to(cur_device)
+        
         if 'wandasp' in self.prune_metric:
             
-
+            self.scaler_inp = self.scaler_inp.to(cur_device)
             if 'bias' in cfg['prune_method']:
                 self.baseline_inp = self.baseline_inp.to(cur_device)
                 self.baseline_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)

@@ -567,7 +567,7 @@ def main():
             line_count = sum(1 for line in cur_file)
 
         if line_count > 180:
-            bash_file_name = './{}.sh'.format(f'msi_{file}_{data[0]}_{i}')
+            bash_file_name = './{}.sh'.format(f'windows_{file}_{data[0]}_{i}')
             print('bash_file_name', bash_file_name)
             delete_file_if_exist(bash_file_name)
     return

@@ -50,37 +50,7 @@ def make_hf_model(model_name, sub_model_name=None):
         device_map = "auto"
         # low_cpu_mem_usage = False
     print('device_map', device_map)
-    if 'bart' in model_name:
-        cfg['model_name_or_path'] = 'facebook/{}'.format(model_name)
-        cfg['tokenizer_name_or_path'] = 'facebook/{}'.format(model_name)
-    elif 'bloom' in model_name:
-        cfg['model_name_or_path'] = 'bigscience/{}'.format(model_name)
-        cfg['tokenizer_name_or_path'] = 'bigscience/{}'.format(model_name)
-    elif 'bart' in model_name:
-        cfg['model_name_or_path'] = 'facebook/{}'.format(model_name)
-        cfg['tokenizer_name_or_path'] = 'facebook/{}'.format(model_name)
-    elif 'roberta' in model_name:
-        cfg['model_name_or_path'] = '{}'.format(model_name)
-        cfg['tokenizer_name_or_path'] = '{}'.format(model_name)
-    elif 'gpt' in model_name:
-        cfg['model_name_or_path'] = '{}'.format(model_name)
-        cfg['tokenizer_name_or_path'] = '{}'.format(model_name)
-    elif 't5' in model_name:
-        cfg['model_name_or_path'] = '{}'.format(model_name)
-        cfg['tokenizer_name_or_path'] = '{}'.format(model_name)
-    elif 'sdiffusion' in model_name:
-        cfg['model_name_or_path'] = 'CompVis/stable-diffusion-v1-4'
-        cfg['tokenizer_name_or_path'] = 'CompVis/stable-diffusion-v1-4'
-    elif 'open-llama' in model_name:
-        # https://huggingface.co/openlm-research/open_llama_3b_v2
-        # support ["open-llama-3b", "open-llama-7b"]
-        if '3b' in model_name:
-            cfg['model_name_or_path'] = 'openlm-research/open_llama_3b_v2'
-            cfg['tokenizer_name_or_path'] = 'openlm-research/open_llama_3b_v2'
-        elif '7b' in model_name:
-            cfg['model_name_or_path'] = 'openlm-research/open_llama_7b_v2'
-            cfg['tokenizer_name_or_path'] = 'openlm-research/open_llama_7b_v2'
-    elif 'opt' in model_name:
+    if 'opt' in model_name:
         # https://huggingface.co/facebook/opt-1.3b
         # if '1.3b' in model_name:
         #     cfg['model_name_or_path'] = 'facebook/opt-1.3b'

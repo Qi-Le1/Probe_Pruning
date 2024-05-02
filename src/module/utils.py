@@ -20,7 +20,16 @@ FLOPS_UNIT = (1000000, 'Million')
 # already in seconds unit
 TIME_UNIT = (1, 's')
 
-
+def check_skip_layers(name):
+    layer_order_matches = re.findall(r'\d+', name)
+    if layer_order_matches:  # Check if the list is not empty
+        layer_order = int(layer_order_matches[0])  # Convert the first match to an integer
+        if layer_order <= cfg['skip_layers']:
+            return True
+        return False
+    else:
+        raise ValueError(f"Layer order not found in the layer key {name}")
+    
 def get_model_profile(tag, model_prof, onlyprobe=False):
     info_list = []
     for name, module in model_prof.model.model.named_modules():

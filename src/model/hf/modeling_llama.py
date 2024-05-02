@@ -157,14 +157,6 @@ class LlamaRotaryEmbedding(nn.Module):
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = torch.cat((freqs, freqs), dim=-1)
 
-        # if 'each' in cfg['prune_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']):
-        #     # Expand embeddings for each head if we prune different indices for each head
-        #     cos_emb = emb.cos().to(dtype).unsqueeze(0).repeat(self.num_heads, 1, 1)
-        #     sin_emb = emb.sin().to(dtype).unsqueeze(0).repeat(self.num_heads, 1, 1)
-
-        #     self.register_buffer("cos_cached", cos_emb, persistent=False)
-        #     self.register_buffer("sin_cached", sin_emb, persistent=False)
-        # else:
         self.register_buffer("cos_cached", emb.cos().to(dtype), persistent=False)
         self.register_buffer("sin_cached", emb.sin().to(dtype), persistent=False)
     def forward(self, x, seq_len=None):
@@ -347,7 +339,7 @@ class LlamaMLP(nn.Module):
         else:
             probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices)
 
-        if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
+        if 'flapratio' in cfg['prune_method']:
             probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
         else:
             probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
@@ -384,67 +376,32 @@ class LlamaMLP(nn.Module):
                     return down_proj
                 elif cfg['calibration_stage'] == False:
                     if 'probe' in cfg['prune_method']:
-                        time_start = time.time()
-                        
                         if cfg['mode'] == 'sync':
                             probe_out_dim_indices, probe_out = self.probe_process(x, **kwargs)
+                            # count flops for probe
                             if cfg['onlyprobe'] == True:
                                 # match the shape, and will not count the flops for this part
                                 down_proj = torch.zeros((cfg['batch_size'], cfg['max_seq_len'], self.hidden_size), device=x.device, dtype=x.dtype)
                                 return down_proj
                         elif cfg['mode'] == 'asyncintra':
-                            # if not, do full inference
                             if 'post_layernorm_attn_residual' in kwargs:
-                                # print('post_layernorm_attn_residual', flush=True)
                                 _, _ = self.probe_process(kwargs['post_layernorm_attn_residual'])
                                 return
-                        
-                        custom_duration = time.time() - time_start
-                        # print('probe_duration', custom_duration, flush=True)
-                        time_start = time.time()
-                        if cfg['mode'] == 'sync':
-                            if 'gate_proj' in cfg['cust_tgt_modules']:
-                                gate_out = self.act_fn(self.gate_proj(x, out_dim_indices=probe_out_dim_indices))
-                            # else:
-                            #     # gate_out = self.act_fn(self.gate_proj(x))
-                            #     gate_out = gate_out[..., probe_out_dim_indices]
-
-                            if 'up_proj' in cfg['cust_tgt_modules']:
-                                up_out = self.up_proj(x, out_dim_indices=probe_out_dim_indices)
+                            else:
+                                raise ValueError('Invalid input for asyncintra mode')
                             
-                            down_proj = self.down_proj(gate_out * up_out, in_dim_indices=probe_out_dim_indices)
+                        if cfg['mode'] == 'sync':
+                            down_proj = self.down_proj(self.act_fn(self.gate_proj(x, out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, out_dim_indices=probe_out_dim_indices), in_dim_indices=probe_out_dim_indices)
                         else:                   
-                            # print('here')      
                             down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
                         
-                        if cfg['mode'] == 'asyncinter':
-                            with torch.cuda.stream(cfg['cuda_stream1']):
-                                _, _ = self.probe_process(x)
-                        
-                        
-                        custom_duration = time.time() - time_start
-                        # print('fll_batch_duration', custom_duration, flush=True)
+                        # if cfg['mode'] == 'asyncinter':
+                        #     with torch.cuda.stream(cfg['cuda_stream1']):
+                        #         _, _ = self.probe_process(x)
                         return down_proj
                     elif 'calib' in cfg['prune_method'] and ('runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']):
-                        # if cfg['logger_detailed_info'] == True:
-                        #     print('input', x, flush=True)
-                        bsz, _, _ = x.shape
-                        time_start = time.time()
 
-                        if cfg['mode'] == 'sync':
-                            if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
-                                out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
-                            else:
-                                out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
-
-                                if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
-                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
-                                else:
-                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
-
-                            temp = self.act_fn(self.gate_proj(x, out_dim_indices=out_dim_indices)) * self.up_proj(x, out_dim_indices=out_dim_indices)
-                            down_proj = self.down_proj(temp, in_dim_indices=out_dim_indices)
-                        elif cfg['mode'] == 'asyncinter':
+                        if cfg['mode'] == 'asyncinter':
                             down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
                             with torch.cuda.stream(cfg['cuda_stream1']):
@@ -452,9 +409,8 @@ class LlamaMLP(nn.Module):
                                     out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
                                 else:
                                     out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
-                                    # out_dim_metric = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
 
-                                    if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
+                                    if 'flapratio' in cfg['prune_method']:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                     else:
                                         out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
@@ -462,17 +418,16 @@ class LlamaMLP(nn.Module):
                                 self.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
                                 self.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
                                 self.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
+                        else:
+                            raise ValueError('Invalid mode')
                         return down_proj
-                    
                     # only calib (baselines)
                     elif 'calib' in cfg['prune_method'] or 'flap' in cfg['prune_method'] or 'wandasp' in cfg['prune_method']:
                         # no ema or runningmean
-                        bsz, _, _ = x.shape
                         if cfg['mode'] == 'asyncinter':
                             down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
                             if cfg['cur_batch_index'] == 0:
-                                # with torch.cuda.stream(cfg['cuda_stream1']):
                                 if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
                                     out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
                                 else:
@@ -488,7 +443,6 @@ class LlamaMLP(nn.Module):
                                 self.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
                         else:
                             raise ValueError('Invalid mode')
-                        
                         return down_proj
             else:
                 down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
@@ -535,7 +489,6 @@ class LlamaAttention(nn.Module):
 
         self.layer_order = layer_order
         self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
-        self.q_head_dim, self.k_head_dim, self.v_head_dim = self.head_dim, self.head_dim, self.head_dim
 
         self._init_rope()
 
@@ -577,7 +530,6 @@ class LlamaAttention(nn.Module):
         # 4. extract metric
 
         cur_batch_seq_len = hidden_states.size(1)
-        print('cur_batch_seq_len', cur_batch_seq_len, flush=True)
         # generate probe: rank
         if cfg['q_probe_ratio'] == cfg['k_probe_ratio'] and cfg['q_probe_ratio'] == cfg['v_probe_ratio']:
             if 'respick' in cfg['prune_method']:
@@ -587,146 +539,15 @@ class LlamaAttention(nn.Module):
             probe, bsz_selected_indices, seq_selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], inforank)
         else:
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
-        # bsz, q_len, _ = probe.size()
-        # # print('attn probe', probe.shape, flush=True)
-        # # print('print(selected_indices.dtype)', selected_indices, selected_indices.dtype, flush=True)
-        # self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
-        # self.q_head_dim, self.k_head_dim, self.v_head_dim = self.head_dim, self.head_dim, self.head_dim
 
-        # # copy orignal code and modify a little bit for probe pruning
-        # # currently does not implement for group attention, but it should work too
-        # query_states = self.q_proj(probe, cal_attn_probe_out_dim_metric=True)   
-        # key_states = self.k_proj(probe, cal_attn_probe_out_dim_metric=True)
-        # value_states = self.v_proj(probe, cal_attn_probe_out_dim_metric=True)
-        # # print('query_states', query_states.shape, flush=True)
-        # # key_states = repeat_kv(key_states, self.num_key_value_groups)
-        # # value_states = repeat_kv(value_states, self.num_key_value_groups)
-
-        # qk_prune_way = cfg['qk_prune_way']
-        # vo_prune_way = cfg['vo_prune_way']
-
-        # query_states = query_states.view(query_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        # key_states = key_states.view(key_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        # value_states = value_states.view(value_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
-
-        # kv_seq_len = key_states.shape[-2]
-        # if past_key_value is not None:
-        #     kv_seq_len += past_key_value[0].shape[-2]
-        # cos, sin = self.rotary_emb(value_states, seq_len=cfg['max_seq_len'])
-        # # cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-        # # print('cos', cos.shape, flush=True)
-
-        # # print('position_ids', position_ids, position_ids.shape, position_ids[:, selected_indices], flush=True)
-        # if q_len != cfg['max_seq_len']:
-        #     print('yes')
-        #     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids[:, seq_selected_indices])
-        #     # query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids[:, :kv_seq_len])
-        # else:
-        #     # print('no')
-        #     query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
-
-        # # key_states = repeat_kv(key_states, self.num_key_value_groups)
-        # # value_states = repeat_kv(value_states, self.num_key_value_groups)
-        # # print('query_states', query_states.shape, query_states, flush=True)
-        # # print('key_states', key_states.shape, key_states, flush=True)
-        # # print(torch.clamp(torch.matmul(query_states, key_states.transpose(2, 3)), max=cfg['data_type_max']))
-        # temp = torch.matmul(query_states, key_states.transpose(2, 3))
-        # has_nan = torch.isnan(temp).any()
-        # has_inf = torch.isinf(temp).any()
-        # if has_nan:
-        #     print("Does 'temp' contain NaN values? Yes")
-        # if has_inf:
-        #     print("Does 'temp' contain infinite values? Yes")
-        # attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-        # # print('query_states', query_states.shape, attn_weights, flush=True)
-        # # print('key_states', key_states.shape, flush=True)
-        # # print('attn_weights', attn_weights.shape, flush=True)
-        # # print('attn_weights', attn_weights.shape, query_states.shape,flush=True)
-        # if attn_weights.size() != (key_states.shape[0], self.num_heads, q_len, kv_seq_len):
-        #     raise ValueError(
-        #         f"Attention weights should be of size {(key_states.shape[0], self.num_heads, q_len, kv_seq_len)}, but is"
-        #         f" {attn_weights.size()}"
-        #     )
-
-        # # print('attention_mask', attention_mask.shape, flush=True)
-        # probe_attn_mask = attention_mask[:key_states.shape[0], :, :q_len, :kv_seq_len]
-        # # print('probe_attn_mask', probe_attn_mask.shape, flush=True)
-        # if probe_attn_mask is not None:
-        #     if probe_attn_mask.size() != (key_states.shape[0], 1, q_len, kv_seq_len):
-        #         raise ValueError(
-        #             f"Attention mask should be of size {(key_states.shape[0], 1, q_len, kv_seq_len)}, but is {probe_attn_mask.size()}"
-        #         )
-        #     # print('0', )
-        #     # print('0.5', )
-        #     attn_weights = attn_weights + probe_attn_mask
-        #     # print('attn_weights', attn_weights.shape, attn_weights, flush=True)
-        #     # print('1', )
-        #     attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
-        #     # print('2')
-        # attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-
-        # attn_output = torch.matmul(attn_weights, value_states)
-        # if attn_output.size() != (key_states.shape[0], self.v_num_heads, q_len, self.v_head_dim):
-        #     raise ValueError(
-        #         f"`attn_output` should be of size {(key_states.shape[0], self.v_num_heads, q_len, self.v_head_dim)}, but is"
-        #         f" {attn_output.size()}"
-        #     )
-
-        # attn_output = attn_output.transpose(1, 2).contiguous()
-        # attn_output = attn_output.reshape(key_states.shape[0], q_len, self.hidden_size)
-        
-        # if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
-        #     # probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution(), selected_indices=selected_indices)
-        #     probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution(cur_batch_seq_len))
-        # else:
-        #     probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'])
-
-        # if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
-        #     probe_vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
-        # else:
-        #     # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
-        #     probe_vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
-        #     # if probe_vo_out_dim_indices is not None:
-        #         # print('probe_vo_out_dim_indices', probe_vo_out_dim_indices.shape, flush=True)
-        
-        # if vo_prune_way is None:
-        #     probe_vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
-        # else:
-        #     pass
-
-        # if qk_prune_way is None:
-        #     probe_qk_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
-        #     probe_qk_out_dim_indices_for_rope = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
-        #     # print('probe_qk_out_dim_indices', probe_qk_out_dim_indices, flush=True)
-        # else:
-            
-        #     # TODO: fix later, selfqk
-        #     if 'selfqk' in qk_prune_way:
-        #         pass
-        #     else:
-        #         self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
-        #         self.q_head_dim, self.k_head_dim = self.v_head_dim, self.v_head_dim
-        #         probe_qk_out_dim_indices = probe_vo_out_dim_indices
-        #         # probe_qk_out_dim_indices_for_rope = probe_vo_out_dim_indices_for_rope
-        #         # print('probe_qk_out_dim_indices', self.probe_qk_out_dim_indices.shape, flush=True)
-        #         # print('self.q_num_heads', self.q_num_heads, flush=True)
-
-        # self.q_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
-        # self.k_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
-        # self.v_proj.prepare_async_weight(out_dim_indices=probe_vo_out_dim_indices)
-        # self.o_proj.prepare_async_weight(in_dim_indices=probe_vo_out_dim_indices)
         bsz, q_len, _ = probe.size()
         self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
-        self.q_head_dim, self.k_head_dim, self.v_head_dim = self.head_dim, self.head_dim, self.head_dim
 
         # copy orignal code and modify a little bit for probe pruning
         # currently does not implement for group attention, but it should work too
         query_states = self.q_proj(probe, cal_attn_probe_out_dim_metric=True)   
         key_states = self.k_proj(probe, cal_attn_probe_out_dim_metric=True)
         value_states = self.v_proj(probe, cal_attn_probe_out_dim_metric=True)
-        # print('query_states', query_states.shape, flush=True)
-        # key_states = repeat_kv(key_states, self.num_key_value_groups)
-        # value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         qk_prune_way = cfg['qk_prune_way']
         vo_prune_way = cfg['vo_prune_way']
@@ -767,9 +588,9 @@ class LlamaAttention(nn.Module):
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
 
         attn_output = torch.matmul(attn_weights, value_states)
-        if attn_output.size() != (key_states.shape[0], self.v_num_heads, q_len, self.v_head_dim):
+        if attn_output.size() != (key_states.shape[0], self.v_num_heads, q_len, self.head_dim):
             raise ValueError(
-                f"`attn_output` should be of size {(key_states.shape[0], self.v_num_heads, q_len, self.v_head_dim)}, but is"
+                f"`attn_output` should be of size {(key_states.shape[0], self.v_num_heads, q_len, self.head_dim)}, but is"
                 f" {attn_output.size()}"
             )
 
@@ -781,14 +602,13 @@ class LlamaAttention(nn.Module):
         else:
             probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices)
 
-        if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
-            probe_vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+        if 'flapratio' in cfg['prune_method']:
+            probe_vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
         else:
-            probe_vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+            probe_vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
         
         self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
-        self.q_head_dim, self.k_head_dim = self.v_head_dim, self.v_head_dim
         probe_qk_out_dim_indices = probe_vo_out_dim_indices
 
         self.q_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
@@ -808,11 +628,8 @@ class LlamaAttention(nn.Module):
             use_cache: bool = False,
             **kwargs
         ):
-        time_start = time.time()
         # full inference
         bsz, q_len, _ = hidden_states.size()
-        # print('attn hiddenstate device', hidden_states.device)
-        # print('q proj device', self.q_proj.weight.device)
 
         if self.config.pretraining_tp > 1:
             key_value_slicing = (self.num_key_value_heads * self.head_dim) // self.config.pretraining_tp
@@ -845,7 +662,6 @@ class LlamaAttention(nn.Module):
             kv_seq_len += past_key_value[0].shape[-2]
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
-        # print('query_states key_states after rotary', query_states, key_states, flush=True)
         if past_key_value is not None:
             # reuse k, v, self_attention
             key_states = torch.cat([past_key_value[0], key_states], dim=2)
@@ -878,7 +694,6 @@ class LlamaAttention(nn.Module):
         # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
         # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
         attn_output = torch.matmul(attn_weights, value_states)
-        # print('attn_output after value', attn_output)
 
         if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
             raise ValueError(
@@ -887,8 +702,6 @@ class LlamaAttention(nn.Module):
             )
 
         attn_output = attn_output.transpose(1, 2).contiguous()
-
-        # attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
         attn_output = attn_output.reshape(bsz, q_len, self.num_heads * self.head_dim)
         if self.config.pretraining_tp > 1:
             attn_output = attn_output.split(self.hidden_size // self.config.pretraining_tp, dim=2)
@@ -900,8 +713,6 @@ class LlamaAttention(nn.Module):
         if not output_attentions:
             attn_weights = None
 
-        custom_duration = time.time() - time_start
-        # print('custom_duration llama attention', custom_duration, flush=True)
         return attn_output, attn_weights, past_key_value
 
 
@@ -946,8 +757,6 @@ class LlamaAttention(nn.Module):
             elif cfg['calibration_stage'] == False :
                 bsz, q_len, _ = hidden_states.size()
                 probe_qk_out_dim_indices, probe_vo_out_dim_indices = None, None
-                # if self.layer_order == 31:
-                #     return self.attention_forward(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
                 if 'probe' in cfg['prune_method']:
                     qk_prune_way = cfg['qk_prune_way']
                     vo_prune_way = cfg['vo_prune_way']
@@ -962,25 +771,22 @@ class LlamaAttention(nn.Module):
                     elif cfg['mode'] == 'asyncintra':
                         # if not, do full inference
                         if 'input_layernorm_mlp_residual' in kwargs:
-                            # print('post_layernorm_attn_residual', flush=True)
-                            _, _, _, _, _, _ = self.probe_process(kwargs['input_layernorm_mlp_residual'], attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
+                            _, _, _, _, _ = self.probe_process(kwargs['input_layernorm_mlp_residual'], attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
                             return
+                        else:
+                            raise ValueError('Invalid input for asyncintra mode')
                     
                     # --------------------------------------
-                    #full inference with adding some info to layer input
+                    #full inference
                     bsz, q_len, _ = hidden_states.size()
-
 
                     query_states = self.q_proj(hidden_states, out_dim_indices=probe_qk_out_dim_indices)
                     key_states = self.k_proj(hidden_states, out_dim_indices=probe_qk_out_dim_indices)
                     value_states = self.v_proj(hidden_states, out_dim_indices=probe_vo_out_dim_indices)
 
-                    # query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-                    # key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-                    # value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-                    query_states = query_states.view(bsz, q_len, self.q_num_heads, self.q_head_dim).transpose(1, 2)
-                    key_states = key_states.view(bsz, q_len, self.k_num_heads, self.k_head_dim).transpose(1, 2)
-                    value_states = value_states.view(bsz, q_len, self.v_num_heads, self.v_head_dim).transpose(1, 2)
+                    query_states = query_states.view(bsz, q_len, self.q_num_heads, self.head_dim).transpose(1, 2)
+                    key_states = key_states.view(bsz, q_len, self.k_num_heads, self.head_dim).transpose(1, 2)
+                    value_states = value_states.view(bsz, q_len, self.v_num_heads, self.head_dim).transpose(1, 2)
 
                     kv_seq_len = key_states.shape[-2]
                     if past_key_value is not None:
@@ -1010,24 +816,23 @@ class LlamaAttention(nn.Module):
                                 f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                             )
                         attn_weights = attn_weights + attention_mask
-                        # attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
 
                     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
 
                     attn_output = torch.matmul(attn_weights, value_states)
-                    if attn_output.size() != (bsz, self.v_num_heads, q_len, self.v_head_dim):
+                    if attn_output.size() != (bsz, self.v_num_heads, q_len, self.head_dim):
                         raise ValueError(
-                            f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.v_head_dim)}, but is"
+                            f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.head_dim)}, but is"
                             f" {attn_output.size()}"
                         )
                     attn_output = attn_output.transpose(1, 2).contiguous()
-                    attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.v_head_dim)
+                    attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.head_dim)
 
                     attn_output = self.o_proj(attn_output, in_dim_indices=probe_vo_out_dim_indices)
 
-                    if cfg['mode'] == 'asyncinter':
-                        with torch.cuda.stream(cfg['cuda_stream1']):
-                            _, _, _, _, _, _ = self.probe_process(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
+                    # if cfg['mode'] == 'asyncinter':
+                    #     with torch.cuda.stream(cfg['cuda_stream1']):
+                    #         _, _, _, _, _, _ = self.probe_process(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
                             
                     if not output_attentions:
                         attn_weights = None
@@ -1044,12 +849,9 @@ class LlamaAttention(nn.Module):
                     key_states = self.k_proj(hidden_states)
                     value_states = self.v_proj(hidden_states)
 
-                    # query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-                    # key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-                    # value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-                    query_states = query_states.view(bsz, q_len, self.q_num_heads, self.q_head_dim).transpose(1, 2)
-                    key_states = key_states.view(bsz, q_len, self.k_num_heads, self.k_head_dim).transpose(1, 2)
-                    value_states = value_states.view(bsz, q_len, self.v_num_heads, self.v_head_dim).transpose(1, 2)
+                    query_states = query_states.view(bsz, q_len, self.q_num_heads, self.head_dim).transpose(1, 2)
+                    key_states = key_states.view(bsz, q_len, self.k_num_heads, self.head_dim).transpose(1, 2)
+                    value_states = value_states.view(bsz, q_len, self.v_num_heads, self.head_dim).transpose(1, 2)
 
                     kv_seq_len = key_states.shape[-2]
                     if past_key_value is not None:
@@ -1079,18 +881,17 @@ class LlamaAttention(nn.Module):
                                 f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                             )
                         attn_weights = attn_weights + attention_mask
-                        # attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
 
                     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
 
                     attn_output = torch.matmul(attn_weights, value_states)
-                    if attn_output.size() != (bsz, self.v_num_heads, q_len, self.v_head_dim):
+                    if attn_output.size() != (bsz, self.v_num_heads, q_len, self.head_dim):
                         raise ValueError(
-                            f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.v_head_dim)}, but is"
+                            f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.head_dim)}, but is"
                             f" {attn_output.size()}"
                         )
                     attn_output = attn_output.transpose(1, 2).contiguous()
-                    attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.v_head_dim)
+                    attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.head_dim)
 
                     attn_output = self.o_proj(attn_output)
                             
@@ -1102,16 +903,13 @@ class LlamaAttention(nn.Module):
                             if torch.all(self.o_proj.get_global_metric_score_distribution() == 0):
                                 vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
                             else:
-                                # TODO: deal with rope
                                 out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
-                                if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
-                                    vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+                                if 'flapratio' in cfg['prune_method']:
+                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                 else:
-                                    # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
-                                    vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
                             self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
-                            self.q_head_dim, self.k_head_dim = self.v_head_dim, self.v_head_dim
                             qk_out_dim_indices = vo_out_dim_indices
                                     
                             self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
@@ -1134,12 +932,9 @@ class LlamaAttention(nn.Module):
                         key_states = self.k_proj(hidden_states)
                         value_states = self.v_proj(hidden_states)
 
-                        # query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-                        # key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-                        # value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-                        query_states = query_states.view(bsz, q_len, self.q_num_heads, self.q_head_dim).transpose(1, 2)
-                        key_states = key_states.view(bsz, q_len, self.k_num_heads, self.k_head_dim).transpose(1, 2)
-                        value_states = value_states.view(bsz, q_len, self.v_num_heads, self.v_head_dim).transpose(1, 2)
+                        query_states = query_states.view(bsz, q_len, self.q_num_heads, self.head_dim).transpose(1, 2)
+                        key_states = key_states.view(bsz, q_len, self.k_num_heads, self.head_dim).transpose(1, 2)
+                        value_states = value_states.view(bsz, q_len, self.v_num_heads, self.head_dim).transpose(1, 2)
 
                         kv_seq_len = key_states.shape[-2]
                         if past_key_value is not None:
@@ -1169,18 +964,16 @@ class LlamaAttention(nn.Module):
                                     f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                                 )
                             attn_weights = attn_weights + attention_mask
-                            # attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
 
                         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-
                         attn_output = torch.matmul(attn_weights, value_states)
-                        if attn_output.size() != (bsz, self.v_num_heads, q_len, self.v_head_dim):
+                        if attn_output.size() != (bsz, self.v_num_heads, q_len, self.head_dim):
                             raise ValueError(
-                                f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.v_head_dim)}, but is"
+                                f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.head_dim)}, but is"
                                 f" {attn_output.size()}"
                             )
                         attn_output = attn_output.transpose(1, 2).contiguous()
-                        attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.v_head_dim)
+                        attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.head_dim)
 
                         attn_output = self.o_proj(attn_output)
                                 
@@ -1190,26 +983,21 @@ class LlamaAttention(nn.Module):
                         if cfg['cur_batch_index'] == 0:
                             if torch.all(self.o_proj.get_global_metric_score_distribution() == 0):
                                 vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
-                                print('here0')
                             else:
                                 # TODO: deal with rope
                                 out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
-                                if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
-                                    print('here1')
-                                    vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+                                if 'flapratio' in cfg['prune_method']:
+                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                 else:
-                                    # probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, multiple)
-                                    vo_out_dim_indices, self.v_num_heads, self.v_head_dim = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
                             self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
-                            self.q_head_dim, self.k_head_dim = self.v_head_dim, self.v_head_dim
                             qk_out_dim_indices = vo_out_dim_indices
                                     
                             self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
                             self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
                             self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
                             self.o_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
-                        
                         return attn_output, attn_weights, past_key_value
                     else:
                         raise ValueError('Invalid mode')
@@ -1308,7 +1096,7 @@ class LlamaDecoderLayer(nn.Module):
         if self.check_asyncintra_mlp():
             torch.cuda.synchronize(cfg['cuda_default_stream'])
 
-        def full_attn_inf(result_dict, hidden_states):
+        def full_attn_inf(result_dict, hidden_states, residual):
             try:
                 hidden_states = self.input_layernorm(hidden_states)
                 hidden_states, self_attn_weights, present_key_value = self.self_attn(
@@ -1334,7 +1122,7 @@ class LlamaDecoderLayer(nn.Module):
                         post_layernorm_attn_residual = self.post_attention_layernorm(residual)
                         if 'resinfo' in cfg['prune_method']: 
                             result_dict['post_layernorm_attn_residual'] = post_layernorm_attn_residual
-                        self.mlp(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual)
+                        self.mlp(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual, respick=residual)
                     except Exception as e:
                         print(f"Error in probe_mlp_inf: {e}")
                         traceback.print_exc() 
@@ -1342,7 +1130,7 @@ class LlamaDecoderLayer(nn.Module):
         # Create threads
         full_attn_inf_result = {}
         probe_mlp_inf_result = {}
-        thread1 = threading.Thread(target=full_attn_inf, args=(full_attn_inf_result, hidden_states))
+        thread1 = threading.Thread(target=full_attn_inf, args=(full_attn_inf_result, hidden_states, residual))
         thread2 = threading.Thread(target=probe_mlp_inf, args=(probe_mlp_inf_result, residual))
 
         # Start the threads
@@ -1353,20 +1141,9 @@ class LlamaDecoderLayer(nn.Module):
 
 
         hidden_states = full_attn_inf_result['hidden_states']
-        # self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
-        # print('no------norm')
-        # print('self.layer_order', self.layer_order, flush=True)
-        # print('no------norm self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
-        # print('no------norm self.attn_l1_diff_percentage', self.attn_l1_diff_percentage, flush=True)
-        # print('no------norm self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
-        
         residual = hidden_states
         if self.check_asyncintra_attention():
-            # wait until the main stream is done
-            # print('wait')
             torch.cuda.synchronize(cfg['cuda_default_stream'])
-        # if self.check_asyncintra_attention():
-        #     cfg[f'cuda_events_mlp_{self.layer_order}'].record(cfg['cuda_default_stream'])
 
         if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_mlp():
             self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(self.post_attention_layernorm(hidden_states), probe_mlp_inf_result['post_layernorm_attn_residual'])
@@ -1375,7 +1152,7 @@ class LlamaDecoderLayer(nn.Module):
             print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
             
 
-        def full_mlp_inf(result_dict, hidden_states):
+        def full_mlp_inf(result_dict, hidden_states, residual):
             try:
                 hidden_states = self.post_attention_layernorm(hidden_states)
                 hidden_states = self.mlp(hidden_states, respick=residual)
@@ -1399,6 +1176,7 @@ class LlamaDecoderLayer(nn.Module):
                             output_attentions=output_attentions,
                             use_cache=use_cache,
                             input_layernorm_mlp_residual=input_layernorm_mlp_residual,
+                            respick=residual
                         )
                         if 'resinfo' in cfg['prune_method']: 
                             result_dict['input_layernorm_mlp_residual'] = input_layernorm_mlp_residual
@@ -1409,7 +1187,7 @@ class LlamaDecoderLayer(nn.Module):
         
         full_mlp_inf_result = {}
         probe_attn_inf_result = {}
-        thread1 = threading.Thread(target=full_mlp_inf, args=(full_mlp_inf_result, hidden_states))
+        thread1 = threading.Thread(target=full_mlp_inf, args=(full_mlp_inf_result, hidden_states, residual))
         # print('residual before', residual[0])
         thread2 = threading.Thread(target=probe_attn_inf, args=(probe_attn_inf_result, residual))
 
@@ -1850,10 +1628,6 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
 
-            # shift_logits = logits[..., :-1, :]
-            # shift_labels = labels[..., 1:]
-            # print('shift_logits', shift_logits, shift_logits.shape, flush=True)
-            # print('shift_labels', shift_labels, shift_labels.shape, flush=True)
             # Flatten the tokens
             loss_fct = CrossEntropyLoss()
             shift_logits = shift_logits.view(-1, self.config.vocab_size)
@@ -1861,8 +1635,6 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             # Enable model parallelism
             shift_labels = shift_labels.to(shift_logits.device)
             loss = loss_fct(shift_logits, shift_labels)
-
-            # loss = torch.tensor(5, device=logits.device)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
