@@ -2,27 +2,23 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import model
-from torchvision import transforms
 from transformers import get_linear_schedule_with_warmup
 from config import cfg
-from diffusers import DDPMScheduler
-from .huggingface import make_hf_model
-
-from module import TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING
+from .huggingface import make_hf_model, make_local_tuned_model
 
 
-def make_model(model_name, sub_model_name=None):
-    if cfg['task_name'] in ['s2s', 'sc', 'clm', 'csr', 't2i']:
-        model, tokenizer = make_hf_model(model_name, sub_model_name)
-        # base_model_name_or_path = model.__dict__.get("name_or_path", None)
-        model_config = getattr(model, "config", {"model_type": "custom"})
-        if hasattr(model_config, "to_dict"):
-            model_config = model_config.to_dict()
-        model_type = model_config["model_type"]
-        cfg['model_type'] = model_type
-
-        
+def make_model(model_name):
+    if cfg['task_name'] in ['clm', 'csr']:
+        if 'llmpruner' in cfg['prune_method'] or 'loraprune' in cfg['prune_method']:
+            model, tokenizer = make_local_tuned_model(model_name)
+            return model, tokenizer
+        else:
+            model, tokenizer = make_hf_model(model_name)
+            model_config = getattr(model, "config", {"model_type": "custom"})
+            if hasattr(model_config, "to_dict"):
+                model_config = model_config.to_dict()
+            model_type = model_config["model_type"]
+            cfg['model_type'] = model_type
     else:
         model = eval('model.{}()'.format(model_name))
         model = model.to(cfg['device'])
@@ -154,32 +150,3 @@ def make_scheduler(optimizer, tag):
     else:
         raise ValueError('Not valid scheduler name')
     return scheduler
-
-
-def make_noise_scheduler(tag):
-    if 'noise_scheduler_name' not in cfg[tag]:
-        raise ValueError('Not valid noise scheduler name')
-
-    if cfg[tag]['noise_scheduler_name'] == 'DDPM':
-        noise_scheduler = DDPMScheduler(
-            beta_start=cfg[tag]['beta_start'],
-            beta_end=cfg[tag]['beta_end'],
-            beta_schedule=cfg[tag]['beta_schedule'],
-            num_train_timesteps=cfg[tag]['num_train_timesteps'],
-        )
-    else:
-        raise ValueError('Not valid noise scheduler name')
-    return noise_scheduler
-
-def freeze_model(model):
-    if cfg['ft_name'] == 'cola':
-        for n, p in model.named_parameters():
-            p.requires_grad = False
-    return
-
-
-def unfreeze_model(model):
-    if cfg['ft_name'] == 'cola':
-        for n, p in model.named_parameters():
-            p.requires_grad = True
-    return

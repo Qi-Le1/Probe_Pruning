@@ -23,7 +23,7 @@ def check_calib_saving_info():
     # prune_ratio
     name_list[6] = 'None'
     # prune_method
-    name_list[8] = 'None'
+    name_list[8] = 'None' if 'skip' not in cfg['model_tag'] else name_list[8]
     # mode
     name_list[9] = 'None'
     # prune_info
@@ -31,7 +31,7 @@ def check_calib_saving_info():
     # cust_tgt_modules
     name_list[12] = 'None'
     calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
-    if os.path.exists(calibsavinginfo_path):
+    if os.path.exists(calibsavinginfo_path) and load(calibsavinginfo_path) is not None:
         return True
     return False
 
@@ -49,7 +49,7 @@ def load_calib_saving_info(model):
     # prune_ratio
     name_list[6] = 'None'
     # prune_method
-    name_list[8] = 'None'
+    name_list[8] = 'None' if 'skip' not in cfg['model_tag'] else name_list[8]
     # mode
     name_list[9] = 'None'
     # prune_info
@@ -59,11 +59,12 @@ def load_calib_saving_info(model):
     calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
     
     # Load the calibration data
-    calibration_data = load(calibsavinginfo_path, mode='torch')
+    calibration_data = load(calibsavinginfo_path)
 
     # Apply the loaded calibration data to the model
     for key, value in calibration_data.items():
-        module_name, attr_name = key.rsplit('_', 1)
+        module_name, attr_name = key.rsplit('+', 1)
+        print(f"Applying calibration data to {module_name}.{attr_name}...")
         module = dict(model.named_modules())[module_name]
         setattr(module, attr_name, value)
     print("Calibration data applied to the model successfully.")
@@ -74,6 +75,7 @@ def load_calib_saving_info(model):
 def save_calib_info(model):
     current_script_dir = os.path.dirname(__file__)
     result_path = os.path.join(current_script_dir, '..', 'output', 'result', 'calibsavinginfo')
+    makedir_exist_ok(result_path)
     name_list = cfg['model_tag'].split('_')
     # data_name
     name_list[1] = 'None'
@@ -84,7 +86,7 @@ def save_calib_info(model):
     # prune_ratio
     name_list[6] = 'None'
     # prune_method
-    name_list[8] = 'None'
+    name_list[8] = 'None' if 'skip' not in cfg['model_tag'] else name_list[8]
     # mode
     name_list[9] = 'None'
     # prune_info
@@ -92,17 +94,17 @@ def save_calib_info(model):
     # cust_tgt_modules
     name_list[12] = 'None'
     calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
-    makedir_exist_ok(calibsavinginfo_path)
-
+    
     all_calin_info = {}
     for name, module in model.named_modules():
         if hasattr(module, 'return_global_metric_info'):
             data = module.return_global_metric_info()
             if data is not None:
                 for key, value in data.items():
-                    all_calin_info[f"{name}_{key}"] = value
+                    all_calin_info[f"{name}+{key}"] = value
             
-    save(all_calin_info, calibsavinginfo_path, mode='torch')
+    save(all_calin_info, calibsavinginfo_path)
+    print("Calibration data saved successfully.")
     return
     
 

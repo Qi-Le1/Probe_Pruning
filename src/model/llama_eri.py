@@ -62,7 +62,7 @@ class LlamaEriModel(torch.nn.Module):
         target_modules = _get_target_modules(cfg)
         print('target_modules: ', target_modules)
         for key in key_list:
-            if 'dense' in cfg['prune_method']:
+            if 'dense' in cfg['prune_method'] or 'llmpruner' in cfg['prune_method'] or 'loraprune' in cfg['prune_method']:
                 continue
 
             if not _check_target_module_exists(target_modules, key):
@@ -70,8 +70,6 @@ class LlamaEriModel(torch.nn.Module):
             
             if check_skip_layers(key):
                 continue
-
-            print('Replaced Layer Keys', key, flush=True)
 
             is_target_modules_in_base_model = True
             parent, target, target_name = _get_submodules(self.model, key)
@@ -407,7 +405,8 @@ class Linear(nn.Linear, EriLayer):
             previous_dtype = x.dtype
             if cfg['calibration_stage'] == True:
                 # running mean
-                self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
+                if 'o_proj' in self.key or 'down_proj' in self.key:
+                    self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
                 result = F.linear(x, self.weight, bias=None)
                     # print('calibrateresult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)

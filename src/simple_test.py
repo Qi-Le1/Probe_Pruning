@@ -1,49 +1,104 @@
 
+# import torch
+# import time
+# print("PyTorch version:", torch.__version__)
+# print("CUDA available:", torch.cuda.is_available())
+# if torch.cuda.is_available():
+#     print("CUDA version:", torch.version.cuda)
+# print(torch.__version__)
+# print(torch.version.cuda)
+# print(torch.backends.cudnn.version())
+# '''
+# PyTorch version: 2.0.1+cu117
+# CUDA available: True
+# CUDA version: 11.7
+# 2.0.1+cu117
+# 11.7
+# 8906
+
+# System: ubuntu 20.04
+# GPU: NVIDIA GeForce RTX 4090
+# '''
+# import re
+# import torch
+
+# # input1 = 'each0.1+0.1'
+# # input2 = 'each'
+# # input3 = 'each0.1'
+# # float_pattern = re.compile(r'\d*\.?\d+')
+# # # Find all matches and convert them to floats
+# # floats1 = [float(match) for match in float_pattern.findall(input1)]
+# # floats2 = [float(match) for match in float_pattern.findall(input2)]
+# # floats3 = [float(match) for match in float_pattern.findall(input3)]
+
+# # print(floats1, floats2, floats3)
+# import torch
+
+# import matplotlib.pyplot as plt
+# import numpy as np
+
+# import matplotlib.pyplot as plt
+# import numpy as np
+
+# # Generating example data
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+# import numpy as np
+
+import argparse
+
 import torch
-import time
-print("PyTorch version:", torch.__version__)
-print("CUDA available:", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("CUDA version:", torch.version.cuda)
-print(torch.__version__)
-print(torch.version.cuda)
-print(torch.backends.cudnn.version())
-'''
-PyTorch version: 2.0.1+cu117
-CUDA available: True
-CUDA version: 11.7
-2.0.1+cu117
-11.7
-8906
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from LLMPruner.peft import PeftModel
 
-System: ubuntu 20.04
-GPU: NVIDIA GeForce RTX 4090
-'''
-import re
-import torch
+def load(model_type: str = 'pruneLLM', base_model: str = 'llama2-7b', ckpt: str = '', lora_ckpt: str = ''):
+    if model_type == 'pruneLLM':
+        pruned_dict = torch.load(ckpt, map_location='cpu')
+        tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
+    elif model_type == 'tune_prune_LLM':
+        pruned_dict = torch.load(ckpt, map_location='cpu')
+        tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
+        model = PeftModel.from_pretrained(
+            model,
+            lora_ckpt,
+            torch_dtype=torch.float16,
+        )
+    else:
+        raise NotImplementedError
 
-# input1 = 'each0.1+0.1'
-# input2 = 'each'
-# input3 = 'each0.1'
-# float_pattern = re.compile(r'\d*\.?\d+')
-# # Find all matches and convert them to floats
-# floats1 = [float(match) for match in float_pattern.findall(input1)]
-# floats2 = [float(match) for match in float_pattern.findall(input2)]
-# floats3 = [float(match) for match in float_pattern.findall(input3)]
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
 
-# print(floats1, floats2, floats3)
-import torch
+    if device == "cuda":
+        model.half()
+        model = model.cuda()
 
-import matplotlib.pyplot as plt
-import numpy as np
+    # unwind broken decapoda-research config
+    model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
+    model.config.bos_token_id = 1
+    model.config.eos_token_id = 2
+    return model, tokenizer
 
-import matplotlib.pyplot as plt
-import numpy as np
+base_model = 'pytorch_model.bin'
+for i in ['results/seed0', 'results/seed1']:
+    for j in ['llmpruner_prune_tune_block_param1_3_31_0.23_0.2_c4',
+                'llmpruner_prune_tune_block_param1_3_31_0.46_0.4_c4',
+                'llmpruner_prune_tune_block_param1_3_31_0.68_0.6_c4']:
+        model, tokenizer = load("pruneLLM", ckpt=i + '/' + j + '/' + base_model)
+        model.eval()
+        # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
+        # print(f"pruneLLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
+        # del model
 
-# Generating example data
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
+        # model, tokenizer = load("tune_prune_LLM", ckpt=i + '/' + j + '/' + base_model, lora_ckpt=i + '/' + j)
+        # model.eval()
+        # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
+        # print(f"tune_prune_LLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
+        # del model
+
+
 
 # Data setup
 # Generate arrays of pruning ratios from 0.1 to 1.0, incrementing by 0.1

@@ -4,18 +4,13 @@ import math
 import torch
 import torch.nn as nn
 from config import cfg
-from diffusers import (
-    AutoencoderKL,
-    DiffusionPipeline,
-    UNet2DConditionModel,
-)
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModelForSequenceClassification, \
     AutoTokenizer, LlamaTokenizer, AutoModelForMultipleChoice, AutoModel, AutoConfig
 # from transformers import LlamaForCausalLM
-from .hf.modeling_llama import LlamaForCausalLM
-from .hf.modeling_opt import OPTForCausalLM
+
 from module import MULTIGPUS_MODEL_NAME_LIST, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING
 from accelerate import infer_auto_device_map ,init_empty_weights
+from LLMPruner import PeftModel
 
 # def check_multiple_for_tensor_cores(data_type):
 #     if data_type == torch.float16:
@@ -25,9 +20,89 @@ from accelerate import infer_auto_device_map ,init_empty_weights
 #             else:
 #                 return 8
 
+def llmpruner_load(model_type: str = 'pruneLLM', ckpt: str = '', lora_ckpt: str = ''):
+    if model_type == 'pruneLLM':
+        pruned_dict = torch.load(ckpt, map_location='cpu')
+        model = pruned_dict['tokenizer'], pruned_dict['model']
+    elif model_type == 'tune_prune_LLM':
+        pruned_dict = torch.load(ckpt, map_location='cpu')
+        model = pruned_dict['tokenizer'], pruned_dict['model']
+        model = PeftModel.from_pretrained(
+            model,
+            lora_ckpt,
+            torch_dtype=torch.float16,
+        )
+    else:
+        raise NotImplementedError
 
-def make_hf_model(model_name, sub_model_name=None):
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
 
+    if device == "cuda":
+        model.half()
+        model = model.cuda()
+
+    # # unwind broken decapoda-research config
+    # model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
+    # model.config.bos_token_id = 1
+    # model.config.eos_token_id = 2
+    return model
+
+
+def make_local_tuned_model(model_name):
+    if 'llama' in model_name:
+        print('model_name', model_name)
+        if 'llmpruner' in cfg['prune_method']:
+            model_path = f"output/llmpruner/{cfg['init_seed']}_llmpruner_{model_name}_{cfg['prune_ratio']}/pytorch_model.bin"
+            lora_path = f"output/llmpruner/{cfg['init_seed']}_llmpruner_{model_name}_{cfg['prune_ratio']}"
+
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(f"Model file not found: {model_path}")
+            if not os.path.exists(lora_path):
+                raise FileNotFoundError(f"Model file not found: {lora_path}")
+            
+            if 'llmpruner-prune' in cfg['prune_method']:
+                model = llmpruner_load(model_type='pruneLLM', ckpt=model_path)
+            elif 'llmpruner-tune' in cfg['prune_method']:
+                model = llmpruner_load(model_type='tune_prune_LLM', ckpt=model_path, lora_ckpt=lora_path)
+            else:
+                raise NotImplementedError
+        elif 'loraprune' in cfg['prune_method']:
+            pass
+    else:
+        raise ValueError('Not valid model name')
+    
+    if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
+        padding_side = "left"
+    else:
+        padding_side = "right"
+
+    if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
+        if cfg['max_seq_len'] > model.config.max_position_embeddings:
+            raise ValueError(
+                f"seq_len ({cfg['max_seq_len']}) is larger than max_position_embeddings ({model.config.max_position_embeddings})."
+            )
+
+    if 'llama' in model_name:
+        tokenizer = LlamaTokenizer.from_pretrained(model_name, padding_side=padding_side)
+        
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+
+    if any(k in model_name for k in ("llama")):
+        model.config.pad_token_id = tokenizer.pad_token_id
+
+    cfg['pad_token_id'] = tokenizer.pad_token_id    
+
+    model.config.use_cache = False
+    return model, tokenizer
+
+
+def make_hf_model(model_name):
+    from .hf.modeling_llama import LlamaForCausalLM
+    from .hf.modeling_opt import OPTForCausalLM
 
     if model_name in MULTIGPUS_MODEL_NAME_LIST:
         device_map = "auto"
@@ -49,7 +124,6 @@ def make_hf_model(model_name, sub_model_name=None):
         #             device_map = "auto"
         device_map = "auto"
         # low_cpu_mem_usage = False
-    print('device_map', device_map)
     if 'opt' in model_name:
         # https://huggingface.co/facebook/opt-1.3b
         # if '1.3b' in model_name:
@@ -63,7 +137,7 @@ def make_hf_model(model_name, sub_model_name=None):
         else:
             cfg['model_name_or_path'] = f"facebook/{cfg['model_name']}"
             cfg['tokenizer_name_or_path'] = f"facebook/{cfg['model_name']}"
-    elif 'llama-2' in model_name:
+    elif 'llama' in model_name:
         # https://huggingface.co/docs/transformers/main/model_doc/llama2
         # FOLLOW the instruction to run the script: python convert_llama_weights_to_hf.py --input_dir /path/to/downloaded/llama/weights --model_size 7B --output_dir output/llama-2-7b
         # in the above py file, change line 270 to model = LlamaForCausalLM.from_pretrained(tmp_model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True), need float16 not bfloat16
@@ -100,7 +174,7 @@ def make_hf_model(model_name, sub_model_name=None):
     else:
         raise ValueError('Not valid task name')
     
-    if any(k in cfg['model_name_or_path'] for k in ("gpt", "opt", "bloom", "llama")):
+    if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
         padding_side = "left"
         # produce nan if we pad input text to the left
         # if cfg['task_name'] == 'csr':
@@ -121,7 +195,7 @@ def make_hf_model(model_name, sub_model_name=None):
                                                   padding_side=padding_side)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
-    if any(k in model_name for k in ("gpt", "llama-2")):
+    if any(k in model_name for k in ("llama")):
         model.config.pad_token_id = tokenizer.pad_token_id
     if 'opt' in model_name:
         model.config.end_token_id = tokenizer.eos_token_id

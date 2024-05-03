@@ -1,20 +1,8 @@
-import re
-import copy
-import math
-import time
-import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import warnings
-import random
-import collections
 from config import cfg
 from module import nearest_multiple, check_skip_layers
-import matplotlib.pyplot as plt
-import os
 
-        
+
 class HiddenRepresentationPruning():
 
     def __init__(self, cfg, key, modelconfig=None):
