@@ -6,7 +6,145 @@ import pickle
 import torch
 from torchvision.utils import save_image
 from .utils import recur
+from config import cfg
 
+
+
+def check_calib_saving_info():
+    current_script_dir = os.path.dirname(__file__)
+    result_path = os.path.join(current_script_dir, '..', 'output', 'result', 'calibsavinginfo')
+    name_list = cfg['model_tag'].split('_')
+    # data_name
+    name_list[1] = 'None'
+    # task_name
+    name_list[3] = 'None'
+    # batch_size
+    name_list[4] = 'None'
+    # prune_ratio
+    name_list[6] = 'None'
+    # prune_method
+    name_list[8] = 'None'
+    # mode
+    name_list[9] = 'None'
+    # prune_info
+    name_list[11] = 'None'
+    # cust_tgt_modules
+    name_list[12] = 'None'
+    calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
+    if os.path.exists(calibsavinginfo_path):
+        return True
+    return False
+
+
+def load_calib_saving_info(model):
+    current_script_dir = os.path.dirname(__file__)
+    result_path = os.path.join(current_script_dir, '..', 'output', 'result', 'calibsavinginfo')
+    name_list = cfg['model_tag'].split('_')
+    # data_name
+    name_list[1] = 'None'
+    # task_name
+    name_list[3] = 'None'
+    # batch_size
+    name_list[4] = 'None'
+    # prune_ratio
+    name_list[6] = 'None'
+    # prune_method
+    name_list[8] = 'None'
+    # mode
+    name_list[9] = 'None'
+    # prune_info
+    name_list[11] = 'None'
+    # cust_tgt_modules
+    name_list[12] = 'None'
+    calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
+    
+    # Load the calibration data
+    calibration_data = load(calibsavinginfo_path, mode='torch')
+
+    # Apply the loaded calibration data to the model
+    for key, value in calibration_data.items():
+        module_name, attr_name = key.rsplit('_', 1)
+        module = dict(model.named_modules())[module_name]
+        setattr(module, attr_name, value)
+    print("Calibration data applied to the model successfully.")
+    return
+
+
+
+def save_calib_info(model):
+    current_script_dir = os.path.dirname(__file__)
+    result_path = os.path.join(current_script_dir, '..', 'output', 'result', 'calibsavinginfo')
+    name_list = cfg['model_tag'].split('_')
+    # data_name
+    name_list[1] = 'None'
+    # task_name
+    name_list[3] = 'None'
+    # batch_size
+    name_list[4] = 'None'
+    # prune_ratio
+    name_list[6] = 'None'
+    # prune_method
+    name_list[8] = 'None'
+    # mode
+    name_list[9] = 'None'
+    # prune_info
+    name_list[11] = 'None'
+    # cust_tgt_modules
+    name_list[12] = 'None'
+    calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
+    makedir_exist_ok(calibsavinginfo_path)
+
+    all_calin_info = {}
+    for name, module in model.named_modules():
+        if hasattr(module, 'return_global_metric_info'):
+            data = module.return_global_metric_info()
+            if data is not None:
+                for key, value in data.items():
+                    all_calin_info[f"{name}_{key}"] = value
+            
+    save(all_calin_info, calibsavinginfo_path, mode='torch')
+    return
+    
+
+def check_dense_model():
+    current_script_dir = os.path.dirname(__file__)
+    result_path = os.path.join(current_script_dir, '..', 'output', 'result')
+    dense_name_list = cfg['model_tag'].split('_')
+    # batch_size
+    dense_name_list[4] = str(cfg[cfg['model_name']]['batch_size']['test'])
+    # prune_ratio
+    dense_name_list[6] = '0'
+    # prune_metric
+    dense_name_list[7] = 'None'
+    # prune_method
+    dense_name_list[8] = 'dense'
+    # mode
+    dense_name_list[9] = 'None'
+    # calib_info
+    dense_name_list[10] = 'None'
+    # prune_info
+    dense_name_list[11] = 'None'
+    # cust_tgt_modules
+    dense_name_list[12] = 'None'
+    dense_model_path = os.path.join(result_path, '_'.join(dense_name_list))
+    if not os.path.exists(dense_model_path):
+        dense_model_path = os.path.join(result_path, 'dense', '_'.join(dense_name_list))
+        if not os.path.exists(dense_model_path):
+            return None
+        else:
+            return dense_model_path
+    else:
+        return dense_model_path
+    
+
+def load_dense_model():    
+    from .io import load
+    dense_model_path = check_dense_model()
+    if dense_model_path is None:
+        return None, None
+    dense_res = load(dense_model_path)
+    dense_info_list, dense_duration = dense_res['dense_info_list'], dense_res['dense_duration']
+    return dense_info_list, dense_duration
 
 def remove_non_picklable_items(input_dict):
     non_picklable_keys = []
@@ -36,6 +174,41 @@ def makedir_exist_ok(path):
             raise
     return
 
+
+
+def save(input, path, mode='pickle'):
+    dirname = os.path.dirname(path)
+    makedir_exist_ok(dirname)
+    if mode == 'torch':
+        torch.save(input, path)
+    elif mode == 'np':
+        np.save(path, input, allow_pickle=True)
+    elif mode == 'pickle':
+        pickle.dump(input, open(path, 'wb'))
+    else:
+        raise ValueError('Not valid save mode')
+    return None
+
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+        else: return super().find_class(module, name)
+
+def load(path, mode='pickle'):
+    if not torch.cuda.is_available() and mode == 'pickle':
+        return CPU_Unpickler(open(path, 'rb')).load()
+    if mode == 'torch':
+        return torch.load(path, map_location=lambda storage, loc: storage)
+    elif mode == 'np':
+        return np.load(path, allow_pickle=True)
+    elif mode == 'pickle':
+        return pickle.load(open(path, 'rb'))
+    else:
+        raise ValueError('Not valid save mode')
+    return None
+
+
 # def save(input, path, mode='torch'):
 #     dirname = os.path.dirname(path)
 #     makedir_exist_ok(dirname)
@@ -59,39 +232,6 @@ def makedir_exist_ok(path):
 #     else:
 #         raise ValueError('Not valid save mode')
 #     return
-
-def save(input, path, mode='pickle'):
-    dirname = os.path.dirname(path)
-    makedir_exist_ok(dirname)
-    if mode == 'torch':
-        torch.save(input, path)
-    elif mode == 'np':
-        np.save(path, input, allow_pickle=True)
-    elif mode == 'pickle':
-        pickle.dump(input, open(path, 'wb'))
-    else:
-        raise ValueError('Not valid save mode')
-    return
-
-class CPU_Unpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        if module == 'torch.storage' and name == '_load_from_bytes':
-            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
-        else: return super().find_class(module, name)
-
-def load(path, mode='pickle'):
-    if not torch.cuda.is_available() and mode == 'pickle':
-        return CPU_Unpickler(open(path, 'rb')).load()
-    if mode == 'torch':
-        return torch.load(path, map_location=lambda storage, loc: storage)
-    elif mode == 'np':
-        return np.load(path, allow_pickle=True)
-    elif mode == 'pickle':
-        return pickle.load(open(path, 'rb'))
-    else:
-        raise ValueError('Not valid save mode')
-    return
-
 
 def save_img(img, path, nrow=10, padding=1, pad_value=0, value_range=None):
     makedir_exist_ok(os.path.dirname(path))

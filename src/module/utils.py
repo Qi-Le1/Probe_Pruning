@@ -58,47 +58,10 @@ def get_model_profile(tag, model_prof, onlyprobe=False):
         info_list.append(temp)
     return copy.deepcopy(info_list)
 
-def check_dense_model():
-    current_script_dir = os.path.dirname(__file__)
-    result_path = os.path.join(current_script_dir, '..', 'output', 'result')
-    dense_name_list = cfg['model_tag'].split('_')
-    # batch_size
-    dense_name_list[4] = str(cfg[cfg['model_name']]['batch_size']['test'])
-    # prune_ratio
-    dense_name_list[6] = '0'
-    # prune_metric
-    dense_name_list[7] = 'None'
-    # prune_method
-    dense_name_list[8] = 'dense'
-    # mode
-    dense_name_list[9] = 'None'
-    # calib_info
-    dense_name_list[10] = 'None'
-    # prune_info
-    dense_name_list[11] = 'None'
-    # cust_tgt_modules
-    dense_name_list[12] = 'None'
-    dense_model_path = os.path.join(result_path, '_'.join(dense_name_list))
-    if not os.path.exists(dense_model_path):
-        dense_model_path = os.path.join(result_path, 'dense', '_'.join(dense_name_list))
-        if not os.path.exists(dense_model_path):
-            return None
-        else:
-            return dense_model_path
-    else:
-        return dense_model_path
-    
 
-def load_dense_model():    
-    from .io import load
-    dense_model_path = check_dense_model()
-    if dense_model_path is None:
-        return None, None
-    dense_res = load(dense_model_path)
-    dense_info_list, dense_duration = dense_res['dense_info_list'], dense_res['dense_duration']
-    return dense_info_list, dense_duration
     
 def summarize_info_list(pruned_info_list, pruned_duration, logger, dataset_size, onlyprobe_info_list=None):
+    from .io import load_dense_model
     # total = fullinf + probe
     # for asyncintra, the info has the dirty write issue because we open 2 streams, check sync mode for the correct info
     dense_info_list, dense_duration = load_dense_model()

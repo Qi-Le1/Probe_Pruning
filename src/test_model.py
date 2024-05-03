@@ -13,7 +13,8 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward, remove_non_picklable_items, check_dense_model
+    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward, remove_non_picklable_items, check_dense_model, \
+    check_calib_saving_info, load_calib_saving_info, save_calib_info
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 import matplotlib.pyplot as plt
 
@@ -60,7 +61,11 @@ def runExperiment():
         print('Running Calibration ...')
         calibration_data_loader = make_calibration_dataloader(tokenizer)
         cfg['calibration_stage'] = True
-        run_calibration(model, calibration_data_loader['train'])
+        if check_calib_saving_info() == True:
+            load_calib_saving_info(model)
+        else:
+            run_calibration(model, calibration_data_loader['train'])
+        save_calib_info(model)
         cfg['calibration_stage'] = False
         print('Calibration Done...')
     model_prof = FlopsProfiler(model)
@@ -138,6 +143,7 @@ def test(data_loader, model, model_prof, metric, logger):
             data_loader_iter = iter(data_loader)
             input = next(data_loader_iter)
             identify_pad_tokens(input)
+            print('hereee1')
             cfg['cur_batch_index'] += 1
             if cfg['task_name'] in ['clm']:
                 input_size = input['labels'].size(0)
@@ -151,7 +157,6 @@ def test(data_loader, model, model_prof, metric, logger):
                 input_size = input['labels'].size(0)
                 input_indices = input['input_indices']
                 correct_labels = input['correct_labels']
-                # print('input', input)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
@@ -167,7 +172,6 @@ def test(data_loader, model, model_prof, metric, logger):
                 output_ = {'target': output['target'], 'loss': output['loss']}
             torch.cuda.synchronize()
 
-            # start_time = time.time()
             model_prof.start_profile()
             model_prof.reset_profile()
             update_model_prof(model_prof)
@@ -220,22 +224,12 @@ def test(data_loader, model, model_prof, metric, logger):
                             # Append the attribute to the logger
                             logger.append({f'{name}_{attr_name}': attr_value}, 'test')
                 
-                # if i == 50:
-                # if i == 100:
-                #     break
-                # if i == 10:
-                #     break
-                # break
                 if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                     batch_time = (time.time() - start_time) / (i + 1)
                     exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
                     info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                     print('running_info', info)
-                # if i == 3:
-                #     break
-            # torch.cuda.synchronize()
-            # inference_duration = time.time() - start_time
-            # print('inference_duration', inference_duration)
+
             if cfg['onlyprobe'] == False: 
                 evaluation = metric.evaluate('test', 'full')
                 print('evaluation_for_full', evaluation)
@@ -252,8 +246,6 @@ def test(data_loader, model, model_prof, metric, logger):
                         # Retrieve the attribute value
                         attr_value = getattr(module, attr_name)
                         if len(attr_value) > 0:
-                            # Print the module name and attribute name
-                            # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
                             # Append the attribute to the logger
                             logger.append({f'{name}_{attr_name}': attr_value}, 'test')
 

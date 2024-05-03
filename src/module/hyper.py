@@ -75,6 +75,12 @@ def process_control():
             cfg['prune_method'] += '-ema'
             cfg['prune_method'] += '-respick'
 
+    cfg['mode'] = cfg['control']['mode']
+    if 'probe' not in cfg['prune_method'] and cfg['mode'] != 'asyncinter':
+        raise ValueError('mode is not valid, need to be asyncinter when not using probe')
+    if 'probe' in cfg['prune_method'] and cfg['mode'] not in ['asyncintra', 'sync']:
+        raise ValueError('mode is not valid, need to be asyncintra or sync when using probe')
+    
     prune_ratio_list = cfg['control']['prune_ratio'].split('-')
     if len(prune_ratio_list) == 1:
         # further update prune_ratio in make_model to match the mean prune ratio
@@ -107,7 +113,7 @@ def process_control():
         else:
             float_value = None
         
-    cfg['mode'] = cfg['control']['mode']
+    
     if torch.cuda.is_available():
         cfg['cuda_default_stream'] = torch.cuda.default_stream()
         # if 'asyncintra' in cfg['mode']:

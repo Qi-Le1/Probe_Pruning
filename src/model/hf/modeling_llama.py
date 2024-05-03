@@ -370,11 +370,11 @@ class LlamaMLP(nn.Module):
             down_proj = sum(down_proj)
         else:
             bsz, _, _ = x.shape
-            if ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
-                if cfg['calibration_stage'] == True:
-                    down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-                    return down_proj
-                elif cfg['calibration_stage'] == False:
+            if cfg['calibration_stage'] == True:
+                down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+                return down_proj
+            elif cfg['calibration_stage'] == False:
+                if ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
                     if 'probe' in cfg['prune_method']:
                         if cfg['mode'] == 'sync':
                             probe_out_dim_indices, probe_out = self.probe_process(x, **kwargs)
@@ -444,9 +444,9 @@ class LlamaMLP(nn.Module):
                         else:
                             raise ValueError('Invalid mode')
                         return down_proj
-            else:
-                down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-                return down_proj
+                else:
+                    down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+                    return down_proj
 
 def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     """
@@ -751,10 +751,10 @@ class LlamaAttention(nn.Module):
         #     self.num_key_value_heads = self.num_heads
         #     self.num_key_value_groups = 1
         #     self.modify_kv_for_llama_2_70b = False
-        if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
-            if cfg['calibration_stage'] == True:
-                return self.attention_forward(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
-            elif cfg['calibration_stage'] == False :
+        if cfg['calibration_stage'] == True:
+            return self.attention_forward(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
+        elif cfg['calibration_stage'] == False :
+            if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
                 bsz, q_len, _ = hidden_states.size()
                 probe_qk_out_dim_indices, probe_vo_out_dim_indices = None, None
                 if 'probe' in cfg['prune_method']:
@@ -1001,8 +1001,8 @@ class LlamaAttention(nn.Module):
                         return attn_output, attn_weights, past_key_value
                     else:
                         raise ValueError('Invalid mode')
-        else:
-            return self.attention_forward(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
+            else:
+                return self.attention_forward(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
 
 
 

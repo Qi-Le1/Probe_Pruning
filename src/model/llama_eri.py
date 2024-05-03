@@ -34,8 +34,6 @@ class LlamaEriModel(torch.nn.Module):
     
     def _create_new_module(self, target, key):
         bias = hasattr(target, "bias") and target.bias is not None
-        loaded_in_4bit = getattr(self.model, "is_loaded_in_4bit", False)
-        loaded_in_8bit = getattr(self.model, "is_loaded_in_8bit", False)
 
         in_features = getattr(target, 'in_features', None)
         out_features = getattr(target, 'out_features', None)
@@ -43,37 +41,17 @@ class LlamaEriModel(torch.nn.Module):
         kwargs = {
             "prune_metric": cfg['prune_metric'],
             "key": key,
-            "fan_in_fan_out": False,
             "dev": target.weight.device,
         }
-        # if isinstance(target, torch.nn.Embedding):
-        #     embedding_kwargs = kwargs.copy()
-        #     embedding_kwargs.pop("fan_in_fan_out", None)
-        #     in_features, out_features = target.num_embeddings, target.embedding_dim
-        #     new_module = Embedding(prune_name, in_features, out_features, **embedding_kwargs)
-        if isinstance(target, torch.nn.Conv2d):
-            out_channels, in_channels = target.weight.size()[:2]
-            kernel_size = target.weight.size()[2:]
-            stride = target.stride
-            padding = target.padding
-            dilation = target.dilation
-            groups = target.groups
-            new_module = Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, **kwargs)
+        
+        if isinstance(target, torch.nn.Linear):
+            in_features, out_features = target.in_features, target.out_features
         else:
-            if isinstance(target, torch.nn.Linear):
-                in_features, out_features = target.in_features, target.out_features
-            elif isinstance(target, Conv1D):
-                in_features, out_features = (
-                    target.weight.ds_shape if hasattr(target.weight, "ds_shape") else target.weight.shape
-                )
-                kwargs["fan_in_fan_out"] = True
-                kwargs["is_target_conv_1d_layer"] = True
-            else:
-                raise ValueError(
-                    f"Target module {target} is not supported. "
-                    f"Currently, only `torch.nn.Linear` and `Conv1D` are supported."
-                )
-            new_module = Linear(in_features, out_features, bias=bias, **kwargs)
+            raise ValueError(
+                f"Target module {target} is not supported. "
+                f"Currently, only `torch.nn.Linear` is supported."
+            )
+        new_module = Linear(in_features, out_features, bias=bias, **kwargs)
 
         return new_module
 
@@ -109,10 +87,7 @@ class LlamaEriModel(torch.nn.Module):
 
     def _replace_module(self, parent_module, child_name, new_module, old_module):
         setattr(parent_module, child_name, new_module)
-        fan_in_fan_out = getattr(new_module, "fan_in_fan_out", False)
-        # if fan_in_fan_out is True, the layer is conv1d layer in GPT2
-        # which is a self-defined layer, not the traditional Conv1D
-        new_module.weight = transpose(old_module.weight, fan_in_fan_out)
+        new_module.weight = old_module.weight
         new_module.weight.requires_grad = False
         new_module.device = old_module.weight.device
         new_module.is_pruned = True
@@ -124,10 +99,6 @@ class LlamaEriModel(torch.nn.Module):
         except AttributeError:
             return getattr(self.model, name)
 
-def transpose(weight, fan_in_fan_out):
-    transposed_weight = weight.T if fan_in_fan_out else weight
-    # return transposed_weight
-    return nn.Parameter(transposed_weight)
 
 def mark_no_trainable(model: nn.Module) -> None:
     for n, p in model.named_parameters():
@@ -160,7 +131,6 @@ class EriLayer:
         return weight[:, indices.to(self.weight.device)]
         # return torch.index_select(weight, dim=1, index=indices.to(self.weight.device))
            
-        
     def extract_out_dim_weight(self, weight, indices):
         return weight[indices.to(self.weight.device), :]
         # return torch.index_select(weight, dim=0, index=indices.to(self.weight.device))
@@ -170,7 +140,6 @@ class Linear(nn.Linear, EriLayer):
         self,
         in_features,
         out_features,
-        fan_in_fan_out: bool = False,  # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
         is_target_conv_1d_layer: bool = False,
         **kwargs,
     ):
@@ -178,9 +147,6 @@ class Linear(nn.Linear, EriLayer):
         EriLayer.__init__(self, in_features=in_features, out_features=out_features, **kwargs)
         # Freezing the pre-trained weight matrix
         self.weight.requires_grad = False
-
-        self.fan_in_fan_out = fan_in_fan_out
-        self.is_target_conv_1d_layer = is_target_conv_1d_layer
         self.layer_type = 'linear'
         self.in_features = in_features
         self.prune_metric = cfg['prune_metric']
@@ -194,15 +160,16 @@ class Linear(nn.Linear, EriLayer):
         if ('o_proj' in self.key or 'down_proj' in self.key) and cfg['mode'] == 'asyncinter':
             self.async_interbatch_in_dim_indices = torch.arange((in_features), device=self.weight.data.device, dtype=torch.int32)
 
-        self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
-        # set same shape for all baselines for comparison
-        self.baseline_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-        if 'wandasp' in self.prune_metric:
-            self.scaler_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-        elif "flap" in self.prune_metric:
-            self.fluc_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
-        else:
-            raise ValueError(f"Unknown pruning method")
+        if ('o_proj' in self.key or 'down_proj' in self.key):
+            self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
+            # set same shape for all baselines for comparison
+            self.baseline_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            if 'wandasp' in self.prune_metric:
+                self.scaler_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            elif "flap" in self.prune_metric:
+                self.fluc_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            else:
+                raise ValueError(f"Unknown pruning method")
 
 
     def update_global_metric_score_distribution_ema(self, inp, update_indices):
@@ -237,7 +204,6 @@ class Linear(nn.Linear, EriLayer):
                     inp[cfg['pad_tokens']] = 0
                     norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
                     self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / cfg['nonpad_tokens_denominator'], max=cfg['data_type_max'])
-                    # self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
                 else:
                     norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
                     self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
@@ -252,6 +218,10 @@ class Linear(nn.Linear, EriLayer):
             if torch.all(self.nsamples == 0):
                 pass
             else:
+                # flaps github code is not matching the paper formula: https://github.com/CASIA-IVA-Lab/FLAP
+                # If bsz is 1, it is not variance between the average of current batch channel and the average of channel.
+                # It is the sum of the variance between each element in the channel and the average of the channel.
+                # We follow their github code
                 self.fluc_inp[:seq_len, update_indices] *= (self.nsamples[update_indices] - 1) / (self.nsamples[update_indices] + batch_size - 1)
                 self.fluc_inp[:seq_len, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:seq_len, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:seq_len, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size) 
 
@@ -336,6 +306,26 @@ class Linear(nn.Linear, EriLayer):
             self.scaler_row = None
         torch.cuda.empty_cache()  
 
+    def return_global_metric_info(self):
+        if ('o_proj' in self.key or 'down_proj' in self.key):
+            if 'wandasp' in self.prune_metric:
+                return {
+                    'nsamples': self.nsamples,
+                    'baseline_inp': self.baseline_inp,
+                    'scaler_inp': self.scaler_inp
+                }
+            elif "flap" in self.prune_metric:
+                return {
+                    'nsamples': self.nsamples,
+                    'baseline_inp': self.baseline_inp,
+                    'fluc_inp': self.fluc_inp
+                }
+            else:
+                raise ValueError(f"Unknown pruning metric")
+        else:
+            return None
+
+
 
     def prepare_async_interbatch_weight(self, **kwargs):
         if 'out_dim_indices' in kwargs:
@@ -346,8 +336,7 @@ class Linear(nn.Linear, EriLayer):
             self.async_interbatch_in_dim_indices = kwargs['in_dim_indices']
         else:
             raise ValueError('Not valid input')
-        if self.async_interbatch_weight_index.device != self.weight.device:
-            self.async_interbatch_weight_index = self.async_interbatch_weight_index.to(self.weight.device)
+        self.async_interbatch_weight_index = self.async_interbatch_weight_index.to(self.weight.device)
         self.async_interbatch_weight_index += 1
         return
     
@@ -360,9 +349,7 @@ class Linear(nn.Linear, EriLayer):
             self.async_intrabatch_in_dim_indices = kwargs['in_dim_indices']
         else:
             raise ValueError('Not valid input')
-        # print('herererere')
-        if self.async_intrabatch_weight_index.device != self.weight.device:
-            self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
+        self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
         self.async_intrabatch_weight_index += 1
         return
 
@@ -386,12 +373,7 @@ class Linear(nn.Linear, EriLayer):
                 return self.weight
             # dont have the prepared weight for current batch
             # sync the stream1
-            if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:
-                # if self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
-                #     torch.cuda.synchronize(cfg['cuda_stream1'])
-                #     # time.sleep(0.001)
-                #     print('wait sync weight step end', self.key, self.async_interbatch_weight_index)
-                
+            if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:              
                 while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
                     # torch.cuda.synchronize(cfg['cuda_stream1'])
                     time.sleep(0.001)
