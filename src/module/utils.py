@@ -34,6 +34,7 @@ def get_model_profile(tag, model_prof, onlyprobe=False):
     info_list = []
     for name, module in model_prof.model.model.named_modules():
         temp = [name, module.__flops__, module.__params__, module.__macs__, type(module)]
+        print('name', name)
         # layer_order_matches = re.findall(r'\d+', name)
         # if layer_order_matches:  # Check if the list is not empty
         #     layer_order = int(layer_order_matches[0])  # Convert the first match to an integer
@@ -41,17 +42,21 @@ def get_model_profile(tag, model_prof, onlyprobe=False):
         #         continue
 
         if 'llama' in cfg['model_name']: 
-            if 'model.embed_tokens.weight' in name or 'model.norm.weight' in name or 'lm_head.weight' in name:
+            if 'model.embed_tokens' in name or 'model.norm' in name or 'lm_head' in name:
                 continue
 
             if onlyprobe:
-            #     # when only use probe, dont need to calculate for this 2 layers
-            #     # just use to match the output shape
-            #     if 'down_proj' in name or 'o_proj' in name:
-            #         temp = [name, 0, 0, 0, type(module)]
+                if not hasattr(module, 'is_pruned') or module.is_pruned == False:
+                    temp = [name, 0, 0, 0, type(module)]
+        elif 'opt' in cfg['model_name']: 
+            if 'model.embed_tokens' in name or 'model.norm' in name or 'lm_head' in name:
+                continue
+
+            if onlyprobe:
                 if not hasattr(module, 'is_pruned') or module.is_pruned == False:
                     temp = [name, 0, 0, 0, type(module)]
         
+        # calculate flops ratio only for pruned part
         if hasattr(module, 'is_pruned') and module.is_pruned == True:
             temp.append(True)
 
@@ -64,8 +69,13 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, dataset_size,
     from .io import load_dense_model
     # total = fullinf + probe
     # for asyncintra, the info has the dirty write issue because we open 2 streams, check sync mode for the correct info
-    dense_info_list, dense_duration = load_dense_model()
-
+    
+    # different package, cannot load, but flops is the same as probe pruning
+    if 'llmpruner' in cfg['prune_method'] or 'loraprune' in cfg['prune_method']:
+        dense_info_list, dense_duration = None, 0
+    else:
+        dense_info_list, dense_duration = load_dense_model()
+    
     print('Summary ---------\n')
     if dense_info_list is not None and pruned_info_list is not None:
         dense_total_flops = sum([dense_info_list[i][1] for i in range(len(dense_info_list))])

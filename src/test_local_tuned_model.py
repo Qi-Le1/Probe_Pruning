@@ -123,7 +123,6 @@ def test(data_loader, model, model_prof, metric, logger):
             data_loader_iter = iter(data_loader)
             input = next(data_loader_iter)
             identify_pad_tokens(input)
-            print('hereee1')
             cfg['cur_batch_index'] += 1
             if cfg['task_name'] in ['clm']:
                 input_size = input['labels'].size(0)

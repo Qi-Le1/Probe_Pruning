@@ -77,7 +77,7 @@ def runExperiment():
         cfg['onlyprobe'] = True
         # change mode to sync to measure the probe flops
         cfg['mode'] = 'sync'
-        inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
+        _ = test(data_loader['test'], model, model_prof, metric, test_logger)
         onlyprobe_info_list = get_model_profile('pruned', model_prof, onlyprobe=True)
     dataset_size = cfg['dataset_size']['test']
     dense_info_list, dense_duration = summarize_info_list(pruned_info_list, inference_duration, test_logger, dataset_size, onlyprobe_info_list)

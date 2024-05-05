@@ -76,8 +76,11 @@ def process_control():
             cfg['prune_method'] += '-respick'
 
     cfg['mode'] = cfg['control']['mode']
-    if 'probe' not in cfg['prune_method'] and cfg['mode'] != 'asyncinter':
-        raise ValueError('mode is not valid, need to be asyncinter when not using probe')
+    if 'probe' not in cfg['prune_method']:
+        if 'dense' in cfg['prune_method']:
+            pass
+        elif cfg['mode'] != 'asyncinter':
+            raise ValueError('mode is not valid, need to be asyncinter when not using probe')
     if 'probe' in cfg['prune_method'] and cfg['mode'] not in ['asyncintra', 'sync']:
         raise ValueError('mode is not valid, need to be asyncintra or sync when using probe')
     
@@ -133,10 +136,12 @@ def process_control():
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
         cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
     elif cfg['cust_tgt_modules'] == ['default']:
-        if 'fixprune' in cfg['prune_method']:
-            cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING[cfg['model_name']]
+        if 'llama' in cfg['model_name']:
+            cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING['llama']
+        elif 'opt' in cfg['model_name']:
+            cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING['opt']
         else:
-            cfg['cust_tgt_modules'] = TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING[cfg['model_name']]
+            raise ValueError('Not valid model name')
 
     
     cfg['calibration_stage'] = False
@@ -244,8 +249,8 @@ def process_control():
 
     cfg['logger_detailed_info'] = False
     cfg['onlyprobe'] = False
-    # cfg['onlyprobeinfo'] = True
-    cfg['onlyprobeinfo'] = False
+    cfg['onlyprobeinfo'] = True
+    # cfg['onlyprobeinfo'] = False
     print('cfg: ', cfg)
     return
 
@@ -355,81 +360,11 @@ def make_data_name():
 
 
 TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING = {
-    "t5": ["q", "v"],
-    "mt5": ["q", "v"],
-    "bart": ["q_proj", "v_proj"],
-    "gpt2": ["c_attn"],
-    "bloom": ["query_key_value"],
-    "blip-2": ["q", "v", "q_proj", "v_proj"],
     "opt": ["q_proj", "v_proj", "k_proj", "out_proj", "fc1", "fc2"],
-    "gptj": ["q_proj", "v_proj"],
-    "gpt_neox": ["query_key_value"],
-    "gpt_neo": ["q_proj", "v_proj"],
-    "bert": ["query", "value"],
-    "roberta": ["query", "value"],
-    "xlm-roberta": ["query", "value"],
-    "electra": ["query", "value"],
-    "deberta-v2": ["query_proj", "value_proj"],
-    "deberta": ["in_proj"],
-    "layoutlm": ["query", "value"],
-    "llama-2-7b": ["q_proj", "v_proj", "o_proj", "k_proj", "gate_proj", "up_proj", "down_proj"],
-    # "llama": ["proj"],
-    "chatglm": ["query_key_value"],
-    "gpt_bigcode": ["c_attn"],
-    "mpt": ["Wqkv"],
-    "RefinedWebModel": ["query_key_value"],
-    "RefinedWeb": ["query_key_value"],
-    "falcon": ["query_key_value"],
-    "btlm": ["c_proj", "c_attn"],
-
-    'resnet9': ['.shortcut', '.conv1', '.conv2'],
-    # 'resnet9': ['.conv2'],
-    'resnet18': ['.shortcut', '.conv1', '.conv2'],
-
-    'test': ['fc']
+    "llama": ["q_proj", "v_proj", "o_proj", "k_proj", "gate_proj", "up_proj", "down_proj"],
 }
 
-TRANSFORMERS_MODELS_TO_EWI_TARGET_MODULES_MAPPING = {
-    "opt": ["out_proj", "fc2"],
-    "llama": ["o_proj", "down_proj"],
-    'resnet9': ['.shortcut', '.conv1', '.conv2'],
-    # 'resnet9': ['.conv2'],
-    'resnet18': ['.shortcut', '.conv1', '.conv2'],
-    'test': ['fc']
-}
 
-TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING = {
-    "llama": ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"],
-    'opt': ["k_proj", "v_proj", "q_proj", "fc1"]
-}
-
-# determine by the grid search
-TRANSFORMERS_MODELS_TO_GRID_SEARCH_RATIO = {
-    "llama": {
-        '128': {
-            '0.1': {'o_proj': 0.1, 'down_proj': 0.1},
-            '0.2': {'o_proj': 0.2, 'down_proj': 0.2},
-            '0.3': {'o_proj': 0.3, 'down_proj': 0.3},
-            '0.4': {'o_proj': 0.4, 'down_proj': 0.4},
-            '0.5': {'o_proj': 0.5, 'down_proj': 0.5},
-            '0.6': {'o_proj': 0.6, 'down_proj': 0.6},
-            '0.7': {'o_proj': 0.7, 'down_proj': 0.7},
-            '0.8': {'o_proj': 0.8, 'down_proj': 0.8},
-        }
-    },
-    "opt": {
-        '128': {
-            '0.1': {'o_proj': 0.1, 'down_proj': 0.1},
-            '0.2': {'o_proj': 0.2, 'down_proj': 0.2},
-            '0.3': {'o_proj': 0.3, 'down_proj': 0.3},
-            '0.4': {'o_proj': 0.4, 'down_proj': 0.4},
-            '0.5': {'o_proj': 0.5, 'down_proj': 0.5},
-            '0.6': {'o_proj': 0.6, 'down_proj': 0.6},
-            '0.7': {'o_proj': 0.7, 'down_proj': 0.7},
-            '0.8': {'o_proj': 0.8, 'down_proj': 0.8},
-        }
-    }
-}
 
 
 # gpt2 layer

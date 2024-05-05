@@ -15,7 +15,7 @@ class HiddenRepresentationPruning():
         if modelconfig is not None:
             num_hidden_layers = modelconfig.num_hidden_layers
             prune_ratio = num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'] 
-            return prune_ratio
+            return round(prune_ratio, 2)
         else:
             return cfg['prune_ratio']
     
@@ -352,7 +352,98 @@ class HiddenRepresentationPruning():
                 module.pruning_ratio = metric[metric <= threshold].numel() / metric.numel()
                 print('name', name, 'module.pruning_ratio', module.pruning_ratio)
         elif 'opt' in cfg['model_name']:
-            pass
+            for name, module in model.named_modules():   
+                if 'fc2' not in name and 'out_proj' not in name:
+                    continue
+
+                if 'fc2' in name and 'fc2' not in cfg['cust_tgt_modules']:
+                    continue
+                elif 'out_proj' in name and 'out_proj' not in cfg['cust_tgt_modules']:
+                    continue
+
+                numbers = int(''.join(filter(str.isdigit, name)))
+                if numbers <= cfg['skip_layers']:
+                    continue
+
+                if check_skip_layers(name):
+                    continue
+
+                if 'out_proj' in name:
+                    # flap code: W_metric = metrics[args.metrics](wrapped_layers, subset, name) ** 2
+                    # we dont put the manually added square (only added for attn) here since it is unreasonable
+                    metric = self.cal_attn_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
+                    attn_metric_list.append(metric)
+                elif 'fc2' in name:
+                    metric = self.cal_mlp_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
+                    mlp_metric_list.append(metric)
+                
+            if len(attn_metric_list) > 0:
+                attn_metric = torch.stack(attn_metric_list).to(torch.float64)
+                attn_metric = standarlization(attn_metric)
+                attn_metric = attn_metric.reshape(attn_metric.shape[0], -1, 128).mean(dim=2)
+            else:
+                attn_metric = None
+
+            if len(mlp_metric_list) > 0:
+                mlp_metric = torch.stack(mlp_metric_list).to(torch.float64)
+                mlp_metric = standarlization(mlp_metric)
+            else:
+                mlp_metric = None
+
+            # prune 1 head will lead to 128 times more flops pruned than 1 mlp channel
+            multiples = model.config.hidden_size//model.config.num_attention_heads
+            if attn_metric is not None and mlp_metric is not None:
+                prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
+                flops_measurement = torch.cat([torch.full_like(attn_metric, multiples).view(-1), torch.full_like(mlp_metric, 1).view(-1)])
+            elif attn_metric is not None:
+                prune_metric = attn_metric.view(-1)
+                flops_measurement = torch.full_like(attn_metric, multiples).view(-1)
+            elif mlp_metric is not None:
+                prune_metric = mlp_metric.view(-1)
+                flops_measurement = torch.full_like(mlp_metric, 1).view(-1)
+
+            # descending=True
+            sorted_prune, indices = torch.sort(prune_metric)
+            sorted_flops_measurement = flops_measurement[indices]
+            # threshold = sorted_prune[int(sorted_prune.numel() * cfg['prune_ratio'])]
+            cumulative_sum = torch.cumsum(sorted_flops_measurement, dim=0)
+
+            # Calculate the total sum and the target sum
+            total_sum = sorted_flops_measurement.sum()
+            target_sum = total_sum * prune_ratio
+            
+            # Find the index where the cumulative sum reaches or exceeds the target sum
+            threshold_index = torch.searchsorted(cumulative_sum, target_sum, right=True)
+            print("Total sum:", total_sum, target_sum, prune_ratio, threshold_index)
+            # Set the threshold using the value at this index
+            threshold = sorted_prune[threshold_index]
+
+            print("Threshold:", threshold.item())
+
+            for name, module in model.named_modules():
+                if 'fc2' not in name and 'out_proj' not in name:
+                    continue
+                
+                if 'fc2' in name and 'fc2' not in cfg['cust_tgt_modules']:
+                    continue
+                elif 'out_proj' in name and 'out_proj' not in cfg['cust_tgt_modules']:
+                    continue
+
+                if check_skip_layers(name):
+                    continue
+                
+                if 'out_proj' in name:
+                    # flap code: W_metric = metrics[args.metrics](wrapped_layers, subset, name) ** 2
+                    # we dont put the manually added square (only added for attn) here since it is unreasonable
+                    metric = self.cal_attn_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric']).reshape(1, -1)
+                    metric = standarlization(metric)
+                    metric = metric.reshape(-1, 128).mean(dim=1)
+                elif 'fc2' in name:
+                    metric = self.cal_mlp_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric']).reshape(1, -1)
+                    metric = standarlization(metric)
+
+                module.pruning_ratio = metric[metric <= threshold].numel() / metric.numel()
+                print('name', name, 'module.pruning_ratio', module.pruning_ratio)
         return
 
     # def grid_ratio(self, model):

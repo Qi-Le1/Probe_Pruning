@@ -1,23 +1,11 @@
 import re
-import copy
-import math
 import time
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import warnings
-import random
-import collections
-from sklearn.exceptions import NotFittedError, ConvergenceWarning
-from sklearn.neural_network import MLPRegressor
-from transformers.pytorch_utils import Conv1D
 from config import cfg
-from math import prod
-from .model import init_param, mse_loss
-from typing import List, Optional, Tuple, Union
-from module import to_device, TRANSFORMERS_MODELS_TO_ERI_TARGET_MODULES_MAPPING, TRANSFORMERS_MODELS_OUT_TARGET_MODULES_MAPPING, check_skip_layers
-from functools import reduce
+from module import check_skip_layers
 
 
 class LlamaEriModel(torch.nn.Module):
@@ -138,7 +126,6 @@ class Linear(nn.Linear, EriLayer):
         self,
         in_features,
         out_features,
-        is_target_conv_1d_layer: bool = False,
         **kwargs,
     ):
         nn.Linear.__init__(self, in_features, out_features, bias=False)
@@ -155,17 +142,18 @@ class Linear(nn.Linear, EriLayer):
         self.async_interbatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
         self.async_intrabatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
 
-        if ('o_proj' in self.key or 'down_proj' in self.key) and cfg['mode'] == 'asyncinter':
-            self.async_interbatch_in_dim_indices = torch.arange((in_features), device=self.weight.data.device, dtype=torch.int32)
+        self.async_interbatch_in_dim_indices = None
+        self.async_intrabatch_in_dim_indices = None
 
         if ('o_proj' in self.key or 'down_proj' in self.key):
-            self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)
-            # set same shape for all baselines for comparison
-            self.baseline_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+            self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)   
             if 'wandasp' in self.prune_metric:
                 self.scaler_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+                if 'bias' in cfg['prune_method']:
+                    self.baseline_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
             elif "flap" in self.prune_metric:
                 self.fluc_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
+                self.baseline_inp = torch.zeros((cfg['max_seq_len'], in_features), device=self.weight.data.device, dtype=cfg['data_type'])
             else:
                 raise ValueError(f"Unknown pruning method")
 
@@ -187,6 +175,7 @@ class Linear(nn.Linear, EriLayer):
 
         if 'wandasp' in self.prune_metric:
             self.scaler_inp[:seq_len, update_indices] *= momentum
+
             if 'bias' in cfg['prune_method']:
                 self.baseline_inp = self.baseline_inp.to(cur_device)
                 self.baseline_inp[:seq_len, update_indices] *= momentum
@@ -307,11 +296,17 @@ class Linear(nn.Linear, EriLayer):
     def return_global_metric_info(self):
         if ('o_proj' in self.key or 'down_proj' in self.key):
             if 'wandasp' in self.prune_metric:
-                return {
-                    'nsamples': self.nsamples,
-                    'baseline_inp': self.baseline_inp,
-                    'scaler_inp': self.scaler_inp
-                }
+                if 'bias' in cfg['prune_method']:
+                   return {
+                        'nsamples': self.nsamples,
+                        'baseline_inp': self.baseline_inp,
+                        'scaler_inp': self.scaler_inp
+                    } 
+                else:
+                    return {
+                        'nsamples': self.nsamples,
+                        'scaler_inp': self.scaler_inp
+                    }
             elif "flap" in self.prune_metric:
                 return {
                     'nsamples': self.nsamples,
@@ -369,26 +364,13 @@ class Linear(nn.Linear, EriLayer):
         elif cfg['mode'] == 'asyncinter':
             if cfg['cur_batch_index'] == 0:
                 return self.weight
-            # dont have the prepared weight for current batch
-            # sync the stream1
             if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:              
                 while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
-                    # torch.cuda.synchronize(cfg['cuda_stream1'])
                     time.sleep(0.001)
-                    print('wait sync weight step end', self.key, self.async_interbatch_weight_index)
             return self.async_interbatch_weight
-        elif cfg['mode'] == 'asyncintra':
-            # if self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
-            #     # time.sleep(0.001)  # Sleep for 1 millisecond
-            # # if self.async_intrabatch_weight_index != cfg['cur_batch_index']:
-            #     torch.cuda.synchronize(cfg['cuda_stream1'])
-            #     print('wait sync weight step end', self.key, self.async_intrabatch_weight_index)
-            
+        elif cfg['mode'] == 'asyncintra':    
             while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
                 time.sleep(0.001)  # Sleep for 1 millisecond
-            # if self.async_intrabatch_weight_index != cfg['cur_batch_index']:
-                # torch.cuda.synchronize(cfg['cuda_stream1'])
-                print('wait sync weight step end', self.key, self.async_intrabatch_weight_index)
             return self.async_intrabatch_weight
     
     def get_async_in_dim_indices(self):
@@ -397,25 +379,25 @@ class Linear(nn.Linear, EriLayer):
         elif cfg['mode'] == 'asyncintra':
             return self.async_intrabatch_in_dim_indices
     
+    def get_compensate_bias(self, x, weight, in_dim_indices):
+        calib = torch.mean(self.baseline_inp, dim=0)
+        calib = calib.to(x.device)
+        in_dim_indices = in_dim_indices.to(device=x.device)
+        calib[in_dim_indices] = 0
+        compensate_bias = F.linear(calib, weight, bias=None)
+        return compensate_bias
+    
     # no bias in llama-2
     def forward(self, x: torch.Tensor, **kwargs):
-        # print('forward key', self.key, flush=True)
         with torch.no_grad():
             forward_start_time = time.time()
             previous_dtype = x.dtype
             if cfg['calibration_stage'] == True:
-                # running mean
                 if 'o_proj' in self.key or 'down_proj' in self.key:
                     self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
                 result = F.linear(x, self.weight, bias=None)
-                    # print('calibrateresult', result.dtype, result.shape, result, flush=True)
                 result = result.to(previous_dtype)
                 return result
-                # if 'meanglobalinput' in cfg['prune_method']:
-                #     self.update_global_input_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
-
-                # metric_score = self.get_global_metric_score_distribution()
-                # mean_for_all_batches, std_for_all_batches = self.get_global_input_distribution()
             elif cfg['calibration_stage'] == False:
                 
                 if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
@@ -429,153 +411,64 @@ class Linear(nn.Linear, EriLayer):
         
                 if cfg['mode'] == 'asyncinter':
                     weight = self.get_weight()
-                    # print('weight', weight.dtype, weight.shape, self.key, flush=True)
                     if 'o_proj' in self.key or 'down_proj' in self.key:
-                        # torch.cuda.synchronize(cfg['cuda_default_stream'])
-                        update_time = time.time()
-                        # with torch.cuda.stream(cfg['cuda_stream1']):
-                        update_time = time.time()
                         async_in_dim_indices = self.get_async_in_dim_indices()
-
-
                         if 'runningmean' in cfg['prune_method']:
                             self.update_global_metric_score_distribution(x, async_in_dim_indices)    
                         elif 'ema' in cfg['prune_method']:
                             self.update_global_metric_score_distribution_ema(x, async_in_dim_indices)
-                        # torch.cuda.synchronize(cfg['cuda_default_stream'])
-                        update_time_end = time.time()
-                        # print('metric update_time', update_time_end - update_time, flush=True)
-                        # print('update_time', update_time_end - update_time, flush=True)
-                        # torch.cuda.synchronize(cfg['cuda_stream1'])
                     previous_dtype = x.dtype
                     result = F.linear(x, weight, bias=None)
 
                     if 'o_proj' in self.key or 'down_proj' in self.key:
-                        # 'flap' in cfg['prune_metric'] and 
                         if 'bias' in cfg['prune_method']:
-                            calib = torch.mean(self.baseline_inp, dim=0)
-                            calib = calib.to(x.device)
-                            # all_indices = torch.arange(self.in_features, dtype=torch.long).to(device=x.device)
-                            async_in_dim_indices = async_in_dim_indices.to(device=x.device)
-                            # print('all_indices', all_indices.dtype, all_indices.shape, all_indices.device, flush=True)
-                            print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, async_in_dim_indices.device, flush=True)
-                            calib[async_in_dim_indices] = 0
-                            # pruned_channel_indices = all_indices[mask]
-                            compensate_bias = F.linear(calib, self.weight, bias=None)
+                            compensate_bias = self.get_compensate_bias(x, weight, async_in_dim_indices)
                             result += compensate_bias
                     result = result.to(previous_dtype)
                     return result
                 elif cfg['mode'] == 'asyncintra':
                     weight = self.get_weight()
-                    # print('weight', weight.dtype, weight.shape, self.key, flush=True)
                     if 'o_proj' in self.key or 'down_proj' in self.key:
-                        # torch.cuda.synchronize(cfg['cuda_default_stream'])
-                        update_time = time.time()
-                        # with torch.cuda.stream(cfg['cuda_stream1']):
-                        update_time = time.time()
                         async_in_dim_indices = self.get_async_in_dim_indices()
                         if 'runningmean' in cfg['prune_method']:
                             self.update_global_metric_score_distribution(x, async_in_dim_indices)    
                         elif 'ema' in cfg['prune_method']:
                             self.update_global_metric_score_distribution_ema(x, async_in_dim_indices)
-                        # torch.cuda.synchronize(cfg['cuda_default_stream'])
-                        update_time_end = time.time()
-                        # print('metric update_time', update_time_end - update_time, flush=True)
-                        # print('update_time', update_time_end - update_time, flush=True)
-                        # torch.cuda.synchronize(cfg['cuda_stream1'])
+
                     previous_dtype = x.dtype
                     result = F.linear(x, weight, bias=None)
 
                     if 'o_proj' in self.key or 'down_proj' in self.key:
-                        if 'flap' in cfg['prune_metric']:
-                            calib = torch.mean(self.baseline_inp, dim=0)
-                            calib = calib.to(x.device)
-                            # all_indices = torch.arange(self.in_features, dtype=torch.long).to(device=x.device)
-                            async_in_dim_indices = async_in_dim_indices.to(device=x.device)
-                            # print('all_indices', all_indices.dtype, all_indices.shape, all_indices.device, flush=True)
-                            print('async_in_dim_indices', async_in_dim_indices.dtype, async_in_dim_indices.shape, async_in_dim_indices.device, flush=True)
-                            calib[async_in_dim_indices] = 0
-                            # pruned_channel_indices = all_indices[mask]
-                            compensate_bias = F.linear(calib, self.weight, bias=None)
+                        if 'bias' in cfg['prune_method']:
+                            compensate_bias = self.get_compensate_bias(x, weight, async_in_dim_indices)
                             result += compensate_bias
                     result = result.to(previous_dtype)
                     return result
                 elif cfg['mode'] == 'sync':
                     weight = self.get_weight()
                     if 'o_proj' in self.key or 'down_proj' in self.key:
-                        update_time = time.time()
                         if 'runningmean' in cfg['prune_method']:
                             if 'in_dim_indices' in kwargs:
-                                # print('self.key', self.key, flush=True)
                                 self.update_global_metric_score_distribution(x, kwargs['in_dim_indices'])
                             else:
                                 self.update_global_metric_score_distribution(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
                         elif 'ema' in cfg['prune_method']:
                             if 'in_dim_indices' in kwargs:
-                                # print("kwargs['in_dim_indices']", kwargs['in_dim_indices'])
                                 self.update_global_metric_score_distribution_ema(x, kwargs['in_dim_indices'])
                             else:
                                 self.update_global_metric_score_distribution_ema(x, torch.arange(self.in_features, dtype=torch.long).to(device=x.device))
-                        update_time_end = time.time()
-                        if cfg['logger_detailed_info'] == True:
-                            print('metric update_time', update_time_end - update_time, flush=True)
-
                     
-
-                    input_dim = x.dim()
-                    batch_size = x.size(0)
-                    seq_len = x.size(1)
-
-                    linear_layer_info = {
-                        'weight': weight.data,
-                    }
-
                     if 'out_dim_indices' in kwargs:
-                        if 'attn' in self.key:
-                            # weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
-                            # weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
-                            weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
-                            # print('attn weight', weight.shape, flush=True)
-                            # if self.check_fill_case():
-                            #     # print('fill', flush=True)
-                            #     self.out_selected_dim = kwargs['out_dim_indices']
-                        else:
-                            # weight = weight[kwargs['out_dim_indices'].to(weight.device), :]
-                            # weight = torch.index_select(weight, dim=0, index=kwargs['out_dim_indices'].to(weight.device))
-                            weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
-
+                        weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
                         result = F.linear(x, weight, bias=None)
-                        # if 'attn' in self.key:
-                        #     if self.check_fill_case():
-                        #         # print('fill', flush=True)
-                        #         refilling_output = torch.zeros(batch_size, seq_len, self.out_features, device=result.device, dtype=result.dtype)
-                        #         refilling_output[..., self.out_selected_dim] = result
-                        #         result = refilling_output
                         result = result.to(previous_dtype)
                         return result
                     elif 'in_dim_indices' in kwargs:
-                        if 'attn' in self.key:
-                            # weight = weight[:, kwargs['in_dim_indices'].to(weight.device)]
-                            # weight = torch.index_select(weight, dim=1, index=kwargs['in_dim_indices'].to(weight.device))
-                            weight = self.extract_in_dim_weight(weight, kwargs['in_dim_indices'])
-                        else:
-                            # weight = weight[:, kwargs['in_dim_indices'].to(weight.device)]
-                            # weight = torch.index_select(weight, dim=1, index=kwargs['in_dim_indices'].to(weight.device))
-                            weight = self.extract_in_dim_weight(weight, kwargs['in_dim_indices'])
-
+                        weight = self.extract_in_dim_weight(weight, kwargs['in_dim_indices'])
                         result = F.linear(x, weight, bias=None)
                         if 'o_proj' in self.key or 'down_proj' in self.key:
-                            # 'flap' in cfg['prune_metric'] and 
                             if 'bias' in cfg['prune_method']:
-                                calib = torch.mean(self.baseline_inp, dim=0)
-                                calib = calib.to(x.device)
-                                # all_indices = torch.arange(self.in_features, dtype=torch.long).to(device=x.device)
-                                in_dim_indices = kwargs['in_dim_indices'].to(device=x.device)
-                                # print('all_indices', all_indices.dtype, all_indices.shape, all_indices.device, flush=True)
-                                print('in_dim_indices', in_dim_indices.dtype, in_dim_indices.shape, in_dim_indices.device, flush=True)
-                                calib[in_dim_indices] = 0
-                                # pruned_channel_indices = all_indices[mask]
-                                compensate_bias = F.linear(calib, self.weight, bias=None)
+                                compensate_bias = self.get_compensate_bias(x, weight, async_in_dim_indices)
                                 result += compensate_bias
                         result = result.to(previous_dtype)
                         return result
@@ -583,7 +476,4 @@ class Linear(nn.Linear, EriLayer):
                         result = F.linear(x, weight, bias=None)
                     
                     result = result.to(previous_dtype)
-                    forward_end_time = time.time()
-                    print('forward_time', forward_end_time - forward_start_time, flush=True)
-
                 return result

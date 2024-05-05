@@ -311,10 +311,9 @@ class LlamaMLP(nn.Module):
         self.pruning_module = HiddenRepresentationPruning(cfg, f'llama_mlp_{layer_order}', config)
 
         self.probe_out_dim_indices = None
-
   
     def probe_process(self, x, **kwargs):
-        # 1. generate probe
+        # 1. generate probeW
         # 2. run matrix multiplication
         # 3. calculate score
         # 4. extract metric
@@ -369,13 +368,13 @@ class LlamaMLP(nn.Module):
             ]
             down_proj = sum(down_proj)
         else:
-            bsz, _, _ = x.shape
             if cfg['calibration_stage'] == True:
                 down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
                 return down_proj
             elif cfg['calibration_stage'] == False:
                 if ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
                     if 'probe' in cfg['prune_method']:
+                        probe_out_dim_indices = None
                         if cfg['mode'] == 'sync':
                             probe_out_dim_indices, probe_out = self.probe_process(x, **kwargs)
                             # count flops for probe
@@ -385,16 +384,14 @@ class LlamaMLP(nn.Module):
                                 return down_proj
                         elif cfg['mode'] == 'asyncintra':
                             if 'post_layernorm_attn_residual' in kwargs:
-                                _, _ = self.probe_process(kwargs['post_layernorm_attn_residual'])
+                                _, _ = self.probe_process(kwargs['post_layernorm_attn_residual'], **kwargs)
                                 return
                             else:
                                 raise ValueError('Invalid input for asyncintra mode')
                             
-                        if cfg['mode'] == 'sync':
-                            down_proj = self.down_proj(self.act_fn(self.gate_proj(x, out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, out_dim_indices=probe_out_dim_indices), in_dim_indices=probe_out_dim_indices)
-                        else:                   
-                            down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-                        
+
+                        down_proj = self.down_proj(self.act_fn(self.gate_proj(x, out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, out_dim_indices=probe_out_dim_indices), in_dim_indices=probe_out_dim_indices)
+       
                         # if cfg['mode'] == 'asyncinter':
                         #     with torch.cuda.stream(cfg['cuda_stream1']):
                         #         _, _ = self.probe_process(x)
@@ -529,6 +526,8 @@ class LlamaAttention(nn.Module):
         # 3. calculate score
         # 4. extract metric
 
+        qk_prune_way = cfg['qk_prune_way']
+        vo_prune_way = cfg['vo_prune_way']
         cur_batch_seq_len = hidden_states.size(1)
         # generate probe: rank
         if cfg['q_probe_ratio'] == cfg['k_probe_ratio'] and cfg['q_probe_ratio'] == cfg['v_probe_ratio']:
@@ -548,9 +547,6 @@ class LlamaAttention(nn.Module):
         query_states = self.q_proj(probe, cal_attn_probe_out_dim_metric=True)   
         key_states = self.k_proj(probe, cal_attn_probe_out_dim_metric=True)
         value_states = self.v_proj(probe, cal_attn_probe_out_dim_metric=True)
-
-        qk_prune_way = cfg['qk_prune_way']
-        vo_prune_way = cfg['vo_prune_way']
 
         query_states = query_states.view(query_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(key_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
@@ -1068,29 +1064,7 @@ class LlamaDecoderLayer(nn.Module):
             warnings.warn(
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
-        
-        # torch.cuda.nvtx.range_push("zzzzzzz")
-        start_time = time.time()
-        # probe_gate = nml_process(hidden_states, cfg['gate_probe_num'], cfg['gate_probe_size'])
-        # torch.cuda.synchronize()
-        # end_time = time.time()
-        # print('probe_gate_duration', end_time-start_time, flush=True)
 
-        # tensor = torch.randn(100, 512, 4096, dtype=torch.float16, device='cuda')
-        # probe_gate = nml_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
-        # torch.cuda.synchronize()
-        # end_time_2 = time.time()
-        # print('probe_gate_duration2', end_time_2-end_time, flush=True)
-
-        # probe_gate = mean_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
-        # torch.cuda.synchronize()
-        # end_time_3= time.time()
-        # print('probe_gate_duration3', end_time_3-end_time_2, flush=True)
-
-        # probe_gate = optimized_nml_process(tensor, cfg['gate_probe_num'], cfg['gate_probe_size'])
-        # torch.cuda.synchronize()
-        # end_time_4 = time.time()
-        # print('probe_gate_duration4', end_time_4-end_time_3, flush=True)
 
         residual = hidden_states
         if self.check_asyncintra_mlp():
@@ -1146,7 +1120,7 @@ class LlamaDecoderLayer(nn.Module):
             torch.cuda.synchronize(cfg['cuda_default_stream'])
 
         if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_mlp():
-            self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(self.post_attention_layernorm(hidden_states), probe_mlp_inf_result['post_layernorm_attn_residual'])
+            self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_mlp_inf_result['post_layernorm_attn_residual'])
             print('self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
             print('self.attn_l1_diff_percentage', self.attn_l1_diff_percentage, flush=True)
             print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
@@ -1199,26 +1173,16 @@ class LlamaDecoderLayer(nn.Module):
         thread2.join()
 
 
-        # if self.check_asyncintra_attention():
-        #     # wait until the main stream is done
-        #     print('wait')
-        #     torch.cuda.synchronize(cfg['cuda_default_stream'])
-        # print('residual after', residual[0])
         hidden_states = full_mlp_inf_result['hidden_states']
         hidden_states = residual + hidden_states
         
         if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_attention():
-            self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(kwargs['next_layer'].input_layernorm(hidden_states), probe_attn_inf_result['input_layernorm_mlp_residual'])
+            self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_attn_inf_result['input_layernorm_mlp_residual'])
             print('self.layer_order', self.layer_order, flush=True)
             print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
             print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
             print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
-            # self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
-            # print('no------norm')
-            # print('no------normself.layer_order', self.layer_order, flush=True)
-            # print('no------normself.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
-            # print('no------normelf.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
-            # print('no------normself.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
+
 
         outputs = (hidden_states,)
 
@@ -1227,9 +1191,7 @@ class LlamaDecoderLayer(nn.Module):
 
         if use_cache:
             outputs += (present_key_value,)
-        custom_duration = time.time() - start_time
-        # torch.cuda.nvtx.range_pop()
-        # print('custom_duration decoder layer', custom_duration, flush=True)
+
         return outputs
 
 

@@ -19,6 +19,8 @@ import time
 import copy
 import torch
 import torch.utils.checkpoint
+import traceback 
+import threading
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
@@ -41,6 +43,7 @@ from transformers.utils import (
 from transformers import OPTConfig
 from config import cfg
 from ..pruning_module import HiddenRepresentationPruning
+from .utils import generate_probe, cal_res_hidden_state_diff  
 
 logger = logging.get_logger(__name__)
 
@@ -104,6 +107,8 @@ class OPTAttention(nn.Module):
         dropout: float = 0.0,
         is_decoder: bool = False,
         bias: bool = True,
+        layer_order: int = 0,
+        config: dict = {}
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -124,10 +129,145 @@ class OPTAttention(nn.Module):
         self.q_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
 
-    def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
-        return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
+        self.layer_order = layer_order
+        self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_heads, self.num_heads
+        self.pruning_module = HiddenRepresentationPruning(cfg, f'opt_attention_{layer_order}', config)
 
-    def forward(
+
+    def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int, num_head=None):
+        if num_head is None:
+            return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
+        else:
+            return tensor.view(bsz, seq_len, num_head, self.head_dim).transpose(1, 2).contiguous()
+
+    def probe_process(
+        self, 
+        hidden_states: torch.Tensor,
+        key_value_states: Optional[torch.Tensor] = None,
+        past_key_value: Optional[Tuple[torch.Tensor]] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        layer_head_mask: Optional[torch.Tensor] = None,
+        output_attentions: bool = False,
+        **kwargs
+    ):
+
+        qk_prune_way = cfg['qk_prune_way']
+        vo_prune_way = cfg['vo_prune_way']
+        full_bsz, tgt_len, _ = hidden_states.size()
+        if cfg['q_probe_ratio'] == cfg['k_probe_ratio'] and cfg['q_probe_ratio'] == cfg['v_probe_ratio']:
+            if 'respick' in cfg['prune_method']:
+                inforank = kwargs['respick']
+            else:
+                inforank = None
+            probe, bsz_selected_indices, seq_selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], inforank)
+        else:
+            raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
+
+        bsz, src_len, _ = probe.size()
+        print('probeshape', probe.shape)
+        self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_heads, self.num_heads
+
+        # get query proj
+        query_states = self.q_proj(probe) * self.scaling
+        # self_attention
+        key_states = self._shape(self.k_proj(probe), -1, bsz)
+        value_states = self._shape(self.v_proj(probe), -1, bsz)
+
+        if self.is_decoder:
+            # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
+            # Further calls to cross_attention layer can then reuse all cross-attention
+            # key/value_states (first "if" case)
+            # if uni-directional self-attention (decoder) save Tuple(torch.Tensor, torch.Tensor) of
+            # all previous decoder key/value_states. Further calls to uni-directional self-attention
+            # can concat previous decoder key/value_states to current projected key/value_states (third "elif" case)
+            # if encoder bi-directional self-attention `past_key_value` is always `None`
+            past_key_value = (key_states, value_states)
+
+        proj_shape = (bsz * self.num_heads, -1, self.head_dim)
+        print('src_len', src_len, query_states.shape)
+        query_states = self._shape(query_states, src_len, bsz).view(*proj_shape)
+        key_states = key_states.view(*proj_shape)
+        value_states = value_states.view(*proj_shape)
+
+        
+        attn_weights = torch.bmm(query_states, key_states.transpose(1, 2))
+
+        if attn_weights.size() != (bsz * self.num_heads, src_len, src_len):
+            raise ValueError(
+                f"Attention weights should be of size {(bsz * self.num_heads, src_len, src_len)}, but is"
+                f" {attn_weights.size()}"
+            )
+
+        if attention_mask is not None:
+            if attention_mask.size() != (full_bsz, 1, tgt_len, tgt_len):
+                raise ValueError(
+                    f"Attention mask should be of size {(full_bsz, 1, tgt_len, tgt_len)}, but is {attention_mask.size()}"
+                )
+        
+        if bsz_selected_indices is None:
+            probe_attn_mask = attention_mask[:bsz, :, :src_len, :src_len]
+        else:
+            probe_attn_mask = attention_mask[bsz_selected_indices, :, :src_len, :src_len]
+
+        print('probe_attn_mask', probe_attn_mask.shape)
+        attn_weights = attn_weights.view(bsz, self.num_heads, src_len, src_len) + probe_attn_mask
+        attn_weights = torch.max(
+            attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device)
+        )
+        attn_weights = attn_weights.view(bsz * self.num_heads, src_len, src_len)
+
+        # upcast to fp32 if the weights are in fp16. Please see https://github.com/huggingface/transformers/pull/17437
+        if attn_weights.dtype == torch.float16:
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(torch.float16)
+        else:
+            attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+
+        if layer_head_mask is not None:
+            if layer_head_mask.size() != (self.num_heads,):
+                raise ValueError(
+                    f"Head mask for a single layer should be of size {(self.num_heads,)}, but is"
+                    f" {layer_head_mask.size()}"
+                )
+            attn_weights = layer_head_mask.view(1, -1, 1, 1) * attn_weights.view(bsz, self.num_heads, tgt_len, src_len)
+            attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
+
+        
+        attn_weights_reshaped = None
+        attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
+        attn_output = torch.bmm(attn_probs, value_states)
+
+        if attn_output.size() != (bsz * self.num_heads, src_len, self.head_dim):
+            raise ValueError(
+                f"`attn_output` should be of size {(bsz, self.num_heads, src_len, self.head_dim)}, but is"
+                f" {attn_output.size()}"
+            )
+        print('attn_output', attn_output.shape)
+        attn_output = attn_output.view(bsz, self.num_heads, src_len, self.head_dim)
+        attn_output = attn_output.transpose(1, 2)
+        attn_output = attn_output.reshape(bsz, src_len, self.embed_dim)
+
+        if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
+            probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.out_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.out_proj.get_global_metric_score_distribution(tgt_len))
+        else:
+            probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.out_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices)
+
+        if 'flapratio' in cfg['prune_method']:
+            probe_vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
+        else:
+            probe_vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+
+        
+        self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
+        probe_qk_out_dim_indices = probe_vo_out_dim_indices
+
+        self.q_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
+        self.k_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
+        self.v_proj.prepare_async_weight(out_dim_indices=probe_vo_out_dim_indices)
+        self.out_proj.prepare_async_weight(in_dim_indices=probe_vo_out_dim_indices)
+        return probe_qk_out_dim_indices, probe_vo_out_dim_indices, attn_output, attn_weights_reshaped, past_key_value
+    
+
+    def attention_forward(
         self,
         hidden_states: torch.Tensor,
         key_value_states: Optional[torch.Tensor] = None,
@@ -135,9 +275,8 @@ class OPTAttention(nn.Module):
         attention_mask: Optional[torch.Tensor] = None,
         layer_head_mask: Optional[torch.Tensor] = None,
         output_attentions: bool = False,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
-        """Input shape: Batch x Time x Channel"""
-
+        **kwargs,
+    ):  
         # if key_value_states are provided this layer is used as a cross-attention layer
         # for the decoder
         is_cross_attention = key_value_states is not None
@@ -207,15 +346,6 @@ class OPTAttention(nn.Module):
         else:
             attn_weights = nn.functional.softmax(attn_weights, dim=-1)
 
-        if layer_head_mask is not None:
-            if layer_head_mask.size() != (self.num_heads,):
-                raise ValueError(
-                    f"Head mask for a single layer should be of size {(self.num_heads,)}, but is"
-                    f" {layer_head_mask.size()}"
-                )
-            attn_weights = layer_head_mask.view(1, -1, 1, 1) * attn_weights.view(bsz, self.num_heads, tgt_len, src_len)
-            attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
-
         if output_attentions:
             # this operation is a bit awkward, but it's required to
             # make sure that attn_weights keeps its gradient.
@@ -246,18 +376,357 @@ class OPTAttention(nn.Module):
         attn_output = self.out_proj(attn_output)
 
         return attn_output, attn_weights_reshaped, past_key_value
+    
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        key_value_states: Optional[torch.Tensor] = None,
+        past_key_value: Optional[Tuple[torch.Tensor]] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        layer_head_mask: Optional[torch.Tensor] = None,
+        output_attentions: bool = False,
+        **kwargs,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+        """Input shape: Batch x Time x Channel"""
+
+
+        if cfg['calibration_stage'] == True:
+            return self.attention_forward(hidden_states, key_value_states, past_key_value, attention_mask, layer_head_mask, output_attentions, **kwargs)
+        elif cfg['calibration_stage'] == False :
+            if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'out_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
+                bsz, q_len, _ = hidden_states.size()
+                probe_qk_out_dim_indices, probe_vo_out_dim_indices = None, None
+                if 'probe' in cfg['prune_method']:
+                    qk_prune_way = cfg['qk_prune_way']
+                    vo_prune_way = cfg['vo_prune_way']
+                    if cfg['mode'] == 'sync':
+                        probe_qk_out_dim_indices, probe_vo_out_dim_indices, attn_weights, attn_weights_reshaped, past_key_value = self.probe_process(hidden_states, key_value_states, past_key_value, attention_mask, layer_head_mask, output_attentions, **kwargs)
+                        # calculate probe's FLOPs
+                        if cfg['onlyprobe'] == True:
+                            attn_output = torch.zeros((cfg['batch_size'], cfg['max_seq_len'], self.embed_dim), device=hidden_states.device, dtype=hidden_states.dtype)
+                            return attn_output, None, past_key_value
+                    elif cfg['mode'] == 'asyncintra':
+                        # if not, do full inference
+                        if 'input_layernorm_mlp_residual' in kwargs:
+                            _, _, _, _, _ = self.probe_process(kwargs['input_layernorm_mlp_residual'], key_value_states, past_key_value, attention_mask, layer_head_mask, output_attentions, **kwargs)
+                            return
+                        else:
+                            raise ValueError('Invalid input for asyncintra mode')
+                    
+                    # --------------------------------------
+                    is_cross_attention = key_value_states is not None
+                    qk_prune_way = cfg['qk_prune_way']
+                    vo_prune_way = cfg['vo_prune_way']
+                    bsz, tgt_len, _ = hidden_states.size()
+
+                    # get query proj
+                    query_states = self.q_proj(hidden_states, out_dim_indices=probe_qk_out_dim_indices) * self.scaling
+                    key_states = self._shape(self.k_proj(hidden_states, out_dim_indices=probe_qk_out_dim_indices), -1, bsz, self.q_num_heads)
+                    value_states = self._shape(self.v_proj(hidden_states, out_dim_indices=probe_vo_out_dim_indices), -1, bsz, self.q_num_heads)
+
+                    if self.is_decoder:
+                        # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
+                        # Further calls to cross_attention layer can then reuse all cross-attention
+                        # key/value_states (first "if" case)
+                        # if uni-directional self-attention (decoder) save Tuple(torch.Tensor, torch.Tensor) of
+                        # all previous decoder key/value_states. Further calls to uni-directional self-attention
+                        # can concat previous decoder key/value_states to current projected key/value_states (third "elif" case)
+                        # if encoder bi-directional self-attention `past_key_value` is always `None`
+                        past_key_value = (key_states, value_states)
+
+                    proj_shape = (bsz * self.q_num_heads, -1, self.head_dim)
+                    query_states = self._shape(query_states, tgt_len, bsz, self.q_num_heads).view(*proj_shape)
+                    key_states = key_states.view(*proj_shape)
+                    value_states = value_states.view(*proj_shape)
+
+                    src_len = key_states.size(1)
+                    attn_weights = torch.bmm(query_states, key_states.transpose(1, 2))
+
+                    if attn_weights.size() != (bsz * self.q_num_heads, tgt_len, src_len):
+                        raise ValueError(
+                            f"Attention weights should be of size {(bsz * self.q_num_heads, tgt_len, src_len)}, but is"
+                            f" {attn_weights.size()}"
+                        )
+
+                    if attention_mask is not None:
+                        if attention_mask.size() != (bsz, 1, tgt_len, src_len):
+                            raise ValueError(
+                                f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {attention_mask.size()}"
+                            )
+                        attn_weights = attn_weights.view(bsz, self.q_num_heads, tgt_len, src_len) + attention_mask
+                        attn_weights = torch.max(
+                            attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device)
+                        )
+                        attn_weights = attn_weights.view(bsz * self.q_num_heads, tgt_len, src_len)
+
+                    # upcast to fp32 if the weights are in fp16. Please see https://github.com/huggingface/transformers/pull/17437
+                    if attn_weights.dtype == torch.float16:
+                        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(torch.float16)
+                    else:
+                        attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+
+                    if output_attentions:
+                        # this operation is a bit awkward, but it's required to
+                        # make sure that attn_weights keeps its gradient.
+                        # In order to do so, attn_weights have to be reshaped
+                        # twice and have to be reused in the following
+                        attn_weights_reshaped = attn_weights.view(bsz, self.q_num_heads, tgt_len, src_len)
+                        attn_weights = attn_weights_reshaped.view(bsz * self.q_num_heads, tgt_len, src_len)
+                    else:
+                        attn_weights_reshaped = None
+
+                    attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
+
+                    attn_output = torch.bmm(attn_probs, value_states)
+
+                    if attn_output.size() != (bsz * self.q_num_heads, tgt_len, self.head_dim):
+                        raise ValueError(
+                            f"`attn_output` should be of size {(bsz, self.q_num_heads, tgt_len, self.head_dim)}, but is"
+                            f" {attn_output.size()}"
+                        )
+
+                    attn_output = attn_output.view(bsz, self.q_num_heads, tgt_len, self.head_dim)
+                    attn_output = attn_output.transpose(1, 2)
+
+                    # Use the `embed_dim` from the config (stored in the class) rather than `hidden_state` because `attn_output` can be
+                    # partitioned aross GPUs when using tensor-parallelism.
+                    attn_output = attn_output.reshape(bsz, tgt_len, self.q_num_heads * self.head_dim)
+
+                    attn_output = self.out_proj(attn_output, in_dim_indices=probe_vo_out_dim_indices)
+                    
+                    return attn_output, attn_weights_reshaped, past_key_value
+                elif 'calib' in cfg['prune_method'] and ('runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']):
+                    # if key_value_states are provided this layer is used as a cross-attention layer
+                    # for the decoder
+                    is_cross_attention = key_value_states is not None
+
+                    qk_prune_way = cfg['qk_prune_way']
+                    vo_prune_way = cfg['vo_prune_way']
+                    bsz, tgt_len, _ = hidden_states.size()
+
+                    # get query proj
+                    query_states = self.q_proj(hidden_states) * self.scaling
+                    key_states = self._shape(self.k_proj(hidden_states), -1, bsz, self.q_num_heads)
+                    value_states = self._shape(self.v_proj(hidden_states), -1, bsz, self.q_num_heads)
+
+                    if self.is_decoder:
+                        # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
+                        # Further calls to cross_attention layer can then reuse all cross-attention
+                        # key/value_states (first "if" case)
+                        # if uni-directional self-attention (decoder) save Tuple(torch.Tensor, torch.Tensor) of
+                        # all previous decoder key/value_states. Further calls to uni-directional self-attention
+                        # can concat previous decoder key/value_states to current projected key/value_states (third "elif" case)
+                        # if encoder bi-directional self-attention `past_key_value` is always `None`
+                        past_key_value = (key_states, value_states)
+
+                    proj_shape = (bsz * self.q_num_heads, -1, self.head_dim)
+                    query_states = self._shape(query_states, tgt_len, bsz, self.q_num_heads).view(*proj_shape)
+                    key_states = key_states.view(*proj_shape)
+                    value_states = value_states.view(*proj_shape)
+
+                    src_len = key_states.size(1)
+                    attn_weights = torch.bmm(query_states, key_states.transpose(1, 2))
+
+                    if attn_weights.size() != (bsz * self.q_num_heads, tgt_len, src_len):
+                        raise ValueError(
+                            f"Attention weights should be of size {(bsz * self.q_num_heads, tgt_len, src_len)}, but is"
+                            f" {attn_weights.size()}"
+                        )
+
+                    if attention_mask is not None:
+                        if attention_mask.size() != (bsz, 1, tgt_len, src_len):
+                            raise ValueError(
+                                f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {attention_mask.size()}"
+                            )
+                        attn_weights = attn_weights.view(bsz, self.q_num_heads, tgt_len, src_len) + attention_mask
+                        attn_weights = torch.max(
+                            attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device)
+                        )
+                        attn_weights = attn_weights.view(bsz * self.q_num_heads, tgt_len, src_len)
+
+                    # upcast to fp32 if the weights are in fp16. Please see https://github.com/huggingface/transformers/pull/17437
+                    if attn_weights.dtype == torch.float16:
+                        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(torch.float16)
+                    else:
+                        attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+
+                    if output_attentions:
+                        # this operation is a bit awkward, but it's required to
+                        # make sure that attn_weights keeps its gradient.
+                        # In order to do so, attn_weights have to be reshaped
+                        # twice and have to be reused in the following
+                        attn_weights_reshaped = attn_weights.view(bsz, self.q_num_heads, tgt_len, src_len)
+                        attn_weights = attn_weights_reshaped.view(bsz * self.q_num_heads, tgt_len, src_len)
+                    else:
+                        attn_weights_reshaped = None
+
+                    attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
+
+                    attn_output = torch.bmm(attn_probs, value_states)
+
+                    if attn_output.size() != (bsz * self.q_num_heads, tgt_len, self.head_dim):
+                        raise ValueError(
+                            f"`attn_output` should be of size {(bsz, self.q_num_heads, tgt_len, self.head_dim)}, but is"
+                            f" {attn_output.size()}"
+                        )
+
+                    attn_output = attn_output.view(bsz, self.q_num_heads, tgt_len, self.head_dim)
+                    attn_output = attn_output.transpose(1, 2)
+
+                    # Use the `embed_dim` from the config (stored in the class) rather than `hidden_state` because `attn_output` can be
+                    # partitioned aross GPUs when using tensor-parallelism.
+                    attn_output = attn_output.reshape(bsz, tgt_len, self.q_num_heads * self.head_dim)
+
+                    attn_output = self.out_proj(attn_output)
+                    if cfg['mode'] == 'asyncinter':
+                        with torch.cuda.stream(cfg['cuda_stream1']):
+                            if torch.all(self.out_proj.get_global_metric_score_distribution() == 0):
+                                vo_out_dim_indices = torch.arange(self.embed_dim, dtype=torch.long).to(device=hidden_states.device)
+                            else:
+                                out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.out_proj.get_global_metric_score_distribution(), self.out_proj.weight.data, cfg['prune_metric'])
+                                if 'flapratio' in cfg['prune_method']:
+                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
+                                else:
+                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+
+                            self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
+                            qk_out_dim_indices = vo_out_dim_indices
+                                    
+                            self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
+                            self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
+                            self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
+                            self.out_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
+                    else:
+                        raise ValueError('please use asyncinter for calib+ema')
+                    return attn_output, attn_weights_reshaped, past_key_value                
+                elif 'calib' in cfg['prune_method'] or 'flap' in cfg['prune_method'] or 'wandasp' in cfg['prune_method']:
+                    if cfg['mode'] == 'asyncinter':
+                        # if key_value_states are provided this layer is used as a cross-attention layer
+                        # for the decoder
+                        is_cross_attention = key_value_states is not None
+
+                        qk_prune_way = cfg['qk_prune_way']
+                        vo_prune_way = cfg['vo_prune_way']
+                        bsz, tgt_len, _ = hidden_states.size()
+
+                        # get query proj
+                        query_states = self.q_proj(hidden_states) * self.scaling
+                        key_states = self._shape(self.k_proj(hidden_states), -1, bsz, self.q_num_heads)
+                        value_states = self._shape(self.v_proj(hidden_states), -1, bsz, self.q_num_heads)
+
+                        if self.is_decoder:
+                            # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
+                            # Further calls to cross_attention layer can then reuse all cross-attention
+                            # key/value_states (first "if" case)
+                            # if uni-directional self-attention (decoder) save Tuple(torch.Tensor, torch.Tensor) of
+                            # all previous decoder key/value_states. Further calls to uni-directional self-attention
+                            # can concat previous decoder key/value_states to current projected key/value_states (third "elif" case)
+                            # if encoder bi-directional self-attention `past_key_value` is always `None`
+                            past_key_value = (key_states, value_states)
+
+                        proj_shape = (bsz * self.q_num_heads, -1, self.head_dim)
+                        print('proj_shape', proj_shape, bsz, self.q_num_heads, self.head_dim)
+                        print('query_states', query_states.shape)
+                        query_states = self._shape(query_states, tgt_len, bsz, self.q_num_heads).view(*proj_shape)
+                        key_states = key_states.view(*proj_shape)
+                        value_states = value_states.view(*proj_shape)
+
+                        src_len = key_states.size(1)
+                        attn_weights = torch.bmm(query_states, key_states.transpose(1, 2))
+
+                        if attn_weights.size() != (bsz * self.q_num_heads, tgt_len, src_len):
+                            raise ValueError(
+                                f"Attention weights should be of size {(bsz * self.q_num_heads, tgt_len, src_len)}, but is"
+                                f" {attn_weights.size()}"
+                            )
+
+                        if attention_mask is not None:
+                            if attention_mask.size() != (bsz, 1, tgt_len, src_len):
+                                raise ValueError(
+                                    f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {attention_mask.size()}"
+                                )
+                            attn_weights = attn_weights.view(bsz, self.q_num_heads, tgt_len, src_len) + attention_mask
+                            attn_weights = torch.max(
+                                attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device)
+                            )
+                            attn_weights = attn_weights.view(bsz * self.q_num_heads, tgt_len, src_len)
+
+                        # upcast to fp32 if the weights are in fp16. Please see https://github.com/huggingface/transformers/pull/17437
+                        if attn_weights.dtype == torch.float16:
+                            attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(torch.float16)
+                        else:
+                            attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+
+                        if output_attentions:
+                            # this operation is a bit awkward, but it's required to
+                            # make sure that attn_weights keeps its gradient.
+                            # In order to do so, attn_weights have to be reshaped
+                            # twice and have to be reused in the following
+                            attn_weights_reshaped = attn_weights.view(bsz, self.q_num_heads, tgt_len, src_len)
+                            attn_weights = attn_weights_reshaped.view(bsz * self.q_num_heads, tgt_len, src_len)
+                        else:
+                            attn_weights_reshaped = None
+
+                        attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
+
+                        attn_output = torch.bmm(attn_probs, value_states)
+
+                        if attn_output.size() != (bsz * self.q_num_heads, tgt_len, self.head_dim):
+                            raise ValueError(
+                                f"`attn_output` should be of size {(bsz, self.q_num_heads, tgt_len, self.head_dim)}, but is"
+                                f" {attn_output.size()}"
+                            )
+
+                        attn_output = attn_output.view(bsz, self.q_num_heads, tgt_len, self.head_dim)
+                        attn_output = attn_output.transpose(1, 2)
+
+                        # Use the `embed_dim` from the config (stored in the class) rather than `hidden_state` because `attn_output` can be
+                        # partitioned aross GPUs when using tensor-parallelism.
+                        attn_output = attn_output.reshape(bsz, tgt_len, self.q_num_heads * self.head_dim)
+
+                        attn_output = self.out_proj(attn_output)
+
+                        if cfg['cur_batch_index'] == 0:
+                            if torch.all(self.out_proj.get_global_metric_score_distribution() == 0):
+                                vo_out_dim_indices = torch.arange(self.embed_dim, dtype=torch.long).to(device=hidden_states.device)
+                            else:
+                                out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.out_proj.get_global_metric_score_distribution(), self.out_proj.weight.data, cfg['prune_metric'])
+                                if 'flapratio' in cfg['prune_method']:
+                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
+                                else:
+                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+
+                            self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
+                            qk_out_dim_indices = vo_out_dim_indices
+                                    
+                            self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
+                            self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
+                            self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
+                            self.out_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
+                        return attn_output, attn_weights_reshaped, past_key_value
+                    else:
+                        raise ValueError('Invalid mode')
+            else:
+                return self.attention_forward(hidden_states, key_value_states, past_key_value, attention_mask, layer_head_mask, output_attentions, **kwargs)
+        
 
 
 class OPTDecoderLayer(nn.Module):
     def __init__(self, config: OPTConfig, layer_order):
         super().__init__()
         self.embed_dim = config.hidden_size
+        self.ffn_dim = config.ffn_dim
+        self.optconfig = config
+
         self.self_attn = OPTAttention(
             embed_dim=self.embed_dim,
             num_heads=config.num_attention_heads,
             dropout=config.attention_dropout,
-            is_decoder=True,
+            is_decoder=False,
             bias=config.enable_bias,
+            layer_order=layer_order,
+            config=config
         )
         self.do_layer_norm_before = config.do_layer_norm_before
         self.dropout = config.dropout
@@ -268,16 +737,138 @@ class OPTDecoderLayer(nn.Module):
         )
         self.fc1 = nn.Linear(self.embed_dim, config.ffn_dim, bias=config.enable_bias)
         self.fc2 = nn.Linear(config.ffn_dim, self.embed_dim, bias=config.enable_bias)
-        self.fc1.cal_total_flops = True
-        self.fc2.cal_total_flops = True
-
         self.final_layer_norm = nn.LayerNorm(self.embed_dim, elementwise_affine=config.layer_norm_elementwise_affine)
 
-        self.cal_total_flops = True
-        self.pruning_module = HiddenRepresentationPruning(cfg, f'opt_mlp_{layer_order}')
-        self.probe_out_dim_indices = None
-
         self.layer_order = layer_order
+        self.pruning_module = HiddenRepresentationPruning(cfg, f'opt_mlp_{layer_order}', config)
+
+        self.probe_out_dim_indices = None
+        
+
+    def probe_process(self, x, **kwargs):
+        # 1. generate probeW
+        # 2. run matrix multiplication
+        # 3. calculate score
+        # 4. extract metric
+
+        # generate probe
+        # rank / mean / absnml
+        cur_batch_seq_len = x.size(1)
+        
+        if 'respick' in cfg['prune_method']:
+            inforank = kwargs['respick']
+        else:
+            inforank = None
+        probe, bsz_selected_indices, seq_selected_indices = generate_probe(x, cfg['fc1_probe_ratio'], inforank)
+        
+        probe_out = self.activation_fn(self.fc1(probe, cal_mlp_probe_out_dim_metric=True))
+        print('probe_out', probe_out.shape)
+        # calculate score
+        if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
+            probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.fc2.get_global_metric_score_distribution(cur_batch_seq_len))
+        else:
+            probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices)
+
+        if 'flapratio' in cfg['prune_method']:
+            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
+        else:
+            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
+
+        # extract matrix
+        self.fc1.prepare_async_weight(out_dim_indices=probe_out_dim_indices)
+        self.fc2.prepare_async_weight(in_dim_indices=probe_out_dim_indices)
+        return probe_out_dim_indices, probe_out
+    
+    def mlp_layer(self, hidden_states, **kwargs):
+        if cfg['calibration_stage'] == True:
+            hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states)))         
+            return hidden_states  
+        elif cfg['calibration_stage'] == False:
+            if ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
+                if 'probe' in cfg['prune_method']:
+                    probe_out_dim_indices = None
+                    if cfg['mode'] == 'sync':
+                        probe_out_dim_indices, probe_out = self.probe_process(hidden_states, **kwargs)
+                        # count flops for probe
+                        if cfg['onlyprobe'] == True:
+                            # match the shape, and will not count the flops for this part
+                            hidden_states = torch.zeros((cfg['batch_size'], cfg['max_seq_len'], self.embed_dim), device=hidden_states.device, dtype=hidden_states.dtype)
+                            return hidden_states
+                    elif cfg['mode'] == 'asyncintra':
+                        if 'post_layernorm_attn_residual' in kwargs:
+                            _, _ = self.probe_process(kwargs['post_layernorm_attn_residual'], **kwargs)
+                            return
+                        else:
+                            raise ValueError('Invalid input for asyncintra mode')
+                        
+                    hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states, out_dim_indices=probe_out_dim_indices)), in_dim_indices=probe_out_dim_indices) 
+                    return hidden_states
+                elif 'calib' in cfg['prune_method'] and ('runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']):
+
+                    if cfg['mode'] == 'asyncinter':
+                        hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states)))  
+
+                        with torch.cuda.stream(cfg['cuda_stream1']):
+                            if torch.all(self.fc2.get_global_metric_score_distribution() == 0):
+                                out_dim_indices = torch.arange(self.ffn_dim, dtype=torch.long).to(device=hidden_states.device)
+                            else:
+                                out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.fc2.get_global_metric_score_distribution(), self.fc2.weight.data, cfg['prune_metric'])
+
+                                if 'flapratio' in cfg['prune_method']:
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
+                                else:
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
+
+                            self.fc1.prepare_async_weight(out_dim_indices=out_dim_indices)
+                            self.fc2.prepare_async_weight(in_dim_indices=out_dim_indices)
+                    else:
+                        raise ValueError('Invalid mode')
+                    return hidden_states
+                # only calib (baselines)
+                elif 'calib' in cfg['prune_method'] or 'flap' in cfg['prune_method'] or 'wandasp' in cfg['prune_method']:
+                    # no ema or runningmean
+                    if cfg['mode'] == 'asyncinter':
+                        hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states)))  
+
+                        if cfg['cur_batch_index'] == 0:
+                            if torch.all(self.fc2.get_global_metric_score_distribution() == 0):
+                                out_dim_indices = torch.arange(self.ffn_dim, dtype=torch.long).to(device=hidden_states.device)
+                            else:
+                                out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.fc2.get_global_metric_score_distribution(), self.fc2.weight.data, cfg['prune_metric'])
+
+                                if 'flapratio' in cfg['prune_method'] or 'gridratio' in cfg['prune_method']:
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
+                                else:
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
+
+                            self.fc1.prepare_async_weight(out_dim_indices=out_dim_indices)
+                            print('out_dim_indices', out_dim_indices.shape, self.fc2.weight.shape, self.fc2.bias.shape)
+                            self.fc2.prepare_async_weight(in_dim_indices=out_dim_indices)
+                    else:
+                        raise ValueError('Invalid mode')
+                    return hidden_states
+            else:
+                hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states))) 
+                return hidden_states  
+
+    def check_asyncintra_mlp(self):
+        if ('fc1_proj' in cfg['cust_tgt_modules'] or 'fc2_proj' in cfg['cust_tgt_modules']) \
+            and self.layer_order > cfg['skip_layers'] \
+            and cfg['calibration_stage'] == False \
+            and cfg['mode'] == 'asyncintra' \
+            and 'probe' in cfg['prune_method']:
+            return True
+        return False
+    
+    def check_asyncintra_attention(self):
+        if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'out_proj' in cfg['cust_tgt_modules']) \
+            and self.layer_order >= cfg['skip_layers'] \
+            and cfg['calibration_stage'] == False \
+            and cfg['mode'] == 'asyncintra' \
+            and 'probe' in cfg['prune_method'] \
+            and self.layer_order != self.optconfig.num_hidden_layers - 1:
+            return True
+        return False
 
     def forward(
         self,
@@ -305,164 +896,148 @@ class OPTDecoderLayer(nn.Module):
             past_key_value (`Tuple(torch.FloatTensor)`, *optional*): cached past key and value projection states
         """
 
-        residual = hidden_states
-        temp_attn_residual = copy.deepcopy(residual)
-        # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
-        if self.do_layer_norm_before:
-            hidden_states = self.self_attn_layer_norm(hidden_states)
+        # residual = hidden_states
+        # if self.check_asyncintra_mlp():
+        #     torch.cuda.synchronize(cfg['cuda_default_stream'])
 
-        # Self Attention
+        # def full_attn_inf(result_dict, hidden_states, residual):
+        #     try:
+        #         hidden_states = self.self_attn_layer_norm(hidden_states)
+        #         hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        #             hidden_states=hidden_states,
+        #             past_key_value=past_key_value,
+        #             attention_mask=attention_mask,
+        #             layer_head_mask=layer_head_mask,
+        #             output_attentions=output_attentions,
+        #             respick=residual
+        #         )
+        #         hidden_states = residual + hidden_states
+        #         result_dict['hidden_states'] = hidden_states
+        #     except Exception as e:
+        #         print(f"Error in full_attn_inf: {e}")
+        #         traceback.print_exc() 
+
+        # def probe_mlp_inf(result_dict, residual):
+        #     if self.check_asyncintra_mlp():
+        #         with torch.cuda.stream(cfg['cuda_stream1']):
+        #             try:
+        #                 post_layernorm_attn_residual = self.final_layer_norm(residual)
+        #                 if 'resinfo' in cfg['prune_method']: 
+        #                     result_dict['post_layernorm_attn_residual'] = post_layernorm_attn_residual
+        #                 self.mlp_layer(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual, respick=residual)
+        #             except Exception as e:
+        #                 print(f"Error in probe_mlp_inf: {e}")
+        #                 traceback.print_exc() 
+
+
+        # # Create threads
+        # full_attn_inf_result = {}
+        # probe_mlp_inf_result = {}
+        # thread1 = threading.Thread(target=full_attn_inf, args=(full_attn_inf_result, hidden_states, residual))
+        # thread2 = threading.Thread(target=probe_mlp_inf, args=(probe_mlp_inf_result, residual))
+
+        # # Start the threads
+        # thread1.start()
+        # thread2.start()
+        # thread1.join()
+        # thread2.join()
+
+
+        # hidden_states = full_attn_inf_result['hidden_states']
+        # residual = hidden_states
+        # if self.check_asyncintra_attention():
+        #     torch.cuda.synchronize(cfg['cuda_default_stream'])
+
+        # if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_mlp():
+        #     self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_mlp_inf_result['post_layernorm_attn_residual'])
+        #     print('self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
+        #     print('self.attn_l1_diff_percentage', self.attn_l1_diff_percentage, flush=True)
+        #     print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
+
+
+        # def full_mlp_inf(result_dict, hidden_states, residual):
+        #     try:
+        #         hidden_states = self.final_layer_norm(hidden_states)
+        #         hidden_states = self.mlp_layer(hidden_states, respick=residual)
+        #         result_dict['hidden_states'] = hidden_states
+        #     except Exception as e:
+        #         print(f"Error in full_mlp_inf: {e}")
+        #         traceback.print_exc()
+        
+        # def probe_attn_inf(result_dict, residual):
+        #     if self.check_asyncintra_attention():
+        #         with torch.cuda.stream(cfg['cuda_stream1']):
+        #             print('self.layer_order', self.layer_order, flush=True)
+        #             try:
+        #                 # cfg[f'cuda_events_mlp_{self.layer_order}'].wait(cfg['cuda_stream1'])
+        #                 input_layernorm_mlp_residual = kwargs['next_layer'].self_attn_layer_norm(residual)
+        #                 kwargs['next_layer'].self_attn(
+        #                     hidden_states=hidden_states,
+        #                     past_key_value=past_key_value,
+        #                     attention_mask=attention_mask,
+        #                     layer_head_mask=layer_head_mask,
+        #                     output_attentions=output_attentions,
+        #                     input_layernorm_mlp_residual=input_layernorm_mlp_residual,
+        #                     respick=residual
+        #                 )
+        #                 if 'resinfo' in cfg['prune_method']: 
+        #                     result_dict['input_layernorm_mlp_residual'] = input_layernorm_mlp_residual
+        #             except Exception as e:
+        #                 print(f"Error in probe_attn_inf: {e}")
+        #                 traceback.print_exc() 
+
+        # full_mlp_inf_result = {}
+        # probe_attn_inf_result = {}
+        # thread1 = threading.Thread(target=full_mlp_inf, args=(full_mlp_inf_result, hidden_states, residual))
+        # # print('residual before', residual[0])
+        # thread2 = threading.Thread(target=probe_attn_inf, args=(probe_attn_inf_result, residual))
+
+        # # Start the threads
+        # thread1.start()
+        # thread2.start()
+
+        # thread1.join()
+        # thread2.join()
+
+        # hidden_states = full_mlp_inf_result['hidden_states']
+        # hidden_states = residual + hidden_states
+
+        # if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_attention():
+        #     self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_attn_inf_result['input_layernorm_mlp_residual'])
+        #     print('self.layer_order', self.layer_order, flush=True)
+        #     print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
+        #     print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
+        #     print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
+
+
+        residual = hidden_states
+        hidden_states = self.self_attn_layer_norm(hidden_states)
+
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
             hidden_states=hidden_states,
             past_key_value=past_key_value,
             attention_mask=attention_mask,
             layer_head_mask=layer_head_mask,
             output_attentions=output_attentions,
+            respick=residual
         )
-        hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+        # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
 
-        # 350m applies layer norm AFTER attention
-        if not self.do_layer_norm_before:
-            hidden_states = self.self_attn_layer_norm(hidden_states)
 
         # Fully Connected
-        hidden_states_shape = hidden_states.shape
-        # print('hidden_states_shape', hidden_states_shape, flush=True)
         # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
         residual = hidden_states
-        # temp = hidden_states.reshape(-1, hidden_states.size(-1))
-        # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
-        if self.do_layer_norm_before:
-            hidden_states = self.final_layer_norm(hidden_states)
-            temp_attn_residual = self.final_layer_norm(temp_attn_residual)
 
-        # flattened_hidden_states = hidden_states.flatten()
-        # num_elements_to_select = max(1, int(0.10 * flattened_hidden_states.numel()))  # Top 10% of elements
-        # # Select the top 10% elements based on their absolute value
-        # abs_flattened_hidden_states = flattened_hidden_states.abs()
-        # values, indices = torch.topk(abs_flattened_hidden_states, num_elements_to_select)
-
-        # ## Retrieve the actual values from the original tensor using these indices
-        # selected_values = flattened_hidden_states[indices].to(torch.float32)
-
-        # # Calculate the L1 norm (sum of absolute values) and L2 norm (square root of sum of squares) of these values
-        # l1_norm = selected_values.abs().sum()
-        # l2_norm = torch.sqrt((selected_values ** 2).sum())
-
-        # flattened_post_temp_attn_residual = post_temp_attn_residual.flatten()
-        # post_temp_attn_residual_values = flattened_post_temp_attn_residual[indices].to(torch.float32)
+        hidden_states = self.final_layer_norm(hidden_states)
 
 
-        # l1_diff_norm = (selected_values - post_temp_attn_residual_values).abs().sum()
-        # l2_diff_norm = torch.sqrt(((selected_values - post_temp_attn_residual_values) ** 2).sum())
+        hidden_states = self.mlp_layer(hidden_states, respick=residual)
 
-        # sign_matches = torch.sign(selected_values) == torch.sign(post_temp_attn_residual_values)
-        # sign_match_ratio = torch.sum(sign_matches).item() / num_elements_to_select    
-
-        # cosine_similarity = torch.nn.functional.cosine_similarity(
-        #     selected_values.float(),  # Ensure the data type is float for cosine similarity computation
-        #     post_temp_attn_residual_values.float(),
-        #     dim=0  # Compute the cosine similarity across the dimension 0 (element-wise for vectors)
-        # )
-
-        # print('l1_norm', l1_norm, flush=True)
-        # print('l2_norm', l2_norm, flush=True)
-        # print('l1_diff_norm', l1_diff_norm, flush=True)
-        # print('l2_diff_norm', l2_diff_norm, flush=True)
-        # print('sign_match_ratio', sign_match_ratio, flush=True)
-        # print('cosine_similarity', cosine_similarity, flush=True)
-        # print('selected_values', selected_values, flush=True)
-        # print('post_temp_attn_residual_values', post_temp_attn_residual_values, flush=True)
+        # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+        hidden_states = residual + hidden_states
 
 
-        
-        if ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip']:
-            if cfg['calibration_stage'] == True:
-                hidden_states = self.fc1(hidden_states)
-                hidden_states = self.activation_fn(hidden_states)
-                hidden_states = self.fc2(hidden_states)
-            elif cfg['calibration_stage'] == False:
-                if 'probe' in cfg['prune_method']:
-                    time_start = time.time()
-                    if 'nml' in cfg['prune_method']:
-                        # abs_x = torch.abs(x).to(torch.float32)
-                        # porportion = abs_x / abs_x.sum(dim=0, keepdim=True)
-                        # print('porportion', porportion, porportion.dtype, porportion.shape, flush=True)
-                        # comp_across_bsz = ((x.to(torch.float32) * porportion).sum(dim=0)).to(x.dtype)
-                        comp_across_bsz = nml_process(temp_attn_residual, cfg['probe_num'], cfg['probe_size'])
-                        # comp_across_bsz = nml_process(hidden_states, cfg['probe_num'], cfg['probe_size'])
-
-
-                    probe_out = self.activation_fn(self.fc1(comp_across_bsz, cal_mlp_probe_out_dim_metric=True))
-                    
-
-                    if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
-                        # if 'saveseqdim' in cfg['prune_method']:
-                        #     probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.down_proj.weight.data, cfg['prune_metric'], global_input_distribution=self.down_proj.get_global_input_distribution()[0])
-                        # else:
-                        probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], global_metric_score_distribution=self.fc2.get_global_metric_score_distribution())
-                    else:
-                        probe_out_dim_metric, comined_probe_out = cal_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'])
-
-                    if 'flapratio' in cfg['prune_method']:
-                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
-                    else:
-                        probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
-
-                    # if self.probe_out_dim_indices is None:
-                    #     self.probe_out_dim_indices = probe_out_dim_indices
-                    # else:
-                    #     # Convert lists to sets
-                    #     set_self = set(self.probe_out_dim_indices.tolist())
-                    #     set_probe = set(probe_out_dim_indices.tolist())
-
-                    #     # Find the intersection
-                    #     intersection = set_self & set_probe
-
-                    #     # Count the number of elements in the intersection
-                    #     intersection_count = len(intersection)
-                    #     intersection_ratio = intersection_count / len(set_self)
-                    #     print('intersection_ratio', intersection_ratio, flush=True)
-                    #     self.probe_out_dim_indices = probe_out_dim_indices
-                    # print('probe_out_dim_indices', probe_out_dim_indices.shape, flush=True)
-                    kwargs['probe_in_dim_indices'] = probe_out_dim_indices
-
-                    time_start = time.time()
-                    hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states, probe_out_dim_indices=probe_out_dim_indices)), **kwargs)
-                    # if 'restore' in cfg['prune_name']:
-                    #     down_proj = down_proj + restore
-                    custom_duration = time.time() - time_start
-                    print('fll_batch_duration', custom_duration, flush=True)
-                elif ('calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']):
-                    bsz, _, _ = hidden_states.shape
-                    time_start = time.time()
-                    if torch.all(self.fc2.get_global_metric_score_distribution() == 0):
-                        probe_out_dim_indices = torch.arange(self.ffn_dim, dtype=torch.long).to(device=hidden_states.device)
-                        # self.running_mean = torch.zeros(self.intermediate_size, dtype=x.dtype, device=x.device)
-                        # self.running_mean_counter = torch.zeros(self.intermediate_size, dtype=torch.int32, device=x.device)
-                    else:
-                        probe_out_dim_metric = cal_calib_prune_metric(self.fc2.get_global_metric_score_distribution(), self.fc2.weight.data, cfg['prune_metric'])
-
-                        if 'flapratio' in cfg['prune_method']:
-                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.fc2.pruning_ratio)
-                        else:
-                            probe_out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(probe_out_dim_metric, cfg['tc_multiple'])
-
-                    kwargs['probe_in_dim_indices'] = probe_out_dim_indices
-                    hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states, probe_out_dim_indices=probe_out_dim_indices)), **kwargs)
-        else:
-            # print('here')
-            hidden_states = self.fc1(hidden_states)
-            hidden_states = self.activation_fn(hidden_states)
-            hidden_states = self.fc2(hidden_states)
-
-        hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
-        hidden_states = (residual + hidden_states).view(hidden_states_shape)
-
-        # 350m applies layer norm AFTER attention
-        if not self.do_layer_norm_before:
-            hidden_states = self.final_layer_norm(hidden_states)
 
         outputs = (hidden_states,)
 
@@ -785,6 +1360,7 @@ class OPTDecoder(OPTPreTrainedModel):
                     past_key_value=past_key_value,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
+                    next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) else None,
                 )
 
             hidden_states = layer_outputs[0]
