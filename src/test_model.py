@@ -172,6 +172,9 @@ def test(data_loader, model, model_prof, metric, logger):
                 output_ = {'target': output['target'], 'loss': output['loss']}
             torch.cuda.synchronize()
 
+            if cfg['test_speed'] == False:
+                torch.cuda.empty_cache()
+
             model_prof.start_profile()
             model_prof.reset_profile()
             update_model_prof(model_prof)
@@ -224,6 +227,8 @@ def test(data_loader, model, model_prof, metric, logger):
                             # Append the attribute to the logger
                             logger.append({f'{name}_{attr_name}': attr_value}, 'test')
                 
+                if cfg['test_speed'] == False:
+                    torch.cuda.empty_cache()
                 if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
                     batch_time = (time.time() - start_time) / (i + 1)
                     exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))

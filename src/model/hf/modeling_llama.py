@@ -666,10 +666,8 @@ class LlamaAttention(nn.Module):
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
 
-        print('key_states', key_states.size(), key_states.dtype, key_states.device, self.q_proj.weight.shape, self.k_proj.weight.shape, flush=True)
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-        print('key_states2', key_states.size(), key_states.dtype, key_states.device, flush=True)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
         kv_seq_len = key_states.shape[-2]
@@ -686,7 +684,6 @@ class LlamaAttention(nn.Module):
 
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
-        print('key_states3', key_states.size(), key_states.dtype, key_states.device, flush=True)
         # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
@@ -1631,21 +1628,41 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             logits = torch.cat(logits, dim=-1)
         else:
             logits = self.lm_head(hidden_states)
-        logits = logits.float()
-
+        
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
+            # occupy too many gpu memory when using llama-3 (large vocab size)
+            if 'llama-3' in cfg['model_name'] and 'clm' in cfg['task_name']:
+                original_device = logits.device
+                logits = logits.cpu()
+                logits = logits.float()
+                labels = labels.cpu()
 
-            # Flatten the tokens
-            loss_fct = CrossEntropyLoss()
-            shift_logits = shift_logits.view(-1, self.config.vocab_size)
-            shift_labels = shift_labels.view(-1)
-            # Enable model parallelism
-            shift_labels = shift_labels.to(shift_logits.device)
-            loss = loss_fct(shift_logits, shift_labels)
+                # Shift so that tokens < n predict n
+                shift_logits = logits[..., :-1, :].contiguous()
+                shift_labels = labels[..., 1:].contiguous()
+
+                # Flatten the tokens
+                loss_fct = CrossEntropyLoss()
+                shift_logits = shift_logits.view(-1, self.config.vocab_size)
+                shift_labels = shift_labels.view(-1)
+                # Enable model parallelism
+                shift_labels = shift_labels.to(shift_logits.device)
+                loss = loss_fct(shift_logits, shift_labels)
+                loss = loss.to(original_device)
+            else:
+                logits = logits.float()
+                # Shift so that tokens < n predict n
+                shift_logits = logits[..., :-1, :].contiguous()
+                shift_labels = labels[..., 1:].contiguous()
+
+                # Flatten the tokens
+                loss_fct = CrossEntropyLoss()
+                shift_logits = shift_logits.view(-1, self.config.vocab_size)
+                shift_labels = shift_labels.view(-1)
+                # Enable model parallelism
+                shift_labels = shift_labels.to(shift_logits.device)
+                loss = loss_fct(shift_logits, shift_labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

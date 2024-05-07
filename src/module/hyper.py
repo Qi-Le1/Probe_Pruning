@@ -251,6 +251,7 @@ def process_control():
     cfg['onlyprobe'] = False
     # cfg['onlyprobeinfo'] = True
     cfg['onlyprobeinfo'] = False
+    cfg['test_speed'] = False
     print('cfg: ', cfg, flush=True)
     return
 

@@ -140,15 +140,23 @@ def make_hf_model(model_name):
         #     model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16)
         #     device_map = infer_auto_device_map(model, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
         # print('device_map', device_map, flush=True)
-        model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map="auto")
+        # model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map="auto")
+        
+        # with init_empty_weights():
+        #     max_memory = {0: '30GiB', 1: "30GiB"}
+        #     model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16)
+        #     # , max_memory=max_memory
+        #     device_map = infer_auto_device_map(model, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16, max_memory=max_memory)
+        # print('device_map', device_map, flush=True)
+        model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map='balanced')
         # quantization_config = BitsAndBytesConfig(load_in_8bit=True)
         # model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], quantization_config=quantization_config, device_map=device_map)
     elif 'opt' in model_name:
-        with init_empty_weights():
-            model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16)
-            device_map = infer_auto_device_map(model, no_split_module_classes=["OPTDecoderLayer"], dtype=torch.float16)
-        print('device_map', device_map, flush=True)
-        model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map=device_map)
+        # with init_empty_weights():
+        #     model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16)
+        #     device_map = infer_auto_device_map(model, no_split_module_classes=["OPTDecoderLayer"], dtype=torch.float16)
+        # print('device_map', device_map, flush=True)
+        model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map='balanced')
     else:
         raise ValueError('Not valid model name')
     

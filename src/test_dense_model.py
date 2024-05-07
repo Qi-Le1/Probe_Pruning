@@ -118,6 +118,9 @@ def test(data_loader, model, model_prof, metric, logger):
             input_ = {'target': input['target']}
             output_ = {'target': output['target'], 'loss': output['loss']}
 
+        if cfg['test_speed'] == False:
+            torch.cuda.empty_cache()
+
         torch.cuda.synchronize()
         model_prof.start_profile()
         update_model_prof(model_prof)
@@ -160,6 +163,9 @@ def test(data_loader, model, model_prof, metric, logger):
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
+            
+            if cfg['test_speed'] == False:
+                torch.cuda.empty_cache()
             # break
         print('inference_duration', inference_duration)
         evaluation = metric.evaluate('test', 'full')
