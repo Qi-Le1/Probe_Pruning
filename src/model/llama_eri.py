@@ -30,6 +30,7 @@ class LlamaEriModel(torch.nn.Module):
             "prune_metric": cfg['prune_metric'],
             "key": key,
             "dev": target.weight.device,
+            'is_GQA': self.model.config.num_key_value_heads != self.model.config.num_attention_heads 
         }
         
         if isinstance(target, torch.nn.Linear):
@@ -130,6 +131,7 @@ class Linear(nn.Linear, EriLayer):
     ):
         nn.Linear.__init__(self, in_features, out_features, bias=False)
         EriLayer.__init__(self, in_features=in_features, out_features=out_features, **kwargs)
+        self.is_GQA = kwargs['is_GQA']
         # Freezing the pre-trained weight matrix
         self.weight.requires_grad = False
         self.layer_type = 'linear'
@@ -359,6 +361,9 @@ class Linear(nn.Linear, EriLayer):
         return
     
     def get_weight(self):        
+        # for GQA, just return the original weight
+        if ('k_proj' in self.key or 'v_proj' in self.key) and self.is_GQA == True:
+            return self.weight
         if cfg['mode'] == 'sync':
             return self.weight
         elif cfg['mode'] == 'asyncinter':

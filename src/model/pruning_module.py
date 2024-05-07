@@ -239,9 +239,12 @@ class HiddenRepresentationPruning():
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
             num_prune_heads = int(prune_ratio * num_heads)
             heads_to_preserve = sorted_indices[num_prune_heads:]
+            # sorted_heads, _ = torch.sort(heads_to_preserve)
+
+            # print(sorted_heads)  # Output: tensor([1, 2, 3, 5, 8])
             full_indices_to_preserve = (torch.arange(head_dim, device=probe_out_dim_metric.device) + heads_to_preserve.unsqueeze(1) * head_dim).view(-1)
             num_heads = num_heads - num_prune_heads
-            return full_indices_to_preserve, num_heads
+            return full_indices_to_preserve, num_heads, heads_to_preserve
         else:
             raise NotImplementedError
 

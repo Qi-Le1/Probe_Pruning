@@ -252,9 +252,9 @@ class OPTAttention(nn.Module):
             probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.out_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices)
 
         if 'flapratio' in cfg['prune_method']:
-            probe_vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
+            probe_vo_out_dim_indices, self.v_num_heads, _ = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
         else:
-            probe_vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+            probe_vo_out_dim_indices, self.v_num_heads, _ = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
         
         self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
@@ -586,9 +586,9 @@ class OPTAttention(nn.Module):
                             else:
                                 out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.out_proj.get_global_metric_score_distribution(), self.out_proj.weight.data, cfg['prune_metric'])
                                 if 'flapratio' in cfg['prune_method']:
-                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
+                                    vo_out_dim_indices, self.v_num_heads, _ = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
                                 else:
-                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                    vo_out_dim_indices, self.v_num_heads, _ = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
                             self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
                             qk_out_dim_indices = vo_out_dim_indices
@@ -693,9 +693,9 @@ class OPTAttention(nn.Module):
                             else:
                                 out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.out_proj.get_global_metric_score_distribution(), self.out_proj.weight.data, cfg['prune_metric'])
                                 if 'flapratio' in cfg['prune_method']:
-                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
+                                    vo_out_dim_indices, self.v_num_heads, _ = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
                                 else:
-                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                    vo_out_dim_indices, self.v_num_heads, _ = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
                             self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
                             qk_out_dim_indices = vo_out_dim_indices

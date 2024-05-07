@@ -445,7 +445,7 @@ class LlamaMLP(nn.Module):
                     down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
                     return down_proj
 
-def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
+def repeat_kv(hidden_states: torch.Tensor, n_rep: int, heads_to_preserve=None) -> torch.Tensor:
     """
     This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
     num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
@@ -454,7 +454,11 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     if n_rep == 1:
         return hidden_states
     hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
-    return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
+    if heads_to_preserve is not None:
+        heads_to_preserve = heads_to_preserve.to(hidden_states.device)
+        return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)[:, heads_to_preserve, :, :]
+    else:
+        return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
 
 
 class LlamaAttention(nn.Module):
@@ -486,9 +490,12 @@ class LlamaAttention(nn.Module):
 
         self.layer_order = layer_order
         self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_key_value_heads, self.num_key_value_heads
-
+        self.heads_to_preserve = torch.arange(self.num_heads)
         self._init_rope()
 
+    def is_GQA(self):
+        return self.num_key_value_groups != 1
+    
     def _init_rope(self):
         if self.config.rope_scaling is None:
             self.rotary_emb = LlamaRotaryEmbedding(
@@ -561,6 +568,9 @@ class LlamaAttention(nn.Module):
             query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids[:, seq_selected_indices])
         else:
             query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+        
+        key_states = repeat_kv(key_states, self.num_key_value_groups)
+        value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
         if attn_weights.size() != (key_states.shape[0], self.num_heads, q_len, kv_seq_len):
@@ -599,18 +609,21 @@ class LlamaAttention(nn.Module):
             probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices)
 
         if 'flapratio' in cfg['prune_method']:
-            probe_vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+            probe_vo_out_dim_indices, self.v_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
         else:
-            probe_vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+            probe_vo_out_dim_indices, self.v_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
         
         self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
         probe_qk_out_dim_indices = probe_vo_out_dim_indices
 
         self.q_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
-        self.k_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
-        self.v_proj.prepare_async_weight(out_dim_indices=probe_vo_out_dim_indices)
         self.o_proj.prepare_async_weight(in_dim_indices=probe_vo_out_dim_indices)
+
+        # MHA, for GQA, skip prune for simplicity, hard to get 4 consecutive heads to be pruned
+        if not self.is_GQA():
+            self.k_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
+            self.v_proj.prepare_async_weight(out_dim_indices=probe_vo_out_dim_indices)
         return probe_qk_out_dim_indices, probe_vo_out_dim_indices, attn_weights, attn_output, past_key_value
 
 
@@ -649,8 +662,10 @@ class LlamaAttention(nn.Module):
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
 
+        print('key_states', key_states.size(), key_states.dtype, key_states.device, self.q_proj.weight.shape, self.k_proj.weight.shape, flush=True)
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        print('key_states2', key_states.size(), key_states.dtype, key_states.device, flush=True)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
         kv_seq_len = key_states.shape[-2]
@@ -667,7 +682,7 @@ class LlamaAttention(nn.Module):
 
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
-
+        print('key_states3', key_states.size(), key_states.dtype, key_states.device, flush=True)
         # key_states: bsz, self.num_key_value_heads, q_len, self.head_dim -> bsz, self.num_key_value_heads, self.head_dim, q_len
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
@@ -865,9 +880,10 @@ class LlamaAttention(nn.Module):
                     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
                     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+                    print('attn_weightssize', attn_weights.size())
                     if attn_weights.size() != (bsz, self.k_num_heads, q_len, kv_seq_len):
                         raise ValueError(
-                            f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+                            f"Attention weights should be of size {(bsz, self.k_num_heads, q_len, kv_seq_len)}, but is"
                             f" {attn_weights.size()}"
                         )
 
@@ -901,17 +917,19 @@ class LlamaAttention(nn.Module):
                             else:
                                 out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
                                 if 'flapratio' in cfg['prune_method']:
-                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+                                    vo_out_dim_indices, self.v_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                 else:
-                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                    vo_out_dim_indices, self.v_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
                             self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
                             qk_out_dim_indices = vo_out_dim_indices
                                     
                             self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
-                            self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
-                            self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
                             self.o_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
+                            # MHA, for GQA, skip prune for simplicity
+                            if not self.is_GQA():
+                                self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
+                                self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
                     else:
                         raise ValueError('please use asyncinter for calib+ema')
                     return attn_output, attn_weights, past_key_value
@@ -944,13 +962,19 @@ class LlamaAttention(nn.Module):
                             value_states = torch.cat([past_key_value[1], value_states], dim=2)
 
                         past_key_value = (key_states, value_states) if use_cache else None
-                        key_states = repeat_kv(key_states, self.num_key_value_groups)
-                        value_states = repeat_kv(value_states, self.num_key_value_groups)
+                        if self.is_GQA():
+                            print('self.heads_to_preserve'  , self.heads_to_preserve)
+                            key_states = repeat_kv(key_states, self.num_key_value_groups, self.heads_to_preserve)
+                            value_states = repeat_kv(value_states, self.num_key_value_groups, self.heads_to_preserve)
+                        else:
+                            key_states = repeat_kv(key_states, self.num_key_value_groups)
+                            value_states = repeat_kv(value_states, self.num_key_value_groups)
 
+                        print('key_states3', key_states.size(), key_states.dtype, key_states.device, flush=True)
                         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-                        if attn_weights.size() != (bsz, self.k_num_heads, q_len, kv_seq_len):
+                        if attn_weights.size() != (bsz, self.q_num_heads, q_len, kv_seq_len):
                             raise ValueError(
-                                f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+                                f"Attention weights should be of size {(bsz, self.q_num_heads, q_len, kv_seq_len)}, but is"
                                 f" {attn_weights.size()}"
                             )
 
@@ -963,13 +987,13 @@ class LlamaAttention(nn.Module):
 
                         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
                         attn_output = torch.matmul(attn_weights, value_states)
-                        if attn_output.size() != (bsz, self.v_num_heads, q_len, self.head_dim):
+                        if attn_output.size() != (bsz, self.q_num_heads, q_len, self.head_dim):
                             raise ValueError(
-                                f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.head_dim)}, but is"
+                                f"`attn_output` should be of size {(bsz, self.q_num_heads, q_len, self.head_dim)}, but is"
                                 f" {attn_output.size()}"
                             )
                         attn_output = attn_output.transpose(1, 2).contiguous()
-                        attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.head_dim)
+                        attn_output = attn_output.reshape(bsz, q_len, self.q_num_heads * self.head_dim)
 
                         attn_output = self.o_proj(attn_output)
                                 
@@ -983,17 +1007,23 @@ class LlamaAttention(nn.Module):
                                 # TODO: deal with rope
                                 out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
                                 if 'flapratio' in cfg['prune_method']:
-                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+                                    vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                 else:
-                                    vo_out_dim_indices, self.v_num_heads = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                    vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
-                            self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
-                            qk_out_dim_indices = vo_out_dim_indices
+                            if self.is_GQA():
+                                self.q_num_heads = self.remain_num_heads
+                                qk_out_dim_indices = vo_out_dim_indices
+                            else:
+                                self.q_num_heads, self.k_num_heads, self.v_num_heads = self.remain_num_heads, self.remain_num_heads, self.remain_num_heads
+                                qk_out_dim_indices = vo_out_dim_indices
                                     
                             self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
-                            self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
-                            self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
                             self.o_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
+                            # MHA, for GQA, skip prune for simplicity
+                            if not self.is_GQA():
+                                self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
+                                self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
                         return attn_output, attn_weights, past_key_value
                     else:
                         raise ValueError('Invalid mode')
