@@ -556,8 +556,8 @@ class LlamaAttention(nn.Module):
         value_states = self.v_proj(probe, cal_attn_probe_out_dim_metric=True)
 
         query_states = query_states.view(query_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        key_states = key_states.view(key_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        value_states = value_states.view(value_states.shape[0], q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        key_states = key_states.view(key_states.shape[0], q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        value_states = value_states.view(value_states.shape[0], q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
         kv_seq_len = key_states.shape[-2]
         if past_key_value is not None:
@@ -573,9 +573,9 @@ class LlamaAttention(nn.Module):
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-        if attn_weights.size() != (key_states.shape[0], self.num_heads, q_len, kv_seq_len):
+        if attn_weights.size() != (key_states.shape[0], self.q_num_heads, q_len, kv_seq_len):
             raise ValueError(
-                f"Attention weights should be of size {(key_states.shape[0], self.num_heads, q_len, kv_seq_len)}, but is"
+                f"Attention weights should be of size {(key_states.shape[0], self.q_num_heads, q_len, kv_seq_len)}, but is"
                 f" {attn_weights.size()}"
             )
 
@@ -594,9 +594,9 @@ class LlamaAttention(nn.Module):
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
 
         attn_output = torch.matmul(attn_weights, value_states)
-        if attn_output.size() != (key_states.shape[0], self.v_num_heads, q_len, self.head_dim):
+        if attn_output.size() != (key_states.shape[0], self.q_num_heads, q_len, self.head_dim):
             raise ValueError(
-                f"`attn_output` should be of size {(key_states.shape[0], self.v_num_heads, q_len, self.head_dim)}, but is"
+                f"`attn_output` should be of size {(key_states.shape[0], self.q_num_heads, q_len, self.head_dim)}, but is"
                 f" {attn_output.size()}"
             )
 
@@ -609,13 +609,17 @@ class LlamaAttention(nn.Module):
             probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices)
 
         if 'flapratio' in cfg['prune_method']:
-            probe_vo_out_dim_indices, self.v_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+            probe_vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
         else:
-            probe_vo_out_dim_indices, self.v_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+            probe_vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(probe_out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
         
-        self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
-        probe_qk_out_dim_indices = probe_vo_out_dim_indices
+        if self.is_GQA():
+            self.q_num_heads = self.remain_num_heads
+            probe_qk_out_dim_indices = probe_vo_out_dim_indices
+        else:
+            self.q_num_heads, self.k_num_heads, self.v_num_heads = self.remain_num_heads, self.remain_num_heads, self.remain_num_heads
+            probe_qk_out_dim_indices = probe_vo_out_dim_indices
 
         self.q_proj.prepare_async_weight(out_dim_indices=probe_qk_out_dim_indices)
         self.o_proj.prepare_async_weight(in_dim_indices=probe_vo_out_dim_indices)
@@ -811,13 +815,18 @@ class LlamaAttention(nn.Module):
                         value_states = torch.cat([past_key_value[1], value_states], dim=2)
 
                     past_key_value = (key_states, value_states) if use_cache else None
-                    key_states = repeat_kv(key_states, self.num_key_value_groups)
-                    value_states = repeat_kv(value_states, self.num_key_value_groups)
+                    if self.is_GQA():
+                        print('self.heads_to_preserve'  , self.heads_to_preserve)
+                        key_states = repeat_kv(key_states, self.num_key_value_groups, self.heads_to_preserve)
+                        value_states = repeat_kv(value_states, self.num_key_value_groups, self.heads_to_preserve)
+                    else:
+                        key_states = repeat_kv(key_states, self.num_key_value_groups)
+                        value_states = repeat_kv(value_states, self.num_key_value_groups)
 
                     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-                    if attn_weights.size() != (bsz, self.k_num_heads, q_len, kv_seq_len):
+                    if attn_weights.size() != (bsz, self.q_num_heads, q_len, kv_seq_len):
                         raise ValueError(
-                            f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+                            f"Attention weights should be of size {(bsz, self.q_num_heads, q_len, kv_seq_len)}, but is"
                             f" {attn_weights.size()}"
                         )
 
@@ -831,13 +840,13 @@ class LlamaAttention(nn.Module):
                     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
 
                     attn_output = torch.matmul(attn_weights, value_states)
-                    if attn_output.size() != (bsz, self.v_num_heads, q_len, self.head_dim):
+                    if attn_output.size() != (bsz, self.q_num_heads, q_len, self.head_dim):
                         raise ValueError(
-                            f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.head_dim)}, but is"
+                            f"`attn_output` should be of size {(bsz, self.q_num_heads, q_len, self.head_dim)}, but is"
                             f" {attn_output.size()}"
                         )
                     attn_output = attn_output.transpose(1, 2).contiguous()
-                    attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.head_dim)
+                    attn_output = attn_output.reshape(bsz, q_len, self.q_num_heads * self.head_dim)
 
                     attn_output = self.o_proj(attn_output, in_dim_indices=probe_vo_out_dim_indices)
 
@@ -876,14 +885,19 @@ class LlamaAttention(nn.Module):
                         value_states = torch.cat([past_key_value[1], value_states], dim=2)
 
                     past_key_value = (key_states, value_states) if use_cache else None
-                    key_states = repeat_kv(key_states, self.num_key_value_groups)
-                    value_states = repeat_kv(value_states, self.num_key_value_groups)
+                    if self.is_GQA():
+                        print('self.heads_to_preserve'  , self.heads_to_preserve)
+                        key_states = repeat_kv(key_states, self.num_key_value_groups, self.heads_to_preserve)
+                        value_states = repeat_kv(value_states, self.num_key_value_groups, self.heads_to_preserve)
+                    else:
+                        key_states = repeat_kv(key_states, self.num_key_value_groups)
+                        value_states = repeat_kv(value_states, self.num_key_value_groups)
 
                     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
                     print('attn_weightssize', attn_weights.size())
-                    if attn_weights.size() != (bsz, self.k_num_heads, q_len, kv_seq_len):
+                    if attn_weights.size() != (bsz, self.q_num_heads, q_len, kv_seq_len):
                         raise ValueError(
-                            f"Attention weights should be of size {(bsz, self.k_num_heads, q_len, kv_seq_len)}, but is"
+                            f"Attention weights should be of size {(bsz, self.q_num_heads, q_len, kv_seq_len)}, but is"
                             f" {attn_weights.size()}"
                         )
 
@@ -897,13 +911,13 @@ class LlamaAttention(nn.Module):
                     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
 
                     attn_output = torch.matmul(attn_weights, value_states)
-                    if attn_output.size() != (bsz, self.v_num_heads, q_len, self.head_dim):
+                    if attn_output.size() != (bsz, self.q_num_heads, q_len, self.head_dim):
                         raise ValueError(
-                            f"`attn_output` should be of size {(bsz, self.v_num_heads, q_len, self.head_dim)}, but is"
+                            f"`attn_output` should be of size {(bsz, self.q_num_heads, q_len, self.head_dim)}, but is"
                             f" {attn_output.size()}"
                         )
                     attn_output = attn_output.transpose(1, 2).contiguous()
-                    attn_output = attn_output.reshape(bsz, q_len, self.v_num_heads * self.head_dim)
+                    attn_output = attn_output.reshape(bsz, q_len, self.q_num_heads * self.head_dim)
 
                     attn_output = self.o_proj(attn_output)
                             
@@ -917,12 +931,16 @@ class LlamaAttention(nn.Module):
                             else:
                                 out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
                                 if 'flapratio' in cfg['prune_method']:
-                                    vo_out_dim_indices, self.v_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
+                                    vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                                 else:
-                                    vo_out_dim_indices, self.v_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                    vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
-                            self.q_num_heads, self.k_num_heads = self.v_num_heads, self.v_num_heads
-                            qk_out_dim_indices = vo_out_dim_indices
+                            if self.is_GQA():
+                                self.q_num_heads = self.remain_num_heads
+                                qk_out_dim_indices = vo_out_dim_indices
+                            else:
+                                self.q_num_heads, self.k_num_heads, self.v_num_heads = self.remain_num_heads, self.remain_num_heads, self.remain_num_heads
+                                qk_out_dim_indices = vo_out_dim_indices
                                     
                             self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
                             self.o_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
