@@ -5,17 +5,40 @@ from module import nearest_multiple, check_skip_layers
 
 class HiddenRepresentationPruning():
 
-    def __init__(self, cfg, key, modelconfig=None):
+    def __init__(self, cfg, key, model_config=None):
         self.key = key
         self.prune_metric = cfg['prune_metric']
         # if flap ratio in prune method, will update later
-        self.prune_ratio = self.adjust_prune_ratio(modelconfig)
+        self.prune_ratio = self.adjust_prune_ratio(model_config)
 
-    def adjust_prune_ratio(self, modelconfig):
-        if modelconfig is not None:
-            num_hidden_layers = modelconfig.num_hidden_layers
-            prune_ratio = num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'] 
-            return round(prune_ratio, 2)
+    def adjust_prune_ratio(self, model_config):
+        if model_config is not None:
+            num_hidden_layers = model_config.num_hidden_layers
+            prune_ratio = round(num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'], 2) 
+            if 'llama-3' in cfg['model_name']:
+                if 'csr' in cfg['task_name']:
+                    approx_seq_len = 100
+                elif 'clm' in cfg['task_name']:
+                    approx_seq_len = cfg['max_seq_len']
+                # since we dont prune kv, increase the pruning ratio a little bit
+                head_dim = model_config.hidden_size // model_config.num_attention_heads
+                num_key_value_groups = model_config.num_attention_heads // model_config.num_key_value_heads
+                
+                attn_flops = approx_seq_len * model_config.hidden_size * model_config.hidden_size * 2 + approx_seq_len * model_config.hidden_size * model_config.hidden_size//num_key_value_groups * 2 + model_config.num_attention_heads * approx_seq_len ** 2 * head_dim + model_config.num_attention_heads * approx_seq_len ** 2 * head_dim
+                mlp_flops = approx_seq_len * model_config.hidden_size * model_config.intermediate_size * 3
+                cur_layer_total_flops = attn_flops + mlp_flops
+
+                prune_heads = int(prune_ratio * model_config.num_attention_heads)
+                prune_attn_dimension = prune_heads * head_dim
+                prune_mlp_dimension = int(prune_ratio * model_config.intermediate_size)
+
+                prune_attn_flops = approx_seq_len * model_config.hidden_size * prune_attn_dimension * 2 + prune_heads * approx_seq_len ** 2 * head_dim + prune_heads * approx_seq_len ** 2 * head_dim
+                prune_mlp_flops = approx_seq_len * model_config.hidden_size * prune_mlp_dimension * 3
+                prune_layer_total_flops = prune_attn_flops + prune_mlp_flops
+
+                multiple_ratio = (cur_layer_total_flops * prune_ratio / prune_layer_total_flops)
+                prune_ratio = prune_ratio * (cur_layer_total_flops * prune_ratio / prune_layer_total_flops)
+            return prune_ratio
         else:
             return cfg['prune_ratio']
     
@@ -205,6 +228,7 @@ class HiddenRepresentationPruning():
                 return probe_out_dim_metric
             
     def cal_attn_calib_prune_metric(self, calib, weight, metric_type):
+        calib = calib.to(weight.device)
         if 'ppwandasp' in metric_type:
             calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
             probe_out_dim_metric = torch.linalg.vector_norm((calib.reshape((1,-1)) * torch.pow(weight, 2)).reshape(4096, 32, 128), ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
@@ -217,6 +241,7 @@ class HiddenRepresentationPruning():
         return probe_out_dim_metric
 
     def cal_mlp_calib_prune_metric(self, calib, weight, metric_type):
+        calib = calib.to(weight.device)
         if 'ppwandasp' in metric_type:
             calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
             probe_out_dim_metric = torch.linalg.vector_norm((calib.reshape((1,-1)) * torch.pow(weight, 2)), ord=2, dim=0).clamp(max=cfg['data_type_max'])
@@ -263,15 +288,24 @@ class HiddenRepresentationPruning():
 
         if 'llama' in cfg['model_name']:
             head_dim = model.config.hidden_size // model.config.num_attention_heads
-            attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 4 + model.config.num_attention_heads * approx_seq_len ** 2 * head_dim + model.config.num_attention_heads * approx_seq_len ** 2 * head_dim
+            attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 4 + approx_seq_len ** 2 * head_dim + approx_seq_len ** 2 * head_dim
             print('approx_seq_len * model.config.hidden_size * head_dim * 4 ', approx_seq_len * model.config.hidden_size * head_dim * 4 )
             print('attnflops', attn_flops)
             mlp_flops = approx_seq_len * model.config.hidden_size * 3 
             print('mlp_flops', mlp_flops)
             multiples = attn_flops / mlp_flops
+            # GQA
+            if 'llama-3' in cfg['model_name']:
+                head_dim = model.config.hidden_size // model.config.num_attention_heads
+                attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 2 + approx_seq_len ** 2 * head_dim + approx_seq_len ** 2 * head_dim
+                print('approx_seq_len * model.config.hidden_size * head_dim * 2 ', approx_seq_len * model.config.hidden_size * head_dim * 2 )
+                print('attnflops', attn_flops)
+                mlp_flops = approx_seq_len * model.config.hidden_size * 3 
+                print('mlp_flops', mlp_flops)
+                multiples = attn_flops / mlp_flops
         elif 'opt' in cfg['model_name']:
             head_dim = model.config.hidden_size // model.config.num_attention_heads
-            attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 4 + model.config.num_attention_heads * approx_seq_len ** 2 * head_dim + model.config.num_attention_heads * approx_seq_len ** 2 * head_dim
+            attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 4 + approx_seq_len ** 2 * head_dim + approx_seq_len ** 2 * head_dim
             mlp_flops = approx_seq_len * model.config.hidden_size * 2 
             multiples = attn_flops / mlp_flops
         

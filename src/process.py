@@ -15,7 +15,7 @@ import random
 import collections
 
 
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
+# os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 parser = argparse.ArgumentParser(description='analyze_data')
 parser.add_argument('--file', default='dp', type=str)

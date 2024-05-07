@@ -183,24 +183,46 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
+            # control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b'], ['clm'], ['10'], ['120'], ['0.4'], 
+            #                  ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-20'], ['None'],        
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b'], ['clm'], ['2'], ['128'], ['0.4'], 
-                             ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],        
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.4'], 
+                             ['flap'], ['flap-default'], ['asyncinter'], ['c4-20'], ['None'],        
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.4'], 
-                             ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],        
+            control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['1'], ['128'], ['0.4'], 
+                             ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-20'], ['None'],        
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                             ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],        
+            control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['1'], ['128'], ['0.4'], 
+                             ['flap'], ['flap-default'], ['asyncinter'], ['c4-20'], ['None'],        
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b'], ['clm'], ['2'], ['128'], ['0.4'], 
+            #                  ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],        
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.4'], 
+            #                  ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],        
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                  ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],        
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
 
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0.4'], 
@@ -405,23 +427,29 @@ def main():
         controls = []
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
+            control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['1'], ['1024'], ['0'], 
+                             ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                            ['None']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0'], 
             #                  ['None'], ['dense'], ['None'], ['None'], ['None'],        
             #                 ['None']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['opt-6.7b'], ['clm'], ['10'], ['128'], ['0'], 
-                             ['None'], ['dense'], ['None'], ['None'], ['None'],        
-                            ['None']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['opt-6.7b'], ['clm'], ['10'], ['128'], ['0'], 
+            #                  ['None'], ['dense'], ['None'], ['None'], ['None'],        
+            #                 ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-3-8b'], ['clm'], ['10'], ['128'], ['0'], 
-                             ['None'], ['dense'], ['None'], ['None'], ['None'],        
-                            ['None']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-3-8b'], ['clm'], ['10'], ['128'], ['0'], 
+            #                  ['None'], ['dense'], ['None'], ['None'], ['None'],        
+            #                 ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
             # control_name = [[['c4'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0'], 
             #                  ['None'], ['dense'], ['None'], ['None'], ['None'],        

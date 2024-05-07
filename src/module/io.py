@@ -31,7 +31,7 @@ def check_calib_saving_info():
     # cust_tgt_modules
     name_list[12] = 'None'
     calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
-    if os.path.exists(calibsavinginfo_path) and load(calibsavinginfo_path) is not None:
+    if os.path.exists(calibsavinginfo_path) and load(calibsavinginfo_path, mode='torch') is not None:
         return True
     return False
 
@@ -59,7 +59,7 @@ def load_calib_saving_info(model):
     calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
     
     # Load the calibration data
-    calibration_data = load(calibsavinginfo_path)
+    calibration_data = load(calibsavinginfo_path, mode='torch')
 
     # Apply the loaded calibration data to the model
     for key, value in calibration_data.items():
@@ -103,7 +103,7 @@ def save_calib_info(model):
                 for key, value in data.items():
                     all_calin_info[f"{name}+{key}"] = value
             
-    save(all_calin_info, calibsavinginfo_path)
+    save(all_calin_info, calibsavinginfo_path, mode='torch')
     print("Calibration data saved successfully.")
     return
     
@@ -177,7 +177,6 @@ def makedir_exist_ok(path):
     return
 
 
-
 def save(input, path, mode='pickle'):
     dirname = os.path.dirname(path)
     makedir_exist_ok(dirname)
@@ -209,6 +208,39 @@ def load(path, mode='pickle'):
     else:
         raise ValueError('Not valid save mode')
     return None
+
+
+# def save(input, path, mode='pickle'):
+#     dirname = os.path.dirname(path)
+#     makedir_exist_ok(dirname)
+#     if mode == 'torch':
+#         torch.save(input, path)
+#     elif mode == 'np':
+#         np.save(path, input, allow_pickle=True)
+#     elif mode == 'pickle':
+#         pickle.dump(input, open(path, 'wb'))
+#     else:
+#         raise ValueError('Not valid save mode')
+#     return None
+
+# class CPU_Unpickler(pickle.Unpickler):
+#     def find_class(self, module, name):
+#         if module == 'torch.storage' and name == '_load_from_bytes':
+#             return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+#         else: return super().find_class(module, name)
+
+# def load(path, mode='pickle'):
+#     if not torch.cuda.is_available() and mode == 'pickle':
+#         return CPU_Unpickler(open(path, 'rb')).load()
+#     if mode == 'torch':
+#         return torch.load(path, map_location=lambda storage, loc: storage)
+#     elif mode == 'np':
+#         return np.load(path, allow_pickle=True)
+#     elif mode == 'pickle':
+#         return pickle.load(open(path, 'rb'))
+#     else:
+#         raise ValueError('Not valid save mode')
+#     return None
 
 
 # def save(input, path, mode='torch'):

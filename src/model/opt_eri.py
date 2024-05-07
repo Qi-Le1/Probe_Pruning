@@ -456,7 +456,7 @@ class Linear(nn.Linear, EriLayer):
 
                     if 'out_proj' in self.key or 'fc2' in self.key:
                         if 'bias' in cfg['prune_method']:
-                            compensate_bias = self.get_compensate_bias(x, weight, async_in_dim_indices)
+                            compensate_bias = self.get_compensate_bias(x, self.weight, async_in_dim_indices)
                             result += compensate_bias
                     result = result.to(previous_dtype)
                     return result
@@ -475,7 +475,7 @@ class Linear(nn.Linear, EriLayer):
 
                     if 'out_proj' in self.key or 'fc2' in self.key:
                         if 'bias' in cfg['prune_method']:
-                            compensate_bias = self.get_compensate_bias(x, weight, async_in_dim_indices)
+                            compensate_bias = self.get_compensate_bias(x, self.weight, async_in_dim_indices)
                             result += compensate_bias
                     result = result.to(previous_dtype)
                     return result
@@ -506,7 +506,7 @@ class Linear(nn.Linear, EriLayer):
                         result = F.linear(x, weight, bias=bias)
                         if 'out_proj' in self.key or 'fc2' in self.key:
                             if 'bias' in cfg['prune_method']:
-                                compensate_bias = self.get_compensate_bias(x, weight, async_in_dim_indices)
+                                compensate_bias = self.get_compensate_bias(x, self.weight, async_in_dim_indices)
                                 result += compensate_bias
                         result = result.to(previous_dtype)
                         return result
