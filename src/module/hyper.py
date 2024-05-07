@@ -249,9 +249,9 @@ def process_control():
 
     cfg['logger_detailed_info'] = False
     cfg['onlyprobe'] = False
-    cfg['onlyprobeinfo'] = True
-    # cfg['onlyprobeinfo'] = False
-    print('cfg: ', cfg)
+    # cfg['onlyprobeinfo'] = True
+    cfg['onlyprobeinfo'] = False
+    print('cfg: ', cfg, flush=True)
     return
 
 

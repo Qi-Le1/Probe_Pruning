@@ -380,6 +380,9 @@ class Linear(nn.Linear, EriLayer):
             return self.async_intrabatch_in_dim_indices
     
     def get_compensate_bias(self, x, weight, in_dim_indices):
+        if cfg['cur_batch_index'] == 0:
+            return torch.zeros(weight.shape[0], device=x.device)
+        
         calib = torch.mean(self.baseline_inp, dim=0)
         calib = calib.to(x.device)
         in_dim_indices = in_dim_indices.to(device=x.device)

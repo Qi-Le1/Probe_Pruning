@@ -58,7 +58,7 @@ def runExperiment():
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     model = make_prune_model(model)
     if 'calib' in cfg['prune_method']:
-        print('Running Calibration ...')
+        print('Running Calibration ...', flush=True)
         calibration_data_loader = make_calibration_dataloader(tokenizer)
         cfg['calibration_stage'] = True
         if check_calib_saving_info() == True:
@@ -66,8 +66,12 @@ def runExperiment():
         else:
             run_calibration(model, calibration_data_loader['train'])
         save_calib_info(model)
+        if 'flapratio' in cfg['prune_method']:
+            from model import HiddenRepresentationPruning
+            pruning_module = HiddenRepresentationPruning(cfg, 'flapratio')
+            pruning_module.flap_ratio(model)
         cfg['calibration_stage'] = False
-        print('Calibration Done...')
+        print('Calibration Done...', flush=True)
     model_prof = FlopsProfiler(model)
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
@@ -83,7 +87,7 @@ def runExperiment():
     dense_info_list, dense_duration = summarize_info_list(pruned_info_list, inference_duration, test_logger, dataset_size, onlyprobe_info_list)
     
     evaluation = metric.evaluate('test', 'full')
-    print('evaluation_for_full', evaluation)
+    print('evaluation_for_full', evaluation, flush=True)
     # thread lock bug
     test_logger.save(False)
     test_logger.writer = None
@@ -96,7 +100,7 @@ def runExperiment():
 
 
 def run_calibration(model, data_loader):
-    from model import HiddenRepresentationPruning
+    
     with torch.no_grad():
         model.eval()
         for i, input in enumerate(data_loader):
@@ -108,10 +112,6 @@ def run_calibration(model, data_loader):
             output = model(**input)
             input_ = {'target': input['labels']}
             output_ = {'target': output['logits'], 'loss': output['loss']}
-
-        if 'flapratio' in cfg['prune_method']:
-            pruning_module = HiddenRepresentationPruning(cfg, 'flapratio')
-            pruning_module.flap_ratio(model)
     return
 
 
@@ -210,7 +210,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 if cfg['onlyprobe'] == False: 
                     metric.add('test', input_, output_)
                     evaluation = metric.evaluate('test', 'batch', input_, output_)
-                    print('evaluation_for_batch', evaluation)
+                    print('evaluation_for_batch', evaluation, flush=True)
                     logger.append(evaluation, 'test', input_size)
 
                 for name, module in model.named_modules():

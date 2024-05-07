@@ -16,8 +16,7 @@ from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
     record_pruing_info, get_model_profile, summarize_info_list, match_prefix, update_model_prof, model_forward, remove_non_picklable_items
 from deepspeed.profiling.flops_profiler import FlopsProfiler
-from lm_eval import tasks
-from lm_eval import evaluator
+
 
 
 
@@ -68,7 +67,8 @@ def runExperiment():
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
     dense_info_list = get_model_profile('dense', model_prof)
-    print('dense_info_list', dense_info_list)
+    for item in dense_info_list:
+        print(item, '\n', flush=True)
     print('inference_duration', inference_duration)
     # thread lock bug
     test_logger.writer = None

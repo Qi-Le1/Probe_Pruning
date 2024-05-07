@@ -380,7 +380,7 @@ class LlamaMLP(nn.Module):
                             # count flops for probe
                             if cfg['onlyprobe'] == True:
                                 # match the shape, and will not count the flops for this part
-                                down_proj = torch.zeros((cfg['batch_size'], cfg['max_seq_len'], self.hidden_size), device=x.device, dtype=x.dtype)
+                                down_proj = torch.zeros((cfg['batch_size'], x.shape[1], self.hidden_size), device=x.device, dtype=x.dtype)
                                 return down_proj
                         elif cfg['mode'] == 'asyncintra':
                             if 'post_layernorm_attn_residual' in kwargs:
@@ -760,7 +760,7 @@ class LlamaAttention(nn.Module):
                         probe_qk_out_dim_indices, probe_vo_out_dim_indices, attn_weights, attn_output, past_key_value = self.probe_process(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
                         # calculate probe's FLOPs
                         if cfg['onlyprobe'] == True:
-                            attn_output = torch.zeros((cfg['batch_size'], cfg['max_seq_len'], self.hidden_size), device=hidden_states.device, dtype=hidden_states.dtype)
+                            attn_output = torch.zeros((cfg['batch_size'], hidden_states.shape[1], self.hidden_size), device=hidden_states.device, dtype=hidden_states.dtype)
                             if not output_attentions:
                                 attn_weights = None
                             return attn_output, attn_weights, past_key_value
@@ -1065,6 +1065,7 @@ class LlamaDecoderLayer(nn.Module):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
 
+        print('layerorder', self.layer_order, flush=True)
 
         residual = hidden_states
         if self.check_asyncintra_mlp():

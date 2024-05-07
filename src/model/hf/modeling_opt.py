@@ -404,7 +404,7 @@ class OPTAttention(nn.Module):
                         probe_qk_out_dim_indices, probe_vo_out_dim_indices, attn_weights, attn_weights_reshaped, past_key_value = self.probe_process(hidden_states, key_value_states, past_key_value, attention_mask, layer_head_mask, output_attentions, **kwargs)
                         # calculate probe's FLOPs
                         if cfg['onlyprobe'] == True:
-                            attn_output = torch.zeros((cfg['batch_size'], cfg['max_seq_len'], self.embed_dim), device=hidden_states.device, dtype=hidden_states.dtype)
+                            attn_output = torch.zeros((cfg['batch_size'], hidden_states.shape[1], self.embed_dim), device=hidden_states.device, dtype=hidden_states.dtype)
                             return attn_output, None, past_key_value
                     elif cfg['mode'] == 'asyncintra':
                         # if not, do full inference
@@ -792,7 +792,7 @@ class OPTDecoderLayer(nn.Module):
                         # count flops for probe
                         if cfg['onlyprobe'] == True:
                             # match the shape, and will not count the flops for this part
-                            hidden_states = torch.zeros((cfg['batch_size'], cfg['max_seq_len'], self.embed_dim), device=hidden_states.device, dtype=hidden_states.dtype)
+                            hidden_states = torch.zeros((cfg['batch_size'], hidden_states.shape[1], self.embed_dim), device=hidden_states.device, dtype=hidden_states.dtype)
                             return hidden_states
                     elif cfg['mode'] == 'asyncintra':
                         if 'post_layernorm_attn_residual' in kwargs:

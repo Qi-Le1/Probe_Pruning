@@ -252,7 +252,33 @@ class HiddenRepresentationPruning():
         num_prune = nearest_multiple(num_prune, probe_out_dim_metric.shape[0], multiple)
         return sorted_indices[num_prune:], sorted_indices[:num_prune]
     
+    def cal_multiple_flops_for_flap(self, model):
+        if 'csr' in cfg['task_name']:
+            approx_seq_len = 100
+        elif 'clm' in cfg['task_name']:
+            approx_seq_len = cfg['max_seq_len']
+
+        if 'llama' in cfg['model_name']:
+            head_dim = model.config.hidden_size // model.config.num_attention_heads
+            attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 4 + model.config.num_attention_heads * approx_seq_len ** 2 * head_dim + model.config.num_attention_heads * approx_seq_len ** 2 * head_dim
+            print('approx_seq_len * model.config.hidden_size * head_dim * 4 ', approx_seq_len * model.config.hidden_size * head_dim * 4 )
+            print('attnflops', attn_flops)
+            mlp_flops = approx_seq_len * model.config.hidden_size * 3 
+            print('mlp_flops', mlp_flops)
+            multiples = attn_flops / mlp_flops
+        elif 'opt' in cfg['model_name']:
+            head_dim = model.config.hidden_size // model.config.num_attention_heads
+            attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 4 + model.config.num_attention_heads * approx_seq_len ** 2 * head_dim + model.config.num_attention_heads * approx_seq_len ** 2 * head_dim
+            mlp_flops = approx_seq_len * model.config.hidden_size * 2 
+            multiples = attn_flops / mlp_flops
+        
+        return multiples
+
+
+
+
     def flap_ratio(self, model):
+        
         prune_ratio = self.adjust_prune_ratio(model.config)
         attn_metric_list, mlp_metric_list = [], []
         standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
@@ -297,8 +323,9 @@ class HiddenRepresentationPruning():
             else:
                 mlp_metric = None
 
-            # prune 1 head will lead to 128 times more flops pruned than 1 mlp channel
-            multiples = model.config.hidden_size//model.config.num_attention_heads
+            # prune 1 head will lead to multiples times more flops pruned than 1 mlp channel
+            multiples = self.cal_multiple_flops_for_flap(model)
+            print('multiples', multiples, flush=True)
             if attn_metric is not None and mlp_metric is not None:
                 prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
                 flops_measurement = torch.cat([torch.full_like(attn_metric, multiples).view(-1), torch.full_like(mlp_metric, 1).view(-1)])
@@ -390,8 +417,9 @@ class HiddenRepresentationPruning():
             else:
                 mlp_metric = None
 
-            # prune 1 head will lead to 128 times more flops pruned than 1 mlp channel
-            multiples = model.config.hidden_size//model.config.num_attention_heads
+            # prune 1 head will lead to multiples times more flops pruned than 1 mlp channel
+            multiples = self.cal_multiple_flops_for_flap(model)
+            print('multiples', multiples, flush=True)
             if attn_metric is not None and mlp_metric is not None:
                 prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
                 flops_measurement = torch.cat([torch.full_like(attn_metric, multiples).view(-1), torch.full_like(mlp_metric, 1).view(-1)])

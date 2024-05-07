@@ -1,1 +1,8 @@
-sbatch clm0wikitext-2v1_llama-2-7b_clm_10_1024_0_None_dense_None_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-3-8b_clm_5_2048_0_None_dense_None_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-7b_clm_5_2048_0_None_dense_None_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_llama-2-13b_clm_5_2048_0_None_dense_None_None_None_None.pbs --wait
+sbatch clm0wikitext-2v1_opt-13b_clm_5_2048_0_None_dense_None_None_None_None.pbs --wait
+sbatch clm0ptb_llama-3-8b_clm_5_2048_0_None_dense_None_None_None_None.pbs --wait
+sbatch clm0ptb_llama-2-7b_clm_5_2048_0_None_dense_None_None_None_None.pbs --wait
+sbatch clm0ptb_llama-2-13b_clm_5_2048_0_None_dense_None_None_None_None.pbs --wait
+sbatch clm0ptb_opt-13b_clm_5_2048_0_None_dense_None_None_None_None.pbs --wait

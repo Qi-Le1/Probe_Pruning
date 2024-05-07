@@ -220,6 +220,8 @@ def make_calibration_dataloader(tokenizer):
     elif cfg['calibration_dataset'] == 'c4':
         dataset = make_dataset('c4')
         dataset = process_calibration_dataset(dataset, tokenizer, 'c4')
+    else:
+        raise ValueError('Not valid calibration dataset name')
 
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     return data_loader

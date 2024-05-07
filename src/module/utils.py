@@ -34,7 +34,6 @@ def get_model_profile(tag, model_prof, onlyprobe=False):
     info_list = []
     for name, module in model_prof.model.model.named_modules():
         temp = [name, module.__flops__, module.__params__, module.__macs__, type(module)]
-        print('name', name)
         # layer_order_matches = re.findall(r'\d+', name)
         # if layer_order_matches:  # Check if the list is not empty
         #     layer_order = int(layer_order_matches[0])  # Convert the first match to an integer

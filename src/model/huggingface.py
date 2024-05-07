@@ -2,6 +2,7 @@ import os
 import torch
 from config import cfg
 from transformers import AutoTokenizer, LlamaTokenizer
+# BitsAndBytesConfig
 from module import MULTIGPUS_MODEL_NAME_LIST
 from accelerate import infer_auto_device_map ,init_empty_weights
 from LLMPruner import PeftModel
@@ -112,26 +113,6 @@ def make_hf_model(model_name):
     from .hf.modeling_llama import LlamaForCausalLM
     from .hf.modeling_opt import OPTForCausalLM
 
-    if model_name in MULTIGPUS_MODEL_NAME_LIST:
-        device_map = "auto"
-        # low_cpu_mem_usage = True
-    else:
-        # device_map = cfg['device']
-        # if 'llama' in model_name:
-        #     match = re.search(r'(\d+)b', model_name)
-        #     number_before_b = match.group(1)
-        #     approximate_gpu_memory_gb = int(number_before_b) * 2 + cfg['batch_size'] * cfg['max_seq_len'] * 11000 * 8 / 1024 / 1024 / 1024 + 5
-        #     print('approximate_gpu_memory_gb', approximate_gpu_memory_gb)
-        #     if cfg['gpu_name'] == 'NVIDIA GeForce RTX 4090':
-        #         if approximate_gpu_memory_gb > 24:
-        #             device_map = "auto"
-        #     elif cfg['gpu_name'] == 'NVIDIA A100-SXM4-40GB':
-        #         # A100
-        #         if approximate_gpu_memory_gb > 40:
-        #             # pass
-        #             device_map = "auto"
-        device_map = "auto"
-        # low_cpu_mem_usage = False
     if 'opt' in model_name:
         # cant load it from hf online, the repo has config file issue
         if model_name == 'opt-6.7b':
@@ -148,30 +129,33 @@ def make_hf_model(model_name):
         # need tokenizer.model, tokenizer_config.json from https://huggingface.co/meta-llama/Llama-2-13b-hf/tree/main   (corresponding model type)
         cfg['model_name_or_path'] = f'output/{model_name}'
         cfg['tokenizer_name_or_path'] = f'output/{model_name}'
-        cfg['tokenizer_name_or_path'] = f'output/{model_name}'
     else:
         raise ValueError('Not valid model name')
     cfg['cache_model_path'] = os.path.join('output', 'model', model_name)
     cfg['cache_tokenizer_path'] = os.path.join('output', 'tokenizer', model_name)
     print("cfg['model_name_or_path']", cfg['model_name_or_path'])
-    if cfg['task_name'] == 'clm':
-        if 'llama' in model_name:
-            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'], torch_dtype=torch.float16, device_map=device_map)
-        elif 'opt' in model_name:
-            model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map=device_map)
-        else:
-            raise ValueError('Not valid model name')
-    # 'csr' stands for common sense reasoning
-    elif cfg['task_name'] == 'csr':
-        if 'llama' in model_name:
-            model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'],  torch_dtype=torch.float16, device_map=device_map)
-        elif 'opt' in model_name:
-            model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['model_name_or_path'], torch_dtype=torch.float16, device_map=device_map)
-        else:
-            raise ValueError('Not valid model name')
+   
+    if 'llama' in model_name:
+        # with init_empty_weights():
+        #     model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16)
+        #     device_map = infer_auto_device_map(model, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
+        # print('device_map', device_map, flush=True)
+        model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map="auto")
+        # quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+        # model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], quantization_config=quantization_config, device_map=device_map)
+    elif 'opt' in model_name:
+        with init_empty_weights():
+            model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16)
+            device_map = infer_auto_device_map(model, no_split_module_classes=["OPTDecoderLayer"], dtype=torch.float16)
+        print('device_map', device_map, flush=True)
+        model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map=device_map)
     else:
-        raise ValueError('Not valid task name')
+        raise ValueError('Not valid model name')
     
+    device_map = getattr(model, 'hf_device_map', {})
+
+    # Print the device map
+    print("Model Device Map:", device_map, flush=True)
     if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
         padding_side = "left"
     else:
@@ -182,10 +166,7 @@ def make_hf_model(model_name):
             raise ValueError(
                 f"seq_len ({cfg['max_seq_len']}) is larger than max_position_embeddings ({model.config.max_position_embeddings})."
             )
-    # if 'llama' in model_name:
-    #     tokenizer = LlamaTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], cache_dir=cfg['cache_tokenizer_path'],
-    #                                                padding_side=padding_side)
-    # else:
+
     tokenizer = AutoTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], cache_dir=cfg['cache_tokenizer_path'],
                                                 padding_side=padding_side)
     print('tokenizer', tokenizer.eos_token_id)
@@ -197,6 +178,13 @@ def make_hf_model(model_name):
         model.config.end_token_id = tokenizer.eos_token_id
         model.config.pad_token_id = model.config.eos_token_id
     cfg['pad_token_id'] = tokenizer.pad_token_id    
+
+    model_config = model.config
+    print('model_config', model_config)
+    model.config.use_cache = False
+    return model, tokenizer
+
+
 
     # # to fit flap and simplify for flops comparision
     # if 'llama-2-70b' in cfg['model_name']:
@@ -227,8 +215,3 @@ def make_hf_model(model_name):
     #             torch.cuda.empty_cache()
     #             layer.self_attn.num_key_value_heads = num_heads
     #             layer.self_attn.num_key_value_groups = 1
-
-    model_config = model.config
-    print('model_config', model_config)
-    model.config.use_cache = False
-    return model, tokenizer
