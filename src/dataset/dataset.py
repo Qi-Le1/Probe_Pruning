@@ -549,8 +549,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         # Combine the current input ids and label input ids
                         temp_input = sample_input_ids + label_input_ids
@@ -560,8 +564,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
                         print('len(temp_input)', len(temp_input))
@@ -645,8 +653,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         # Combine the current input ids and label input ids
                         temp_input = sample_input_ids + label_input_ids
@@ -656,8 +668,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
                         print('len(temp_input)', len(temp_input))
@@ -741,8 +757,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         # Combine the current input ids and label input ids
                         temp_input = sample_input_ids + label_input_ids
@@ -752,8 +772,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
                         print('len(temp_input)', len(temp_input))
@@ -851,8 +875,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         # Combine the current input ids and label input ids
                         temp_input = sample_input_ids + label_input_ids
@@ -862,8 +890,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
                         print('len(temp_input)', len(temp_input))
@@ -1011,8 +1043,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         # Combine the current input ids and label input ids
                         temp_input = sample_input_ids + label_input_ids
@@ -1022,8 +1058,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
                         print('len(temp_input)', len(temp_input))
@@ -1124,8 +1164,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         # Combine the current input ids and label input ids
                         temp_input = sample_input_ids + label_input_ids
@@ -1135,8 +1179,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
                         print('len(temp_input)', len(temp_input))
@@ -1299,8 +1347,14 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
+
+
 
                         # Combine the current input ids and label input ids
                         temp_input = sample_input_ids + label_input_ids
@@ -1310,8 +1364,12 @@ def process_dataset(dataset, tokenizer):
                     for i in range(batch_index, batch_end):
                         sample_input_ids = model_inputs["input_ids"][i]
                         sample_attention_mask = model_inputs["attention_mask"][i]
-                        label_input_ids = labels["input_ids"][i][1:]  # skip the first token
-                        label_attention_mask = labels["attention_mask"][i][1:]
+                        if labels["input_ids"][i][0] == tokenizer.bos_token_id:
+                            label_input_ids = labels["input_ids"][i][1:]  # skip the first token
+                            label_attention_mask = labels["attention_mask"][i][1:]
+                        else:
+                            label_input_ids = labels["input_ids"][i]
+                            label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
                         print('len(temp_input)', len(temp_input))

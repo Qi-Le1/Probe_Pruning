@@ -83,6 +83,7 @@ def runExperiment():
 
 
 def test(data_loader, model, model_prof, metric, logger):   
+    torch.cuda.empty_cache()
     with torch.no_grad():
         
         model.train(False)

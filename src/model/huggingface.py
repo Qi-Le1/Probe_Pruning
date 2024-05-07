@@ -177,7 +177,7 @@ def make_hf_model(model_name):
 
     tokenizer = AutoTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], cache_dir=cfg['cache_tokenizer_path'],
                                                 padding_side=padding_side)
-    print('tokenizer', tokenizer.eos_token_id)
+    print('tokenizer', tokenizer.eos_token_id, tokenizer.bos_token_id)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
     if any(k in model_name for k in ("llama")):

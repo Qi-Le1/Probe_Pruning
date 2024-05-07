@@ -131,6 +131,7 @@ def identify_pad_tokens(input):
     return
 
 def test(data_loader, model, model_prof, metric, logger):
+    torch.cuda.empty_cache()
     start_time = time.time()
     with torch.no_grad():
         

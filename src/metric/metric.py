@@ -141,6 +141,8 @@ class CsrAccuracyNorm:
         self.average.append(loss.item())
         
         # accnorm
+        # print('loss_per_sample', loss_per_sample)
+        # print('label_length_per_sample', label_length_per_sample)
         for i in range(input['input_indices'].shape[0]):
             self.acc_norm_output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item()/label_length_per_sample[i].item())
             self.acc_norm_correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
