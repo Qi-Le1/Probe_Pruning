@@ -12,12 +12,12 @@ def list_available_gpus():
         num_gpus = torch.cuda.device_count()
         print(f"Number of CUDA Devices: {num_gpus}")
         
-        # List each GPU
-        for i in range(num_gpus):
-            print(f"Device {i}: {torch.cuda.get_device_name(i)}")
-            # Additional details can be printed if needed
-            print(f"  Memory Allocated: {torch.cuda.memory_allocated(i)} bytes")
-            print(f"  Memory Cached: {torch.cuda.memory_reserved(i)} bytes")
+        # # List each GPU
+        # for i in range(num_gpus):
+        #     print(f"Device {i}: {torch.cuda.get_device_name(i)}")
+        #     # Additional details can be printed if needed
+        #     print(f"  Memory Allocated: {torch.cuda.memory_allocated(i)} bytes")
+        #     print(f"  Memory Cached: {torch.cuda.memory_reserved(i)} bytes")
     else:
         print("CUDA is not available. No GPU detected.")
 

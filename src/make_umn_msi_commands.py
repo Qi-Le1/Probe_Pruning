@@ -95,18 +95,23 @@ def main():
         if 'clm' in data:
             print('here')
             
-            control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['10'], ['1024'], ['0.4'], 
-                             ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
+            # control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+            #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank','0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                             ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-20'], ['None'],        
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-
-            control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['10'], ['1024'], ['0.4'], 
-                             ['wandasp'], ['wandasp-default', 'wandasp-calib-ema'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['10'], ['1024'], ['0.4'], 
+            #                  ['wandasp'], ['wandasp-default', 'wandasp-calib-ema'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.5'], 
             #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-100'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank'],
@@ -280,13 +285,13 @@ def main():
             controls.extend(CIFAR10_controls_9)
 
             # 'llama-3-8b', 'llama-2-7b', 'llama-2-13b', 'opt-13b'
-            control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.5'], 
+            control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b', 'llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2'], 
                              ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],        
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.5'], 
+            control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b', 'llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2'], 
                              ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-bszrank'],        
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
@@ -476,20 +481,20 @@ def main():
             if '30b' in controls[i-1][4] or '70b' in controls[i-1][4]:
                 gpu_num = 2
             else:
-                gpu_num = 1
+                gpu_num = 2
         if 'csr' in controls[i-1][4]:
             if '30b' in controls[i-1][4] or '70b' in controls[i-1][4]:
                 gpu_num = 2
             else:
                 gpu_num = 1
 
-        s += f'#SBATCH -A aanwar\n'
-        s += f'#SBATCH --gres=gpu:a100:{gpu_num}\n'
-        s += '#SBATCH --partition=a100-4\n'
+        # s += f'#SBATCH -A aanwar\n'
+        # s += f'#SBATCH --gres=gpu:a100:{gpu_num}\n'
+        # s += '#SBATCH --partition=a100-4\n'
 
-        # s += f'#SBATCH -A dingj\n'
-        # s += f'#SBATCH --gres=gpu:{gpu_num}\n'
-        # s += '#SBATCH --partition=jd-4a100\n'
+        s += f'#SBATCH -A dingj\n'
+        s += f'#SBATCH --gres=gpu:{gpu_num}\n'
+        s += '#SBATCH --partition=jd-4a100\n'
 
 
         s += f'#SBATCH --mem={temp_mem}gb\n'
@@ -511,9 +516,10 @@ def main():
         #     continue
         # while i < len(controls):
         # srun --nodes=1 --ntasks=1 
+        # srun --nodes=1 --ntasks=1 
         for item in sub_controls:
             s += '\n'
-            s = s + 'srun --nodes=1 --ntasks=1 python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
+            s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
         
         s += 'wait\n'
         # controls[i][0] = 'test_classifier_fl.py'

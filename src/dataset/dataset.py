@@ -512,6 +512,7 @@ def process_dataset(dataset, tokenizer):
                     return "no"
     
             max_length = cfg[cfg['model_name']]['max_length']
+            cur_input_bsz = cfg['batch_size']
             def tokenize_function(examples):
                 batch_size = len(examples['answer'])
                 targets = examples['answer']
@@ -537,10 +538,9 @@ def process_dataset(dataset, tokenizer):
                 tokenizer.truncation_side = 'right'
                 labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
 
-                batch_size = cfg['batch_size']
-                for batch_index in range(0, len(correct_labels_extended), batch_size):
+                for batch_index in range(0, len(correct_labels_extended), cur_input_bsz):
                     # Determine the batch boundaries
-                    batch_end = min(batch_index + batch_size, len(correct_labels_extended))
+                    batch_end = min(batch_index + cur_input_bsz, len(correct_labels_extended))
 
                     # Initialize a variable to track the maximum length of sequences in this batch
                     max_length_in_batch = 0
@@ -618,6 +618,7 @@ def process_dataset(dataset, tokenizer):
             }
             '''
             max_length = cfg[cfg['model_name']]['max_length']
+            cur_input_bsz = cfg['batch_size']
             def tokenize_function(examples):
                 batch_size = len(examples['label'])
                 targets = examples['label']
@@ -641,10 +642,9 @@ def process_dataset(dataset, tokenizer):
                 tokenizer.truncation_side = 'right'
                 labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
 
-                batch_size = cfg['batch_size']
-                for batch_index in range(0, len(correct_labels_extended), batch_size):
+                for batch_index in range(0, len(correct_labels_extended), cur_input_bsz):
                     # Determine the batch boundaries
-                    batch_end = min(batch_index + batch_size, len(correct_labels_extended))
+                    batch_end = min(batch_index + cur_input_bsz, len(correct_labels_extended))
 
                     # Initialize a variable to track the maximum length of sequences in this batch
                     max_length_in_batch = 0
@@ -724,6 +724,7 @@ def process_dataset(dataset, tokenizer):
             }
             '''
             max_length = cfg[cfg['model_name']]['max_length']
+            cur_input_bsz = cfg['batch_size']
             def tokenize_function(examples):
                 batch_size = len(examples['label'])
                 targets = examples['label']
@@ -745,10 +746,9 @@ def process_dataset(dataset, tokenizer):
                 tokenizer.truncation_side = 'right'
                 labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
 
-                batch_size = cfg['batch_size']
-                for batch_index in range(0, len(correct_labels_extended), batch_size):
+                for batch_index in range(0, len(correct_labels_extended), cur_input_bsz):
                     # Determine the batch boundaries
-                    batch_end = min(batch_index + batch_size, len(correct_labels_extended))
+                    batch_end = min(batch_index + cur_input_bsz, len(correct_labels_extended))
 
                     # Initialize a variable to track the maximum length of sequences in this batch
                     max_length_in_batch = 0
@@ -831,6 +831,7 @@ def process_dataset(dataset, tokenizer):
             '''
             
             max_length = cfg[cfg['model_name']]['max_length']
+            cur_input_bsz = cfg['batch_size']
             def tokenize_function(examples):
                 batch_size = len(examples['answerKey'])
                 targets = examples['answerKey']
@@ -863,10 +864,9 @@ def process_dataset(dataset, tokenizer):
                 tokenizer.truncation_side = 'right'
                 labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
 
-                batch_size = cfg['batch_size']
-                for batch_index in range(0, len(correct_labels_extended), batch_size):
+                for batch_index in range(0, len(correct_labels_extended), cur_input_bsz):
                     # Determine the batch boundaries
-                    batch_end = min(batch_index + batch_size, len(correct_labels_extended))
+                    batch_end = min(batch_index + cur_input_bsz, len(correct_labels_extended))
 
                     # Initialize a variable to track the maximum length of sequences in this batch
                     max_length_in_batch = 0
@@ -998,6 +998,7 @@ def process_dataset(dataset, tokenizer):
             }
             '''
             max_length = cfg[cfg['model_name']]['max_length']
+            cur_input_bsz = cfg['batch_size']
             def preprocess(text):
                 text = text.strip()
                 # NOTE: Brackets are artifacts of the WikiHow dataset portion of HellaSwag.
@@ -1031,10 +1032,9 @@ def process_dataset(dataset, tokenizer):
                 tokenizer.truncation_side = 'right'
                 labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
 
-                batch_size = cfg['batch_size']
-                for batch_index in range(0, len(correct_labels_extended), batch_size):
+                for batch_index in range(0, len(correct_labels_extended), cur_input_bsz):
                     # Determine the batch boundaries
-                    batch_end = min(batch_index + batch_size, len(correct_labels_extended))
+                    batch_end = min(batch_index + cur_input_bsz, len(correct_labels_extended))
 
                     # Initialize a variable to track the maximum length of sequences in this batch
                     max_length_in_batch = 0
@@ -1114,6 +1114,7 @@ def process_dataset(dataset, tokenizer):
             }
             '''
             max_length = cfg[cfg['model_name']]['max_length']
+            cur_input_bsz = cfg['batch_size']
             def partial_context(sentence, option):
                 # Substitute the pronoun in the sentence with the specified option
                 # and ignore everything after.
@@ -1152,10 +1153,9 @@ def process_dataset(dataset, tokenizer):
                 tokenizer.truncation_side = 'right'
                 labels = tokenizer(labels, max_length=max_length, padding="do_not_pad", truncation=True)
 
-                batch_size = cfg['batch_size']
-                for batch_index in range(0, len(correct_labels_extended), batch_size):
+                for batch_index in range(0, len(correct_labels_extended), cur_input_bsz):
                     # Determine the batch boundaries
-                    batch_end = min(batch_index + batch_size, len(correct_labels_extended))
+                    batch_end = min(batch_index + cur_input_bsz, len(correct_labels_extended))
 
                     # Initialize a variable to track the maximum length of sequences in this batch
                     max_length_in_batch = 0
@@ -1283,6 +1283,7 @@ def process_dataset(dataset, tokenizer):
             }
             '''
             max_length = cfg[cfg['model_name']]['max_length']
+            cur_input_bsz = cfg['batch_size']
             def tokenize_function(examples):
                 batch_size = len(examples['answerKey'])
                 correct_labels = examples['answerKey']
@@ -1335,7 +1336,6 @@ def process_dataset(dataset, tokenizer):
                 #     model_inputs["attention_mask"][i] = torch.tensor(model_inputs["attention_mask"][i][-max_length:])
                 #     labels["input_ids"][i] = torch.tensor(labels["input_ids"][i][-max_length:])
 
-                batch_size = cfg['batch_size']
                 for batch_index in range(0, len(correct_labels_extended), batch_size):
                     # Determine the batch boundaries
                     batch_end = min(batch_index + batch_size, len(correct_labels_extended))
