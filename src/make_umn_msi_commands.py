@@ -113,6 +113,12 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
+            # control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], [ '0.6'], 
+            #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], [ '0.1-0.1-0.1-0.1-0.1-bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
             # control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
             #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank',  '0.05-0.05-0.05-0.05-0.05-seqrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
             #                 ['default']]]
@@ -121,15 +127,15 @@ def main():
             
             # comparing metric
             # 'flap', 'llama-3-8b',
-            control_name = [[['wikitext-2v1'], ['llama-2-13b',  'llama-2-7b', 'llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.6'], 
-                             ['wandasp', 'ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+            control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.6'], 
+                             ['wandasp', 'ppwandasp', 'flap'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
                             ['q-proj+k-proj+v-proj+o-proj', 'gate-proj+up-proj+down-proj', 'default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.6'], 
                              ['flap', 'wandasp', 'ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['q-proj+k-proj+v-proj+out-proj', 'fc1+fc2']]]
+                            ['q-proj+k-proj+v-proj+out-proj', 'fc1+fc2', 'default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
             pass
@@ -163,25 +169,25 @@ def main():
             
             pass
     # gather calib info to save time
-    # model, seq, metric, calib important
+    # model, seq, metric, calib, target module important
     elif file == 'save_calib_info':
         controls = []
         script_name = [['test_model.py']]
         if 'clm' in data:
-            control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b', 'llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2'], 
+            control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2'], 
                              ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],        
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
             # 'llama-3-8b', 'llama-2-7b', 'llama-2-13b', 'opt-13b'
-            control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b', 'llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2'], 
+            control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2'], 
                              ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],        
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b', 'llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2'], 
+            control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2'], 
                              ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-bszrank'],        
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
@@ -194,19 +200,19 @@ def main():
             # controls.extend(CIFAR10_controls_9)
             pass
         elif 'csr' in data:
-            control_name = [[['obqa'], ['llama-3-8b', 'llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2'], 
+            control_name = [[['obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2'], 
                              ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['obqa'], ['llama-3-8b', 'llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2'], 
+            control_name = [[['obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2'], 
                              ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['obqa'], ['llama-3-8b', 'llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2'], 
+            control_name = [[['obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2'], 
                              ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-bszrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
@@ -395,7 +401,7 @@ def main():
 
         s += f'#SBATCH -A aanwar\n'
         s += f'#SBATCH --gres=gpu:a100:{gpu_num}\n'
-        s += '#SBATCH --partition=a100-4\n'
+        s += '#SBATCH --partition=a100-8\n'
 
         # s += f'#SBATCH -A dingj\n'
         # s += f'#SBATCH --gres=gpu:{gpu_num}\n'

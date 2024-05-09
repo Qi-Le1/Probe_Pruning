@@ -37,14 +37,15 @@ def process_control():
         print(f"An error occurred: {e}")
     cfg['gpu_name'] = gpu_name
     list_available_gpus()
-    cfg['data_type'] = torch.float16
+    cfg['data_type'] = torch.float32
     cfg['data_type_max'] = torch.finfo(cfg['data_type']).max
     cfg['data_type_min'] = torch.finfo(cfg['data_type']).min
     # cfg['data_type_min_positive'] = torch.finfo(cfg['data_type']).tiny
     cfg['data_type_min_positive'] = 1e-8
     # This can be implemented dynamically in each layer
     # tc stands for tensor core
-    if cfg['data_type'] == torch.float16:
+    # https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html
+    if cfg['data_type'] == torch.float16 or cfg['data_type'] == torch.float32:
         if cfg['cudatoolkit_version'] >= 11 and cfg['cudnn_version'] >= 7630:
             if gpu_name == 'NVIDIA A100-SXM4-40GB':
                 cfg['tc_multiple'] = 64
