@@ -6,7 +6,7 @@
     "configurations": [
 
         {
-            "name": "c4gridsearch",
+            "name": "dense",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
@@ -14,7 +14,54 @@
             "justMyCode": true,
             "args": [
                 "--file",
-                "c4-gridsearch",
+                "dense",
+                "--num_experiments",
+                "3"
+            ],
+        },
+
+        {
+            "name": "clm_task",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--file",
+                "clm_task",
+                "--num_experiments",
+                "1"
+            ],
+        },
+
+        {
+            "name": "csr_task",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--file",
+                "csr_task",
+                "--num_experiments",
+                "1"
+            ],
+        },
+
+        {
+            "name": "compare_metric",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--file",
+                "compare_metric",
+                "--num_experiments",
+                "3"
             ],
         },
     ]

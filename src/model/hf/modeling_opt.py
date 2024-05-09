@@ -689,8 +689,10 @@ class OPTAttention(nn.Module):
 
                         if cfg['cur_batch_index'] == 0:
                             if torch.all(self.out_proj.get_global_metric_score_distribution() == 0):
+                                print('jinzheli1')
                                 vo_out_dim_indices = torch.arange(self.embed_dim, dtype=torch.long).to(device=hidden_states.device)
                             else:
+                                print('jinzheli2')
                                 out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.out_proj.get_global_metric_score_distribution(), self.out_proj.weight.data, cfg['prune_metric'])
                                 if 'flapratio' in cfg['prune_method']:
                                     vo_out_dim_indices, self.v_num_heads, _ = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
@@ -1360,7 +1362,7 @@ class OPTDecoder(OPTPreTrainedModel):
                     past_key_value=past_key_value,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
-                    next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) else None,
+                    # next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) else None,
                 )
 
             hidden_states = layer_outputs[0]

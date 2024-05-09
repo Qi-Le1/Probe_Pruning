@@ -10,12 +10,16 @@ class HiddenRepresentationPruning():
         self.prune_metric = cfg['prune_metric']
         # if flap ratio in prune method, will update later
         self.prune_ratio = self.adjust_prune_ratio(model_config)
+        self.model_config = model_config
 
     def adjust_prune_ratio(self, model_config):
         if model_config is not None:
+            if cfg['prune_ratio'] == 0:
+                return 0
+            
             num_hidden_layers = model_config.num_hidden_layers
             prune_ratio = round(num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'], 2) 
-            if 'llama-3' in cfg['model_name']:
+            if 'llama-3' in cfg['model_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) :
                 if 'csr' in cfg['task_name']:
                     approx_seq_len = 100
                 elif 'clm' in cfg['task_name']:
@@ -83,12 +87,12 @@ class HiddenRepresentationPruning():
                     combined_probe_out = global_ratio * cur_global_metric_score_distribution + probe_ratio * norm_probe_out_square
 
                 combined_probe_out = torch.sum(combined_probe_out, dim=0).clamp(max=cfg['data_type_max'])
-                probe_out_dim_metric = torch.linalg.vector_norm((combined_probe_out.reshape((1,-1)) * torch.pow(weight, 2)).reshape(4096, 32, 128), ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
+                probe_out_dim_metric = torch.linalg.vector_norm((combined_probe_out.reshape((1,-1)) * torch.pow(weight, 2)).reshape(self.model_config.hidden_size, self.model_config.num_attention_heads, -1), ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
                 return probe_out_dim_metric
             else:
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
                 norm_probe_out_square = torch.sum(norm_probe_out_square, dim=0).clamp(max=cfg['data_type_max'])
-                probe_out_dim_metric = torch.linalg.vector_norm((norm_probe_out_square.reshape((1,-1)) * torch.pow(weight, 2)).reshape(4096, 32, 128), ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
+                probe_out_dim_metric = torch.linalg.vector_norm((norm_probe_out_square.reshape((1,-1)) * torch.pow(weight, 2)).reshape(self.model_config.hidden_size, self.model_config.num_attention_heads, -1), ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
                 return probe_out_dim_metric
         elif 'wandasp' in metric_type:
             combined_probe_out = None
@@ -167,6 +171,7 @@ class HiddenRepresentationPruning():
 
                 combined_probe_out = torch.sum(combined_probe_out, dim=0).clamp(max=cfg['data_type_max'])
                 probe_out_dim_metric = torch.linalg.vector_norm((combined_probe_out.reshape((1,-1)) * torch.pow(weight, 2)), ord=2, dim=0).clamp(max=cfg['data_type_max'])
+                print('probe_out_dim_metric', probe_out_dim_metric.dtype)
                 return probe_out_dim_metric
             else:
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
@@ -229,28 +234,57 @@ class HiddenRepresentationPruning():
             
     def cal_attn_calib_prune_metric(self, calib, weight, metric_type):
         calib = calib.to(weight.device)
+        calib = calib.to(torch.float32)
+        sorted_calib, _ = torch.sort(calib)
+        print('sorted_calib', sorted_calib)
+        weight = weight.to(torch.float32)
         if 'ppwandasp' in metric_type:
-            calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
-            probe_out_dim_metric = torch.linalg.vector_norm((calib.reshape((1,-1)) * torch.pow(weight, 2)).reshape(4096, 32, 128), ord=2, dim=(0, 2)).clamp(max=cfg['data_type_max'])
+            calib = torch.sum(calib, dim=0)
+            probe_out_dim_metric = torch.linalg.vector_norm((calib.reshape((1,-1)) * torch.pow(weight, 2)).reshape(self.model_config.hidden_size, self.model_config.num_attention_heads, -1), ord=2, dim=(0, 2))
         elif 'wandasp' in metric_type:
-            calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
-            probe_out_dim_metric = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight)).sum(dim=0).clamp(max=cfg['data_type_max'])
+            calib = torch.sum(calib, dim=0)
+            probe_out_dim_metric = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight)).sum(dim=0)
         elif 'flap' in metric_type:
-            calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
-            probe_out_dim_metric = (calib * torch.sum(torch.pow(weight, 2), dim=0)).clamp(max=cfg['data_type_max'])
+            calib = torch.sum(calib, dim=0)
+            probe_out_dim_metric = (calib * torch.sum(torch.pow(weight, 2), dim=0))
+        
+        sorted_values, sorted_indices = torch.sort(probe_out_dim_metric)
+
+        # Print sorted tensor
+        print("Sorted tensor:", sorted_values)
         return probe_out_dim_metric
 
     def cal_mlp_calib_prune_metric(self, calib, weight, metric_type):
         calib = calib.to(weight.device)
+        calib = calib.to(torch.float32)
+
+        sorted_calib, _ = torch.sort(calib)
+        print('sorted_calib', sorted_calib)
+        weight = weight.to(torch.float32)
+        # if 'ppwandasp' in metric_type:
+        #     calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
+        #     probe_out_dim_metric = torch.linalg.vector_norm((calib.reshape((1,-1)) * torch.pow(weight, 2)), ord=2, dim=0).clamp(max=cfg['data_type_max'])
+        # elif 'wandasp' in metric_type:
+        #     calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
+        #     probe_out_dim_metric = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight)).sum(dim=0).clamp(max=cfg['data_type_max'])
+        # elif 'flap' in metric_type:
+        #     calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
+        #     probe_out_dim_metric = (calib * torch.sum(torch.pow(weight, 2), dim=0)).clamp(max=cfg['data_type_max'])
+
         if 'ppwandasp' in metric_type:
-            calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
-            probe_out_dim_metric = torch.linalg.vector_norm((calib.reshape((1,-1)) * torch.pow(weight, 2)), ord=2, dim=0).clamp(max=cfg['data_type_max'])
+            calib = torch.sum(calib, dim=0)
+            probe_out_dim_metric = torch.linalg.vector_norm((calib.reshape((1,-1)) * torch.pow(weight, 2)), ord=2, dim=0)
         elif 'wandasp' in metric_type:
-            calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
-            probe_out_dim_metric = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight)).sum(dim=0).clamp(max=cfg['data_type_max'])
+            calib = torch.sum(calib, dim=0)
+            probe_out_dim_metric = (torch.sqrt(calib).reshape((1,-1)) * torch.abs(weight)).sum(dim=0)
         elif 'flap' in metric_type:
-            calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
-            probe_out_dim_metric = (calib * torch.sum(torch.pow(weight, 2), dim=0)).clamp(max=cfg['data_type_max'])
+            calib = torch.sum(calib, dim=0)
+            probe_out_dim_metric = (calib * torch.sum(torch.pow(weight, 2), dim=0))
+        
+        sorted_values, sorted_indices = torch.sort(probe_out_dim_metric)
+
+        # Print sorted tensor
+        print("Sorted tensor:", sorted_values)
         return probe_out_dim_metric
     
     def sort_attn_metric(self, probe_out_dim_metric, num_heads, head_dim, prune_way, prune_module, multiple, pruning_ratio=None):
@@ -295,7 +329,7 @@ class HiddenRepresentationPruning():
             print('mlp_flops', mlp_flops)
             multiples = attn_flops / mlp_flops
             # GQA
-            if 'llama-3' in cfg['model_name']:
+            if 'llama-3' in cfg['model_name'] and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) :
                 head_dim = model.config.hidden_size // model.config.num_attention_heads
                 attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 2 + approx_seq_len ** 2 * head_dim + approx_seq_len ** 2 * head_dim
                 print('approx_seq_len * model.config.hidden_size * head_dim * 2 ', approx_seq_len * model.config.hidden_size * head_dim * 2 )

@@ -22,6 +22,7 @@ def list_available_gpus():
         print("CUDA is not available. No GPU detected.")
 
 def process_control():
+    print('is cuda available: ', torch.cuda.is_available())
     print('torch version: ', torch.__version__)
     print('cuda version: ', torch.version.cuda)
     print('cudnn version: ', torch.backends.cudnn.version())
@@ -118,10 +119,11 @@ def process_control():
         
     
     if torch.cuda.is_available():
-        cfg['cuda_default_stream'] = torch.cuda.default_stream()
-        # if 'asyncintra' in cfg['mode']:
-        #     cfg['cuda_default_stream'] = torch.cuda.Stream()
-        cfg['cuda_stream1'] = torch.cuda.Stream()
+        # cfg['cuda_default_stream'] = torch.cuda.default_stream()
+        # # if 'asyncintra' in cfg['mode']:
+        # #     cfg['cuda_default_stream'] = torch.cuda.Stream()
+        # cfg['cuda_stream1'] = torch.cuda.Stream()
+        pass
     else:
         raise ValueError('No cuda device available')
 
@@ -134,6 +136,8 @@ def process_control():
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
+        cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
+    elif 'opt' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
         cfg['cust_tgt_modules'] = [module.replace('-', '_') for module in cfg['cust_tgt_modules']]
     elif cfg['cust_tgt_modules'] == ['default']:
         if 'llama' in cfg['model_name']:
@@ -169,9 +173,9 @@ def process_control():
         cfg['collate_mode'] = 'transformer'
         cfg['gpt2'] = {'max_length': cfg['max_seq_len']}
         if 'llama' in cfg['model_name']:
-            cfg[model_name] = {'max_length': cfg['max_seq_len'] , 'hidden_size': 4096}
+            cfg[model_name] = {'max_length': cfg['max_seq_len']}
         if 'opt' in cfg['model_name']:
-            cfg[model_name] = {'max_length': cfg['max_seq_len'] }
+            cfg[model_name] = {'max_length': cfg['max_seq_len']}
 
         cfg['qk_prune_way'] = 'whole'
         cfg['vo_prune_way'] = 'whole'

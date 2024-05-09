@@ -185,15 +185,15 @@ class Linear(nn.Linear, EriLayer):
 
         if 'wandasp' in self.prune_metric:
             self.scaler_inp[:seq_len, update_indices] *= momentum
-            
+
             if 'bias' in cfg['prune_method']:
                 self.baseline_inp = self.baseline_inp.to(cur_device)
                 self.baseline_inp[:seq_len, update_indices] *= momentum
                 self.baseline_inp[:seq_len, update_indices] += (1 - momentum) * (torch.mean(inp, dim=0) / batch_size)
 
             if cfg['calibration_stage'] == True:
-                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
-                self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / batch_size, max=cfg['data_type_max'])
+                norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
+                self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * norm_squared / batch_size
             elif cfg['calibration_stage'] == False:
                 if cfg['pad_tokens'] is not None:
                     cfg['pad_tokens'] = cfg['pad_tokens'].to(cur_device)
@@ -229,6 +229,7 @@ class Linear(nn.Linear, EriLayer):
         if len(inp.shape) == 2:
             raise ValueError(f"Input shape {inp.shape} is not supported. Please provide a 3D tensor.")
         
+
         batch_size = inp.shape[0]
         seq_len = inp.shape[1]
         cur_device = inp.device
@@ -245,10 +246,11 @@ class Linear(nn.Linear, EriLayer):
                         
             if cfg['calibration_stage'] == True:
                 self.scaler_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
-                norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
+                norm_squared = torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2
                 denominator = (self.nsamples[update_indices] + batch_size)
-                self.scaler_inp[:seq_len, update_indices] += torch.clamp(norm_squared / denominator, max=cfg['data_type_max'])
+                self.scaler_inp[:seq_len, update_indices] += norm_squared / denominator
             elif cfg['calibration_stage'] == False:
+                self.scaler_inp = self.scaler_inp.to(cfg['data_type'])
                 if cfg['pad_tokens'] is not None:
                     cfg['pad_tokens'] = cfg['pad_tokens'].to(cur_device)
                     cfg['nonpad_tokens_denominator'] = cfg['nonpad_tokens_denominator'].to(cur_device)
@@ -267,7 +269,7 @@ class Linear(nn.Linear, EriLayer):
         elif "flap" in self.prune_metric:
             self.baseline_inp = self.baseline_inp.to(cur_device)
             self.fluc_inp = self.fluc_inp.to(cur_device)
-
+            
             old_baseline_inp = self.baseline_inp.clone()
             self.baseline_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + batch_size)
             self.baseline_inp[:seq_len, update_indices] += torch.mean(inp, dim=0) / (self.nsamples[update_indices] + batch_size)
@@ -327,6 +329,20 @@ class Linear(nn.Linear, EriLayer):
                 raise ValueError(f"Unknown pruning metric")
         else:
             return None
+
+    def set_global_metric_to_data_type(self):
+        if ('out_proj' in self.key or 'fc2' in self.key):
+            if 'wandasp' in self.prune_metric:
+                if 'bias' in cfg['prune_method']:
+                    self.baseline_inp = self.baseline_inp.to(cfg['data_type'])
+                    self.scaler_inp = self.scaler_inp.to(cfg['data_type'])
+                else:
+                    self.scaler_inp = self.scaler_inp.to(cfg['data_type'])
+            elif "flap" in self.prune_metric:
+                self.baseline_inp = self.baseline_inp.to(cfg['data_type'])
+                self.scaler_inp = self.scaler_inp.to(cfg['data_type'])
+            else:
+                raise ValueError(f"Unknown pruning metric")
 
 
 
@@ -432,7 +448,9 @@ class Linear(nn.Linear, EriLayer):
                 result = result.to(previous_dtype)
                 return result
             elif cfg['calibration_stage'] == False:
-                
+                if cfg['cur_batch_index'] == 0:
+                    self.set_global_metric_to_data_type()
+                    
                 if 'probe' in cfg['prune_method'] and 'cal_mlp_probe_out_dim_metric' in kwargs and kwargs['cal_mlp_probe_out_dim_metric'] == True:
                     result = F.linear(x, self.weight, bias=self.bias)
                     result = result.to(previous_dtype)

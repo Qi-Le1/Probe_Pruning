@@ -29,7 +29,7 @@ def check_calib_saving_info():
     # prune_info
     name_list[11] = 'None'
     # cust_tgt_modules
-    name_list[12] = 'None'
+    # name_list[12] = 'None'
     calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
     if os.path.exists(calibsavinginfo_path) and load(calibsavinginfo_path, mode='torch') is not None:
         return True
@@ -55,7 +55,7 @@ def load_calib_saving_info(model):
     # prune_info
     name_list[11] = 'None'
     # cust_tgt_modules
-    name_list[12] = 'None'
+    # name_list[12] = 'None'
     calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
     
     # Load the calibration data
@@ -66,7 +66,13 @@ def load_calib_saving_info(model):
         module_name, attr_name = key.rsplit('+', 1)
         print(f"Applying calibration data to {module_name}.{attr_name}...")
         module = dict(model.named_modules())[module_name]
-        setattr(module, attr_name, value)
+        module_device = module.weight.device
+
+        # Move the value to the same device as the module's weights
+        value_to_device = value.to(module_device)
+        
+        # Set the attribute with the value that's now on the correct device
+        setattr(module, attr_name, value_to_device)
     print("Calibration data applied to the model successfully.")
     return
 
@@ -92,7 +98,7 @@ def save_calib_info(model):
     # prune_info
     name_list[11] = 'None'
     # cust_tgt_modules
-    name_list[12] = 'None'
+    # name_list[12] = 'None'
     calibsavinginfo_path = os.path.join(result_path, '_'.join(name_list))
     
     all_calin_info = {}

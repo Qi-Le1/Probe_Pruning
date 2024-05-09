@@ -161,10 +161,6 @@ def make_hf_model(model_name):
     else:
         raise ValueError('Not valid model name')
     
-    device_map = getattr(model, 'hf_device_map', {})
-
-    # Print the device map
-    print("Model Device Map:", device_map, flush=True)
     if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
         padding_side = "left"
     else:

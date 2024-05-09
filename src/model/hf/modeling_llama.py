@@ -1108,7 +1108,7 @@ class LlamaDecoderLayer(nn.Module):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
 
-        print('layerorder', self.layer_order, flush=True)
+        # print('layerorder', self.layer_order, flush=True)
 
         # residual = hidden_states
         # if self.check_asyncintra_mlp():
@@ -1226,12 +1226,12 @@ class LlamaDecoderLayer(nn.Module):
         #     print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
         #     print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
         #     print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
-        print('hiddenstatedevice', hidden_states.device, flush=True)
-        print('self.input_layernorm.weight.device', self.input_layernorm.weight.device, flush=True)
-        print('qkvodevice', self.self_attn.q_proj.weight.device, self.self_attn.k_proj.weight.device, self.self_attn.v_proj.weight.device, self.self_attn.o_proj.weight.device, flush=True)
-        print('mlpdevice', self.mlp.down_proj.weight.device, self.mlp.up_proj.weight.device, self.mlp.gate_proj.weight.device, flush=True)
-        hidden_states = hidden_states.to(self.input_layernorm.weight.device)
-        print('hiddenstatedeviceafter', hidden_states.device, flush=True)
+        # print('hiddenstatedevice', hidden_states.device, flush=True)
+        # print('self.input_layernorm.weight.device', self.input_layernorm.weight.device, flush=True)
+        # print('qkvodevice', self.self_attn.q_proj.weight.device, self.self_attn.k_proj.weight.device, self.self_attn.v_proj.weight.device, self.self_attn.o_proj.weight.device, flush=True)
+        # print('mlpdevice', self.mlp.down_proj.weight.device, self.mlp.up_proj.weight.device, self.mlp.gate_proj.weight.device, flush=True)
+        # hidden_states = hidden_states.to(self.input_layernorm.weight.device)
+        # print('hiddenstatedeviceafter', hidden_states.device, flush=True)
 
         
         residual = hidden_states
@@ -1499,8 +1499,11 @@ class LlamaModel(LlamaPreTrainedModel):
 
         # torch.cuda.nvtx.range_push("layer start".format(idx))
         for idx, decoder_layer in enumerate(self.layers):
-            hidden_states = hidden_states.to(decoder_layer.input_layernorm.weight.device)
-            print(idx, decoder_layer.input_layernorm.weight.device, hidden_states.device, flush=True)
+            # hidden_states = hidden_states.to(decoder_layer.input_layernorm.weight.device)
+            # print(idx, decoder_layer.input_layernorm.weight.device, hidden_states.device, flush=True)
+            # print('decoder_layer.input_layernorm.weight.device', decoder_layer.input_layernorm.weight.device, flush=True)
+            # print('decoder_layerqkvodevice', decoder_layer.self_attn.q_proj.weight.device, decoder_layer.self_attn.k_proj.weight.device, decoder_layer.self_attn.v_proj.weight.device, decoder_layer.self_attn.o_proj.weight.device, flush=True)
+            # print('decoder_layermlpdevice', decoder_layer.mlp.down_proj.weight.device, decoder_layer.mlp.up_proj.weight.device, decoder_layer.mlp.gate_proj.weight.device, flush=True)
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             # print('idx decoder_layer', idx, decoder_layer, flush=True)
@@ -1530,7 +1533,7 @@ class LlamaModel(LlamaPreTrainedModel):
                     past_key_value=past_key_value,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
-                    next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) else None,
+                    # next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) else None,
                 )
 
                 # print('layer_outputs', idx, layer_outputs[0])
@@ -1544,7 +1547,7 @@ class LlamaModel(LlamaPreTrainedModel):
                 # elapsed_time_ms = start_event.elapsed_time(stop_event)
         
                
-                print(f'layerdevice, {decoder_layer.mlp.gate_proj.weight.device}')
+                # print(f'layerdevice, {decoder_layer.mlp.gate_proj.weight.device}')
             
 
             # print('layer_outputs', layer_outputs, flush=True)
@@ -1658,6 +1661,8 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         # print('input_ids', input_ids.shape, flush=True)
+
+
         outputs = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,

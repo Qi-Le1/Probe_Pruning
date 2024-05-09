@@ -59,6 +59,7 @@ def runExperiment():
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
     dataset = process_dataset(dataset, tokenizer)
     data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
@@ -67,10 +68,10 @@ def runExperiment():
     test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
     dense_info_list = get_model_profile('dense', model_prof)
-    for item in dense_info_list:
-        print(item, '\n', flush=True)
+
     print('inference_duration', inference_duration)
     # thread lock bug
+    test_logger.save(False)
     test_logger.writer = None
     remove_non_picklable_items(cfg)
     result = {'cfg': cfg, 'epoch': cfg['epoch'], 'logger': {'test': test_logger},\
@@ -119,8 +120,6 @@ def test(data_loader, model, model_prof, metric, logger):
             input_ = {'target': input['target']}
             output_ = {'target': output['target'], 'loss': output['loss']}
 
-        if cfg['test_speed'] == False:
-            torch.cuda.empty_cache()
 
         torch.cuda.synchronize()
         model_prof.start_profile()
@@ -165,8 +164,6 @@ def test(data_loader, model, model_prof, metric, logger):
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
             
-            if cfg['test_speed'] == False:
-                torch.cuda.empty_cache()
             # break
         print('inference_duration', inference_duration)
         evaluation = metric.evaluate('test', 'full')

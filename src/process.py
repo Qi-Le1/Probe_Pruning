@@ -20,14 +20,15 @@ import collections
 parser = argparse.ArgumentParser(description='analyze_data')
 parser.add_argument('--file', default='dp', type=str)
 parser.add_argument('--detail', default='False', type=str)
+parser.add_argument('--num_experiments', default=1, type=int)
 args = vars(parser.parse_args())
 
 save_format = 'png'
 # result_path = './output/result'
-result_path = f"./output/result/{args['file']}"
+result_path = f"./output/result/"
 vis_path = './output/vis/{}'.format(save_format)
 
-num_experiments = 1
+num_experiments = args['num_experiments']
 exp = [str(x) for x in list(range(num_experiments))]
 
 
@@ -60,27 +61,77 @@ def make_controls(control_name):
 
 def make_control_list(file):
     controls = []
-    if file == 'c4-gridsearch':
-        interval_values = np.arange(0, 1, 0.1)
-        interval_pairs = [f"{x:.1f}-{y:.1f}" for x in interval_values for y in interval_values]
+    if file == 'dense':
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0'], 
+                             ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                            ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['c4'], ['llama-2-7b'], ['clm'], ['10'], ['128'], interval_pairs, 
-                            ['ppwandasp'], ['calib-gridsearch'], ['asyncinter'], ['c4-2000'], ['None'],
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0'], 
+                            ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                        ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-3-8b'], ['csr'], ['20'], ['512'], ['0'], 
+                             ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                            ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'clm_task':
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                            ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                            ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['c4'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.0-0.0'], 
-        #                     ['ppwandasp'], ['calib-gridsearch'], ['asyncinter'], ['c4-2000'], ['None'],
-        #                 ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank','0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'csr_task':
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                             ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                            ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank','0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'compare_metric':
+        control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                             ['flap', 'wandasp', 'ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                            ['q-proj+k-proj+v-proj+o-proj', 'gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                            ['flap', 'wandasp', 'ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['q-proj+k-proj+v-proj+out-proj', 'fc1+fc2']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
     return controls
 
 
 def main():
-    global result_path, final_result_path, vis_path, num_experiments, exp
+    global result_path, vis_path, num_experiments, exp
     file = args['file']
     vis_path = './output/vis/{}'.format(file)
     makedir_exist_ok(vis_path)
@@ -112,6 +163,9 @@ def check_missing_files(control, model_tag, processed_result_history):
     return
 
 def extract_result(control, model_tag, processed_result_history):
+    file = args['file']
+    metric_name_list = ['test/Loss', 'test/Perplexity', 'test/CsrAccuracy', 'test/CsrAccuracyNorm']
+    print('control', control)
     if len(control) == 1:
         exp_idx = exp.index(control[0])
         base_result_path_i = os.path.join(result_path, '{}'.format(model_tag))
@@ -119,15 +173,22 @@ def extract_result(control, model_tag, processed_result_history):
         if os.path.exists(base_result_path_i):
             base_result = load(base_result_path_i)                
             for k in base_result['logger']['test'].history:
-                if k not in processed_result_history:
-                    processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
-                processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
+                print('kkkk', k, base_result['logger']['test'].history[k])
+                if file == 'compare_metric':
+                    if any(metric_name in k for metric_name in metric_name_list):
+                        if k not in processed_result_history:
+                            processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
+                        processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
+                else:
+                    if k not in processed_result_history:
+                        processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
+                    processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
         else:
             print('Missing {}'.format(base_result_path_i))
     else:
         if control[1] not in processed_result_history:
             processed_result_history[control[1]] = {}
-        # TODO zheshisha
+        print('control[1]', control[1])
         extract_result([control[0]] + control[2:], model_tag, processed_result_history[control[1]])
     return
 
@@ -180,7 +241,7 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
             extracted_processed_result[exp_name] = defaultdict()
         
         extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = np.round(processed_result['mean'], 2)
-        extracted_processed_result[exp_name]['{}_std'.format(metric_name)] = np.round(processed_result['std'], 2)
+        extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = np.round(processed_result['se'], 2)
         # extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = np.round(processed_result['se'], 2)
     else:
         for k, v in processed_result.items():
@@ -195,14 +256,14 @@ def write_xlsx(path, df, startrow=0):
         df[df_name].to_excel(writer, sheet_name='Sheet1', startrow=startrow + 1)
         writer.sheets['Sheet1'].write_string(startrow, 0, df_name)
         startrow = startrow + len(df[df_name].index) + 3
-    writer.save()
+    writer.close()
     return
 
 
 def make_df_history(extracted_processed_result_history):
     df = defaultdict(list)
     df_for_xlsx = defaultdict(list)
-    metric_name_list = ['test/Loss', 'test/Perplexity', 'test/CsrAccuracy']
+    metric_name_list = ['test/Loss', 'test/Perplexity', 'test/CsrAccuracy', 'test/CsrAccuracyNorm']
     for exp_name in extracted_processed_result_history:
         control = exp_name.split('_')
         if len(control) == 12:
@@ -217,6 +278,7 @@ def make_df_history(extracted_processed_result_history):
                 
                 if 'fullinf_FLOPs_ratio_for_all_layers' in k or 'probe_FLOPs_ratio_for_all_layers' in k or \
                     any(metric_name in k for metric_name in metric_name_list):
+                    print('inxlsxk', k)
                     df_for_xlsx[df_name].append(
                         pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
         else:
@@ -304,9 +366,9 @@ def make_vis(df_history):
     # marker['Full model'] = '*'
     # linestyle['pqnobias-0.5-0.5'] = '-.'
     # linestyle['pqnobiasglobal-0.5-0.5'] = '-.'
-    loc_dict = {'test/Perplexity': 'lower left', 'label': 'center left', 'test/CsrAccuracy': 'lower left'}
+    loc_dict = {'test/Perplexity': 'lower left', 'label': 'center left', 'test/CsrAccuracy': 'lower left', 'test/CsrAccuracyNorm': 'lower left'}
     fontsize = {'legend': 17, 'label': 17, 'ticks': 14, 'group_x_ticks': 8}
-    metric_name_list = ['test/Loss', 'test/Perplexity', 'test/CsrAccuracy']
+    metric_name_list = ['test/Loss', 'test/Perplexity', 'test/CsrAccuracyNorm', 'test/CsrAccuracy']
 
     fig = {}
     fig_data_across_multi_indices = collections.defaultdict(dict)
@@ -353,6 +415,36 @@ def make_vis(df_history):
         plt.yticks(fontsize=fontsize['ticks'])
         plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'], bbox_to_anchor=(1, 0.5))
         return
+    
+    def draw_scatter_x_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy'):
+        fig_color = color.get(key_for_dict, random.choice(list(backup_color_set)))
+        fig_linestyle = linestyle.get(key_for_dict, random.choice(list(backup_linestyle_set)))
+        fig_marker = marker.get(key_for_dict, random.choice(list(backup_marker_set)))
+        if key_for_dict not in color:
+            color[key_for_dict] = fig_color
+            linestyle[key_for_dict] = fig_linestyle
+            marker[key_for_dict] = fig_marker
+
+            backup_color_set.remove(fig_color)
+            backup_linestyle_set.remove(fig_linestyle)
+            backup_marker_set.remove(fig_marker)
+        if label_exists(plt, key_for_dict):
+            print('label exists', key_for_dict)
+            return
+            # plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
+        # else:
+        plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle, marker=fig_marker, label=key_for_dict)
+            # plt.scatter(x, y, color=fig_color, linestyle=fig_linestyle)
+        # plt.plot(x, y, color=fig_color, linestyle=fig_linestyle, marker=fig_marker, label=key_for_dict)
+        # plt.fill_between(x, (y - yerr), (y + yerr), color=color[algo_mode], alpha=.1)
+        plt.errorbar(x, y, yerr=yerr, color=fig_color, linestyle=fig_linestyle)
+        plt.xlabel(x_label, fontsize=fontsize['label'])
+        plt.ylabel(y_label, fontsize=fontsize['label'])
+        plt.xticks(fontsize=fontsize['ticks'])
+        plt.yticks(fontsize=fontsize['ticks'])
+        plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'], bbox_to_anchor=(1, 0.5))
+        return
+    
     
     
 
@@ -459,60 +551,73 @@ def make_vis(df_history):
                     temp_key = index_list[-1]
 
                     # print('index', index)
-                    if 'gridsearch' in prune_method and ('Loss' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
-                        if any(metric_name in index for metric_name in metric_name_list):
-                            flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                            flops_metric_name = flops_metric_name.split('/')[1]
-                            if loss_performance_vs_total_FLOPs_ratio[0] is None:
-                                loss_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
-                                loss_performance_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
-                        elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
-                            if loss_performance_vs_total_FLOPs_ratio[2] is None:
-                                loss_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
+                    # if 'gridsearch' in prune_method and ('Loss' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
+                    #     if any(metric_name in index for metric_name in metric_name_list):
+                    #         flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                    #         flops_metric_name = flops_metric_name.split('/')[1]
+                    #         if loss_performance_vs_total_FLOPs_ratio[0] is None:
+                    #             loss_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
+                    #             loss_performance_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                    #     elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
+                    #         if loss_performance_vs_total_FLOPs_ratio[2] is None:
+                    #             loss_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
 
                         
-                        if loss_performance_vs_total_FLOPs_ratio[0] is not None and loss_performance_vs_total_FLOPs_ratio[2] is not None:
-                            print('performancevssparsity', loss_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
-                            calib_info, prune_info, cust_tgt_modules, 'FIG:Loss_fullinf_FLOPs_ratio_for_all_layers'])
-                            fig[fig_name] = plt.figure(fig_name)
-                            x = loss_performance_vs_total_FLOPs_ratio[2]
-                            y = loss_performance_vs_total_FLOPs_ratio[0]
-                            yerr = loss_performance_vs_total_FLOPs_ratio[1]
-                            prune_ratio_list = prune_ratio.split('-')
-                            key_for_dict = f"{prune_ratio_list[0]}"
-                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
-                            print('loss_performance_vs_total_FLOPs_ratio', loss_performance_vs_total_FLOPs_ratio)
-                            # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
-                            loss_performance_vs_total_FLOPs_ratio = [None, None, None]
+                    #     if loss_performance_vs_total_FLOPs_ratio[0] is not None and loss_performance_vs_total_FLOPs_ratio[2] is not None:
+                    #         print('performancevssparsity', loss_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
+                    #         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
+                    #         calib_info, prune_info, cust_tgt_modules, 'FIG:Loss_fullinf_FLOPs_ratio_for_all_layers'])
+                    #         fig[fig_name] = plt.figure(fig_name)
+                    #         x = loss_performance_vs_total_FLOPs_ratio[2]
+                    #         y = loss_performance_vs_total_FLOPs_ratio[0]
+                    #         yerr = loss_performance_vs_total_FLOPs_ratio[1]
+                    #         prune_ratio_list = prune_ratio.split('-')
+                    #         key_for_dict = f"{prune_ratio_list[0]}"
+                    #         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                    #         print('loss_performance_vs_total_FLOPs_ratio', loss_performance_vs_total_FLOPs_ratio)
+                    #         # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                    #         loss_performance_vs_total_FLOPs_ratio = [None, None, None]
                     
-                    if 'gridsearch' in prune_method and ('Perplexity' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
-                        if any(metric_name in index for metric_name in metric_name_list):
-                            flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                            flops_metric_name = flops_metric_name.split('/')[1]
-                            if ppl_performance_vs_total_FLOPs_ratio[0] is None:
-                                ppl_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
-                                ppl_performance_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
-                        elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
-                            if ppl_performance_vs_total_FLOPs_ratio[2] is None:
-                                ppl_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
+                    # if 'gridsearch' in prune_method and ('Perplexity' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
+                    #     if any(metric_name in index for metric_name in metric_name_list):
+                    #         flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                    #         flops_metric_name = flops_metric_name.split('/')[1]
+                    #         if ppl_performance_vs_total_FLOPs_ratio[0] is None:
+                    #             ppl_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
+                    #             ppl_performance_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                    #     elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
+                    #         if ppl_performance_vs_total_FLOPs_ratio[2] is None:
+                    #             ppl_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
 
                         
-                        if ppl_performance_vs_total_FLOPs_ratio[0] is not None and ppl_performance_vs_total_FLOPs_ratio[2] is not None:
-                            print('performancevssparsity', ppl_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
-                            calib_info, prune_info, cust_tgt_modules, 'FIG:Perplexity_fullinf_FLOPs_ratio_for_all_layers'])
-                            fig[fig_name] = plt.figure(fig_name)
-                            x = ppl_performance_vs_total_FLOPs_ratio[2]
-                            y = ppl_performance_vs_total_FLOPs_ratio[0]
-                            yerr = ppl_performance_vs_total_FLOPs_ratio[1]
-                            prune_ratio_list = prune_ratio.split('-')
-                            key_for_dict = f"{prune_ratio_list[0]}"
-                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
-                            print('ppl_performance_vs_total_FLOPs_ratio', ppl_performance_vs_total_FLOPs_ratio)
-                            # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
-                            ppl_performance_vs_total_FLOPs_ratio = [None, None, None]
+                    #     if ppl_performance_vs_total_FLOPs_ratio[0] is not None and ppl_performance_vs_total_FLOPs_ratio[2] is not None:
+                    #         print('performancevssparsity', ppl_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
+                    #         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
+                    #         calib_info, prune_info, cust_tgt_modules, 'FIG:Perplexity_fullinf_FLOPs_ratio_for_all_layers'])
+                    #         fig[fig_name] = plt.figure(fig_name)
+                    #         x = ppl_performance_vs_total_FLOPs_ratio[2]
+                    #         y = ppl_performance_vs_total_FLOPs_ratio[0]
+                    #         yerr = ppl_performance_vs_total_FLOPs_ratio[1]
+                    #         prune_ratio_list = prune_ratio.split('-')
+                    #         key_for_dict = f"{prune_ratio_list[0]}"
+                    #         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                    #         print('ppl_performance_vs_total_FLOPs_ratio', ppl_performance_vs_total_FLOPs_ratio)
+                    #         # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                    #         ppl_performance_vs_total_FLOPs_ratio = [None, None, None]
 
+                    if any(metric_name in index for metric_name in metric_name_list):
+                        metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                        metric_name = metric_name.split('/')[1]
+                        print('metric_name', metric_name)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, \
+                        calib_info, cust_tgt_modules, f'FIG:{metric_name}'])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = prune_ratio
+                        y = row.tolist()[0]
+                        yerr = row_std.tolist()[0]
+                        prune_ratio_list = prune_ratio.split('-')
+                        key_for_dict = f"{prune_method}_{mode}_{prune_info}_{metric_name}"
+                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Prune Ratio', y_label=metric_name)
                     
         
     for fig_name in fig_data_across_multi_indices:
@@ -525,7 +630,7 @@ def make_vis(df_history):
             x_label = fig_data_across_multi_indices[fig_name][key_for_dict]['x_label'][0]
             y_label = fig_data_across_multi_indices[fig_name][key_for_dict]['y_label'][0]
 
-            if 'fullinf_FLOPs_ratio_for_all_layers' in fig_name:
+            if 'Loss' in fig_name or 'Perplexity' in fig_name or 'CsrAccuracyNorm' in fig_name or 'CsrAccuracy' in fig_name:
                 # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, y_lim=performance_metric_max)
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
             # if 'all_methods_performance_vs_FLOPs_ratio_for_all_layers' in fig_name:

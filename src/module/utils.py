@@ -183,11 +183,11 @@ def summarize_info_list(pruned_info_list, pruned_duration, logger, dataset_size,
 
 
 def model_forward(model, input, inference_duration, index):
-    torch.cuda.synchronize(cfg['cuda_default_stream'])
+    torch.cuda.synchronize()
     torch.cuda.nvtx.range_push("iteration{}".format(index))
     start_time = time.time()
     output = model(**input)
-    torch.cuda.synchronize(cfg['cuda_default_stream'])
+    torch.cuda.synchronize()
     cur_inference_duration = time.time() - start_time
     inference_duration += cur_inference_duration
     torch.cuda.nvtx.range_pop()
