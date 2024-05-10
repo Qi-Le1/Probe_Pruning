@@ -30,18 +30,18 @@ vis_path = './output/vis/{}'.format(save_format)
 
 num_experiments = args['num_experiments']
 exp = [str(x) for x in list(range(num_experiments))]
-
+decimal_places = 1
 
 # for standard error
 def cal_se(std, sample_nums):
     return std / np.sqrt(sample_nums)
 
-def change_decimal_to_percentage(decimal):
-    return '{:.2%}'.format(float(decimal))
+# def change_decimal_to_percentage(decimal):
+#     return '{:.2%}'.format(float(decimal))
 
-def cut_decimal(decimal):
-    decimal = float(decimal)
-    return format(decimal, '.2f')
+# def cut_decimal(decimal):
+#     decimal = float(decimal)
+#     return format(decimal, '.1f')
 
 def label_exists(plt, label):
     legend = plt.gca().legend_
@@ -80,51 +80,63 @@ def make_control_list(file):
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'clm_task':
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
-                            ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                         ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
-                            ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                         ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
-                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank','0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2',  '0.6'], 
+                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank','0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'csr_task':
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
-                             ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['default']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
-
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
-                            ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                         ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
-                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank','0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                         ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.2','0.6'], 
+                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank','0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'compare_metric':
-        control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                             ['flap', 'wandasp', 'ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['q-proj+k-proj+v-proj+o-proj', 'gate-proj+up-proj+down-proj']]]
+        control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.6'], 
+                             ['wandasp', 'ppwandasp', 'flap'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                            ['q-proj+k-proj+v-proj+o-proj', 'gate-proj+up-proj+down-proj', 'default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+        control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.6'], 
                             ['flap', 'wandasp', 'ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
-                        ['q-proj+k-proj+v-proj+out-proj', 'fc1+fc2']]]
+                        ['q-proj+k-proj+v-proj+out-proj', 'fc1+fc2', 'default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     return controls
@@ -231,7 +243,10 @@ def process_result(controls, processed_result_history):
         summarize_result(processed_result_history, None)
     return 
 
-
+def trunc(values):
+    values = np.round(values, decimal_places)
+    values = np.trunc(values*10**decimal_places)/(10**decimal_places)
+    return values
 
 def extract_processed_result(extracted_processed_result, processed_result, control):
     if 'history' in processed_result:
@@ -240,8 +255,9 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
         if exp_name not in extracted_processed_result:
             extracted_processed_result[exp_name] = defaultdict()
         
-        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = np.round(processed_result['mean'], 2)
-        extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = np.round(processed_result['se'], 2)
+        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = trunc(processed_result['mean'])
+        extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = trunc(processed_result['se'])
+
         # extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = np.round(processed_result['se'], 2)
     else:
         for k, v in processed_result.items():
@@ -278,9 +294,20 @@ def make_df_history(extracted_processed_result_history):
                 
                 if 'fullinf_FLOPs_ratio_for_all_layers' in k or 'probe_FLOPs_ratio_for_all_layers' in k or \
                     any(metric_name in k for metric_name in metric_name_list):
-                    print('inxlsxk', k)
+                    print('inxlsxk', k, extracted_processed_result_history[exp_name][k].reshape(1, -1))
+                    if '_se' in k:
+                        value = extracted_processed_result_history[exp_name][k].reshape(1, -1)
+                        # value_type = type(value[0][0])
+                        # print('value_type', value_type, value[0][0])
+                        # # value[0][0] = f"({value[0][0]})"
+
+                        # value = pd.Series([f"({value[0][0]})"], dtype="string")
+
+                    else:
+                        value = extracted_processed_result_history[exp_name][k].reshape(1, -1)
+                    print('pdvalue', value)
                     df_for_xlsx[df_name].append(
-                        pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
+                        pd.DataFrame(data=value, index=index_name))
         else:
             raise ValueError('Not valid control')
 

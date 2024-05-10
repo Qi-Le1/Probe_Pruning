@@ -332,7 +332,7 @@ class Linear(nn.Linear, EriLayer):
                     self.scaler_inp = self.scaler_inp.to(cfg['data_type'])
             elif "flap" in self.prune_metric:
                 self.baseline_inp = self.baseline_inp.to(cfg['data_type'])
-                self.scaler_inp = self.scaler_inp.to(cfg['data_type'])
+                self.fluc_inp = self.fluc_inp.to(cfg['data_type'])
             else:
                 raise ValueError(f"Unknown pruning metric")
 

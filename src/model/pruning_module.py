@@ -375,10 +375,10 @@ class HiddenRepresentationPruning():
                     # flap code: W_metric = metrics[args.metrics](wrapped_layers, subset, name) ** 2
                     # we dont put the manually added square (only added for attn) here since it is unreasonable
                     metric = self.cal_attn_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
-                    attn_metric_list.append(metric)
+                    attn_metric_list.append(metric.to('cpu'))
                 elif 'down_proj' in name:
                     metric = self.cal_mlp_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
-                    mlp_metric_list.append(metric)
+                    mlp_metric_list.append(metric.to('cpu'))
                 
             if len(attn_metric_list) > 0:
                 attn_metric = torch.stack(attn_metric_list).to(torch.float64)
@@ -447,6 +447,7 @@ class HiddenRepresentationPruning():
                     metric = self.cal_mlp_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric']).reshape(1, -1)
                     metric = standarlization(metric)
 
+                threshold = threshold.to(metric.device)
                 module.pruning_ratio = metric[metric <= threshold].numel() / metric.numel()
                 print('name', name, 'module.pruning_ratio', module.pruning_ratio)
         elif 'opt' in cfg['model_name']:
@@ -470,10 +471,10 @@ class HiddenRepresentationPruning():
                     # flap code: W_metric = metrics[args.metrics](wrapped_layers, subset, name) ** 2
                     # we dont put the manually added square (only added for attn) here since it is unreasonable
                     metric = self.cal_attn_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
-                    attn_metric_list.append(metric)
+                    attn_metric_list.append(metric.to('cpu'))
                 elif 'fc2' in name:
                     metric = self.cal_mlp_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
-                    mlp_metric_list.append(metric)
+                    mlp_metric_list.append(metric.to('cpu'))
                 
             if len(attn_metric_list) > 0:
                 attn_metric = torch.stack(attn_metric_list).to(torch.float64)
@@ -541,6 +542,7 @@ class HiddenRepresentationPruning():
                     metric = self.cal_mlp_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric']).reshape(1, -1)
                     metric = standarlization(metric)
 
+                threshold = threshold.to(metric.device)
                 module.pruning_ratio = metric[metric <= threshold].numel() / metric.numel()
                 print('name', name, 'module.pruning_ratio', module.pruning_ratio)
         return

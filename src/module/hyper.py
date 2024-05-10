@@ -37,7 +37,7 @@ def process_control():
         print(f"An error occurred: {e}")
     cfg['gpu_name'] = gpu_name
     list_available_gpus()
-    cfg['data_type'] = torch.float32
+    cfg['data_type'] = torch.float16
     cfg['data_type_max'] = torch.finfo(cfg['data_type']).max
     cfg['data_type_min'] = torch.finfo(cfg['data_type']).min
     # cfg['data_type_min_positive'] = torch.finfo(cfg['data_type']).tiny
