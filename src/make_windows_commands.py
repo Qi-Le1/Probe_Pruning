@@ -100,6 +100,8 @@ def main():
     print('data', data)
     
     gpu_ids = [','.join(str(i) for i in list(range(x, x + world_size))) for x in list(range(0, num_gpus, world_size))]
+    print('gpu_ids', gpu_ids)
+    # return 
     init_seeds = [list(range(init_seed, init_seed + num_experiments, experiment_step))]
     world_size = [[world_size]]
     num_experiments = [[experiment_step]]
@@ -583,7 +585,7 @@ def main():
     
     delete_file_if_exist(bash_file_name)
 
-    task_parallel_num = int(round / num_gpus)
+    task_parallel_num = 1
     mem = 15
     if task_parallel_num == 1:
         mem = 15
@@ -594,10 +596,11 @@ def main():
     
 
     i = 0
+    kk = 0
     while i < len(controls):
     # for i in range(len(controls)):
         controls[i] = list(controls[i])
-        print('controls[i]', controls[i])
+        # print('controls[i]', controls[i])
         temp = controls[i][3:] 
         filename = ''.join(str(_) for _ in temp)
         filename = pbs_prefix + filename
@@ -611,7 +614,7 @@ def main():
         while j < task_parallel_num and i < len(controls):
             controls[i] = list(controls[i])
             sub_controls.append(controls[i])
-            print('controls[i]', controls[i])
+            # print('controls[i]', controls[i])
             if 'llama' in controls[i][4]:
                 is_llama = True
             if 'opt' in controls[i][4]:
@@ -673,8 +676,12 @@ def main():
         # time_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
         for item in sub_controls:
             s += '\n'
-            s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
+            # s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
+            s = s + 'CUDA_VISIBLE_DEVICES={} python {} --device {} --resume_mode {} --init_seed {} --control_name {} -- &> wslout/output_{}_$timestamp.txt\n'.format(gpu_ids[kk % len(gpu_ids)], *item, item[-1])
+            # print('CUDA_VISIBLE_DEVICES={} python {} --device {} --resume_mode {} --init_seed {} --control_name {} -- &> wslout/output_{}_$timestamp.txt\n'.format(gpu_ids[k % len(gpu_ids)], *item, item[-1]))
+            kk += 1
 
+  
             # s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
 
 
