@@ -88,13 +88,13 @@ def make_dataset(data_name, subset_name=None, verbose=True):
     # hellaswag: hellaswag (Zellers et al., 2019) 
     # winogrande: winogrande 
     # obqa: OpenBookQA (Mihaylov et al., 2018)
-    elif data_name in ['wikitext', 'arc', 'obqa', 'ptb']:   
+    elif data_name in ['wikitext', 'arc', 'obqa']:   
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test', cache_dir=root)
     elif data_name in ['wikivalid'] and cfg['calibration_stage'] == True:
         dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='validation', cache_dir=root)
     elif data_name in ['wikitest'] and cfg['calibration_stage'] == True:
         dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
-    elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq']:
+    elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq', 'ptb']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
     else:
         raise ValueError('Not valid dataset name')
@@ -413,16 +413,16 @@ def process_dataset(dataset, tokenizer):
                 num_samples = len(input_ids) // max_length
                 input_chunks = []
                 mask_chunks = []
-                for i in range(num_samples):
-                    # print('ibefore', i)
-                    # i = random.randint(0, len(input_ids) - max_length - 1)
-                    i = torch.randint(0, len(input_ids) - max_length, (1,)).item()
-                    # print('iafter', i)
-                    j = i + max_length
-                    input_chunks.append(input_ids[i: j])
-                    mask_chunks.append(attention_mask[i: j])
-                # input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
-                # mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+                if 'inorderwiki' in cfg['prune_method']:
+                    input_chunks = [input_ids[i:i + max_length] for i in range(0, len(input_ids), max_length)]
+                    mask_chunks = [attention_mask[i:i + max_length] for i in range(0, len(attention_mask), max_length)]
+                else:
+                    for i in range(num_samples):
+                        i = torch.randint(0, len(input_ids) - max_length, (1,)).item()
+                        j = i + max_length
+                        input_chunks.append(input_ids[i: j])
+                        mask_chunks.append(attention_mask[i: j])
+                
                 final_inputs = defaultdict(list)
                 for i in range(len(input_chunks)):
                     # print('len(input_chunks[i])', len(input_chunks[i]))

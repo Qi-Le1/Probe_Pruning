@@ -9,39 +9,45 @@ class HiddenRepresentationPruning():
         self.key = key
         self.prune_metric = cfg['prune_metric']
         # if flap ratio in prune method, will update later
-        self.prune_ratio = self.adjust_prune_ratio(model_config)
+        if not isinstance(cfg['prune_ratio'], float) and len(cfg['prune_ratio']) == 2:
+            if 'attention' in self.key:
+                self.prune_ratio = self.adjust_prune_ratio(cfg['prune_ratio'][0], model_config)
+            else:
+                self.prune_ratio = self.adjust_prune_ratio(cfg['prune_ratio'][1], model_config)
+        else:
+            self.prune_ratio = self.adjust_prune_ratio(cfg['prune_ratio'], model_config)
         self.model_config = model_config
 
-    def adjust_prune_ratio(self, model_config):
+    def adjust_prune_ratio(self, prune_ratio, model_config):
         if model_config is not None:
-            if cfg['prune_ratio'] == 0:
+            if prune_ratio == 0:
                 return 0
             
             num_hidden_layers = model_config.num_hidden_layers
-            prune_ratio = round(num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * cfg['prune_ratio'], 2) 
-            if ('llama-3' in cfg['model_name'] or 'llama-2-70b' in cfg['model_name']) and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) :
-                if 'csr' in cfg['task_name']:
-                    approx_seq_len = 100
-                elif 'clm' in cfg['task_name']:
-                    approx_seq_len = cfg['max_seq_len']
-                # since we dont prune kv, increase the pruning ratio a little bit
-                head_dim = model_config.hidden_size // model_config.num_attention_heads
-                num_key_value_groups = model_config.num_attention_heads // model_config.num_key_value_heads
+            prune_ratio = round(num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * prune_ratio, 2) 
+            # if ('llama-3' in cfg['model_name'] or 'llama-2-70b' in cfg['model_name']) and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) :
+            #     if 'csr' in cfg['task_name']:
+            #         approx_seq_len = 100
+            #     elif 'clm' in cfg['task_name']:
+            #         approx_seq_len = cfg['max_seq_len']
+            #     # since we dont prune kv, increase the pruning ratio a little bit
+            #     head_dim = model_config.hidden_size // model_config.num_attention_heads
+            #     num_key_value_groups = model_config.num_attention_heads // model_config.num_key_value_heads
                 
-                attn_flops = approx_seq_len * model_config.hidden_size * model_config.hidden_size * 2 + approx_seq_len * model_config.hidden_size * model_config.hidden_size//num_key_value_groups * 2 + model_config.num_attention_heads * approx_seq_len ** 2 * head_dim + model_config.num_attention_heads * approx_seq_len ** 2 * head_dim
-                mlp_flops = approx_seq_len * model_config.hidden_size * model_config.intermediate_size * 3
-                cur_layer_total_flops = attn_flops + mlp_flops
+            #     attn_flops = approx_seq_len * model_config.hidden_size * model_config.hidden_size * 2 + approx_seq_len * model_config.hidden_size * model_config.hidden_size//num_key_value_groups * 2 + model_config.num_attention_heads * approx_seq_len ** 2 * head_dim + model_config.num_attention_heads * approx_seq_len ** 2 * head_dim
+            #     mlp_flops = approx_seq_len * model_config.hidden_size * model_config.intermediate_size * 3
+            #     cur_layer_total_flops = attn_flops + mlp_flops
 
-                prune_heads = int(prune_ratio * model_config.num_attention_heads)
-                prune_attn_dimension = prune_heads * head_dim
-                prune_mlp_dimension = int(prune_ratio * model_config.intermediate_size)
+            #     prune_heads = int(prune_ratio * model_config.num_attention_heads)
+            #     prune_attn_dimension = prune_heads * head_dim
+            #     prune_mlp_dimension = int(prune_ratio * model_config.intermediate_size)
 
-                prune_attn_flops = approx_seq_len * model_config.hidden_size * prune_attn_dimension * 2 + prune_heads * approx_seq_len ** 2 * head_dim + prune_heads * approx_seq_len ** 2 * head_dim
-                prune_mlp_flops = approx_seq_len * model_config.hidden_size * prune_mlp_dimension * 3
-                prune_layer_total_flops = prune_attn_flops + prune_mlp_flops
+            #     prune_attn_flops = approx_seq_len * model_config.hidden_size * prune_attn_dimension * 2 + prune_heads * approx_seq_len ** 2 * head_dim + prune_heads * approx_seq_len ** 2 * head_dim
+            #     prune_mlp_flops = approx_seq_len * model_config.hidden_size * prune_mlp_dimension * 3
+            #     prune_layer_total_flops = prune_attn_flops + prune_mlp_flops
 
-                multiple_ratio = (cur_layer_total_flops * prune_ratio / prune_layer_total_flops)
-                prune_ratio = prune_ratio * (cur_layer_total_flops * prune_ratio / prune_layer_total_flops)
+            #     multiple_ratio = (cur_layer_total_flops * prune_ratio / prune_layer_total_flops)
+            #     prune_ratio = prune_ratio * (cur_layer_total_flops * prune_ratio / prune_layer_total_flops)
             return prune_ratio
         else:
             return cfg['prune_ratio']
@@ -350,7 +356,7 @@ class HiddenRepresentationPruning():
 
     def flap_ratio(self, model):
         
-        prune_ratio = self.adjust_prune_ratio(model.config)
+        prune_ratio = self.adjust_prune_ratio(cfg['prune_ratio'][0], model.config)
         attn_metric_list, mlp_metric_list = [], []
         standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
 

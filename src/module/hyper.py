@@ -91,7 +91,7 @@ def process_control():
         # further update prune_ratio in make_model to match the mean prune ratio
         cfg['prune_ratio'] = float(prune_ratio_list[0])
         # cfg['mean_prune_ratio'] = float(prune_ratio_list[0])
-    elif len(prune_ratio_list) == 2 and 'gridsearch' in cfg['prune_method']:
+    elif len(prune_ratio_list) == 2:
         # only use this for grid search, first ratio for attn, second ratio for mlp
         cfg['prune_ratio'] = [float(x) for x in prune_ratio_list]
         # cfg['mean_prune_ratio'] = [float(x) for x in prune_ratio_list]
