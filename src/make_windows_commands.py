@@ -679,14 +679,14 @@ def main():
             # s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
             s = s + 'CUDA_VISIBLE_DEVICES={} python {} --device {} --resume_mode {} --init_seed {} --control_name {} -- &> wslout/output_{}_$timestamp.txt\n'.format(gpu_ids[kk % len(gpu_ids)], *item, item[-1])
             # print('CUDA_VISIBLE_DEVICES={} python {} --device {} --resume_mode {} --init_seed {} --control_name {} -- &> wslout/output_{}_$timestamp.txt\n'.format(gpu_ids[k % len(gpu_ids)], *item, item[-1]))
-            kk += 1
+        kk += 1
 
   
             # s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
 
 
             # s = s + 'nsys profile -w true --gpu-metrics-device=0 -x true --force-overwrite=true -o {} python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(item[4], *item, item[-1])
-
+        
         s += 'wait\n'
         # controls[i][0] = 'test_classifier_fl.py'
         # for item in sub_controls:
@@ -705,7 +705,11 @@ def main():
         run_file.close()
 
         run_file = open(bash_file_name, 'a')
-        command = f'bash {filename}.sh --wait\n'
+        if kk % len(gpu_ids) == 0:
+            command = f'bash {filename}.sh\n'
+            command = f'--wait\n'
+        else:
+            command = f'bash {filename}.sh &\n'
         run_file.write(command)
         # run_file.write('sleep 20\n')
         run_file.close()
