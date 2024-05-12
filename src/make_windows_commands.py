@@ -673,9 +673,9 @@ def main():
         # time_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
         for item in sub_controls:
             s += '\n'
-            # s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
+            s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
 
-            s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
+            # s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
 
 
             # s = s + 'nsys profile -w true --gpu-metrics-device=0 -x true --force-overwrite=true -o {} python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(item[4], *item, item[-1])
