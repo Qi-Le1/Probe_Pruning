@@ -88,13 +88,13 @@ def make_dataset(data_name, subset_name=None, verbose=True):
     # hellaswag: hellaswag (Zellers et al., 2019) 
     # winogrande: winogrande 
     # obqa: OpenBookQA (Mihaylov et al., 2018)
-    elif data_name in ['wikitext', 'arc', 'obqa']:   
+    elif data_name in ['wikitext', 'arc', 'obqa', 'ptb']:   
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='test', cache_dir=root)
     elif data_name in ['wikivalid'] and cfg['calibration_stage'] == True:
         dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='validation', cache_dir=root)
     elif data_name in ['wikitest'] and cfg['calibration_stage'] == True:
         dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
-    elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq', 'ptb']:
+    elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
     else:
         raise ValueError('Not valid dataset name')
@@ -449,7 +449,7 @@ def process_dataset(dataset, tokenizer):
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
             def preprocess_function(examples):   
-                all_text = "\n".join(examples['sentence'])
+                all_text = "\n\n".join(examples['sentence'])
 
                 model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
 

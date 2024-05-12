@@ -31,7 +31,7 @@
                 "--file",
                 "clm_task",
                 "--num_experiments",
-                "1"
+                "3"
             ],
         },
 
@@ -46,7 +46,7 @@
                 "--file",
                 "csr_task",
                 "--num_experiments",
-                "1"
+                "3"
             ],
         },
 
@@ -60,6 +60,21 @@
             "args": [
                 "--file",
                 "compare_metric",
+                "--num_experiments",
+                "3"
+            ],
+        },
+
+        {
+            "name": "flap_calibration_compare",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--file",
+                "flap_calibration_compare",
                 "--num_experiments",
                 "3"
             ],

@@ -62,68 +62,74 @@ def make_controls(control_name):
 def make_control_list(file):
     controls = []
     if file == 'dense':
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0'], 
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0'], 
                              ['None'], ['dense'], ['None'], ['None'], ['None'],        
                             ['None']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0'], 
-                            ['None'], ['dense'], ['None'], ['None'], ['None'],        
-                        ['None']]]
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0'], 
+                             ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                            ['None']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-3-8b'], ['csr'], ['20'], ['512'], ['0'], 
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-13b'], ['csr'], ['20'], ['512'], ['0'], 
+                             ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                            ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['opt-13b'], ['csr'], ['20'], ['512'], ['0'], 
                              ['None'], ['dense'], ['None'], ['None'], ['None'],        
                             ['None']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'clm_task':
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
                          ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
                          ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2',  '0.6'], 
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2',  '0.4', '0.6'], 
                          ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank','0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'csr_task':
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
                          ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
                          ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.2','0.6'], 
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
                          ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
-                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank','0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
@@ -137,6 +143,12 @@ def make_control_list(file):
         control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.6'], 
                             ['flap', 'wandasp', 'ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['q-proj+k-proj+v-proj+out-proj', 'fc1+fc2', 'default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'flap_calibration_compare':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                             ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000', 'wikivalid-2000'], ['None'],
+                            ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     return controls
@@ -185,16 +197,21 @@ def extract_result(control, model_tag, processed_result_history):
         if os.path.exists(base_result_path_i):
             base_result = load(base_result_path_i)                
             for k in base_result['logger']['test'].history:
-                print('kkkk', k, base_result['logger']['test'].history[k])
-                if file == 'compare_metric':
-                    if any(metric_name in k for metric_name in metric_name_list):
-                        if k not in processed_result_history:
-                            processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
-                        processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
-                else:
+                if any(metric_name in k for metric_name in metric_name_list):
+                    print('kkkk', k, base_result['logger']['test'].history[k])
                     if k not in processed_result_history:
                         processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
                     processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
+                # if file == 'compare_metric' or file == 'clm_task' or file == 'csr_task':
+                #     if any(metric_name in k for metric_name in metric_name_list):
+                #         print('kkkk', k, base_result['logger']['test'].history[k])
+                #         if k not in processed_result_history:
+                #             processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
+                #         processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
+                # else:
+                #     if k not in processed_result_history:
+                #         processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
+                #     processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
         else:
             print('Missing {}'.format(base_result_path_i))
     else:
@@ -280,6 +297,8 @@ def make_df_history(extracted_processed_result_history):
     df = defaultdict(list)
     df_for_xlsx = defaultdict(list)
     metric_name_list = ['test/Loss', 'test/Perplexity', 'test/CsrAccuracy', 'test/CsrAccuracyNorm']
+
+    output_string = ''
     for exp_name in extracted_processed_result_history:
         control = exp_name.split('_')
         if len(control) == 12:
@@ -287,6 +306,9 @@ def make_df_history(extracted_processed_result_history):
             calib_info, prune_info, cust_tgt_modules = control
             df_name = '_'.join(
                 control)
+            output_string += f'{df_name}\n'
+
+            substring = ''
             for k in extracted_processed_result_history[exp_name]:
                 index_name = ['_'.join(control + [k])]
                 df[df_name].append(
@@ -308,10 +330,21 @@ def make_df_history(extracted_processed_result_history):
                     print('pdvalue', value)
                     df_for_xlsx[df_name].append(
                         pd.DataFrame(data=value, index=index_name))
+                    
+                    if substring == '':
+                        substring += f'{index_name}: {value[0][0]}'
+                    else:
+                        substring += f'({value[0][0]})\n'
+                        output_string += substring
+                        substring = ''
         else:
             raise ValueError('Not valid control')
 
     write_xlsx(f"{result_path}/{args['file']}_result.xlsx", df_for_xlsx)
+    file_path = f"{result_path}/{args['file']}_result.txt"
+    # Open the file in write mode and write the code snippet
+    with open(file_path, "w") as file:
+        file.write(output_string)
     return df
 
 

@@ -59,8 +59,8 @@ def runExperiment():
     model = make_prune_model(model)
     if 'calib' in cfg['prune_method']:
         print('Running Calibration ...', flush=True)
-        calibration_data_loader = make_calibration_dataloader(tokenizer)
         cfg['calibration_stage'] = True
+        calibration_data_loader = make_calibration_dataloader(tokenizer)
         if check_calib_saving_info() == True:
             load_calib_saving_info(model)
         else:
