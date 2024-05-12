@@ -7,9 +7,58 @@ from module import MULTIGPUS_MODEL_NAME_LIST
 from accelerate import infer_auto_device_map ,init_empty_weights
 from LLMPruner import PeftModel
 
-def loraprune_load(ckpt: str = ''):
-    pruned_dict = torch.load(ckpt, map_location='cpu')
-    model = pruned_dict['model']
+# def loraprune_load(ckpt: str = ''):
+#     pruned_dict = torch.load(ckpt, map_location='cpu')
+#     model = pruned_dict['model']
+
+#     if torch.cuda.is_available():
+#         device = "cuda"
+#     else:
+#         device = "cpu"
+
+#     if device == "cuda":
+#         model.half()
+#         model = model.cuda()
+
+#     return model
+
+def loraprune_load(model_type: str = 'pruneLLM', ckpt: str = '', lora_ckpt: str = ''):
+    # if model_type == 'pruneLLM':
+    #     pruned_dict = torch.load(ckpt, map_location='cpu')
+    #     model = pruned_dict['model']
+    # elif model_type == 'tune_prune_LLM':
+    #     pruned_dict = torch.load(ckpt, map_location='cpu')
+    #     model = pruned_dict['model']
+    #     model = PeftModel.from_pretrained(
+    #         model,
+    #         lora_ckpt,
+    #         torch_dtype=torch.float16,
+    #     )
+    # else:
+    #     raise NotImplementedError
+
+    # if torch.cuda.is_available():
+    #     device = "cuda"
+    # else:
+    #     device = "cpu"
+
+    # if device == "cuda":
+    #     model.half()
+    #     model = model.cuda()
+
+    if model_type == 'pruneLLM':
+        pruned_dict = torch.load(ckpt, map_location='cpu')
+        model = pruned_dict['model']
+    elif model_type == 'tune_prune_LLM':
+        pruned_dict = torch.load(ckpt, map_location='cpu')
+        model = pruned_dict['model']
+        model = PeftModel.from_pretrained(
+            model,
+            lora_ckpt,
+            torch_dtype=torch.float16,
+        )
+    else:
+        raise NotImplementedError
 
     if torch.cuda.is_available():
         device = "cuda"
@@ -68,17 +117,25 @@ def make_local_tuned_model(model_name):
                 model = llmpruner_load(model_type='tune_prune_LLM', ckpt=model_path, lora_ckpt=lora_path)
             else:
                 raise NotImplementedError
+            
+            tokenizer = AutoTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], padding_side=padding_side)
         elif 'loraprune' in cfg['prune_method']:
             model_path = f"output/loraprune/{cfg['init_seed']}_loraprune_{model_name}_{cfg['prune_ratio']}/pytorch_model.bin"
+            lora_path = f"output/loraprune/{cfg['init_seed']}_loraprune_{model_name}_{cfg['prune_ratio']}"
 
             if not os.path.exists(model_path):
                 raise FileNotFoundError(f"Model file not found: {model_path}")
+            if not os.path.exists(lora_path):
+                raise FileNotFoundError(f"Model file not found: {lora_path}")
             
-            # loraprune method does not have prune file
-            if 'loraprune-tune' in cfg['prune_method']:
-                model = loraprune_load(ckpt=model_path)
+            if 'loraprune-prune' in cfg['prune_method']:
+                model = loraprune_load(model_type='pruneLLM', ckpt=model_path)
+            elif 'loraprune-tune' in cfg['prune_method']:
+                model = loraprune_load(model_type='tune_prune_LLM', ckpt=model_path, lora_ckpt=lora_path)
             else:
                 raise NotImplementedError
+            
+            tokenizer = LlamaTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], padding_side=padding_side)
     else:
         raise ValueError('Not valid model name')
     
@@ -93,9 +150,8 @@ def make_local_tuned_model(model_name):
                 f"seq_len ({cfg['max_seq_len']}) is larger than max_position_embeddings ({model.config.max_position_embeddings})."
             )
 
-    # if 'llama' in model_name:
-    #     tokenizer = LlamaTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], padding_side=padding_side)
-    tokenizer = AutoTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], padding_side=padding_side)
+
+
         
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id

@@ -517,14 +517,14 @@ def main():
         controls = []
         script_name = [[f'{filename}.py']]
         if 'clm' in data:
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0.4'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
                              ['None'], ['llmpruner-prune', 'llmpruner-tune'], ['asyncinter'], ['None'], ['None'],
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['1024'], ['0.4'], 
-                             ['None'], ['loraprune-tune'], ['asyncinter'], ['None'], ['None'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                             ['None'], ['loraprune-prune', 'loraprune-tune'], ['asyncinter'], ['None'], ['None'],
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -544,8 +544,19 @@ def main():
             #         ['o-proj+down-proj']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
-            pass
-            
+
+
+            control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                             ['None'], ['llmpruner-prune', 'llmpruner-tune'], ['asyncinter'], ['None'], ['None'],
+                            ['None']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                             ['None'], ['loraprune-prune', 'loraprune-tune'], ['asyncinter'], ['None'], ['None'],
+                            ['None']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
         elif 'missing' in data:
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode)
             controls.extend(CIFAR10_controls_9)
@@ -662,7 +673,11 @@ def main():
         # time_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
         for item in sub_controls:
             s += '\n'
-            s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
+            # s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
+
+            s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
+
+
             # s = s + 'nsys profile -w true --gpu-metrics-device=0 -x true --force-overwrite=true -o {} python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(item[4], *item, item[-1])
 
         s += 'wait\n'
@@ -685,7 +700,7 @@ def main():
         run_file = open(bash_file_name, 'a')
         command = f'bash {filename}.sh --wait\n'
         run_file.write(command)
-        run_file.write('sleep 20\n')
+        # run_file.write('sleep 20\n')
         run_file.close()
 
         with open(bash_file_name, 'r') as cur_file:
