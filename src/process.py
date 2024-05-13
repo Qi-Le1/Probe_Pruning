@@ -30,7 +30,7 @@ vis_path = './output/vis/{}'.format(save_format)
 
 num_experiments = args['num_experiments']
 exp = [str(x) for x in list(range(num_experiments))]
-decimal_places = 1
+
 
 # for standard error
 def cal_se(std, sample_nums):
@@ -86,6 +86,14 @@ def make_control_list(file):
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'clm_task':
+
+        # 'llama-2-7b', 'llama-2-13b', 'opt-13b'
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0'], 
+                         ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                        ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
         control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
                          ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
@@ -104,12 +112,57 @@ def make_control_list(file):
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank'],
-                        ['default']]]
+        # control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+        #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank'],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                             ['ppwandasp'], ['probe'], ['sync'], ['None'], ['1-1-1-1-1-bszrank'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # llama-3-8b
+        control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0'], 
+                         ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                        ['None']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # llama-3-8b
+        control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                         ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                         ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                            ['ppwandasp'], ['probe'], ['sync'], ['None'], ['1-1-1-1-1-bszrank'],
+                        ['gate-proj+up-proj+down-proj']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'csr_task':
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0'], 
+                             ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                            ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
         control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
                          ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
@@ -128,11 +181,48 @@ def make_control_list(file):
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
-                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank'],
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                         ['ppwandasp'], ['probe'], ['sync'], ['None'], ['1-1-1-1-1-bszrank'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
+        #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank'],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0'], 
+                         ['None'], ['dense'], ['None'], ['None'], ['None'],        
+                        ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                         ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                         ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                         ['ppwandasp'], ['probe'], ['sync'], ['None'], ['1-1-1-1-1-bszrank'],
+                        ['gate-proj+up-proj+down-proj']]]
+        CIFAR10_controls_9 = make_controls( control_name)
+        controls.extend(CIFAR10_controls_9)
+
     elif file == 'compare_metric':
         control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.6'], 
                              ['wandasp', 'ppwandasp', 'flap'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
@@ -148,6 +238,36 @@ def make_control_list(file):
     elif file == 'flap_calibration_compare':
         control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
                              ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000', 'wikivalid-2000'], ['None'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'inorderwiki':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                             ['ppwandasp'], ['probe-default-inorderwiki'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'differentattentionmlp':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0-0', '0-0.2', '0-0.4', '0-0.6', '0.2-0', '0.2-0.2', '0.2-0.4', '0.2-0.6', '0.4-0', '0.4-0.2', '0.4-0.4', '0.4-0.6', '0.6-0', '0.6-0.2', '0.6-0.4', '0.6-0.6'], 
+                             ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['hellaswag', 'arc-c', 'arc-e'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0-0', '0-0.2', '0-0.4', '0-0.6', '0.2-0', '0.2-0.2', '0.2-0.4', '0.2-0.6', '0.4-0', '0.4-0.2', '0.4-0.4', '0.4-0.6', '0.6-0', '0.6-0.2', '0.6-0.4', '0.6-0.6'], 
+                          ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                         ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'probeimproveperformance':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                             ['wandasp', 'flap'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e', 'piqa', 'obqa'], ['llama-2-7b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                             ['wandasp', 'flap'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                             ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
@@ -197,11 +317,17 @@ def extract_result(control, model_tag, processed_result_history):
         if os.path.exists(base_result_path_i):
             base_result = load(base_result_path_i)                
             for k in base_result['logger']['test'].history:
-                if any(metric_name in k for metric_name in metric_name_list):
-                    print('kkkk', k, base_result['logger']['test'].history[k])
-                    if k not in processed_result_history:
-                        processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
-                    processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
+                if file == 'differentattentionmlp':
+                    if any(metric_name in k for metric_name in metric_name_list) or 'fullinf_FLOPs_ratio_for_all_layers' in k:
+                        if k not in processed_result_history:
+                            processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
+                        processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
+                else:
+                    if any(metric_name in k for metric_name in metric_name_list):
+                        print('kkkk', k, base_result['logger']['test'].history[k])
+                        if k not in processed_result_history:
+                            processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
+                        processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
                 # if file == 'compare_metric' or file == 'clm_task' or file == 'csr_task':
                 #     if any(metric_name in k for metric_name in metric_name_list):
                 #         print('kkkk', k, base_result['logger']['test'].history[k])
@@ -260,7 +386,7 @@ def process_result(controls, processed_result_history):
         summarize_result(processed_result_history, None)
     return 
 
-def trunc(values):
+def trunc(values, decimal_places):
     values = np.round(values, decimal_places)
     values = np.trunc(values*10**decimal_places)/(10**decimal_places)
     return values
@@ -272,8 +398,14 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
         if exp_name not in extracted_processed_result:
             extracted_processed_result[exp_name] = defaultdict()
         
-        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = trunc(processed_result['mean'])
-        extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = trunc(processed_result['se'])
+        if 'fullinf_FLOPs_ratio_for_all_layers' in metric_name:
+            # delete probe flops
+            processed_result['mean'] -= 0.015
+            decimal_places = 2
+        else:
+            decimal_places = 1
+        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = trunc(processed_result['mean'], decimal_places)
+        extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = trunc(processed_result['se'], decimal_places)
 
         # extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = np.round(processed_result['se'], 2)
     else:

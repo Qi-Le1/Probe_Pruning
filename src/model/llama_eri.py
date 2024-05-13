@@ -173,9 +173,10 @@ class Linear(nn.Linear, EriLayer):
         cur_device = inp.device
         update_indices = update_indices.to(cur_device)
         self.nsamples = self.nsamples.to(cur_device)
-        self.scaler_inp = self.scaler_inp.to(cur_device)
+        
 
         if 'wandasp' in self.prune_metric:
+            self.scaler_inp = self.scaler_inp.to(cur_device)
             self.scaler_inp[:seq_len, update_indices] *= momentum
 
             if 'bias' in cfg['prune_method']:
