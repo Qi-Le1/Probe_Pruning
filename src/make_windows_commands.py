@@ -704,8 +704,13 @@ def main():
         run_file.close()
 
         run_file = open(bash_file_name, 'a')
-        command = f'bash {filename}.sh --wait\n'
+        if kk % len(gpu_ids) == 0:
+            command = f'bash {filename}.sh\n'
+            command = f'wait\n'
+        else:
+            command = f'bash {filename}.sh &\n'
         run_file.write(command)
+        
         # run_file.write('sleep 20\n')
         run_file.close()
 
