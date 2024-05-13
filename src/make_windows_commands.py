@@ -216,8 +216,8 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.2-0.6', '0.4-0.6', '0.6', '0.5'], 
-                             ['ppwandasp'], ['probe-default-inorderwiki', 'probe-default'], ['sync'], ['c4-20'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.2'], 
+                             ['wandasp', 'flap'], ['probe-default'], ['sync'], ['c4-20'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -585,7 +585,7 @@ def main():
     
     delete_file_if_exist(bash_file_name)
 
-    task_parallel_num = int(round / num_gpus)
+    task_parallel_num = 1
     mem = 15
     if task_parallel_num == 1:
         mem = 15
@@ -596,7 +596,7 @@ def main():
     
 
     i = 0
-    k = 0
+    kk = 0
     while i < len(controls):
     # for i in range(len(controls)):
         controls[i] = list(controls[i])
@@ -677,16 +677,15 @@ def main():
         for item in sub_controls:
             s += '\n'
             s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(*item, item[-1])
-            # s = s + 'CUDA_VISIBLE_DEVICES={} python {} --device {} --resume_mode {} --init_seed {} --control_name {} -- &> wslout/output_{}_$timestamp.txt\n'.format(gpu_ids[k % len(gpu_ids)], *item, item[-1])
+            # s = s + 'CUDA_VISIBLE_DEVICES={} python {} --device {} --resume_mode {} --init_seed {} --control_name {} -- &> wslout/output_{}_$timestamp.txt\n'.format(gpu_ids[kk % len(gpu_ids)], *item, item[-1])
             # print('CUDA_VISIBLE_DEVICES={} python {} --device {} --resume_mode {} --init_seed {} --control_name {} -- &> wslout/output_{}_$timestamp.txt\n'.format(gpu_ids[k % len(gpu_ids)], *item, item[-1]))
-            k += 1
+        kk += 1
 
   
             # s = s + 'python {} --device {} --resume_mode {} --init_seed {} --control_name {}\n'.format(*item)
 
 
             # s = s + 'nsys profile -w true --gpu-metrics-device=0 -x true --force-overwrite=true -o {} python {} --device {} --resume_mode {} --init_seed {} --control_name {} &> wslout/output_{}_$timestamp.txt\n'.format(item[4], *item, item[-1])
-
         s += 'wait\n'
         # controls[i][0] = 'test_classifier_fl.py'
         # for item in sub_controls:
@@ -717,6 +716,42 @@ def main():
             bash_file_name = './{}.sh'.format(f'windows_{file}_{data[0]}_{i}')
             print('bash_file_name', bash_file_name)
             delete_file_if_exist(bash_file_name)
+            
+        # s += 'wait\n'
+        # # controls[i][0] = 'test_classifier_fl.py'
+        # # for item in sub_controls:
+        # #     item[0] = item[0].replace('train', 'test')
+        # #     print(item, item[0])
+        # #     s += '\n'
+        # #     s = s + 'srun --nodes=1 --ntasks=1 python {} --device {} --resume_mode {} --init_seed {} --control_name {}&\n'.format(*item)
+        # # s += 'wait\n'
+        # pbs_file_name = './{}.sh'.format(f'{filename}')
+        # # Check if the file exists
+        # if os.path.exists(pbs_file_name):
+        #     # Delete the file if it exists
+        #     os.remove(pbs_file_name)
+        # run_file = open(pbs_file_name, 'a')
+        # run_file.write(s)
+        # run_file.close()
+
+        # run_file = open(bash_file_name, 'a')
+        # if kk % len(gpu_ids) == 0:
+        #     command = f'bash {filename}.sh\n'
+        #     command = f'wait\n'
+        # else:
+        #     command = f'bash {filename}.sh &\n'
+        # run_file.write(command)
+        
+        # # run_file.write('sleep 20\n')
+        # run_file.close()
+
+        # with open(bash_file_name, 'r') as cur_file:
+        #     line_count = sum(1 for line in cur_file)
+
+        # if line_count > 180:
+        #     bash_file_name = './{}.sh'.format(f'windows_{file}_{data[0]}_{i}')
+        #     print('bash_file_name', bash_file_name)
+        #     delete_file_if_exist(bash_file_name)
     return
 
 
