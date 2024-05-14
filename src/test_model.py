@@ -218,13 +218,15 @@ def test(data_loader, model, model_prof, metric, logger):
             for name, module in model.named_modules():
                 for attr_name in dir(module):
                     # Check if the attribute name contains 'mean_intersection_ratio'
-                    if 'mean_intersection_ratio' in attr_name:
+                    if 'attn_sign_match_percentage' in attr_name or 'attn_l2_magnitude_ratio' in attr_name or 'attn_cosine_similarity' in attr_name\
+                        or 'mlp_sign_match_percentage' in attr_name or 'mlp_l2_magnitude_ratio' in attr_name or 'mlp_cosine_similarity' in attr_name:
                         # Retrieve the attribute value
                         attr_value = getattr(module, attr_name)
                         # Print the module name and attribute name
                         # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
                         # Append the attribute to the logger
                         logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+                        print('name', name, 'attr_name', attr_name)
             
 
             if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
@@ -242,15 +244,15 @@ def test(data_loader, model, model_prof, metric, logger):
             print(logger.write('test', metric.metric_name['test']), flush=True)
         model_prof.stop_profile()
 
-        for name, module in model.named_modules():
-            for attr_name in dir(module):
-                # Check if the attribute name contains 'mean_intersection_ratio'
-                if 'position_distribution' in attr_name:
-                    # Retrieve the attribute value
-                    attr_value = getattr(module, attr_name)
-                    if len(attr_value) > 0:
-                        # Append the attribute to the logger
-                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+        # for name, module in model.named_modules():
+        #     for attr_name in dir(module):
+        #         # Check if the attribute name contains 'mean_intersection_ratio'
+        #         if 'position_distribution' in attr_name:
+        #             # Retrieve the attribute value
+        #             attr_value = getattr(module, attr_name)
+        #             if len(attr_value) > 0:
+        #                 # Append the attribute to the logger
+        #                 logger.append({f'{name}_{attr_name}': attr_value}, 'test')
 
         torch.cuda.cudart().cudaProfilerStop()
     return inference_duration

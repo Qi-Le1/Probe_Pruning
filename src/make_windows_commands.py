@@ -216,7 +216,13 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['10'], ['128'], ['0.2'], 
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['5'], ['128'], ['0.2'], 
+            #                  ['wandasp', 'flap'], ['calib-resinfo'], ['asyncinter'], ['c4-20'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['5'], ['128'], ['0.6'], 
                              ['wandasp', 'flap'], ['probe-default'], ['sync'], ['c4-20'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
@@ -371,8 +377,14 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b', 'llama-2-7b'], ['clm'], ['10'], ['128'], ['0.2'], 
-                             ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-bszrank'],        
+            # control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b', 'llama-2-7b'], ['clm'], ['10'], ['128'], ['0.2'], 
+            #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-bszrank'],        
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['arc-c'], ['llama-2-7b'], ['csr'], ['5'], ['128'], ['0.6'], 
+                             ['wandasp', 'flap'], ['probe-default-resinfo'], ['sync'], ['c4-20'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -706,9 +718,9 @@ def main():
         run_file = open(bash_file_name, 'a')
         if kk % len(gpu_ids) == 0:
             command = f'bash {filename}.sh\n'
-            command = f'wait\n'
+            # command = f'wait\n'
         else:
-            command = f'bash {filename}.sh &\n'
+            command = f'bash {filename}.sh\n'
         run_file.write(command)
         
         # run_file.write('sleep 20\n')

@@ -383,7 +383,7 @@ class LlamaMLP(nn.Module):
                         elif cfg['mode'] == 'asyncintra':
                             if 'post_layernorm_attn_residual' in kwargs:
                                 _, _ = self.probe_process(kwargs['post_layernorm_attn_residual'], **kwargs)
-                                return
+                                # return
                             else:
                                 raise ValueError('Invalid input for asyncintra mode')
                             
@@ -782,7 +782,7 @@ class LlamaAttention(nn.Module):
                         # if not, do full inference
                         if 'input_layernorm_mlp_residual' in kwargs:
                             _, _, _, _, _ = self.probe_process(kwargs['input_layernorm_mlp_residual'], attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
-                            return
+                            # return
                         else:
                             raise ValueError('Invalid input for asyncintra mode')
                     
@@ -1060,7 +1060,7 @@ class LlamaDecoderLayer(nn.Module):
         self.layer_order = layer_order
         self.llamaconfig = config
 
-    def check_asyncintra_mlp(self):
+    def check_asyncintra_for_mlp(self):
         if ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) \
             and self.layer_order > cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
@@ -1069,13 +1069,14 @@ class LlamaDecoderLayer(nn.Module):
             return True
         return False
     
-    def check_asyncintra_attention(self):
+    def check_asyncintra_for_attention(self):
         if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) \
-            and self.layer_order >= cfg['skip_layers'] \
+            and self.layer_order > cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
             and cfg['mode'] == 'asyncintra' \
-            and 'probe' in cfg['prune_method'] \
-            and self.layer_order != self.llamaconfig.num_hidden_layers - 1:
+            and 'probe' in cfg['prune_method']:
+            # and 'next_layer' in kwargs \
+            # and kwargs['next_layer'] != None:
             return True
         return False
     
@@ -1108,11 +1109,11 @@ class LlamaDecoderLayer(nn.Module):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
 
-        # print('layerorder', self.layer_order, flush=True)
+        print('layerorder', self.layer_order, flush=True)
 
         # residual = hidden_states
-        # if self.check_asyncintra_mlp():
-        #     torch.cuda.synchronize(cfg['cuda_default_stream'])
+        # if self.check_asyncintra_for_next_mlp():
+        #     torch.cuda.synchronize()
 
         # def full_attn_inf(result_dict, hidden_states, residual):
         #     try:
@@ -1134,16 +1135,16 @@ class LlamaDecoderLayer(nn.Module):
         #         traceback.print_exc() 
 
         # def probe_mlp_inf(result_dict, residual):
-        #     if self.check_asyncintra_mlp():
-        #         with torch.cuda.stream(cfg['cuda_stream1']):
-        #             try:
-        #                 post_layernorm_attn_residual = self.post_attention_layernorm(residual)
-        #                 if 'resinfo' in cfg['prune_method']: 
-        #                     result_dict['post_layernorm_attn_residual'] = post_layernorm_attn_residual
-        #                 self.mlp(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual, respick=residual)
-        #             except Exception as e:
-        #                 print(f"Error in probe_mlp_inf: {e}")
-        #                 traceback.print_exc() 
+        #     if self.check_asyncintra_for_next_mlp():
+        #         # with torch.cuda.stream(cfg['cuda_stream1']):
+        #         try:
+        #             post_layernorm_attn_residual = self.post_attention_layernorm(residual)
+        #             if 'resinfo' in cfg['prune_method']: 
+        #                 result_dict['post_layernorm_attn_residual'] = post_layernorm_attn_residual
+        #             self.mlp(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual, respick=residual)
+        #         except Exception as e:
+        #             print(f"Error in probe_mlp_inf: {e}")
+        #             traceback.print_exc() 
 
         # # Create threads
         # full_attn_inf_result = {}
@@ -1160,11 +1161,11 @@ class LlamaDecoderLayer(nn.Module):
 
         # hidden_states = full_attn_inf_result['hidden_states']
         # residual = hidden_states
-        # if self.check_asyncintra_attention():
-        #     torch.cuda.synchronize(cfg['cuda_default_stream'])
+        # if self.check_asyncintra_for_next_attention():
+        #     torch.cuda.synchronize()
 
-        # if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_mlp():
-        #     self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_mlp_inf_result['post_layernorm_attn_residual'])
+        # if 'resinfo' in cfg['prune_method']:
+        #     self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, )
         #     print('self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
         #     print('self.attn_l1_diff_percentage', self.attn_l1_diff_percentage, flush=True)
         #     print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
@@ -1180,27 +1181,28 @@ class LlamaDecoderLayer(nn.Module):
         #         traceback.print_exc() 
     
         # def probe_attn_inf(result_dict, residual):
-        #     if self.check_asyncintra_attention():
-        #         with torch.cuda.stream(cfg['cuda_stream1']):
-        #             print('self.layer_order', self.layer_order, flush=True)
-        #             try:
-        #                 # cfg[f'cuda_events_mlp_{self.layer_order}'].wait(cfg['cuda_stream1'])
-        #                 input_layernorm_mlp_residual = kwargs['next_layer'].input_layernorm(residual)
-        #                 kwargs['next_layer'].self_attn(
-        #                     hidden_states=hidden_states,
-        #                     attention_mask=attention_mask,
-        #                     position_ids=position_ids,
-        #                     past_key_value=past_key_value,
-        #                     output_attentions=output_attentions,
-        #                     use_cache=use_cache,
-        #                     input_layernorm_mlp_residual=input_layernorm_mlp_residual,
-        #                     respick=residual
-        #                 )
-        #                 if 'resinfo' in cfg['prune_method']: 
-        #                     result_dict['input_layernorm_mlp_residual'] = input_layernorm_mlp_residual
-        #             except Exception as e:
-        #                 print(f"Error in probe_attn_inf: {e}")
-        #                 traceback.print_exc() 
+        #     if self.check_asyncintra_for_next_attention():
+        #         # multiple gpu will be complex for 2 stream
+        #         # with torch.cuda.stream(cfg['cuda_stream1']):
+        #         print('self.layer_order', self.layer_order, flush=True)
+        #         try:
+        #             # cfg[f'cuda_events_mlp_{self.layer_order}'].wait(cfg['cuda_stream1'])
+        #             input_layernorm_mlp_residual = kwargs['next_layer'].input_layernorm(residual)
+        #             kwargs['next_layer'].self_attn(
+        #                 hidden_states=hidden_states,
+        #                 attention_mask=attention_mask,
+        #                 position_ids=position_ids,
+        #                 past_key_value=past_key_value,
+        #                 output_attentions=output_attentions,
+        #                 use_cache=use_cache,
+        #                 input_layernorm_mlp_residual=input_layernorm_mlp_residual,
+        #                 respick=residual
+        #             )
+        #             if 'resinfo' in cfg['prune_method']: 
+        #                 result_dict['input_layernorm_mlp_residual'] = input_layernorm_mlp_residual
+        #         except Exception as e:
+        #             print(f"Error in probe_attn_inf: {e}")
+        #             traceback.print_exc() 
         
         
         # full_mlp_inf_result = {}
@@ -1220,18 +1222,13 @@ class LlamaDecoderLayer(nn.Module):
         # hidden_states = full_mlp_inf_result['hidden_states']
         # hidden_states = residual + hidden_states
         
-        # if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_attention():
-        #     self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_attn_inf_result['input_layernorm_mlp_residual'])
+        # if 'resinfo' in cfg['prune_method']:
+        #     self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
         #     print('self.layer_order', self.layer_order, flush=True)
         #     print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
         #     print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
         #     print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
-        # print('hiddenstatedevice', hidden_states.device, flush=True)
-        # print('self.input_layernorm.weight.device', self.input_layernorm.weight.device, flush=True)
-        # print('qkvodevice', self.self_attn.q_proj.weight.device, self.self_attn.k_proj.weight.device, self.self_attn.v_proj.weight.device, self.self_attn.o_proj.weight.device, flush=True)
-        # print('mlpdevice', self.mlp.down_proj.weight.device, self.mlp.up_proj.weight.device, self.mlp.gate_proj.weight.device, flush=True)
-        # hidden_states = hidden_states.to(self.input_layernorm.weight.device)
-        # print('hiddenstatedeviceafter', hidden_states.device, flush=True)
+
 
         
         residual = hidden_states
@@ -1239,6 +1236,11 @@ class LlamaDecoderLayer(nn.Module):
 
        
         hidden_states = self.input_layernorm(hidden_states)
+
+        if self.check_asyncintra_for_attention():
+            input_layernorm_mlp_residual = self.input_layernorm(kwargs['last_layer_residual'])
+        else:
+            input_layernorm_mlp_residual = None
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -1247,32 +1249,33 @@ class LlamaDecoderLayer(nn.Module):
             output_attentions=output_attentions,
             use_cache=use_cache,
             # norm=residual,
-            respick=residual
+            respick=residual,
+            input_layernorm_mlp_residual=input_layernorm_mlp_residual
         )
         hidden_states = residual + hidden_states
+        if 'resinfo' in cfg['prune_method']:
+            self.attn_sign_match_percentage, self.attn_l2_magnitude_ratio, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+            print('self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
+            print('self.attn_l2_magnitude_ratio', self.attn_l2_magnitude_ratio, flush=True)
+            print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
+
+        if self.check_asyncintra_for_mlp():
+            post_layernorm_attn_residual = self.post_attention_layernorm(residual)
+        else:
+            post_layernorm_attn_residual = None
 
         residual = hidden_states
 
 
-        if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_mlp():
-            self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_mlp_inf_result['post_layernorm_attn_residual'])
-            print('self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
-            print('self.attn_l1_diff_percentage', self.attn_l1_diff_percentage, flush=True)
-            print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
-            
-
-       
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states, respick=residual)
-                
-    
+        hidden_states = self.mlp(hidden_states, respick=residual, post_layernorm_attn_residual=post_layernorm_attn_residual)
         hidden_states = residual + hidden_states
         
-        if 'resinfo' in cfg['prune_method'] and self.check_asyncintra_attention():
-            self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, probe_attn_inf_result['input_layernorm_mlp_residual'])
+        if 'resinfo' in cfg['prune_method']:
+            self.mlp_sign_match_percentage, self.mlp_l2_magnitude_ratio, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
             print('self.layer_order', self.layer_order, flush=True)
             print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
-            print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
+            print('self.mlp_l2_magnitude_ratio', self.mlp_l2_magnitude_ratio, flush=True)
             print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
 
@@ -1284,7 +1287,10 @@ class LlamaDecoderLayer(nn.Module):
         if use_cache:
             outputs += (present_key_value,)
 
-        return outputs
+        if 'asyncintra' in cfg['mode']:
+            return outputs, residual
+        else:
+            return outputs, None
 
 
 LLAMA_START_DOCSTRING = r"""
@@ -1496,7 +1502,7 @@ class LlamaModel(LlamaPreTrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
 
-
+        last_layer_residual = None
         # torch.cuda.nvtx.range_push("layer start".format(idx))
         for idx, decoder_layer in enumerate(self.layers):
             # hidden_states = hidden_states.to(decoder_layer.input_layernorm.weight.device)
@@ -1526,14 +1532,20 @@ class LlamaModel(LlamaPreTrainedModel):
                 # stop_event = torch.cuda.Event(enable_timing=True)
                 
                 # start_event.record()
-                layer_outputs = decoder_layer(
+                # if idx + 1 < len(self.layers) and self.layers[idx + 1].mlp.gate_proj.weight.device == self.layers[idx].mlp.gate_proj.weight.device:
+                #     next_layer = self.layers[idx + 1]
+                # else:
+                #     next_layer = None
+
+                layer_outputs, last_layer_residual = decoder_layer(
                     hidden_states,
                     attention_mask=attention_mask,
                     position_ids=position_ids,
                     past_key_value=past_key_value,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
-                    # next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) else None,
+                    # next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) and self.layers[idx + 1].mlp.gate_proj.weight.device == self.layers[idx].mlp.gate_proj.weight.device else None,
+                    last_layer_residual=last_layer_residual
                 )
 
                 # print('layer_outputs', idx, layer_outputs[0])

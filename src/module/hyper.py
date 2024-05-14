@@ -108,7 +108,7 @@ def process_control():
         else:
             float_value = None
     
-    cfg['resinfo_ratio'] = 0.1
+    cfg['resinfo_ratio'] = 1
     if 'resinfo' in cfg['prune_method']:
         match = re.search(r'resinfo(\d+(?:\.\d+)?)', cfg['prune_method'])
         if match:

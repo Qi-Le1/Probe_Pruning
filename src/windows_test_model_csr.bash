@@ -1,16 +1,4 @@
-bash csr0wikitext-2v1_llama-3-8b_clm_10_128_0.2_ppwandasp_probe-default_sync_c4-2000_0.1-0.1-0.1-0.1-0.1-bszrank_default.sh --wait
-sleep 20
-bash csr0wikitext-2v1_llama-2-7b_clm_10_128_0.2_ppwandasp_probe-default_sync_c4-2000_0.1-0.1-0.1-0.1-0.1-bszrank_default.sh --wait
-sleep 20
-bash csr0ptb_llama-3-8b_clm_10_128_0.2_ppwandasp_probe-default_sync_c4-2000_0.1-0.1-0.1-0.1-0.1-bszrank_default.sh --wait
-sleep 20
-bash csr0ptb_llama-2-7b_clm_10_128_0.2_ppwandasp_probe-default_sync_c4-2000_0.1-0.1-0.1-0.1-0.1-bszrank_default.sh --wait
-sleep 20
-bash csr1wikitext-2v1_llama-3-8b_clm_10_128_0.2_ppwandasp_probe-default_sync_c4-2000_0.1-0.1-0.1-0.1-0.1-bszrank_default.sh --wait
-sleep 20
-bash csr1wikitext-2v1_llama-2-7b_clm_10_128_0.2_ppwandasp_probe-default_sync_c4-2000_0.1-0.1-0.1-0.1-0.1-bszrank_default.sh --wait
-sleep 20
-bash csr1ptb_llama-3-8b_clm_10_128_0.2_ppwandasp_probe-default_sync_c4-2000_0.1-0.1-0.1-0.1-0.1-bszrank_default.sh --wait
-sleep 20
-bash csr1ptb_llama-2-7b_clm_10_128_0.2_ppwandasp_probe-default_sync_c4-2000_0.1-0.1-0.1-0.1-0.1-bszrank_default.sh --wait
-sleep 20
+bash csr0arc-c_llama-2-7b_csr_5_128_0.6_wandasp_probe-default-resinfo_sync_c4-20_0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank_default.sh
+bash csr0arc-c_llama-2-7b_csr_5_128_0.6_flap_probe-default-resinfo_sync_c4-20_0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank_default.sh
+bash csr1arc-c_llama-2-7b_csr_5_128_0.6_wandasp_probe-default-resinfo_sync_c4-20_0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank_default.sh
+bash csr1arc-c_llama-2-7b_csr_5_128_0.6_flap_probe-default-resinfo_sync_c4-20_0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank_default.sh

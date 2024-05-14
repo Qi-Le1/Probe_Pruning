@@ -410,7 +410,7 @@ class OPTAttention(nn.Module):
                         # if not, do full inference
                         if 'input_layernorm_mlp_residual' in kwargs:
                             _, _, _, _, _ = self.probe_process(kwargs['input_layernorm_mlp_residual'], key_value_states, past_key_value, attention_mask, layer_head_mask, output_attentions, **kwargs)
-                            return
+                            # return
                         else:
                             raise ValueError('Invalid input for asyncintra mode')
                     
@@ -799,7 +799,7 @@ class OPTDecoderLayer(nn.Module):
                     elif cfg['mode'] == 'asyncintra':
                         if 'post_layernorm_attn_residual' in kwargs:
                             _, _ = self.probe_process(kwargs['post_layernorm_attn_residual'], **kwargs)
-                            return
+                            # return
                         else:
                             raise ValueError('Invalid input for asyncintra mode')
                         
@@ -853,7 +853,7 @@ class OPTDecoderLayer(nn.Module):
                 hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states))) 
                 return hidden_states  
 
-    def check_asyncintra_mlp(self):
+    def check_asyncintra_for_mlp(self):
         if ('fc1_proj' in cfg['cust_tgt_modules'] or 'fc2_proj' in cfg['cust_tgt_modules']) \
             and self.layer_order > cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
@@ -862,13 +862,13 @@ class OPTDecoderLayer(nn.Module):
             return True
         return False
     
-    def check_asyncintra_attention(self):
+    def check_asyncintra_for_attention(self):
         if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'out_proj' in cfg['cust_tgt_modules']) \
-            and self.layer_order >= cfg['skip_layers'] \
+            and self.layer_order > cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
             and cfg['mode'] == 'asyncintra' \
-            and 'probe' in cfg['prune_method'] \
-            and self.layer_order != self.optconfig.num_hidden_layers - 1:
+            and 'probe' in cfg['prune_method']:
+            # and self.layer_order != self.optconfig.num_hidden_layers - 1:
             return True
         return False
 
@@ -1014,31 +1014,50 @@ class OPTDecoderLayer(nn.Module):
 
         residual = hidden_states
         hidden_states = self.self_attn_layer_norm(hidden_states)
-
+        if self.check_asyncintra_for_attention():
+            input_layernorm_mlp_residual = self.self_attn_layer_norm(kwargs['last_layer_residual'])
+        else:
+            input_layernorm_mlp_residual = None
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
             hidden_states=hidden_states,
             past_key_value=past_key_value,
             attention_mask=attention_mask,
             layer_head_mask=layer_head_mask,
             output_attentions=output_attentions,
-            respick=residual
+            respick=residual,
+            input_layernorm_mlp_residual=input_layernorm_mlp_residual
         )
         # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
-
+        if 'resinfo' in cfg['prune_method']:
+            self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+            print('self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
+            print('self.attn_l1_diff_percentage', self.attn_l1_diff_percentage, flush=True)
+            print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
 
         # Fully Connected
         # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
         residual = hidden_states
 
+        if self.check_asyncintra_for_mlp():
+            post_layernorm_attn_residual = self.final_layer_norm(residual)
+        else:
+            post_layernorm_attn_residual = None
+
         hidden_states = self.final_layer_norm(hidden_states)
 
 
-        hidden_states = self.mlp_layer(hidden_states, respick=residual)
+        hidden_states = self.mlp_layer(hidden_states, respick=residual, post_layernorm_attn_residual=post_layernorm_attn_residual)
 
         # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
 
+        if 'resinfo' in cfg['prune_method']:
+            self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+            print('self.layer_order', self.layer_order, flush=True)
+            print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
+            print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
+            print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
 
         outputs = (hidden_states,)
@@ -1049,7 +1068,10 @@ class OPTDecoderLayer(nn.Module):
         if use_cache:
             outputs += (present_key_value,)
 
-        return outputs
+        if 'asyncintra' in cfg['mode']:
+            return outputs, residual
+        else:
+            return outputs, None
 
 
 OPT_START_DOCSTRING = r"""
@@ -1331,7 +1353,7 @@ class OPTDecoder(OPTPreTrainedModel):
                         f"The `{mask_name}` should be specified for {len(self.layers)} layers, but it is for"
                         f" {head_mask.size()[0]}."
                     )
-
+        last_layer_residual = None
         for idx, decoder_layer in enumerate(self.layers):
             # add LayerDrop (see https://arxiv.org/abs/1909.11556 for description)
             if output_hidden_states:
@@ -1355,7 +1377,7 @@ class OPTDecoder(OPTPreTrainedModel):
                     use_cache,
                 )
             else:
-                layer_outputs = decoder_layer(
+                layer_outputs, last_layer_residual = decoder_layer(
                     hidden_states,
                     attention_mask=causal_attention_mask,
                     layer_head_mask=(head_mask[idx] if head_mask is not None else None),
@@ -1363,6 +1385,7 @@ class OPTDecoder(OPTPreTrainedModel):
                     output_attentions=output_attentions,
                     use_cache=use_cache,
                     # next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) else None,
+                    last_layer_residual=last_layer_residual
                 )
 
             hidden_states = layer_outputs[0]
