@@ -99,9 +99,17 @@ def llmpruner_load(model_type: str = 'pruneLLM', ckpt: str = '', lora_ckpt: str 
 
 
 def make_local_tuned_model(model_name):
+    
+
     if 'llama' in model_name:
         cfg['model_name_or_path'] = f'output/{model_name}'
         cfg['tokenizer_name_or_path'] = f'output/{model_name}'
+
+        if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
+            padding_side = "left"
+        else:
+            padding_side = "right"
+
         if 'llmpruner' in cfg['prune_method']:
             model_path = f"output/llmpruner/{cfg['init_seed']}_llmpruner_{model_name}_{cfg['prune_ratio']}/pytorch_model.bin"
             lora_path = f"output/llmpruner/{cfg['init_seed']}_llmpruner_{model_name}_{cfg['prune_ratio']}"
@@ -139,10 +147,7 @@ def make_local_tuned_model(model_name):
     else:
         raise ValueError('Not valid model name')
     
-    if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
-        padding_side = "left"
-    else:
-        padding_side = "right"
+    
 
     if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
         if cfg['max_seq_len'] > model.config.max_position_embeddings:

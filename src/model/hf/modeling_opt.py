@@ -398,6 +398,7 @@ class OPTAttention(nn.Module):
                 bsz, q_len, _ = hidden_states.size()
                 probe_qk_out_dim_indices, probe_vo_out_dim_indices = None, None
                 if 'probe' in cfg['prune_method']:
+                    print('yes')
                     qk_prune_way = cfg['qk_prune_way']
                     vo_prune_way = cfg['vo_prune_way']
                     if cfg['mode'] == 'sync':
@@ -414,6 +415,7 @@ class OPTAttention(nn.Module):
                         else:
                             raise ValueError('Invalid input for asyncintra mode')
                     
+                    print('attn probe done')
                     # --------------------------------------
                     is_cross_attention = key_value_states is not None
                     qk_prune_way = cfg['qk_prune_way']
@@ -897,7 +899,7 @@ class OPTDecoderLayer(nn.Module):
                 (see `past_key_values`).
             past_key_value (`Tuple(torch.FloatTensor)`, *optional*): cached past key and value projection states
         """
-
+        print('layerorder', self.layer_order, flush=True)
         # residual = hidden_states
         # if self.check_asyncintra_mlp():
         #     torch.cuda.synchronize(cfg['cuda_default_stream'])
@@ -1016,50 +1018,63 @@ class OPTDecoderLayer(nn.Module):
         hidden_states = self.self_attn_layer_norm(hidden_states)
         if self.check_asyncintra_for_attention():
             input_layernorm_mlp_residual = self.self_attn_layer_norm(kwargs['last_layer_residual'])
-        else:
-            input_layernorm_mlp_residual = None
-        hidden_states, self_attn_weights, present_key_value = self.self_attn(
+            hidden_states, self_attn_weights, present_key_value = self.self_attn(
             hidden_states=hidden_states,
             past_key_value=past_key_value,
             attention_mask=attention_mask,
             layer_head_mask=layer_head_mask,
             output_attentions=output_attentions,
-            respick=residual,
+            respick=kwargs['last_layer_residual'],
             input_layernorm_mlp_residual=input_layernorm_mlp_residual
         )
+        else:
+            input_layernorm_mlp_residual = None
+            hidden_states, self_attn_weights, present_key_value = self.self_attn(
+                hidden_states=hidden_states,
+                past_key_value=past_key_value,
+                attention_mask=attention_mask,
+                layer_head_mask=layer_head_mask,
+                output_attentions=output_attentions,
+                respick=residual
+            )
         # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
         if 'resinfo' in cfg['prune_method']:
-            self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+            self.attn_sign_match_percentage, self.attn_l2_magnitude_ratio, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
             print('self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
-            print('self.attn_l1_diff_percentage', self.attn_l1_diff_percentage, flush=True)
+            print('self.attn_l2_magnitude_ratio', self.attn_l2_magnitude_ratio, flush=True)
             print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
-
+        print('attn done')
         # Fully Connected
         # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
-        residual = hidden_states
-
         if self.check_asyncintra_for_mlp():
             post_layernorm_attn_residual = self.final_layer_norm(residual)
+            respick = residual
         else:
             post_layernorm_attn_residual = None
 
+        residual = hidden_states
+
+        
+
         hidden_states = self.final_layer_norm(hidden_states)
 
-
-        hidden_states = self.mlp_layer(hidden_states, respick=residual, post_layernorm_attn_residual=post_layernorm_attn_residual)
+        if self.check_asyncintra_for_mlp():
+            hidden_states = self.mlp_layer(hidden_states, respick=respick, post_layernorm_attn_residual=post_layernorm_attn_residual)
+        else:
+            hidden_states = self.mlp_layer(hidden_states, respick=residual)
 
         # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
 
         if 'resinfo' in cfg['prune_method']:
-            self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+            self.mlp_sign_match_percentage, self.mlp_l2_magnitude_ratio, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
             print('self.layer_order', self.layer_order, flush=True)
             print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
-            print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
+            print('self.mlp_l2_magnitude_ratio', self.mlp_l2_magnitude_ratio, flush=True)
             print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
-
+        print('mlp done')
         outputs = (hidden_states,)
 
         if output_attentions:

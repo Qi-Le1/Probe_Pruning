@@ -1239,9 +1239,7 @@ class LlamaDecoderLayer(nn.Module):
 
         if self.check_asyncintra_for_attention():
             input_layernorm_mlp_residual = self.input_layernorm(kwargs['last_layer_residual'])
-        else:
-            input_layernorm_mlp_residual = None
-        hidden_states, self_attn_weights, present_key_value = self.self_attn(
+            hidden_states, self_attn_weights, present_key_value = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -1249,9 +1247,21 @@ class LlamaDecoderLayer(nn.Module):
             output_attentions=output_attentions,
             use_cache=use_cache,
             # norm=residual,
-            respick=residual,
+            respick=kwargs['last_layer_residual'],
             input_layernorm_mlp_residual=input_layernorm_mlp_residual
         )
+        else:
+            input_layernorm_mlp_residual = None
+            hidden_states, self_attn_weights, present_key_value = self.self_attn(
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_value,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+                # norm=residual,
+                respick=residual,
+            )
         hidden_states = residual + hidden_states
         if 'resinfo' in cfg['prune_method']:
             self.attn_sign_match_percentage, self.attn_l2_magnitude_ratio, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
@@ -1261,6 +1271,7 @@ class LlamaDecoderLayer(nn.Module):
 
         if self.check_asyncintra_for_mlp():
             post_layernorm_attn_residual = self.post_attention_layernorm(residual)
+            respick = residual
         else:
             post_layernorm_attn_residual = None
 
@@ -1268,7 +1279,10 @@ class LlamaDecoderLayer(nn.Module):
 
 
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states, respick=residual, post_layernorm_attn_residual=post_layernorm_attn_residual)
+        if self.check_asyncintra_for_mlp():
+            hidden_states = self.mlp(hidden_states, respick=respick, post_layernorm_attn_residual=post_layernorm_attn_residual)
+        else:
+            hidden_states = self.mlp(hidden_states, respick=residual)
         hidden_states = residual + hidden_states
         
         if 'resinfo' in cfg['prune_method']:
