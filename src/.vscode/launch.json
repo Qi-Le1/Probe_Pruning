@@ -139,6 +139,21 @@
                 "1"
             ],
         },
+
+        {
+            "name": "llmpruner",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--file",
+                "llmpruner",
+                "--num_experiments",
+                "3"
+            ],
+        },
     ]
 }
 

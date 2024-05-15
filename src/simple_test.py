@@ -51,55 +51,116 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from LLMPruner.peft import PeftModel
 
-def load(model_type: str = 'pruneLLM', base_model: str = 'llama2-7b', ckpt: str = '', lora_ckpt: str = ''):
-    if model_type == 'pruneLLM':
-        pruned_dict = torch.load(ckpt, map_location='cpu')
-        tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
-    elif model_type == 'tune_prune_LLM':
-        pruned_dict = torch.load(ckpt, map_location='cpu')
-        tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
-        model = PeftModel.from_pretrained(
-            model,
-            lora_ckpt,
-            torch_dtype=torch.float16,
-        )
-    else:
-        raise NotImplementedError
+# def load(model_type: str = 'pruneLLM', base_model: str = 'llama2-7b', ckpt: str = '', lora_ckpt: str = ''):
+#     if model_type == 'pruneLLM':
+#         pruned_dict = torch.load(ckpt, map_location='cpu')
+#         tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
+#     elif model_type == 'tune_prune_LLM':
+#         pruned_dict = torch.load(ckpt, map_location='cpu')
+#         tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
+#         model = PeftModel.from_pretrained(
+#             model,
+#             lora_ckpt,
+#             torch_dtype=torch.float16,
+#         )
+#     else:
+#         raise NotImplementedError
 
-    if torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device = "cpu"
+#     if torch.cuda.is_available():
+#         device = "cuda"
+#     else:
+#         device = "cpu"
 
-    if device == "cuda":
-        model.half()
-        model = model.cuda()
+#     if device == "cuda":
+#         model.half()
+#         model = model.cuda()
 
-    # unwind broken decapoda-research config
-    model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
-    model.config.bos_token_id = 1
-    model.config.eos_token_id = 2
-    return model, tokenizer
+#     # unwind broken decapoda-research config
+#     model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
+#     model.config.bos_token_id = 1
+#     model.config.eos_token_id = 2
+#     return model, tokenizer
 
-base_model = 'pytorch_model.bin'
-for i in ['results/seed0', 'results/seed1']:
-    for j in ['llmpruner_prune_tune_block_param1_3_31_0.23_0.2_c4',
-                'llmpruner_prune_tune_block_param1_3_31_0.46_0.4_c4',
-                'llmpruner_prune_tune_block_param1_3_31_0.68_0.6_c4']:
-        model, tokenizer = load("pruneLLM", ckpt=i + '/' + j + '/' + base_model)
-        model.eval()
-        # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
-        # print(f"pruneLLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
-        # del model
+# base_model = 'pytorch_model.bin'
+# for i in ['results/seed0', 'results/seed1']:
+#     for j in ['llmpruner_prune_tune_block_param1_3_31_0.23_0.2_c4',
+#                 'llmpruner_prune_tune_block_param1_3_31_0.46_0.4_c4',
+#                 'llmpruner_prune_tune_block_param1_3_31_0.68_0.6_c4']:
+#         model, tokenizer = load("pruneLLM", ckpt=i + '/' + j + '/' + base_model)
+#         model.eval()
+#         # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
+#         # print(f"pruneLLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
+#         # del model
 
-        # model, tokenizer = load("tune_prune_LLM", ckpt=i + '/' + j + '/' + base_model, lora_ckpt=i + '/' + j)
-        # model.eval()
-        # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
-        # print(f"tune_prune_LLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
-        # del model
+#         # model, tokenizer = load("tune_prune_LLM", ckpt=i + '/' + j + '/' + base_model, lora_ckpt=i + '/' + j)
+#         # model.eval()
+#         # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
+#         # print(f"tune_prune_LLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
+#         # del model
+import numpy as np
+data_latest = [
+    [68.4, 77.7, 74.3, 67.8, 41.8, 66.9, 41.3],
+    [71.1, 78.6, 74.7, 66.3, 42.9, 69.0, 43.1],
+    [65.9, 76.0, 69.4, 63.8, 36.5, 62.4, 40.3],
+    [65.3, 77.2, 69.3, 58.4, 38.1, 64.9, 40.3],
+    [62.8, 71.1, 55.3, 58.6, 31.4, 53.4, 34.8],
+    [60.8, 71.4, 42.2, 51.8, 29.9, 49.8, 36.4],
+    [67.7, 75.4, 69.1, 62.7, 38.3, 64.1, 41.0],
+    [65.0, 76.4, 68.4, 59.3, 39.0, 64.8, 40.6],
+    [62.5, 70.8, 55.6, 58.5, 33.2, 54.6, 36.2],
+    [62.0, 72.6, 43.7, 51.0, 29.9, 52.3, 38.5],
+    [60.6, 70.3, 50.7, 53.8, 30.1, 52.8, 35.9],
+    [62.0, 70.8, 42.8, 51.0, 29.0, 51.2, 36.9]
+]
+
+# Calculate the average for each row using numpy for precision
+averages_latest = np.mean(data_latest, axis=1)
+print(averages_latest)
+
+# data = [
+#     [65.3, 77.2, 74.1, 67.1, 41.1, 63.9, 41.8],
+#     [68.7, 77.7, 73.7, 64.2, 41.3, 67.7, 41.3],
+#     [67.3, 76.6, 73.0, 67.4, 40.6, 63.1, 42.0],
+#     [69.9, 77.2, 72.2, 65.3, 41.3, 67.9, 40.0],
+#     [69.0, 78.1, 73.5, 66.7, 42.8, 68.5, 40.9],
+#     [62.5, 72.5, 63.3, 56.9, 33.4, 54.4, 40.8],
+#     [61.4, 74.6, 63.9, 54.9, 36.1, 58.0, 40.1],
+#     [63.5, 71.7, 63.3, 59.8, 33.8, 52.5, 40.0],
+#     [58.3, 72.5, 62.7, 55.0, 34.8, 56.9, 36.1],
+#     [62.7, 74.9, 63.6, 57.5, 35.5, 61.7, 40.3],
+#     [61.9, 61.7, 38.4, 51.5, 27.2, 36.0, 30.7],
+#     [60.0, 66.9, 40.5, 51.0, 26.7, 41.4, 35.4],
+#     [50.9, 63.8, 44.3, 52.1, 26.7, 38.1, 30.8],
+#     [55.7, 65.1, 36.4, 50.9, 26.8, 41.0, 30.0],
+#     [61.6, 66.9, 36.7, 52.2, 27.0, 46.2, 33.9]
+# ]
+
+# # Calculate the average for each row
+# averages = [sum(row) / len(row) for row in data]
+# print(averages)
 
 
+# data_new = [
+#     [66.0, 75.4, 63.0, 64.8, 33.7, 48.2, 35.0],
+#     [66.8, 75.3, 65.3, 65.6, 33.5, 51.9, 36.5],
+#     [68.1, 75.1, 62.5, 62.6, 31.8, 49.5, 34.5],
+#     [66.8, 75.2, 65.3, 66.1, 33.9, 50.5, 35.7],
+#     [67.4, 75.5, 65.7, 64.9, 33.8, 51.6, 36.5],
+#     [63.7, 71.8, 53.2, 57.6, 29.6, 43.3, 34.3],
+#     [60.7, 74.5, 58.2, 57.8, 33.1, 49.7, 35.4],
+#     [62.7, 72.4, 53.3, 58.3, 29.4, 45.2, 34.1],
+#     [57.9, 74.4, 58.1, 57.9, 32.2, 49.6, 33.5],
+#     [61.1, 74.3, 58.7, 59.3, 33.6, 49.7, 35.3],
+#     [42.3, 63.6, 32.5, 49.7, 23.0, 35.5, 29.5],
+#     [47.5, 70.6, 39.3, 51.4, 26.8, 45.4, 32.4],
+#     [56.9, 63.5, 35.3, 51.1, 25.5, 34.8, 30.3],
+#     [47.4, 66.8, 35.8, 51.2, 24.6, 41.7, 30.1],
+#     [48.0, 71.4, 42.2, 51.0, 27.1, 45.8, 32.5]
+# ]
 
+# # Calculate the average for each row
+# averages_new = [sum(row) / len(row) for row in data_new]
+# print(averages_new)
 # Data setup
 # Generate arrays of pruning ratios from 0.1 to 1.0, incrementing by 0.1
 # mlp_prune_ratio = np.arange(0.1, 1.1, 0.1)
@@ -140,46 +201,46 @@ for i in ['results/seed0', 'results/seed1']:
 
 
 
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 
-# Data setup
-mlp_prune_ratio = np.arange(0.1, 1.1, 0.1)
-attention_prune_ratio = np.arange(0.1, 1.1, 0.1)
+# # Data setup
+# mlp_prune_ratio = np.arange(0.1, 1.1, 0.1)
+# attention_prune_ratio = np.arange(0.1, 1.1, 0.1)
 
-# Weights
-mlp_weight = 0.7
-attention_weight = 0.3
+# # Weights
+# mlp_weight = 0.7
+# attention_weight = 0.3
 
-# Calculate the total pruning ratio
-total_pruning_ratio = np.empty((10, 10))
-for i in range(len(mlp_prune_ratio)):
-    for j in range(len(attention_prune_ratio)):
-        total_pruning_ratio[i, j] = mlp_weight * mlp_prune_ratio[i] + attention_weight * attention_prune_ratio[j]
+# # Calculate the total pruning ratio
+# total_pruning_ratio = np.empty((10, 10))
+# for i in range(len(mlp_prune_ratio)):
+#     for j in range(len(attention_prune_ratio)):
+#         total_pruning_ratio[i, j] = mlp_weight * mlp_prune_ratio[i] + attention_weight * attention_prune_ratio[j]
 
-# Generating perplexity for demonstration
-perplexity = 100 / total_pruning_ratio
+# # Generating perplexity for demonstration
+# perplexity = 100 / total_pruning_ratio
 
-# Creating the heatmap
-plt.figure(figsize=(10, 8))
-ax = sns.heatmap(total_pruning_ratio, annot=perplexity, fmt=".1f", cmap="Reds", 
-                 xticklabels=np.round(mlp_prune_ratio,1), yticklabels=np.round(attention_prune_ratio,1))
+# # Creating the heatmap
+# plt.figure(figsize=(10, 8))
+# ax = sns.heatmap(total_pruning_ratio, annot=perplexity, fmt=".1f", cmap="Reds", 
+#                  xticklabels=np.round(mlp_prune_ratio,1), yticklabels=np.round(attention_prune_ratio,1))
 
-# Adjust the x and y axis to range from 0 to 1
-ax.set_xticklabels(np.round(mlp_prune_ratio,1))
-ax.set_yticklabels(np.round(attention_prune_ratio[::-1],1))  # Reverse the yticklabels for inversion
+# # Adjust the x and y axis to range from 0 to 1
+# ax.set_xticklabels(np.round(mlp_prune_ratio,1))
+# ax.set_yticklabels(np.round(attention_prune_ratio[::-1],1))  # Reverse the yticklabels for inversion
 
-ax.set_xlabel('MLP Prune Ratio')
-ax.set_ylabel('Attention Prune Ratio')
-ax.set_title('Total Pruning Ratio with Perplexity Annotations')
+# ax.set_xlabel('MLP Prune Ratio')
+# ax.set_ylabel('Attention Prune Ratio')
+# ax.set_title('Total Pruning Ratio with Perplexity Annotations')
 
-# Invert the y-axis to have 1 at the top
-ax.invert_yaxis()
+# # Invert the y-axis to have 1 at the top
+# ax.invert_yaxis()
 
-plt.show()
+# plt.show()
 
-plt.close('all')
+# plt.close('all')
 
 
 

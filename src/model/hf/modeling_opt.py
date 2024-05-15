@@ -168,10 +168,10 @@ class OPTAttention(nn.Module):
         self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_heads, self.num_heads
 
         # get query proj
-        query_states = self.q_proj(probe) * self.scaling
+        query_states = self.q_proj(probe, cal_attn_probe_out_dim_metric=True) * self.scaling
         # self_attention
-        key_states = self._shape(self.k_proj(probe), -1, bsz)
-        value_states = self._shape(self.v_proj(probe), -1, bsz)
+        key_states = self._shape(self.k_proj(probe, cal_attn_probe_out_dim_metric=True), -1, bsz)
+        value_states = self._shape(self.v_proj(probe, cal_attn_probe_out_dim_metric=True), -1, bsz)
 
         if self.is_decoder:
             # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
@@ -856,7 +856,7 @@ class OPTDecoderLayer(nn.Module):
                 return hidden_states  
 
     def check_asyncintra_for_mlp(self):
-        if ('fc1_proj' in cfg['cust_tgt_modules'] or 'fc2_proj' in cfg['cust_tgt_modules']) \
+        if ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) \
             and self.layer_order > cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
             and cfg['mode'] == 'asyncintra' \

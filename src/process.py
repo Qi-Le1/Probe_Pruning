@@ -193,35 +193,35 @@ def make_control_list(file):
         # CIFAR10_controls_9 = make_controls(control_name)
         # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0'], 
-                         ['None'], ['dense'], ['None'], ['None'], ['None'],        
-                        ['None']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0'], 
+        #                  ['None'], ['dense'], ['None'], ['None'], ['None'],        
+        #                 ['None']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
-                         ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
-                        ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+        #                  ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+        #                 ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
-                         ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
-                        ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+        #                  ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+        #                 ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
-                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
-                        ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+        #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+        #                 ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
-                         ['ppwandasp'], ['probe'], ['sync'], ['None'], ['1-1-1-1-1-bszrank'],
-                        ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls( control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-3-8b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+        #                  ['ppwandasp'], ['probe'], ['sync'], ['None'], ['1-1-1-1-1-bszrank'],
+        #                 ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
 
     elif file == 'compare_metric':
         control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.6'], 
@@ -254,7 +254,8 @@ def make_control_list(file):
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0-0', '0-0.2', '0-0.4', '0-0.6', '0.2-0', '0.2-0.2', '0.2-0.4', '0.2-0.6', '0.4-0', '0.4-0.2', '0.4-0.4', '0.4-0.6', '0.6-0', '0.6-0.2', '0.6-0.4', '0.6-0.6'], 
+        # '0-0', '0.2-0.2','0.4-0.4','0.6-0.6'
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0-0.2', '0.2-0', '0-0.4', '0.4-0', '0-0.6', '0.6-0', '0.2-0.4', '0.4-0.2', '0.2-0.6',  '0.6-0.2',  '0.4-0.6',   '0.6-0.4', ], 
                           ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                          ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
@@ -272,9 +273,55 @@ def make_control_list(file):
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'resinfo':
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                             ['ppwandasp'], ['probe-default-resinfo0.7'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
-                            ['default']]]
+        # 'ppwandasp', 'wandasp'
+        control_name = [[['wikitext-2v1'], ['llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4', '0.6'], 
+                         ['ppwandasp'], [ 'calib-resinfo0.9'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # 'ppwandasp', 'wandasp'
+        control_name = [[['arc-c'], ['llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.4', '0.6'], 
+                         ['ppwandasp'], ['calib-resinfo0.9'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # 'ppwandasp', 'wandasp'
+        control_name = [[['wikitext-2v1'], ['llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4', '0.6'], 
+                         ['ppwandasp'], [ 'calib-resinfo1'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # 'ppwandasp', 'wandasp'
+        control_name = [[['arc-c'], ['llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.4', '0.6'], 
+                         ['ppwandasp'], ['calib-resinfo1'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'llmpruner':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                             ['None'], ['llmpruner-prune'], ['asyncinter'], ['None'], ['None'],
+                            ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                            ['None'], ['llmpruner-prune'], ['asyncinter'], ['None'], ['None'],
+                        ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                             ['None'], ['llmpruner-tune'], ['asyncinter'], ['None'], ['None'],
+                            ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                            ['None'], [ 'llmpruner-tune'], ['asyncinter'], ['None'], ['None'],
+                        ['None']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     return controls
@@ -413,6 +460,9 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
         if 'fullinf_FLOPs_ratio_for_all_layers' in metric_name:
             # delete probe flops
             processed_result['mean'] -= 0.015
+            decimal_places = 2
+        elif 'attn_sign_match_percentage' in metric_name or 'attn_l2_magnitude_ratio' in metric_name or 'attn_cosine_similarity' in metric_name\
+                        or 'mlp_sign_match_percentage' in metric_name or 'mlp_l2_magnitude_ratio' in metric_name or 'mlp_cosine_similarity' in metric_name:
             decimal_places = 2
         else:
             decimal_places = 1

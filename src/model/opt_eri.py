@@ -402,8 +402,8 @@ class Linear(nn.Linear, EriLayer):
             return self.async_interbatch_weight
         elif cfg['mode'] == 'asyncintra':    
             # sync now, now need
-            # while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
-            #     time.sleep(0.001)  # Sleep for 1 millisecond
+            while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
+                time.sleep(0.001)  # Sleep for 1 millisecond
             return self.async_intrabatch_weight
         
     def get_bias(self):        

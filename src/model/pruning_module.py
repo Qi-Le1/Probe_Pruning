@@ -356,7 +356,7 @@ class HiddenRepresentationPruning():
 
     def flap_ratio(self, model):
         
-        prune_ratio = self.adjust_prune_ratio(cfg['prune_ratio'][0], model.config)
+        prune_ratio = self.adjust_prune_ratio(cfg['prune_ratio'], model.config)
         attn_metric_list, mlp_metric_list = [], []
         standarlization = lambda x: (x - torch.mean(x, axis=1, keepdim=True)) / torch.std(x, axis=1, keepdim=True)
 
