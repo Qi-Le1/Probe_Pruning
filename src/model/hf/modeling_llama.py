@@ -389,7 +389,7 @@ class LlamaMLP(nn.Module):
                                 raise ValueError('Invalid input for asyncintra mode')
                             
                         if 'recorddiff' in cfg['prune_method']:
-                            out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                            out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
                             out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
 
                             tensor_A = probe_out_dim_indices.detach().view(-1).cpu().numpy()

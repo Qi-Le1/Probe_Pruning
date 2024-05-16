@@ -367,23 +367,109 @@ def make_control_list(file):
                             ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)        
-    elif file == 'probecompare':
-        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2','0.4', '0.6'], 
-        #                      ['ppwandasp'], ['calib', 'calib-ema'], ['asyncinter'], ['c4-2000'], ['None'],
-        #                     ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
+    elif file == 'calibvsnocalib':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2','0.4', '0.6'], 
+                             ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
 
-        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
-        #                      ['ppwandasp'], ['calib', 'calib-ema'], ['asyncinter'], ['c4-2000'], ['None'],
-        #                     ['default']]]
-        # CIFAR10_controls_9 = make_controls(control_name)
-        # controls.extend(CIFAR10_controls_9)
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                             ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
 
         control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2','0.4', '0.6'], 
-                         ['ppwandasp'], ['probe-respick'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', '0.15-0.15-0.15-0.15-0.15-seqrank',\
-                                                                                               '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.15-0.15-0.15-0.15-0.15-bszrank',\
-                                                                                               '0.2-0.2-0.2-0.2-0.2-bszrank'],
+                             ['ppwandasp'], ['calib-ema'], ['asyncinter'], ['c4-2000'], ['None'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                             ['ppwandasp'], ['calib-ema'], ['asyncinter'], ['c4-2000'], ['None'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2','0.4', '0.6'], 
+        #                  ['ppwandasp'], ['probe-respick'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', '0.15-0.15-0.15-0.15-0.15-seqrank',\
+        #                                                                                        '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank', '0.15-0.15-0.15-0.15-0.15-bszrank',\
+        #                                                                                        '0.2-0.2-0.2-0.2-0.2-bszrank'],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+    elif file == 'respickcompare':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                         ['ppwandasp'], ['probe-calib-ema'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                         ['ppwandasp'], ['probe-calib-ema'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                         ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'fixordynamic':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2','0.4', '0.6'], 
+                            ['ppwandasp'], ['probe-default-probefixratio0.5'], ['sync'], ['c4-2000'], 
+                            ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                             ['ppwandasp'], ['probe-default-probefixratio0.5'], ['sync'], ['c4-2000'], 
+                             ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2','0.4', '0.6'], 
+                            ['ppwandasp'], ['probe-default-probefixratio0.9'], ['sync'], ['c4-2000'], 
+                            ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                             ['ppwandasp'], ['probe-default-probefixratio0.9'], ['sync'], ['c4-2000'], 
+                             ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'channeldiff':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                             ['ppwandasp'], ['probe-default-recorddiff'], ['sync'], ['c4-2000'], 
+                    [ '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'probevsprobenocalib':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2','0.4', '0.6'], 
+                         ['ppwandasp'], ['probe-respick'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.2','0.4', '0.6'], 
+                         ['ppwandasp'], ['probe-respick'], ['sync'], ['c4-2000'], 
+                         ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
@@ -451,6 +537,11 @@ def extract_result(control, model_tag, processed_result_history):
                         processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
                 elif file == 'flapsquare':
                     if any(metric_name in k for metric_name in metric_name_list) or 'average_pruning_ratio' in k:
+                        if k not in processed_result_history:
+                            processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
+                        processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
+                elif file == 'channeldiff':
+                    if 'diff_ratio' in k:
                         if k not in processed_result_history:
                             processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
                         processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
@@ -530,7 +621,7 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
         if exp_name not in extracted_processed_result:
             extracted_processed_result[exp_name] = defaultdict()
         
-        if 'average_pruning_ratio' in metric_name:
+        if 'average_pruning_ratio' in metric_name or 'diff_ratio' in metric_name:
             decimal_places = 4
         elif 'fullinf_FLOPs_ratio_for_all_layers' in metric_name:
             # delete probe flops
@@ -585,7 +676,7 @@ def make_df_history(extracted_processed_result_history):
                 
                 if 'fullinf_FLOPs_ratio_for_all_layers' in k or 'probe_FLOPs_ratio_for_all_layers' in k or \
                     any(metric_name in k for metric_name in metric_name_list) or 'attn_sign_match_percentage' in k or 'attn_l2_magnitude_ratio' in k or 'attn_cosine_similarity' in k\
-                        or 'mlp_sign_match_percentage' in k or 'mlp_l2_magnitude_ratio' in k or 'mlp_cosine_similarity' in k or 'duration' in k or 'average_pruning_ratio' in k:
+                        or 'mlp_sign_match_percentage' in k or 'mlp_l2_magnitude_ratio' in k or 'mlp_cosine_similarity' in k or 'duration' in k or 'average_pruning_ratio' in k or 'diff_ratio' in k:
                     print('inxlsxk', k, extracted_processed_result_history[exp_name][k].reshape(1, -1))
                     if '_se' in k:
                         value = extracted_processed_result_history[exp_name][k].reshape(1, -1)
@@ -626,6 +717,9 @@ def make_vis(df_history):
              'dense': 'green',
              'llmpruner': 'blue',
              'llmprunerlora': 'brown',
+             'Pruning Ratio 0.2': 'purple',
+            'Pruning Ratio 0.4': 'red',
+            'Pruning Ratio 0.6': 'green',
              }
     linestyle = {
                 'probe': (5, (10, 3)),
@@ -633,7 +727,10 @@ def make_vis(df_history):
                 'wandasp': (10, (2, 5)),
                 'dense': '--',
                 'llmpruner': '-.',
-                'llmprunerlora': (0, (1, 1))
+                'llmprunerlora': (0, (1, 1)),
+                'Pruning Ratio 0.2': (5, (10, 3)),
+            'Pruning Ratio 0.4': (0, (3, 1, 1, 1)),
+            'Pruning Ratio 0.6': (10, (2, 5)),
                 }
     marker = {
                 'probe': 'D',
@@ -641,7 +738,10 @@ def make_vis(df_history):
                 'wandasp': 'H',
                 'dense': '--',
                 'llmpruner': 'x',
-                'llmprunerlora': '+'
+                'llmprunerlora': '+',
+                'Pruning Ratio 0.2': 'o',
+            'Pruning Ratio 0.4': 's',
+            'Pruning Ratio 0.6': 'p',
                 }
     # marker = {}
     # prune_ratios = [0, 0.001, 0.01, 0.03, 0.05, 0.06, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 9999]
@@ -696,7 +796,7 @@ def make_vis(df_history):
     # marker['Full model'] = '*'
     # linestyle['pqnobias-0.5-0.5'] = '-.'
     # linestyle['pqnobiasglobal-0.5-0.5'] = '-.'
-    loc_dict = {'test/Perplexity': 'lower left', 'label': 'center left', 'test/CsrAccuracy': 'lower left', 'test/CsrAccuracyNorm': 'lower left'}
+    loc_dict = {'test/Perplexity': 'lower left', 'label': 'upper right', 'test/CsrAccuracy': 'lower left', 'test/CsrAccuracyNorm': 'lower left'}
     fontsize = {'legend': 17, 'label': 17, 'ticks': 14, 'group_x_ticks': 8}
     metric_name_list = ['test/Loss', 'test/Perplexity', 'test/CsrAccuracyNorm', 'test/CsrAccuracy']
 
@@ -743,7 +843,8 @@ def make_vis(df_history):
         plt.ylabel(y_label, fontsize=fontsize['label'])
         plt.xticks(fontsize=fontsize['ticks'])
         plt.yticks(fontsize=fontsize['ticks'])
-        plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'], bbox_to_anchor=(1, 0.5))
+        plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'])
+        # plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'], bbox_to_anchor=(1, 0.5))
         return
     
     def draw_scatter_x_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy'):
@@ -823,6 +924,19 @@ def make_vis(df_history):
         plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'], bbox_to_anchor=(1, 0.5))
         return
     
+        
+    def find_layer_number(index):
+
+        layer_number = index.split('/')[1]
+
+        # Find all numbers in the string
+        layer_number = re.findall(r'\d+', layer_number)
+
+        # Join the number strings and convert to an integer
+        layer_number = int(''.join(layer_number)) if layer_number else None
+        return layer_number
+    
+
     
     for df_name in df_history:
         loss_performance_vs_total_FLOPs_ratio = [None, None, None]
@@ -872,7 +986,7 @@ def make_vis(df_history):
             for i in range(0, len(temp), 2):
                 cur_item = temp[i]
                 cur_se_item = temp[i+1]
-                for ((index, row), (index_std, row_std)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
+                for ((index, row), (index_std, row_se)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
                     # print('index before', index)
                     if 'mean' not in index:
                         continue
@@ -887,7 +1001,7 @@ def make_vis(df_history):
                     #         flops_metric_name = flops_metric_name.split('/')[1]
                     #         if loss_performance_vs_total_FLOPs_ratio[0] is None:
                     #             loss_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
-                    #             loss_performance_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                    #             loss_performance_vs_total_FLOPs_ratio[1] = row_se.tolist()[0]
                     #     elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
                     #         if loss_performance_vs_total_FLOPs_ratio[2] is None:
                     #             loss_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
@@ -914,7 +1028,7 @@ def make_vis(df_history):
                     #         flops_metric_name = flops_metric_name.split('/')[1]
                     #         if ppl_performance_vs_total_FLOPs_ratio[0] is None:
                     #             ppl_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
-                    #             ppl_performance_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                    #             ppl_performance_vs_total_FLOPs_ratio[1] = row_se.tolist()[0]
                     #     elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
                     #         if ppl_performance_vs_total_FLOPs_ratio[2] is None:
                     #             ppl_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
@@ -944,10 +1058,28 @@ def make_vis(df_history):
                         fig[fig_name] = plt.figure(fig_name)
                         x = prune_ratio
                         y = row.tolist()[0]
-                        yerr = row_std.tolist()[0]
+                        yerr = row_se.tolist()[0]
                         prune_ratio_list = prune_ratio.split('-')
                         key_for_dict = f"{prune_method}_{mode}_{prune_info}_{metric_name}"
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Prune Ratio', y_label=metric_name)
+
+                    
+                    if 'diff_ratio' in index:
+                        layer_number = find_layer_number(index)
+                        if 'attn' in index:
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
+            calib_info, prune_info, cust_tgt_modules, f'FIG:attn_diff_ratio'])
+                        elif 'mlp' in index:
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
+            calib_info, prune_info, cust_tgt_modules, f'FIG:mlp_diff_ratio'])
+                        
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = layer_number
+                        y = row.tolist()[0]
+                        yerr = row_se.tolist()[0]
+
+                        key_for_dict = f"Pruning Ratio {prune_ratio}"
+                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Different Channel Ratio')
                     
         
     for fig_name in fig_data_across_multi_indices:
@@ -962,6 +1094,8 @@ def make_vis(df_history):
 
             if 'Loss' in fig_name or 'Perplexity' in fig_name or 'CsrAccuracyNorm' in fig_name or 'CsrAccuracy' in fig_name:
                 # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, y_lim=performance_metric_max)
+                draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
+            if 'diff_ratio' in fig_name:
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
             # if 'all_methods_performance_vs_FLOPs_ratio_for_all_layers' in fig_name:
             #     draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
@@ -1183,7 +1317,7 @@ if __name__ == '__main__':
                     #         flops_metric_name = flops_metric_name.split('/')[1]
                     #         if performance_vs_prunedflops[0] is None:
                     #             performance_vs_prunedflops[0] = min(performance_metric_max, row.tolist()[0])
-                    #             performance_vs_prunedflops[1] = min(performance_metric_max, row_std.tolist()[0])
+                    #             performance_vs_prunedflops[1] = min(performance_metric_max, row_se.tolist()[0])
                     #     elif 'FLOPs_ratio_for_pruned_layers' in index or 'FLOPs_for_pruned_layers' in index:
                     #         if performance_vs_prunedflops[2] is None:
                     #             performance_vs_prunedflops[2] = row.tolist()[0]
@@ -1222,7 +1356,7 @@ if __name__ == '__main__':
                     #         flops_metric_name = flops_metric_name.split('/')[1]
                     #         if performance_vs_total_FLOPs_ratio[0] is None:
                     #             performance_vs_total_FLOPs_ratio[0] = min(performance_metric_max, row.tolist()[0])
-                    #             performance_vs_total_FLOPs_ratio[1] = min(performance_metric_max, row_std.tolist()[0])
+                    #             performance_vs_total_FLOPs_ratio[1] = min(performance_metric_max, row_se.tolist()[0])
                     #     elif 'FLOPs_ratio_for_all_layers' in index:
                     #         if performance_vs_total_FLOPs_ratio[2] is None:
                     #             performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
@@ -1268,7 +1402,7 @@ if __name__ == '__main__':
                     #         x = float(prune_ratio)
                             
                     #         y = min(performance_metric_max, row.tolist()[0])
-                    #         yerr = min(performance_metric_max, row_std.tolist()[0])
+                    #         yerr = min(performance_metric_max, row_se.tolist()[0])
                     #         # if 'pq' in prune_name and 'WIFV' in prune_metric:
                     #         #     prune_name += '-flap'
                     #         # elif 'O1WIFN' in prune_metric or 'O2WIFN' in prune_metric:
@@ -1303,7 +1437,7 @@ if __name__ == '__main__':
                     #     # cur_bsz_mean_intersection_ratio_order += 1
                         
                     #     y = row.tolist()
-                    #     yerr = row_std.tolist()
+                    #     yerr = row_se.tolist()
                     #     if 'position_distribution_1' in index:
                     #         print('\nposition_distribution_1', len(y), layer_number)
                     #     key_for_dict = prune_name
@@ -1316,7 +1450,7 @@ if __name__ == '__main__':
                     #     x = fullinf_vs_optimal_select_mean_intersection_ratio_order
                     #     # cur_bsz_mean_intersection_ratio_order += 1
                     #     y = row.tolist()[0]
-                    #     yerr = row_std.tolist()[0]
+                    #     yerr = row_se.tolist()[0]
                     #     key_for_dict = prune_name
                     #     record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
 
@@ -1326,7 +1460,7 @@ if __name__ == '__main__':
                     #     x = probe_vs_optimal_select_mean_intersection_ratio_order
                     #     # probe_mean_intersection_ratio += 1
                     #     y = row.tolist()[0]
-                    #     yerr = row_std.tolist()[0]
+                    #     yerr = row_se.tolist()[0]
                     #     # print(x,y)
                     #     key_for_dict = prune_name
                     #     record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
@@ -1337,7 +1471,7 @@ if __name__ == '__main__':
                     #     x = probe_vs_fullinf_select_mean_intersection_ratio_order
                     #     # probe_mean_intersection_ratio += 1
                     #     y = row.tolist()[0]
-                    #     yerr = row_std.tolist()[0]
+                    #     yerr = row_se.tolist()[0]
                     #     # print(x,y)
                     #     key_for_dict = prune_name
                     #     record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
@@ -1358,7 +1492,7 @@ if __name__ == '__main__':
                     #         probe_vs_fullinf_select_mean_intersection_ratio_order += 1
                     #         key_for_dict = f'probe_vs_fullinf_select_{prune_name}'
                     #     y = row.tolist()[0]
-                    #     yerr = row_std.tolist()[0]                        
+                    #     yerr = row_se.tolist()[0]                        
                     #     record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
 
                     # if 'fullinf_vs_optimal_prune_mean_intersection_ratio' in index:
@@ -1367,7 +1501,7 @@ if __name__ == '__main__':
                     #     x = fullinf_vs_optimal_prune_mean_intersection_ratio_order
                     #     # cur_bsz_mean_intersection_ratio_order += 1
                     #     y = row.tolist()[0]
-                    #     yerr = row_std.tolist()[0]
+                    #     yerr = row_se.tolist()[0]
                     #     key_for_dict = prune_name
                     #     record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
 
@@ -1377,7 +1511,7 @@ if __name__ == '__main__':
                     #     x = probe_vs_optimal_prune_mean_intersection_ratio_order
                     #     # probe_mean_intersection_ratio += 1
                     #     y = row.tolist()[0]
-                    #     yerr = row_std.tolist()[0]
+                    #     yerr = row_se.tolist()[0]
                     #     # print(x,y)
                     #     key_for_dict = prune_name
                     #     record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
@@ -1388,7 +1522,7 @@ if __name__ == '__main__':
                     #     x = probe_vs_fullinf_prune_mean_intersection_ratio_order
                     #     # probe_mean_intersection_ratio += 1
                     #     y = row.tolist()[0]
-                    #     yerr = row_std.tolist()[0]
+                    #     yerr = row_se.tolist()[0]
                     #     # print(x,y)
                     #     key_for_dict = prune_name
                     #     record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
@@ -1409,13 +1543,13 @@ if __name__ == '__main__':
                     #         probe_vs_fullinf_prune_mean_intersection_ratio_order += 1
                     #         key_for_dict = f'probe_vs_fullinf_prune_{prune_name}'
                     #     y = row.tolist()[0]
-                    #     yerr = row_std.tolist()[0]                        
+                    #     yerr = row_se.tolist()[0]                        
                     #     record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer order', y_label='Ratio')
 
                     # if 'dense_duration_per_sample' or 'FLOPs_ratio_for_all_layers' in index:
                     #     if 'dense_duration_per_sample' in index:
                     #         dense_time_vs_total_FLOPs_ratio[0] = row.tolist()[0]
-                    #         dense_time_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                    #         dense_time_vs_total_FLOPs_ratio[1] = row_se.tolist()[0]
                     #     elif 'FLOPs_ratio_for_all_layers' in index:
                     #         dense_time_vs_total_FLOPs_ratio[2] = row.tolist()[0]
                         
@@ -1434,7 +1568,7 @@ if __name__ == '__main__':
                     # if 'pruned_duration_per_sample' in index or 'FLOPs_ratio_for_all_layers' in index:
                     #     if 'pruned_duration_per_sample' in index:
                     #         prune_time_vs_total_FLOPs_ratio[0] = row.tolist()[0]
-                    #         prune_time_vs_total_FLOPs_ratio[1] = row_std.tolist()[0]
+                    #         prune_time_vs_total_FLOPs_ratio[1] = row_se.tolist()[0]
                     #     elif 'FLOPs_ratio_for_all_layers' in index:
                     #         prune_time_vs_total_FLOPs_ratio[2] = row.tolist()[0]
                         
