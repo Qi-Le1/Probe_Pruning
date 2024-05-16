@@ -242,7 +242,7 @@ class HiddenRepresentationPruning():
         calib = calib.to(weight.device)
         calib = calib.to(torch.float32)
         sorted_calib, _ = torch.sort(calib)
-        print('sorted_calib', sorted_calib)
+        # print('sorted_calib', sorted_calib)
         weight = weight.to(torch.float32)
         if 'ppwandasp' in metric_type:
             calib = torch.sum(calib, dim=0)
@@ -257,7 +257,7 @@ class HiddenRepresentationPruning():
         sorted_values, sorted_indices = torch.sort(probe_out_dim_metric)
 
         # Print sorted tensor
-        print("Sorted tensor:", sorted_values)
+        # print("Sorted tensor:", sorted_values)
         return probe_out_dim_metric
 
     def cal_mlp_calib_prune_metric(self, calib, weight, metric_type):
@@ -265,7 +265,7 @@ class HiddenRepresentationPruning():
         calib = calib.to(torch.float32)
 
         sorted_calib, _ = torch.sort(calib)
-        print('sorted_calib', sorted_calib)
+        # print('sorted_calib', sorted_calib)
         weight = weight.to(torch.float32)
         # if 'ppwandasp' in metric_type:
         #     calib = torch.sum(calib, dim=0).clamp(max=cfg['data_type_max'])
@@ -290,7 +290,7 @@ class HiddenRepresentationPruning():
         sorted_values, sorted_indices = torch.sort(probe_out_dim_metric)
 
         # Print sorted tensor
-        print("Sorted tensor:", sorted_values)
+        # print("Sorted tensor:", sorted_values)
         return probe_out_dim_metric
     
     def sort_attn_metric(self, probe_out_dim_metric, num_heads, head_dim, prune_way, prune_module, multiple, pruning_ratio=None):

@@ -399,20 +399,20 @@ class LlamaMLP(nn.Module):
                         if cfg['mode'] == 'asyncinter':
                             down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
-                            with torch.cuda.stream(cfg['cuda_stream1']):
-                                if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
-                                    out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
+                            # with torch.cuda.stream(cfg['cuda_stream1']):
+                            if torch.all(self.down_proj.get_global_metric_score_distribution() == 0):
+                                out_dim_indices = torch.arange(self.intermediate_size, dtype=torch.long).to(device=x.device)
+                            else:
+                                out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+
+                                if 'flapratio' in cfg['prune_method']:
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
                                 else:
-                                    out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                                    out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
 
-                                    if 'flapratio' in cfg['prune_method']:
-                                        out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'], pruning_ratio=self.down_proj.pruning_ratio)
-                                    else:
-                                        out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
-
-                                self.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
-                                self.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
-                                self.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
+                            self.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
+                            self.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
+                            self.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
                         else:
                             raise ValueError('Invalid mode')
                         return down_proj
@@ -920,29 +920,29 @@ class LlamaAttention(nn.Module):
                         attn_weights = None                      
                     
                     if cfg['mode'] == 'asyncinter':
-                        with torch.cuda.stream(cfg['cuda_stream1']):
-                            if torch.all(self.o_proj.get_global_metric_score_distribution() == 0):
-                                vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                        # with torch.cuda.stream(cfg['cuda_stream1']):
+                        if torch.all(self.o_proj.get_global_metric_score_distribution() == 0):
+                            vo_out_dim_indices = torch.arange(self.hidden_size, dtype=torch.long).to(device=hidden_states.device)
+                        else:
+                            out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
+                            if 'flapratio' in cfg['prune_method']:
+                                vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
                             else:
-                                out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
-                                if 'flapratio' in cfg['prune_method']:
-                                    vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.o_proj.pruning_ratio)
-                                else:
-                                    vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+                                vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
 
-                            if self.is_GQA():
-                                self.q_num_heads = self.remain_num_heads
-                                qk_out_dim_indices = vo_out_dim_indices
-                            else:
-                                self.q_num_heads, self.k_num_heads, self.v_num_heads = self.remain_num_heads, self.remain_num_heads, self.remain_num_heads
-                                qk_out_dim_indices = vo_out_dim_indices
-                                    
-                            self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
-                            self.o_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
-                            # MHA, for GQA, skip prune for simplicity
-                            if not self.is_GQA():
-                                self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
-                                self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
+                        if self.is_GQA():
+                            self.q_num_heads = self.remain_num_heads
+                            qk_out_dim_indices = vo_out_dim_indices
+                        else:
+                            self.q_num_heads, self.k_num_heads, self.v_num_heads = self.remain_num_heads, self.remain_num_heads, self.remain_num_heads
+                            qk_out_dim_indices = vo_out_dim_indices
+                                
+                        self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
+                        self.o_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
+                        # MHA, for GQA, skip prune for simplicity
+                        if not self.is_GQA():
+                            self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
+                            self.v_proj.prepare_async_weight(out_dim_indices=vo_out_dim_indices)
                     else:
                         raise ValueError('please use asyncinter for calib+ema')
                     return attn_output, attn_weights, past_key_value

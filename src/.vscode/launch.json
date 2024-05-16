@@ -201,7 +201,7 @@
         },
 
         {
-            "name": "calibvscalibema",
+            "name": "probecompare",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
@@ -209,7 +209,7 @@
             "justMyCode": true,
             "args": [
                 "--file",
-                "calibvscalibema",
+                "probecompare",
                 "--num_experiments",
                 "3"
             ],
