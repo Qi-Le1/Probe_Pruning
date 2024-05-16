@@ -354,7 +354,7 @@ class HiddenRepresentationPruning():
 
 
 
-    def flap_ratio(self, model):
+    def flap_ratio(self, model, logger=None):
         
         prune_ratio = self.adjust_prune_ratio(cfg['prune_ratio'], model.config)
         attn_metric_list, mlp_metric_list = [], []
@@ -381,6 +381,8 @@ class HiddenRepresentationPruning():
                     # flap code: W_metric = metrics[args.metrics](wrapped_layers, subset, name) ** 2
                     # we dont put the manually added square (only added for attn) here since it is unreasonable
                     metric = self.cal_attn_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
+                    if 'square' in cfg['prune_method']:
+                        metric = metric ** 2
                     attn_metric_list.append(metric.to('cpu'))
                 elif 'down_proj' in name:
                     metric = self.cal_mlp_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
@@ -431,6 +433,10 @@ class HiddenRepresentationPruning():
 
             print("Threshold:", threshold.item())
 
+            attention_ratio = 0
+            attention_counter = 0
+            mlp_ratio = 0
+            mlp_counter = 0
             for name, module in model.named_modules():
                 if 'down_proj' not in name and 'o_proj' not in name:
                     continue
@@ -447,6 +453,8 @@ class HiddenRepresentationPruning():
                     # flap code: W_metric = metrics[args.metrics](wrapped_layers, subset, name) ** 2
                     # we dont put the manually added square (only added for attn) here since it is unreasonable
                     metric = self.cal_attn_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric']).reshape(1, -1)
+                    if 'square' in cfg['prune_method']:
+                        metric = metric ** 2
                     metric = standarlization(metric)
                     metric = metric.reshape(-1, 128).mean(dim=1)
                 elif 'down_proj' in name:
@@ -455,7 +463,16 @@ class HiddenRepresentationPruning():
 
                 threshold = threshold.to(metric.device)
                 module.pruning_ratio = metric[metric <= threshold].numel() / metric.numel()
+                if 'o_proj' in name:
+                    attention_ratio += module.pruning_ratio
+                    attention_counter += 1
+                elif 'down_proj' in name:
+                    mlp_ratio += module.pruning_ratio
+                    mlp_counter += 1
                 print('name', name, 'module.pruning_ratio', module.pruning_ratio)
+            
+            logger.append({f'flap_attention_average_pruning_ratio': attention_ratio/(attention_counter+1e-4)}, 'test')
+            logger.append({f'flap_mlp_average_pruning_ratio': mlp_ratio/(mlp_counter+1e-4)}, 'test')
         elif 'opt' in cfg['model_name']:
             for name, module in model.named_modules():   
                 if 'fc2' not in name and 'out_proj' not in name:
@@ -477,6 +494,8 @@ class HiddenRepresentationPruning():
                     # flap code: W_metric = metrics[args.metrics](wrapped_layers, subset, name) ** 2
                     # we dont put the manually added square (only added for attn) here since it is unreasonable
                     metric = self.cal_attn_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
+                    if 'square' in cfg['prune_method']:
+                        metric = metric ** 2
                     attn_metric_list.append(metric.to('cpu'))
                 elif 'fc2' in name:
                     metric = self.cal_mlp_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric'])
@@ -542,6 +561,8 @@ class HiddenRepresentationPruning():
                     # flap code: W_metric = metrics[args.metrics](wrapped_layers, subset, name) ** 2
                     # we dont put the manually added square (only added for attn) here since it is unreasonable
                     metric = self.cal_attn_calib_prune_metric(module.get_global_metric_score_distribution(), module.weight.data, cfg['prune_metric']).reshape(1, -1)
+                    if 'square' in cfg['prune_method']:
+                        metric = metric ** 2
                     metric = standarlization(metric)
                     metric = metric.reshape(-1, 128).mean(dim=1)
                 elif 'fc2' in name:

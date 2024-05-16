@@ -89,6 +89,10 @@ class CsrAccuracy:
         label_length_per_sample = torch.sum(shift_labels != -100, dim=1)
 
         loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+        
+        shift_labels = shift_labels.to(shift_logits.device)
+        print('shift_logitsdevice', shift_logits.device)
+        print('shift_labelsdevice', shift_labels.device)
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         loss = loss.view(bsz, -1)
         loss_per_sample = loss.sum(dim=1)
@@ -132,6 +136,7 @@ class CsrAccuracyNorm:
         label_length_per_sample = torch.sum(shift_labels != -100, dim=1)
 
         loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+        shift_labels = shift_labels.to(shift_logits.device)
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         loss = loss.view(bsz, -1)
         loss_per_sample = loss.sum(dim=1)

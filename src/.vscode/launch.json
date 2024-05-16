@@ -154,6 +154,66 @@
                 "3"
             ],
         },
+
+        {
+            "name": "inferencespeed",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--file",
+                "inferencespeed",
+                "--num_experiments",
+                "3"
+            ],
+        },
+
+        {
+            "name": "asyncintra",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--file",
+                "asyncintra",
+                "--num_experiments",
+                "3"
+            ],
+        },
+
+        {
+            "name": "flapsquare",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--file",
+                "flapsquare",
+                "--num_experiments",
+                "3"
+            ],
+        },
+
+        {
+            "name": "calibvscalibema",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/process.py",
+            "justMyCode": true,
+            "args": [
+                "--file",
+                "calibvscalibema",
+                "--num_experiments",
+                "3"
+            ],
+        }
     ]
 }
 

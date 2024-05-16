@@ -57,6 +57,7 @@ def runExperiment():
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])
     model = make_prune_model(model)
+    test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
     if 'calib' in cfg['prune_method']:
         print('Running Calibration ...', flush=True)
         cfg['calibration_stage'] = True
@@ -69,11 +70,11 @@ def runExperiment():
         if 'flapratio' in cfg['prune_method']:
             from model import HiddenRepresentationPruning
             pruning_module = HiddenRepresentationPruning(cfg, 'flapratio')
-            pruning_module.flap_ratio(model)
+            pruning_module.flap_ratio(model, test_logger)
         cfg['calibration_stage'] = False
         print('Calibration Done...', flush=True)
     model_prof = FlopsProfiler(model)
-    test_logger = make_logger(os.path.join('output', 'runs', 'test_{}'.format(cfg['model_tag'])))
+    
     inference_duration = test(data_loader['test'], model, model_prof, metric, test_logger)
     pruned_info_list = get_model_profile('pruned', model_prof)
     onlyprobe_info_list = None
