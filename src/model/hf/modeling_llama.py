@@ -20,6 +20,7 @@
 """ PyTorch LLaMA model."""
 import math
 import time
+import numpy as np
 import warnings
 from typing import List, Optional, Tuple, Union
 
@@ -387,6 +388,15 @@ class LlamaMLP(nn.Module):
                             else:
                                 raise ValueError('Invalid input for asyncintra mode')
                             
+                        if 'recorddiff' in cfg['prune_method']:
+                            out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
+                            out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
+
+                            tensor_A = probe_out_dim_indices.detach().view(-1).cpu().numpy()
+                            tensor_B = out_dim_indices.detach().view(-1).cpu().numpy()
+                            tensor_C = np.intersect1d(tensor_A, tensor_B)
+                            self.diff_ratio = 1 - tensor_C.shape[0] / tensor_A.shape[0]
+
 
                         down_proj = self.down_proj(self.act_fn(self.gate_proj(x, out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, out_dim_indices=probe_out_dim_indices), in_dim_indices=probe_out_dim_indices)
        
@@ -786,6 +796,16 @@ class LlamaAttention(nn.Module):
                         else:
                             raise ValueError('Invalid input for asyncintra mode')
                     
+                    if 'recorddiff' in cfg['prune_method']:
+                        out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
+                        vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
+
+                        tensor_A = probe_vo_out_dim_indices.detach().view(-1).cpu().numpy()
+                        tensor_B = vo_out_dim_indices.detach().view(-1).cpu().numpy()
+                        tensor_C = np.intersect1d(tensor_A, tensor_B)
+                        self.diff_ratio = 1 - tensor_C.shape[0] / tensor_A.shape[0]
+
+
                     # --------------------------------------
                     #full inference
                     bsz, q_len, _ = hidden_states.size()
