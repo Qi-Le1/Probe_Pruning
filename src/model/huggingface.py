@@ -22,7 +22,7 @@ from LLMPruner import PeftModel
 
 #     return model
 
-def loraprune_load(model_type: str = 'pruneLLM', ckpt: str = '', lora_ckpt: str = ''):
+def loraprune_load(model_type: str = 'pruneLLM', ckpt: str = ''):
     # if model_type == 'pruneLLM':
     #     pruned_dict = torch.load(ckpt, map_location='cpu')
     #     model = pruned_dict['model']
@@ -49,16 +49,17 @@ def loraprune_load(model_type: str = 'pruneLLM', ckpt: str = '', lora_ckpt: str 
     if model_type == 'pruneLLM':
         pruned_dict = torch.load(ckpt, map_location='cpu')
         model = pruned_dict['model']
+        model.disable_adapter_layers()
     elif model_type == 'tune_prune_LLM':
         pruned_dict = torch.load(ckpt, map_location='cpu')
         model = pruned_dict['model']
-        model = PeftModel.from_pretrained(
-            model,
-            lora_ckpt,
-            torch_dtype=torch.float16,
-        )
-    else:
-        raise NotImplementedError
+    # model = PeftModel.from_pretrained(
+    #     model,
+    #     lora_ckpt,
+    #     torch_dtype=torch.float16,
+    # )
+    # else:
+    #     raise NotImplementedError
 
     if torch.cuda.is_available():
         device = "cuda"
@@ -128,18 +129,23 @@ def make_local_tuned_model(model_name):
             
             tokenizer = AutoTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], padding_side=padding_side)
         elif 'loraprune' in cfg['prune_method']:
-            model_path = f"output/loraprune/{cfg['init_seed']}_loraprune_{model_name}_{cfg['prune_ratio']}/pytorch_model.bin"
-            lora_path = f"output/loraprune/{cfg['init_seed']}_loraprune_{model_name}_{cfg['prune_ratio']}"
 
-            if not os.path.exists(model_path):
-                raise FileNotFoundError(f"Model file not found: {model_path}")
-            if not os.path.exists(lora_path):
-                raise FileNotFoundError(f"Model file not found: {lora_path}")
+            # lora_path = f"output/loraprune/tune/{cfg['init_seed']}_loraprune_{model_name}_{cfg['prune_ratio']}/pytorch_model.bin"
+            #
+            # if not os.path.exists(model_path):
+            #     raise FileNotFoundError(f"Model file not found: {model_path}")
+
             
             if 'loraprune-prune' in cfg['prune_method']:
+                model_path = f"output/loraprune/prune/{cfg['init_seed']}_loraprune_{model_name}_{cfg['prune_ratio']}/pytorch_model.bin"
+                if not os.path.exists(model_path):
+                    raise FileNotFoundError(f"Model file not found: {model_path}")
                 model = loraprune_load(model_type='pruneLLM', ckpt=model_path)
             elif 'loraprune-tune' in cfg['prune_method']:
-                model = loraprune_load(model_type='tune_prune_LLM', ckpt=model_path, lora_ckpt=lora_path)
+                model_path = f"output/loraprune/tune/{cfg['init_seed']}_loraprune_{model_name}_{cfg['prune_ratio']}/pytorch_model.bin"
+                if not os.path.exists(model_path):
+                    raise FileNotFoundError(f"Model file not found: {model_path}")
+                model = loraprune_load(model_type='tune_prune_LLM', ckpt=model_path)
             else:
                 raise NotImplementedError
             
@@ -168,7 +174,6 @@ def make_local_tuned_model(model_name):
 
     model.config.use_cache = False
     return model, tokenizer
-
 
 def make_hf_model(model_name):
     from .hf.modeling_llama import LlamaForCausalLM
@@ -235,6 +240,7 @@ def make_hf_model(model_name):
 
     tokenizer = AutoTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], cache_dir=cfg['cache_tokenizer_path'],
                                                 padding_side=padding_side)
+
     print('tokenizer', tokenizer.eos_token_id, tokenizer.bos_token_id)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
