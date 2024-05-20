@@ -831,7 +831,6 @@ class LlamaAttention(nn.Module):
 
                     past_key_value = (key_states, value_states) if use_cache else None
                     if self.is_GQA():
-                        print('self.heads_to_preserve'  , self.heads_to_preserve)
                         key_states = repeat_kv(key_states, self.num_key_value_groups, self.heads_to_preserve)
                         value_states = repeat_kv(value_states, self.num_key_value_groups, self.heads_to_preserve)
                     else:
@@ -901,7 +900,6 @@ class LlamaAttention(nn.Module):
 
                     past_key_value = (key_states, value_states) if use_cache else None
                     if self.is_GQA():
-                        print('self.heads_to_preserve'  , self.heads_to_preserve)
                         key_states = repeat_kv(key_states, self.num_key_value_groups, self.heads_to_preserve)
                         value_states = repeat_kv(value_states, self.num_key_value_groups, self.heads_to_preserve)
                     else:
@@ -909,7 +907,6 @@ class LlamaAttention(nn.Module):
                         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
                     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-                    print('attn_weightssize', attn_weights.size())
                     if attn_weights.size() != (bsz, self.q_num_heads, q_len, kv_seq_len):
                         raise ValueError(
                             f"Attention weights should be of size {(bsz, self.q_num_heads, q_len, kv_seq_len)}, but is"
@@ -996,14 +993,12 @@ class LlamaAttention(nn.Module):
 
                         past_key_value = (key_states, value_states) if use_cache else None
                         if self.is_GQA():
-                            print('self.heads_to_preserve'  , self.heads_to_preserve)
                             key_states = repeat_kv(key_states, self.num_key_value_groups, self.heads_to_preserve)
                             value_states = repeat_kv(value_states, self.num_key_value_groups, self.heads_to_preserve)
                         else:
                             key_states = repeat_kv(key_states, self.num_key_value_groups)
                             value_states = repeat_kv(value_states, self.num_key_value_groups)
 
-                        print('key_states3', key_states.size(), key_states.dtype, key_states.device, flush=True)
                         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
                         if attn_weights.size() != (bsz, self.q_num_heads, q_len, kv_seq_len):
                             raise ValueError(
@@ -1128,8 +1123,6 @@ class LlamaDecoderLayer(nn.Module):
             warnings.warn(
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
-
-        print('layerorder', self.layer_order, flush=True)
 
         # residual = hidden_states
         # if self.check_asyncintra_for_next_mlp():

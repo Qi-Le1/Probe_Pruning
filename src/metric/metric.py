@@ -91,8 +91,6 @@ class CsrAccuracy:
         loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
         
         shift_labels = shift_labels.to(shift_logits.device)
-        print('shift_logitsdevice', shift_logits.device)
-        print('shift_labelsdevice', shift_labels.device)
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         loss = loss.view(bsz, -1)
         loss_per_sample = loss.sum(dim=1)
@@ -115,7 +113,6 @@ class CsrAccuracy:
             total_acc += acc
 
         ppl = np.exp(np.mean(self.average))
-        print('pplforcsr', ppl)
         return (total_acc / len(self.acc_output_for_one_question)) * 100
 
 
@@ -160,8 +157,6 @@ class CsrAccuracyNorm:
             total_acc += acc
 
         ppl = np.exp(np.mean(self.average))
-        print('pplforcsr', ppl)
-
         return (total_acc / len(self.acc_norm_output_for_one_question)) * 100
     
 class Metric:

@@ -49,7 +49,6 @@ class LlamaEriModel(torch.nn.Module):
         key_list = [key for key, _ in self.model.named_modules()]
         # return
         target_modules = _get_target_modules(cfg)
-        print('target_modules: ', target_modules)
         for key in key_list:
             if 'dense' in cfg['prune_method'] or 'llmpruner' in cfg['prune_method'] or 'loraprune' in cfg['prune_method']:
                 continue

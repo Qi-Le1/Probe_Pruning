@@ -40,7 +40,6 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         root = os.path.join('data', f'{data_name}_{subset_name}')
     else:
         root = os.path.join('data', data_name)
-    print('cache_dir', root)
     if data_name in ['MNIST', 'FashionMNIST']:
         dataset_['train'] = eval('dataset.{}(root=root, split="train", '
                                  'transform=dataset.Compose([transforms.ToTensor()]))'.format(data_name))
@@ -94,7 +93,7 @@ def make_dataset(data_name, subset_name=None, verbose=True):
         dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='validation', cache_dir=root)
     elif data_name in ['wikitest'] and cfg['calibration_stage'] == True:
         dataset_['train'] = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test', cache_dir=root)
-    elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq', 'ptb']:
+    elif data_name in ['piqa', 'siqa', 'hellaswag', 'winogrande', 'boolq']:
         dataset_['test'] = load_dataset(cfg['hf_data_name'], cfg['hf_subset_name'], split='validation')
     else:
         raise ValueError('Not valid dataset name')
@@ -207,7 +206,6 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
                                         worker_init_fn=np.random.seed(cfg['seed']), drop_last=True)
         cfg['num_steps'][k] = len(data_loader[k])
         cfg['dataset_size'][k] = len(dataset[k])
-        print(f"{'tag'}_dataset_size", k, cfg['dataset_size'][k])
     return data_loader
 
 def make_calibration_dataloader(tokenizer):
@@ -237,7 +235,6 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
         processed_calibrate_sample_num = 0
         if dataset_name == 'c4':
             max_length = cfg[cfg['model_name']]['max_length']
-            print('max_length', max_length)
 
             def preprocess_function(examples):   
                 nonlocal processed_calibrate_sample_num
@@ -285,7 +282,6 @@ def process_calibration_dataset(dataset, tokenizer, dataset_name):
             )
         elif 'wiki' in dataset_name:
             max_length = cfg[cfg['model_name']]['max_length']
-            print('max_length', max_length)
             def preprocess_function_test(examples):   
                 nonlocal processed_calibrate_sample_num
                 all_text = "\n\n".join(examples['text'])
@@ -351,7 +347,6 @@ def process_dataset(dataset, tokenizer):
             # enter here only for dense model c4 flops info
             # fix 2000 samples for gridsearch
             cfg['calibration_nsamples'] = 2000
-            print('max_length', max_length)
 
             def preprocess_function(examples):   
                 nonlocal processed_c4_sample_num
@@ -400,9 +395,7 @@ def process_dataset(dataset, tokenizer):
             processed_calibrate_sample_num = 0
         elif cfg['data_name'] == 'wikitext':
             max_length = cfg[cfg['model_name']]['max_length']
-            print('max_length', max_length)
             def preprocess_function_test(examples):   
-                print('times')
                 all_text = "\n\n".join(examples[text_column[0]])
 
                 model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
@@ -437,47 +430,6 @@ def process_dataset(dataset, tokenizer):
             processed_dataset = {}
             processed_dataset['test'] = dataset['test'].map(
                 preprocess_function_test,
-                batched=True,
-                batch_size=100000,
-                num_proc=1,
-                remove_columns=dataset["test"].column_names,
-                load_from_cache_file=False,
-                desc="Running tokenizer on dataset",
-                keep_in_memory=True,
-            )
-        elif cfg['data_name'] == 'ptb':
-            max_length = cfg[cfg['model_name']]['max_length']
-            print('max_length', max_length)
-            def preprocess_function(examples):   
-                all_text = "\n\n".join(examples['sentence'])
-
-                model_inputs = tokenizer(all_text, return_tensors='pt', truncation=False, padding=False)
-
-                input_ids = model_inputs['input_ids'][0]
-                attention_mask = model_inputs['attention_mask'][0]
-
-                num_samples = len(input_ids) // max_length
-                input_chunks = []
-                mask_chunks = []
-                for i in range(num_samples):
-                    # i = random.randint(0, len(input_ids) - max_length - 1)
-                    i = torch.randint(0, len(input_ids) - max_length, (1,)).item()
-                    j = i + max_length
-                    input_chunks.append(input_ids[i: j])
-                    mask_chunks.append(attention_mask[i: j])
-                final_inputs = defaultdict(list)
-                for i in range(len(input_chunks)):
-                    if len(input_chunks[i]) == max_length:
-                        final_inputs['input_ids'].append(input_chunks[i])
-                        final_inputs['attention_mask'].append(mask_chunks[i])
-                        labels = copy.deepcopy(input_chunks[i])
-                        final_inputs['labels'].append(labels)
-                
-                return final_inputs
-
-            processed_dataset = {}
-            processed_dataset['test'] = dataset['test'].map(
-                preprocess_function,
                 batched=True,
                 batch_size=100000,
                 num_proc=1,
@@ -572,7 +524,6 @@ def process_dataset(dataset, tokenizer):
                             label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
-                        print('len(temp_input)', len(temp_input))
                         temp_attention_mask = sample_attention_mask + label_attention_mask
                         temp_label = [-100] * len(sample_input_ids) + label_input_ids
 
@@ -676,7 +627,6 @@ def process_dataset(dataset, tokenizer):
                             label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
-                        print('len(temp_input)', len(temp_input))
                         temp_attention_mask = sample_attention_mask + label_attention_mask
                         temp_label = [-100] * len(sample_input_ids) + label_input_ids
 
@@ -780,7 +730,6 @@ def process_dataset(dataset, tokenizer):
                             label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
-                        print('len(temp_input)', len(temp_input))
                         temp_attention_mask = sample_attention_mask + label_attention_mask
                         temp_label = [-100] * len(sample_input_ids) + label_input_ids
 
@@ -898,7 +847,6 @@ def process_dataset(dataset, tokenizer):
                             label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
-                        print('len(temp_input)', len(temp_input))
                         temp_attention_mask = sample_attention_mask + label_attention_mask
                         temp_label = [-100] * len(sample_input_ids) + label_input_ids
 
@@ -1066,7 +1014,6 @@ def process_dataset(dataset, tokenizer):
                             label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
-                        print('len(temp_input)', len(temp_input))
                         temp_attention_mask = sample_attention_mask + label_attention_mask
                         temp_label = [-100] * len(sample_input_ids) + label_input_ids
 
@@ -1187,7 +1134,6 @@ def process_dataset(dataset, tokenizer):
                             label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
-                        print('len(temp_input)', len(temp_input))
                         temp_attention_mask = sample_attention_mask + label_attention_mask
                         temp_label = [-100] * len(sample_input_ids) + label_input_ids
 
@@ -1372,7 +1318,6 @@ def process_dataset(dataset, tokenizer):
                             label_attention_mask = labels["attention_mask"][i]
 
                         temp_input = sample_input_ids + label_input_ids
-                        print('len(temp_input)', len(temp_input))
                         temp_attention_mask = sample_attention_mask + label_attention_mask
                         temp_label = [-100] * len(sample_input_ids) + label_input_ids
 

@@ -34,7 +34,6 @@ def main():
     for i in range(cfg['num_experiments']):
         model_tag_list = [str(seeds[i]), cfg['control_name']]
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
-        print('Experiment: {}'.format(cfg['model_tag']))
         runExperiment()
     return
 
@@ -181,7 +180,6 @@ def test(data_loader, model, model_prof, metric, logger):
         torch.cuda.cudart().cudaProfilerStart()
         for i, input in enumerate(data_loader):
             cfg['cur_batch_index'] += 1
-            print('cur_batch_index', cfg['cur_batch_index'])
             identify_pad_tokens(input)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
@@ -195,7 +193,6 @@ def test(data_loader, model, model_prof, metric, logger):
                 input_size = input['labels'].size(0)
                 input_indices = input['input_indices']
                 correct_labels = input['correct_labels']
-                # print('input', input)
                 input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
                         'labels': input['labels']}
                 input = to_device(input, cfg['device'])
@@ -223,19 +220,12 @@ def test(data_loader, model, model_prof, metric, logger):
                         or 'mlp_sign_match_percentage' in attr_name or 'mlp_l2_magnitude_ratio' in attr_name or 'mlp_cosine_similarity' in attr_name:
                         # Retrieve the attribute value
                         attr_value = getattr(module, attr_name)
-                        # Print the module name and attribute name
-                        # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
                         # Append the attribute to the logger
                         logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-                        print('name', name, 'attr_name', attr_name)
                     if 'diff_ratio' in attr_name:
                         # Retrieve the attribute value
                         attr_value = getattr(module, attr_name)
-                        
-                            # Append the attribute to the logger
-                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-                        print('name', name, attr_name, attr_value)
-                        
+                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')                        
                     # Check if the attribute name contains 'mean_intersection_ratio'
                     
 

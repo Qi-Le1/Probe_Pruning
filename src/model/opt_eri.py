@@ -48,9 +48,7 @@ class OPTEriModel(torch.nn.Module):
         key_list = [key for key, _ in self.model.named_modules()]
         # return
         target_modules = _get_target_modules(cfg)
-        print('target_modules: ', target_modules)
         for key in key_list:
-            print('key', key)
             if 'dense' in cfg['prune_method'] or 'llmpruner' in cfg['prune_method'] or 'loraprune' in cfg['prune_method']:
                 continue
 
@@ -121,7 +119,6 @@ class EriLayer:
         # return torch.index_select(weight, dim=1, index=indices.to(self.weight.device))
            
     def extract_out_dim_weight(self, weight, indices):
-        print('key', self.key, weight.shape)
         return weight[indices.to(self.weight.device), :]
         # return torch.index_select(weight, dim=0, index=indices.to(self.weight.device))
     
@@ -352,7 +349,6 @@ class Linear(nn.Linear, EriLayer):
             self.async_interbatch_bias = self.bias[kwargs['out_dim_indices']]
             self.async_interbatch_weight = self.extract_out_dim_weight(self.weight, kwargs['out_dim_indices'])
         elif 'in_dim_indices' in kwargs:
-            print('biasshape', self.key, self.bias.shape)
             self.async_interbatch_bias = self.bias
             self.async_interbatch_weight = self.extract_in_dim_weight(self.weight, kwargs['in_dim_indices'])
             # record indices to update metric
@@ -517,7 +513,6 @@ class Linear(nn.Linear, EriLayer):
                     if 'out_dim_indices' in kwargs:
                         weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
                         bias = self.extract_bias(bias, kwargs['out_dim_indices'])
-                        print(x.shape, weight.shape)
                         result = F.linear(x, weight, bias=bias)
                         result = result.to(previous_dtype)
                         return result

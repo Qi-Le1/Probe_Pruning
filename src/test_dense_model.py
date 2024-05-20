@@ -32,7 +32,6 @@ process_args(args)
 def main():
     # Get the name of the current file
     current_file_name = os.path.basename(__file__)
-    print(f"The current file name is {current_file_name}")
     # You can also use conditions to differentiate behavior
     cfg['python_file'] = current_file_name
     process_control()
@@ -40,10 +39,7 @@ def main():
     for i in range(cfg['num_experiments']):
         model_tag_list = [str(seeds[i]), cfg['control_name']]
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
-        print('Experiment: {}'.format(cfg['model_tag']))
         runExperiment()
-    
-    
     return
 
 
@@ -126,7 +122,6 @@ def test(data_loader, model, model_prof, metric, logger):
         update_model_prof(model_prof)
         for i, input in enumerate(data_loader):
             cfg['cur_batch_index'] += 1
-            print('cur_batch_index', cfg['cur_batch_index'])
             torch.cuda.nvtx.range_push("iteration{}".format(i))
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
@@ -165,7 +160,7 @@ def test(data_loader, model, model_prof, metric, logger):
                 print('running_info', info)
             
             # break
-        print('inference_duration', inference_duration)
+        # print('inference_duration', inference_duration)
         evaluation = metric.evaluate('test', 'full')
         print('evaluation_for_full', evaluation)
         logger.append(evaluation, 'test')

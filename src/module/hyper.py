@@ -257,7 +257,6 @@ def process_control():
     # cfg['onlyprobeinfo'] = True
     cfg['onlyprobeinfo'] = False
     cfg['test_speed'] = False
-    print('cfg: ', cfg, flush=True)
     return
 
 
@@ -283,12 +282,6 @@ def make_data_name():
                                                    'label_column': None}
                                            }                       
                          },
-            'ptb': {'data_name': 'ptb_text_only',
-                          'subset_name_dict': {'none': {'subset_name': None,
-                                                   'text_column': ['sentence'],
-                                                   'label_column': None}
-                                           }                       
-            },
             # piqa: piqa
             # boolq: boolq , 
             # arc-e: arc-easy 

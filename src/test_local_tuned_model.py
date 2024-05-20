@@ -34,7 +34,6 @@ def main():
     for i in range(cfg['num_experiments']):
         model_tag_list = [str(seeds[i]), cfg['control_name']]
         cfg['model_tag'] = '_'.join([x for x in model_tag_list if x])
-        print('Experiment: {}'.format(cfg['model_tag']))
         runExperiment()
     return
 
@@ -156,7 +155,6 @@ def test(data_loader, model, model_prof, metric, logger):
         torch.cuda.cudart().cudaProfilerStart()
         for i, input in enumerate(data_loader):
             cfg['cur_batch_index'] += 1
-            print('cur_batch_index', cfg['cur_batch_index'])
             identify_pad_tokens(input)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)

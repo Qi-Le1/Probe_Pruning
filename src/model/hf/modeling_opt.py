@@ -164,7 +164,6 @@ class OPTAttention(nn.Module):
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
 
         bsz, src_len, _ = probe.size()
-        print('probeshape', probe.shape)
         self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_heads, self.num_heads
 
         # get query proj
@@ -184,7 +183,6 @@ class OPTAttention(nn.Module):
             past_key_value = (key_states, value_states)
 
         proj_shape = (bsz * self.num_heads, -1, self.head_dim)
-        print('src_len', src_len, query_states.shape)
         query_states = self._shape(query_states, src_len, bsz).view(*proj_shape)
         key_states = key_states.view(*proj_shape)
         value_states = value_states.view(*proj_shape)
@@ -209,7 +207,6 @@ class OPTAttention(nn.Module):
         else:
             probe_attn_mask = attention_mask[bsz_selected_indices, :, :src_len, :src_len]
 
-        print('probe_attn_mask', probe_attn_mask.shape)
         attn_weights = attn_weights.view(bsz, self.num_heads, src_len, src_len) + probe_attn_mask
         attn_weights = torch.max(
             attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device)
@@ -241,7 +238,6 @@ class OPTAttention(nn.Module):
                 f"`attn_output` should be of size {(bsz, self.num_heads, src_len, self.head_dim)}, but is"
                 f" {attn_output.size()}"
             )
-        print('attn_output', attn_output.shape)
         attn_output = attn_output.view(bsz, self.num_heads, src_len, self.head_dim)
         attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(bsz, src_len, self.embed_dim)
@@ -398,7 +394,6 @@ class OPTAttention(nn.Module):
                 bsz, q_len, _ = hidden_states.size()
                 probe_qk_out_dim_indices, probe_vo_out_dim_indices = None, None
                 if 'probe' in cfg['prune_method']:
-                    print('yes')
                     qk_prune_way = cfg['qk_prune_way']
                     vo_prune_way = cfg['vo_prune_way']
                     if cfg['mode'] == 'sync':
@@ -415,7 +410,6 @@ class OPTAttention(nn.Module):
                         else:
                             raise ValueError('Invalid input for asyncintra mode')
                     
-                    print('attn probe done')
                     # --------------------------------------
                     is_cross_attention = key_value_states is not None
                     qk_prune_way = cfg['qk_prune_way']
@@ -628,8 +622,6 @@ class OPTAttention(nn.Module):
                             past_key_value = (key_states, value_states)
 
                         proj_shape = (bsz * self.q_num_heads, -1, self.head_dim)
-                        print('proj_shape', proj_shape, bsz, self.q_num_heads, self.head_dim)
-                        print('query_states', query_states.shape)
                         query_states = self._shape(query_states, tgt_len, bsz, self.q_num_heads).view(*proj_shape)
                         key_states = key_states.view(*proj_shape)
                         value_states = value_states.view(*proj_shape)
@@ -691,10 +683,8 @@ class OPTAttention(nn.Module):
 
                         if cfg['cur_batch_index'] == 0:
                             if torch.all(self.out_proj.get_global_metric_score_distribution() == 0):
-                                print('jinzheli1')
                                 vo_out_dim_indices = torch.arange(self.embed_dim, dtype=torch.long).to(device=hidden_states.device)
                             else:
-                                print('jinzheli2')
                                 out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.out_proj.get_global_metric_score_distribution(), self.out_proj.weight.data, cfg['prune_metric'])
                                 if 'flapratio' in cfg['prune_method']:
                                     vo_out_dim_indices, self.v_num_heads, _ = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'], pruning_ratio=self.out_proj.pruning_ratio)
@@ -766,7 +756,6 @@ class OPTDecoderLayer(nn.Module):
         probe, bsz_selected_indices, seq_selected_indices = generate_probe(x, cfg['fc1_probe_ratio'], inforank)
         
         probe_out = self.activation_fn(self.fc1(probe, cal_mlp_probe_out_dim_metric=True))
-        print('probe_out', probe_out.shape)
         # calculate score
         if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
             probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.fc2.get_global_metric_score_distribution(cur_batch_seq_len))
@@ -846,7 +835,6 @@ class OPTDecoderLayer(nn.Module):
                                     out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
 
                             self.fc1.prepare_async_weight(out_dim_indices=out_dim_indices)
-                            print('out_dim_indices', out_dim_indices.shape, self.fc2.weight.shape, self.fc2.bias.shape)
                             self.fc2.prepare_async_weight(in_dim_indices=out_dim_indices)
                     else:
                         raise ValueError('Invalid mode')
@@ -899,7 +887,6 @@ class OPTDecoderLayer(nn.Module):
                 (see `past_key_values`).
             past_key_value (`Tuple(torch.FloatTensor)`, *optional*): cached past key and value projection states
         """
-        print('layerorder', self.layer_order, flush=True)
         # residual = hidden_states
         # if self.check_asyncintra_mlp():
         #     torch.cuda.synchronize(cfg['cuda_default_stream'])
@@ -1044,7 +1031,6 @@ class OPTDecoderLayer(nn.Module):
             print('self.attn_sign_match_percentage', self.attn_sign_match_percentage, flush=True)
             print('self.attn_l2_magnitude_ratio', self.attn_l2_magnitude_ratio, flush=True)
             print('self.attn_cosine_similarity', self.attn_cosine_similarity, flush=True)
-        print('attn done')
         # Fully Connected
         # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
         if self.check_asyncintra_for_mlp():
@@ -1069,12 +1055,10 @@ class OPTDecoderLayer(nn.Module):
 
         if 'resinfo' in cfg['prune_method']:
             self.mlp_sign_match_percentage, self.mlp_l2_magnitude_ratio, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
-            print('self.layer_order', self.layer_order, flush=True)
             print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
             print('self.mlp_l2_magnitude_ratio', self.mlp_l2_magnitude_ratio, flush=True)
             print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
-        print('mlp done')
         outputs = (hidden_states,)
 
         if output_attentions:

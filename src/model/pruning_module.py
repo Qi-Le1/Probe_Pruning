@@ -177,7 +177,6 @@ class HiddenRepresentationPruning():
 
                 combined_probe_out = torch.sum(combined_probe_out, dim=0).clamp(max=cfg['data_type_max'])
                 probe_out_dim_metric = torch.linalg.vector_norm((combined_probe_out.reshape((1,-1)) * torch.pow(weight, 2)), ord=2, dim=0).clamp(max=cfg['data_type_max'])
-                print('probe_out_dim_metric', probe_out_dim_metric.dtype)
                 return probe_out_dim_metric
             else:
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
@@ -329,19 +328,13 @@ class HiddenRepresentationPruning():
         if 'llama' in cfg['model_name']:
             head_dim = model.config.hidden_size // model.config.num_attention_heads
             attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 4 + approx_seq_len ** 2 * head_dim + approx_seq_len ** 2 * head_dim
-            print('approx_seq_len * model.config.hidden_size * head_dim * 4 ', approx_seq_len * model.config.hidden_size * head_dim * 4 )
-            print('attnflops', attn_flops)
             mlp_flops = approx_seq_len * model.config.hidden_size * 3 
-            print('mlp_flops', mlp_flops)
             multiples = attn_flops / mlp_flops
             # GQA
             if ('llama-3' in cfg['model_name'] or 'llama-2-70b' in cfg['model_name']) and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) :
                 head_dim = model.config.hidden_size // model.config.num_attention_heads
                 attn_flops = approx_seq_len * model.config.hidden_size * head_dim * 2 + approx_seq_len ** 2 * head_dim + approx_seq_len ** 2 * head_dim
-                print('approx_seq_len * model.config.hidden_size * head_dim * 2 ', approx_seq_len * model.config.hidden_size * head_dim * 2 )
-                print('attnflops', attn_flops)
                 mlp_flops = approx_seq_len * model.config.hidden_size * 3 
-                print('mlp_flops', mlp_flops)
                 multiples = attn_flops / mlp_flops
         elif 'opt' in cfg['model_name']:
             head_dim = model.config.hidden_size // model.config.num_attention_heads
@@ -391,7 +384,6 @@ class HiddenRepresentationPruning():
             if len(attn_metric_list) > 0:
                 attn_metric = torch.stack(attn_metric_list).to(torch.float64)
                 attn_metric = standarlization(attn_metric)
-                print('attn_metric', attn_metric.shape)
                 attn_metric = attn_metric.reshape(attn_metric.shape[0], -1, 128).mean(dim=2)
             else:
                 attn_metric = None
@@ -404,7 +396,6 @@ class HiddenRepresentationPruning():
 
             # prune 1 head will lead to multiples times more flops pruned than 1 mlp channel
             multiples = self.cal_multiple_flops_for_flap(model)
-            print('multiples', multiples, flush=True)
             if attn_metric is not None and mlp_metric is not None:
                 prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
                 flops_measurement = torch.cat([torch.full_like(attn_metric, multiples).view(-1), torch.full_like(mlp_metric, 1).view(-1)])
@@ -469,7 +460,6 @@ class HiddenRepresentationPruning():
                 elif 'down_proj' in name:
                     mlp_ratio += module.pruning_ratio
                     mlp_counter += 1
-                print('name', name, 'module.pruning_ratio', module.pruning_ratio)
             
             logger.append({f'flap_attention_average_pruning_ratio': attention_ratio/(attention_counter+1e-4)}, 'test')
             logger.append({f'flap_mlp_average_pruning_ratio': mlp_ratio/(mlp_counter+1e-4)}, 'test')
@@ -516,7 +506,6 @@ class HiddenRepresentationPruning():
 
             # prune 1 head will lead to multiples times more flops pruned than 1 mlp channel
             multiples = self.cal_multiple_flops_for_flap(model)
-            print('multiples', multiples, flush=True)
             if attn_metric is not None and mlp_metric is not None:
                 prune_metric = torch.cat([attn_metric.view(-1), mlp_metric.view(-1)])
                 flops_measurement = torch.cat([torch.full_like(attn_metric, multiples).view(-1), torch.full_like(mlp_metric, 1).view(-1)])
@@ -571,65 +560,5 @@ class HiddenRepresentationPruning():
 
                 threshold = threshold.to(metric.device)
                 module.pruning_ratio = metric[metric <= threshold].numel() / metric.numel()
-                print('name', name, 'module.pruning_ratio', module.pruning_ratio)
         return
 
-    # def grid_ratio(self, model):
-    #     from module import TRANSFORMERS_MODELS_TO_GRID_SEARCH_RATIO
-    #     if 'llama' in cfg['model_name']:
-    #         for name, module in model.named_modules():
-    #             if 'down_proj' not in name and 'o_proj' not in name:
-    #                 continue
-                
-    #             if 'down_proj' in name and 'down_proj' not in cfg['cust_tgt_modules']:
-    #                 continue
-    #             elif 'o_proj' in name and 'o_proj' not in cfg['cust_tgt_modules']:
-    #                 continue
-
-    #             numbers = int(''.join(filter(str.isdigit, name)))
-    #             print('numebres', numbers)
-    #             if numbers <= cfg['skip_layers']:
-    #                 continue
-                
-    #             if 'o_proj' in name:
-    #                 # if there are more layers, like llama-2-13B, prune less in each layer to reach mean prune ratio
-    #                 # simply scale this ratio, one may run the grid search for other model type to find the best ratio
-    #                 pruning_ratio = TRANSFORMERS_MODELS_TO_GRID_SEARCH_RATIO['llama']['128'][cfg['prune_ratio']]['o_proj'] * \
-    #                     (32 / 29) / (model.config.num_hidden_layers / (model.config.num_hidden_layers - (cfg['skip_layers'] + 1)))
-    #                 module.pruning_ratio = pruning_ratio
-    #             elif 'down_proj' in name:
-    #                 pruning_ratio = TRANSFORMERS_MODELS_TO_GRID_SEARCH_RATIO['llama']['128'][cfg['prune_ratio']]['down_proj'] * \
-    #                     (32 / 29) / (model.config.num_hidden_layers / (model.config.num_hidden_layers - (cfg['skip_layers'] + 1)))
-    #                 module.pruning_ratio = pruning_ratio
-
-
-    #     elif 'opt' in cfg['model_name']:
-    #         pass
-    #     return
-
-
-    # def grid_search(self, model):
-    #     if 'llama' in cfg['model_name']:
-    #         for name, module in model.named_modules():
-    #             if 'down_proj' not in name and 'o_proj' not in name:
-    #                 continue
-                
-    #             if 'down_proj' in name and 'down_proj' not in cfg['cust_tgt_modules']:
-    #                 continue
-    #             elif 'o_proj' in name and 'o_proj' not in cfg['cust_tgt_modules']:
-    #                 continue
-
-    #             numbers = int(''.join(filter(str.isdigit, name)))
-    #             print('numebers', numbers)
-    #             if numbers <= cfg['skip_layers']:
-    #                 continue
-                
-    #             if 'o_proj' in name:
-    #                 module.pruning_ratio = cfg['prune_ratio'][0]
-    #             elif 'down_proj' in name:
-    #                 module.pruning_ratio = cfg['prune_ratio'][1]
-
-
-    #     elif 'opt' in cfg['model_name']:
-    #         pass
-    #     return
