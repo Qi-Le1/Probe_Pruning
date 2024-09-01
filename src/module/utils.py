@@ -24,7 +24,7 @@ def check_skip_layers(name):
     layer_order_matches = re.findall(r'\d+', name)
     if layer_order_matches:  # Check if the list is not empty
         layer_order = int(layer_order_matches[0])  # Convert the first match to an integer
-        if layer_order <= cfg['skip_layers']:
+        if layer_order in cfg['skip_layers']:
             return True
         return False
     else:

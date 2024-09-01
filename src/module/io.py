@@ -37,6 +37,7 @@ def check_calib_saving_info():
 
 
 def load_calib_saving_info(model):
+    # variable: model_name, max_seq_len, prune_metric, calib_info, cust_tgt_modules
     current_script_dir = os.path.dirname(__file__)
     result_path = os.path.join(current_script_dir, '..', 'output', 'result', 'calibsavinginfo')
     name_list = cfg['model_tag'].split('_')

@@ -497,7 +497,7 @@ class Linear(nn.Linear, EriLayer):
                         result = F.linear(x, weight, bias=None)
                         if 'o_proj' in self.key or 'down_proj' in self.key:
                             if 'bias' in cfg['prune_method']:
-                                compensate_bias = self.get_compensate_bias(x, self.weight, async_in_dim_indices)
+                                compensate_bias = self.get_compensate_bias(x, self.weight, kwargs['in_dim_indices'])
                                 result += compensate_bias
                         result = result.to(previous_dtype)
                         return result

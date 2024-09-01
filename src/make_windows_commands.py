@@ -222,11 +222,11 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['5'], ['128'], ['0.6'], 
-                             ['wandasp'], ['probe-default-recorddiff'], ['sync'], ['c4-20'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
-                            ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['5'], ['128'], ['0.6'], 
+            #                  ['wandasp'], ['probe-default-recorddiff'], ['sync'], ['c4-20'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             # control_name = [[['wikitext-2v1', 'ptb'], ['llama-3-8b'], ['clm'], ['2'], ['128'], ['0.4'], 
             #                  ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],        
             #                 ['default']]]
@@ -383,7 +383,7 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['arc-c'], ['llama-2-7b'], ['csr'], ['5'], ['128'], ['0.6'], 
+            control_name = [[['arc-c'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.6'], 
                              ['wandasp', 'flap'], ['probe-default-resinfo'], ['sync'], ['c4-20'], ['0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-0.5+0.1-seqrank+bszrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)

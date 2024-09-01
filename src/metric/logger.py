@@ -58,6 +58,21 @@ class Logger:
             n = prev_n
         return
 
+    def accumulate(self, result, tag):
+        for k in result:
+            name = '{}/{}'.format(tag, k)
+            self.tracker[name] = result[k]
+            if name not in self.history:
+                self.history[name] = []
+            if isinstance(result[k], Number):
+                self.history[name].append(result[k])
+            elif isinstance(result[k], list) and len(result[k]) > 0:
+                self.history[name].extend(result[k])
+            else:
+                print(result[k], type(result[k]), k)
+                raise ValueError('Not valid data type for logger')
+        return
+    
     def write(self, tag, metric_names):
         names = ['{}/{}'.format(tag, k) for k in metric_names]
         evaluation_info = []

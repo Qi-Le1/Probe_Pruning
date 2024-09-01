@@ -61,6 +61,41 @@ def make_controls(control_name):
 
 def make_control_list(file):
     controls = []
+    if file == 'similarchannel':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                             ['ppwandasp'], ['probe'], ['sync'], ['None'], ['1-1-1-1-1-seqrank'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+        #                     ['flap'], ['probe-flap-default'], ['sync'], ['c4-2000'], ['1-1-1-1-1-seqrank'],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+        #                      ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+        #                     ['default']]]
+        # CIFAR10_controls_9 = make_controls( control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        
+        
+
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+        #                 ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+        #             ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+        
     if file == 'dense':
         control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0'], 
                              ['None'], ['dense'], ['None'], ['None'], ['None'],        
@@ -711,6 +746,11 @@ def extract_result(control, model_tag, processed_result_history):
                         if k not in processed_result_history:
                             processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
                         processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
+                elif file == 'similarchannel':
+                    if 'cur_select_indices' in k:
+                        if k not in processed_result_history:
+                            processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
+                        processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
                 else:
                     if any(metric_name in k for metric_name in metric_name_list):
                         print('kkkk', k, base_result['logger']['test'].history[k])
@@ -784,6 +824,7 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
     if 'history' in processed_result:
         exp_name = '_'.join(control[:-1])
         metric_name = control[-1]
+        print('metric_name', metric_name)
         if exp_name not in extracted_processed_result:
             extracted_processed_result[exp_name] = defaultdict()
         
@@ -836,13 +877,15 @@ def make_df_history(extracted_processed_result_history):
 
             substring = ''
             for k in extracted_processed_result_history[exp_name]:
+                print('k', k)
                 index_name = ['_'.join(control + [k])]
                 df[df_name].append(
                     pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
                 
                 if 'fullinf_FLOPs_ratio_for_all_layers' in k or 'probe_FLOPs_ratio_for_all_layers' in k or \
                     any(metric_name in k for metric_name in metric_name_list) or 'attn_sign_match_percentage' in k or 'attn_l2_magnitude_ratio' in k or 'attn_cosine_similarity' in k\
-                        or 'mlp_sign_match_percentage' in k or 'mlp_l2_magnitude_ratio' in k or 'mlp_cosine_similarity' in k or 'duration' in k or 'average_pruning_ratio' in k or 'diff_ratio' in k:
+                        or 'mlp_sign_match_percentage' in k or 'mlp_l2_magnitude_ratio' in k or 'mlp_cosine_similarity' in k or 'duration' in k or 'average_pruning_ratio' in k or 'diff_ratio' in k\
+                            or 'cur_select_indices' in k:
                     print('inxlsxk', k, extracted_processed_result_history[exp_name][k].reshape(1, -1))
                     if '_se' in k:
                         value = extracted_processed_result_history[exp_name][k].reshape(1, -1)
@@ -867,11 +910,11 @@ def make_df_history(extracted_processed_result_history):
         else:
             raise ValueError('Not valid control')
 
-    write_xlsx(f"{result_path}/{args['file']}_result.xlsx", df_for_xlsx)
-    file_path = f"{result_path}/{args['file']}_result.txt"
-    # Open the file in write mode and write the code snippet
-    with open(file_path, "w") as file:
-        file.write(output_string)
+    # write_xlsx(f"{result_path}/{args['file']}_result.xlsx", df_for_xlsx)
+    # file_path = f"{result_path}/{args['file']}_result.txt"
+    # # Open the file in write mode and write the code snippet
+    # with open(file_path, "w") as file:
+    #     file.write(output_string)
     return df
 
 
@@ -886,10 +929,14 @@ def make_vis(df_history):
              'Pruning Ratio 0.2': 'purple',
             'Pruning Ratio 0.4': 'red',
             'Pruning Ratio 0.6': 'green',
+            'PP': 'orange',
+             'FLAP': 'purple',
              }
     linestyle = {
                 'probe': (5, (10, 3)),
                 'flap': (0, (3, 1, 1, 1)),
+                'PP': (5, (10, 3)),
+                'FLAP': (0, (3, 1, 1, 1)),
                 'wandasp': (10, (2, 5)),
                 'dense': '--',
                 'llmpruner': '-.',
@@ -901,6 +948,8 @@ def make_vis(df_history):
     marker = {
                 'probe': 'D',
                 'flap': 's',
+                'PP': 'D',
+                'FLAP': 's',
                 'wandasp': 'H',
                 'dense': '--',
                 'llmpruner': 'x',
@@ -963,7 +1012,7 @@ def make_vis(df_history):
     # linestyle['pqnobias-0.5-0.5'] = '-.'
     # linestyle['pqnobiasglobal-0.5-0.5'] = '-.'
     loc_dict = {'test/Perplexity': 'lower left', 'label': 'upper right', 'test/CsrAccuracy': 'lower left', 'test/CsrAccuracyNorm': 'lower left'}
-    fontsize = {'legend': 17, 'label': 17, 'ticks': 14, 'group_x_ticks': 8}
+    fontsize = {'legend': 17, 'label': 15, 'ticks': 14, 'group_x_ticks': 8}
     metric_name_list = ['test/Loss', 'test/Perplexity', 'test/CsrAccuracyNorm', 'test/CsrAccuracy']
 
     fig = {}
@@ -1103,7 +1152,7 @@ def make_vis(df_history):
         return layer_number
     
 
-    
+    select_channels_indices = {}
     for df_name in df_history:
         loss_performance_vs_total_FLOPs_ratio = [None, None, None]
         ppl_performance_vs_total_FLOPs_ratio = [None, None, None]
@@ -1149,6 +1198,7 @@ def make_vis(df_history):
             fullinf_vs_optimal_prune_mean_intersection_ratio_order = 0
             probe_vs_optimal_prune_mean_intersection_ratio_order = 0
             probe_vs_fullinf_prune_mean_intersection_ratio_order = 0
+            
             for i in range(0, len(temp), 2):
                 cur_item = temp[i]
                 cur_se_item = temp[i+1]
@@ -1160,6 +1210,9 @@ def make_vis(df_history):
                     index_list = index.split('/')
                     temp_key = index_list[-1]
 
+                    # layer_number = find_layer_number(index)
+                    # if layer_number > 5:
+                    #     continue
                     # print('index', index)
                     # if 'gridsearch' in prune_method and ('Loss' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
                     #     if any(metric_name in index for metric_name in metric_name_list):
@@ -1247,6 +1300,73 @@ def make_vis(df_history):
                         key_for_dict = f"Pruning Ratio {prune_ratio}"
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Different Channel Ratio')
                     
+            #         if 'cur_select_indices' in index:
+            #             layer_number = find_layer_number(index)
+            #             print('prune_method', prune_method, prune_info, index)
+            #             print('layer_number', layer_number)
+            #             if 'attn' in index:
+            #                 key = f'attn_{layer_number}'
+            #             elif 'mlp' in index:
+            #                 key = f'mlp_{layer_number}'
+
+            #             if '1-1-1-1-1-seq' in prune_info:
+            #                 select_channels_indices[key] = set(row.tolist())
+            #                 continue
+            #             else:
+            #                 if 'probe' in prune_method or 'flap' in prune_method:
+            #                     intersection_ratio =  (len(set(select_channels_indices[key])) - len(select_channels_indices[key].intersection(set(row.tolist())))) / len(set(select_channels_indices[key]))
+
+            #             if 'attn' in index:
+            #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio,\
+            # calib_info,  cust_tgt_modules, f'FIG:attn_same_ratio_with_upperbound'])
+            #             elif 'mlp' in index:
+            #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, \
+            # calib_info,  cust_tgt_modules, f'FIG:mlp_same_ratio_with_upperbound'])
+
+            #             fig[fig_name] = plt.figure(fig_name)
+            #             x = layer_number
+            #             y = intersection_ratio
+            #             yerr = 0
+
+            #             if 'probe' in prune_method:
+            #                 key_for_dict = 'PP'
+            #             elif 'flap' in prune_method:
+            #                 key_for_dict = 'FLAP'
+            #             record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Different Channel Ratio')
+            #             pass
+
+                    if 'cur_select_indices' in index:
+                        layer_number = find_layer_number(index)
+                        print('prune_method', prune_method, prune_info, index)
+                        print('layer_number', layer_number)
+                        if 'attn' in index:
+                            key = f'attn_{layer_number}'
+                        elif 'mlp' in index:
+                            key = f'mlp_{layer_number}'
+
+                        if '1-1-1-1-1-seq' in prune_info:
+                            select_channels_indices[key] = set(row.tolist())
+                            continue
+                        else:
+                            if 'probe' in prune_method or 'flap' in prune_method:
+                                intersection_ratio = len(select_channels_indices[key].intersection(set(row.tolist()))) / len(set(select_channels_indices[key]))
+
+                        if 'attn' in index:
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_metric, seq_len, \
+            calib_info,  cust_tgt_modules, f'FIG:attn_same_ratio_with_upperbound'])
+                        elif 'mlp' in index:
+                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_metric, seq_len, \
+            calib_info,  cust_tgt_modules, f'FIG:mlp_same_ratio_with_upperbound'])
+
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = layer_number
+                        y = intersection_ratio
+                        yerr = 0
+
+                        key_for_dict = f"Pruning Ratio {prune_ratio}"
+                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Ratio of Common Pruning Channels')
+                        pass
+                    
         
     for fig_name in fig_data_across_multi_indices:
         print('fig_name', fig_name)
@@ -1262,6 +1382,8 @@ def make_vis(df_history):
                 # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, y_lim=performance_metric_max)
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
             if 'diff_ratio' in fig_name:
+                draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
+            if 'same_ratio_with_upperbound' in fig_name:
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
             # if 'all_methods_performance_vs_FLOPs_ratio_for_all_layers' in fig_name:
             #     draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)

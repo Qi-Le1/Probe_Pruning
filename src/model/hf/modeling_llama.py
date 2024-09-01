@@ -371,7 +371,7 @@ class LlamaMLP(nn.Module):
                 down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
                 return down_proj
             elif cfg['calibration_stage'] == False:
-                if ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
+                if ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) and self.layer_order not in cfg['skip_layers']:
                     if 'probe' in cfg['prune_method']:
                         probe_out_dim_indices = None
                         if cfg['mode'] == 'sync':
@@ -387,7 +387,8 @@ class LlamaMLP(nn.Module):
                                 # return
                             else:
                                 raise ValueError('Invalid input for asyncintra mode')
-                            
+                        
+                        self.mlp_cur_select_indices = probe_out_dim_indices.tolist()
                         if 'recorddiff' in cfg['prune_method']:
                             out_dim_metric = self.pruning_module.cal_mlp_calib_prune_metric(self.down_proj.get_global_metric_score_distribution(), self.down_proj.weight.data, cfg['prune_metric'])
                             out_dim_indices, prune_out_dim_indices = self.pruning_module.sort_mlp_metric(out_dim_metric, cfg['tc_multiple'])
@@ -446,6 +447,7 @@ class LlamaMLP(nn.Module):
                                 self.gate_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
                                 self.up_proj.prepare_async_weight(out_dim_indices=out_dim_indices)
                                 self.down_proj.prepare_async_weight(in_dim_indices=out_dim_indices)
+                                self.mlp_cur_select_indices = out_dim_indices.tolist()
                         else:
                             raise ValueError('Invalid mode')
                         return down_proj
@@ -774,7 +776,7 @@ class LlamaAttention(nn.Module):
         if cfg['calibration_stage'] == True:
             return self.attention_forward(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
         elif cfg['calibration_stage'] == False :
-            if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
+            if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) and self.layer_order not in cfg['skip_layers']:
                 bsz, q_len, _ = hidden_states.size()
                 probe_qk_out_dim_indices, probe_vo_out_dim_indices = None, None
                 if 'probe' in cfg['prune_method']:
@@ -796,6 +798,7 @@ class LlamaAttention(nn.Module):
                         else:
                             raise ValueError('Invalid input for asyncintra mode')
                     
+                    self.attn_cur_select_indices = probe_vo_out_dim_indices.tolist()
                     if 'recorddiff' in cfg['prune_method']:
                         out_dim_metric = self.pruning_module.cal_attn_calib_prune_metric(self.o_proj.get_global_metric_score_distribution(), self.o_proj.weight.data, cfg['prune_metric'])
                         vo_out_dim_indices, self.remain_num_heads, self.heads_to_preserve = self.pruning_module.sort_attn_metric(out_dim_metric, self.num_heads, self.head_dim, vo_prune_way, 'vo', cfg['tc_multiple'])
@@ -1003,7 +1006,7 @@ class LlamaAttention(nn.Module):
                             key_states = repeat_kv(key_states, self.num_key_value_groups)
                             value_states = repeat_kv(value_states, self.num_key_value_groups)
 
-                        print('key_states3', key_states.size(), key_states.dtype, key_states.device, flush=True)
+                        # print('key_states3', key_states.size(), key_states.dtype, key_states.device, flush=True)
                         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
                         if attn_weights.size() != (bsz, self.q_num_heads, q_len, kv_seq_len):
                             raise ValueError(
@@ -1053,6 +1056,8 @@ class LlamaAttention(nn.Module):
                                     
                             self.q_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
                             self.o_proj.prepare_async_weight(in_dim_indices=vo_out_dim_indices)
+
+                            self.attn_cur_select_indices = qk_out_dim_indices.tolist()
                             # MHA, for GQA, skip prune for simplicity
                             if not self.is_GQA():
                                 self.k_proj.prepare_async_weight(out_dim_indices=qk_out_dim_indices)
@@ -1080,9 +1085,13 @@ class LlamaDecoderLayer(nn.Module):
         self.layer_order = layer_order
         self.llamaconfig = config
 
+        # if self.layer_order not in cfg['skip_layers']:
+        self.cur_attn_inference_duration = 0
+        self.cur_mlp_inference_duration = 0
+
     def check_asyncintra_for_mlp(self):
         if ('down_proj' in cfg['cust_tgt_modules'] or 'up_proj' in cfg['cust_tgt_modules'] or 'gate_proj' in cfg['cust_tgt_modules']) \
-            and self.layer_order > cfg['skip_layers'] \
+            and self.layer_order not in cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
             and cfg['mode'] == 'asyncintra' \
             and 'probe' in cfg['prune_method']:
@@ -1091,7 +1100,7 @@ class LlamaDecoderLayer(nn.Module):
     
     def check_asyncintra_for_attention(self):
         if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) \
-            and self.layer_order > cfg['skip_layers'] \
+            and self.layer_order not in cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
             and cfg['mode'] == 'asyncintra' \
             and 'probe' in cfg['prune_method']:
@@ -1129,7 +1138,7 @@ class LlamaDecoderLayer(nn.Module):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
 
-        print('layerorder', self.layer_order, flush=True)
+        # print('layerorder', self.layer_order, flush=True)
 
         # residual = hidden_states
         # if self.check_asyncintra_for_next_mlp():
@@ -1254,8 +1263,26 @@ class LlamaDecoderLayer(nn.Module):
         residual = hidden_states
 
 
-       
+        # l2_layer_norm = torch.linalg.norm(hidden_states, dim=-1)
+        # print('max_residual', self.layer_order, torch.max(residual), flush=True)
+        # # Find the index of the maximum element
+        # max_index_flattened = torch.argmax(residual)
+        # print('max_index_flattened', max_index_flattened, flush=True)
+
+        # # Convert the flattened index to 3-dimensional index
+        # B, T, D = residual.shape
+        # max_index_3d = (max_index_flattened // (T * D), (max_index_flattened % (T * D)) // D, max_index_flattened % D)
+        # # print('max_index_3d', max_index_3d)
+        # temp_max_token = residual[max_index_3d[0], max_index_3d[1], :].to(torch.float32)
+        # print('temp_max_token_average_l2', temp_max_token.shape, torch.linalg.norm(temp_max_token)/64, flush=True)
+        torch.cuda.synchronize()
+        start_time = time.time()
         hidden_states = self.input_layernorm(hidden_states)
+        # if 
+        # l2_layer_norm = torch.linalg.norm(hidden_states, dim=-1)
+        # print('torch.liang', l2_layer_norm, torch.max(l2_layer_norm), flush=True)
+
+        
 
         if self.check_asyncintra_for_attention():
             input_layernorm_mlp_residual = self.input_layernorm(kwargs['last_layer_residual'])
@@ -1297,7 +1324,12 @@ class LlamaDecoderLayer(nn.Module):
 
         residual = hidden_states
 
+        torch.cuda.synchronize()
+        if hasattr(self, 'cur_attn_inference_duration') and cfg['cur_batch_index'] >= 1:
+            self.cur_attn_inference_duration += time.time() - start_time
 
+        torch.cuda.synchronize()
+        start_time = time.time()
         hidden_states = self.post_attention_layernorm(hidden_states)
         if self.check_asyncintra_for_mlp():
             hidden_states = self.mlp(hidden_states, respick=respick, post_layernorm_attn_residual=post_layernorm_attn_residual)
@@ -1312,6 +1344,9 @@ class LlamaDecoderLayer(nn.Module):
             print('self.mlp_l2_magnitude_ratio', self.mlp_l2_magnitude_ratio, flush=True)
             print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
+        torch.cuda.synchronize()
+        if hasattr(self, 'cur_mlp_inference_duration') and cfg['cur_batch_index'] >= 1:
+            self.cur_mlp_inference_duration += time.time() - start_time
 
         outputs = (hidden_states,)
 

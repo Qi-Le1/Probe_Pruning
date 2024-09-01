@@ -15,7 +15,22 @@ def rank_process(x, probe_num, probe_type, residual):
         elif 'seq' in probe_type:
             l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
 
+
+    # all_sorted_values, all_sorted_indices = torch.sort(l2_norms, descending=True)
+    # all_sorted_values = all_sorted_values.to(torch.float32)
+    # print('values', all_sorted_values, all_sorted_indices, flush=True)
+
+    # sum_values = all_sorted_values.sum()
+    # probabilities = (all_sorted_values / sum_values)
+    # print('probabilities', probabilities, flush=True)
+    # selected_indices = torch.multinomial(probabilities, probe_num, replacement=False)
+    # all_sorted_values = all_sorted_values.to(torch.float16)
+    # values = all_sorted_values[selected_indices]
+    # indices = all_sorted_indices[selected_indices]
+
     values, indices = torch.topk(l2_norms, probe_num)
+
+
     sorted_indices = indices.sort()[0]
 
     if 'bsz' in probe_type:
@@ -43,7 +58,7 @@ def generate_probe(x, probe_ratio_list, residual=None):
         if 'bsz' in probe_type:
             probe_num = math.ceil(x.size(0) * probe_ratio)
         elif 'seq' in probe_type:
-            probe_num = math.ceil(x.size(1) * probe_ratio)
+            probe_num = max(math.ceil(x.size(1) * probe_ratio), 5)
 
         if 'rank' in probe_type:
             x, selected_indices = rank_process(x, probe_num, probe_type, residual)

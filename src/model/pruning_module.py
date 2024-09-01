@@ -24,7 +24,9 @@ class HiddenRepresentationPruning():
                 return 0
             
             num_hidden_layers = model_config.num_hidden_layers
-            prune_ratio = round(num_hidden_layers / (num_hidden_layers - (cfg['skip_layers'] + 1)) * prune_ratio, 2) 
+            # TODO: command back
+            prune_ratio = round(num_hidden_layers / (num_hidden_layers - (len(cfg['skip_layers']))) * prune_ratio, 2) 
+            # prune_ratio = cfg['prune_ratio']
             # if ('llama-3' in cfg['model_name'] or 'llama-2-70b' in cfg['model_name']) and ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) :
             #     if 'csr' in cfg['task_name']:
             #         approx_seq_len = 100
@@ -177,7 +179,7 @@ class HiddenRepresentationPruning():
 
                 combined_probe_out = torch.sum(combined_probe_out, dim=0).clamp(max=cfg['data_type_max'])
                 probe_out_dim_metric = torch.linalg.vector_norm((combined_probe_out.reshape((1,-1)) * torch.pow(weight, 2)), ord=2, dim=0).clamp(max=cfg['data_type_max'])
-                print('probe_out_dim_metric', probe_out_dim_metric.dtype)
+                # print('probe_out_dim_metric', probe_out_dim_metric.dtype)
                 return probe_out_dim_metric
             else:
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
@@ -370,9 +372,9 @@ class HiddenRepresentationPruning():
                 elif 'o_proj' in name and 'o_proj' not in cfg['cust_tgt_modules']:
                     continue
 
-                numbers = int(''.join(filter(str.isdigit, name)))
-                if numbers <= cfg['skip_layers']:
-                    continue
+                # numbers = int(''.join(filter(str.isdigit, name)))
+                # if numbers <= cfg['skip_layers']:
+                #     continue
 
                 if check_skip_layers(name):
                     continue
@@ -484,8 +486,8 @@ class HiddenRepresentationPruning():
                     continue
 
                 numbers = int(''.join(filter(str.isdigit, name)))
-                if numbers <= cfg['skip_layers']:
-                    continue
+                # if numbers <= cfg['skip_layers']:
+                #     continue
 
                 if check_skip_layers(name):
                     continue

@@ -151,16 +151,32 @@ def process_control():
     
     cfg['calibration_stage'] = False
     # default skip 3 layers
-    cfg['skip_layers'] = 2
+    cfg['skip_layers'] = [0, 1, 2]
     if 'skip' in cfg['prune_method']:
-        match = re.search(r'skip(-?\d+)', cfg['prune_method'])
+        # match = re.search(r'skip(-?\d+)', cfg['prune_method'])
+        # if match:
+        #     # Convert the matched string to a float
+        #     int_value = int(match.group(1))
+        #     # layer index starts from 0
+        #     cfg['skip_layers'] = int_value - 1
+        # else:
+        #     int_value = None
+        match = re.findall(r'skip(-?\d+(-\d+)*)', cfg['prune_method'])
+        print('match: ', match)
         if match:
-            # Convert the matched string to a float
-            int_value = int(match.group(1))
-            # layer index starts from 0
-            cfg['skip_layers'] = int_value - 1
-        else:
-            int_value = None
+            # Convert found strings to integers
+            numbers_str = match[0][0].split('-')
+            numbers = [int(num) for num in numbers_str if num]  
+            even_index_numbers = numbers[0::2]
+            odd_index_numbers = numbers[1::2]     
+            # Generate the list using range
+            skip_layers = []
+            for i in range(len(odd_index_numbers)):
+                start = even_index_numbers[i]
+                end = odd_index_numbers[i]
+                skip_layers.extend(range(start, end + 1))
+            cfg['skip_layers'] = skip_layers
+
 
     cfg['cur_batch_index'] = -1
     cfg['prune_dim'] = -1

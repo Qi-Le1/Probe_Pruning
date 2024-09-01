@@ -235,6 +235,12 @@ def test(data_loader, model, model_prof, metric, logger):
                             # Append the attribute to the logger
                         logger.append({f'{name}_{attr_name}': attr_value}, 'test')
                         print('name', name, attr_name, attr_value)
+                    if 'cur_select_indices' in attr_name:
+                        # Retrieve the attribute value
+                        attr_value = getattr(module, attr_name)
+                        # Append the attribute to the logger
+                        logger.accumulate({f'{name}_{attr_name}': attr_value}, 'test')
+                        # print('name', name, attr_name, attr_value)
                         
                     # Check if the attribute name contains 'mean_intersection_ratio'
                     
@@ -244,6 +250,26 @@ def test(data_loader, model, model_prof, metric, logger):
                 exp_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
+
+        # cur_attn_inference_duration_list = []
+        # cur_mlp_inference_duration_list = []
+        # for name, module in model.named_modules():
+        #     for attr_name in dir(module):
+        #         if 'cur_attn_inference_duration' in attr_name:
+        #             # Retrieve the attribute value
+        #             attr_value = getattr(module, attr_name)
+        #             cur_attn_inference_duration_list.append(attr_value)
+        #             # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+        #             # print('name', name, attr_name, attr_value)
+        #         if 'cur_mlp_inference_duration' in attr_name:
+        #             # Retrieve the attribute value
+        #             attr_value = getattr(module, attr_name)
+        #             cur_mlp_inference_duration_list.append(attr_value)
+        #             # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+        #             # print('name', name, attr_name, attr_value)
+        # print('mean_cur_attn_inference_duration', sum(cur_attn_inference_duration_list)/len(cur_attn_inference_duration_list))
+        # print('mean_cur_mlp_inference_duration', sum(cur_mlp_inference_duration_list)/len(cur_mlp_inference_duration_list))
+        # print('mean_inference_duration', inference_duration/len(data_loader))
 
         if cfg['onlyprobe'] == False: 
             evaluation = metric.evaluate('test', 'full')

@@ -394,7 +394,7 @@ class OPTAttention(nn.Module):
         if cfg['calibration_stage'] == True:
             return self.attention_forward(hidden_states, key_value_states, past_key_value, attention_mask, layer_head_mask, output_attentions, **kwargs)
         elif cfg['calibration_stage'] == False :
-            if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'out_proj' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
+            if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'out_proj' in cfg['cust_tgt_modules']) and self.layer_order not in cfg['skip_layers']:
                 bsz, q_len, _ = hidden_states.size()
                 probe_qk_out_dim_indices, probe_vo_out_dim_indices = None, None
                 if 'probe' in cfg['prune_method']:
@@ -788,7 +788,7 @@ class OPTDecoderLayer(nn.Module):
             hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states)))         
             return hidden_states  
         elif cfg['calibration_stage'] == False:
-            if ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) and self.layer_order > cfg['skip_layers']:
+            if ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) and self.layer_order not in cfg['skip_layers']:
                 if 'probe' in cfg['prune_method']:
                     probe_out_dim_indices = None
                     if cfg['mode'] == 'sync':
@@ -857,7 +857,7 @@ class OPTDecoderLayer(nn.Module):
 
     def check_asyncintra_for_mlp(self):
         if ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) \
-            and self.layer_order > cfg['skip_layers'] \
+            and self.layer_order not in cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
             and cfg['mode'] == 'asyncintra' \
             and 'probe' in cfg['prune_method']:
@@ -866,7 +866,7 @@ class OPTDecoderLayer(nn.Module):
     
     def check_asyncintra_for_attention(self):
         if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'out_proj' in cfg['cust_tgt_modules']) \
-            and self.layer_order > cfg['skip_layers'] \
+            and self.layer_order not in cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
             and cfg['mode'] == 'asyncintra' \
             and 'probe' in cfg['prune_method']:
