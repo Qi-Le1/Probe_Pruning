@@ -34,7 +34,9 @@ from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 from transformers.activations import ACT2FN
-from transformers.modeling_attn_mask_utils import AttentionMaskConverter, _prepare_4d_causal_attention_mask
+# from transformers.modeling_attn_mask_utils import AttentionMaskConverter, _prepare_4d_causal_attention_mask
+# 4.35.0 transformers verions has problem with the mask -> will get float('-inf'), use 4.37 version
+from .attentionmask import AttentionMaskConverter, _prepare_4d_causal_attention_mask
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast, SequenceClassifierOutputWithPast
 from transformers.modeling_utils import PreTrainedModel
 from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
@@ -51,7 +53,7 @@ from transformers import LlamaConfig
 from config import cfg
 from ..pruning_module import HiddenRepresentationPruning
 from torch.nn.functional import cosine_similarity
-from .utils import generate_probe, cal_res_hidden_state_diff  
+from .utils import generate_probe, cal_res_hidden_state_diff, custom_expand_mask, check_nan_inf  
 '''
 Note: transformers 4.35.0 version
 '''
@@ -325,6 +327,7 @@ class LlamaMLP(nn.Module):
                 inforank = kwargs['respick']
             else:
                 inforank = None
+            
             probe, bsz_selected_indices, seq_selected_indices = generate_probe(x, cfg['gate_probe_ratio'], inforank)
         else:
             raise ValueError('gate_probe_num should be equal to up_probe_num for now')
@@ -398,9 +401,22 @@ class LlamaMLP(nn.Module):
                             tensor_C = np.intersect1d(tensor_A, tensor_B)
                             self.diff_ratio = 1 - tensor_C.shape[0] / tensor_A.shape[0]
 
+                        # TODO: delete
+                        print('mlp input', check_nan_inf(x), x[0], x[-1], torch.max(x), torch.min(x), probe_out_dim_indices, probe_out_dim_indices.shape, flush=True)
+                        intermediate_states = self.act_fn(self.gate_proj(x, out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, out_dim_indices=probe_out_dim_indices)
+                        print('intermediate_states', check_nan_inf(intermediate_states), intermediate_states[0], torch.max(intermediate_states), torch.min(intermediate_states), torch.argmax(intermediate_states), flush=True)
+          
+                        intermediate_states = self.act_fn(self.gate_proj(x, out_dim_indices=torch.sort(probe_out_dim_indices)[0])) * self.up_proj(x, out_dim_indices=torch.sort(probe_out_dim_indices)[0])
+                        print('intermediate_states222222', check_nan_inf(intermediate_states), intermediate_states[0], torch.max(intermediate_states), torch.min(intermediate_states), flush=True)
 
+                        # temp = self.act_fn(self.gate_proj(x)) * self.up_proj(x)
+                        # print('temp', check_nan_inf(temp), torch.max(temp), torch.min(temp), flush=True)
+                        # temp2 = self.down_proj(temp)
+                        # print('temp2', check_nan_inf(temp2), torch.max(temp2), torch.min(temp2), flush=True)
                         down_proj = self.down_proj(self.act_fn(self.gate_proj(x, out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, out_dim_indices=probe_out_dim_indices), in_dim_indices=probe_out_dim_indices)
-       
+                        print('down_proj', check_nan_inf(down_proj), down_proj[0], torch.max(down_proj), torch.min(down_proj), flush=True)
+                        down_proj2 = self.down_proj(intermediate_states, in_dim_indices=torch.sort(probe_out_dim_indices)[0])
+                        print('down_proj2', check_nan_inf(down_proj2), down_proj2[0], torch.max(down_proj2), torch.min(down_proj2), flush=True)
                         # if cfg['mode'] == 'asyncinter':
                         #     with torch.cuda.stream(cfg['cuda_stream1']):
                         #         _, _ = self.probe_process(x)
@@ -552,6 +568,7 @@ class LlamaAttention(nn.Module):
                 inforank = kwargs['respick']
             else:
                 inforank = None
+            print('inforankid', id(inforank), flush=True)
             probe, bsz_selected_indices, seq_selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], inforank)
         else:
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
@@ -589,10 +606,28 @@ class LlamaAttention(nn.Module):
                 f" {attn_weights.size()}"
             )
 
+        # if bsz_selected_indices is None:
+        #     probe_attn_mask = attention_mask[:key_states.shape[0], :, :q_len, :kv_seq_len]
+        # else:
+        #     probe_attn_mask = attention_mask[bsz_selected_indices, :, :q_len, :kv_seq_len]
+        # print('bsz_selected_indices', bsz_selected_indices, q_len, flush=True)
+        # print('seq_selected_indices', seq_selected_indices, flush=True)
+        # print('attention_maskshape', attention_mask.shape, flush=True)
+        # if bsz_selected_indices is None:
+        #     probe_attn_mask = attention_mask[:key_states.shape[0], :, -q_len:, seq_selected_indices]
+        # else:
+        #     probe_attn_mask = attention_mask[bsz_selected_indices, :, -q_len:, seq_selected_indices]
+        
         if bsz_selected_indices is None:
-            probe_attn_mask = attention_mask[:key_states.shape[0], :, :q_len, :kv_seq_len]
+            probe_attn_mask = attention_mask[:key_states.shape[0], :, -q_len:, seq_selected_indices][:,:,:,seq_selected_indices]
         else:
-            probe_attn_mask = attention_mask[bsz_selected_indices, :, :q_len, :kv_seq_len]
+            probe_attn_mask = attention_mask[bsz_selected_indices, :, -q_len:, :][:,:,:,seq_selected_indices]
+
+        # torch.set_printoptions(threshold=5000)
+        # print("Shape after batch selection:", attention_mask[bsz_selected_indices].shape)
+        # print("Shape after query length slicing:", attention_mask[bsz_selected_indices, :, -q_len:].shape, attention_mask[bsz_selected_indices, :, -q_len:])
+        # print("Final shape after sequence index selection:", probe_attn_mask.shape, probe_attn_mask_2.shape, probe_attn_mask)
+
         # probe_attn_mask = attention_mask[:key_states.shape[0], :, :q_len, :kv_seq_len]
         if probe_attn_mask is not None:
             if probe_attn_mask.size() != (key_states.shape[0], 1, q_len, kv_seq_len):
@@ -602,7 +637,7 @@ class LlamaAttention(nn.Module):
             attn_weights = attn_weights + probe_attn_mask
 
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-
+        print('probe attn_weights', attn_weights, check_nan_inf(attn_weights), flush=True)
         attn_output = torch.matmul(attn_weights, value_states)
         if attn_output.size() != (key_states.shape[0], self.q_num_heads, q_len, self.head_dim):
             raise ValueError(
@@ -709,10 +744,14 @@ class LlamaAttention(nn.Module):
                     f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                 )
             attn_weights = attn_weights + attention_mask
+            attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
             # print('torch.tensor(torch.finfo(attn_weights.dtype).min', torch.tensor(torch.finfo(attn_weights.dtype).min))
-
+        
 
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+        # if 'mask' in cfg['prune_method']:
+            # print('attn_weights before', attn_weights[0][0], attention_mask[0][0])
+        # attn_weights = attn_weights + cfg['padding_mask']
         # value_states: bsz, self.num_key_value_heads, q_len, self.head_dim
         # value_states: 1, self.num_key_value_heads, q_len, self.head_dim
         attn_output = torch.matmul(attn_weights, value_states)
@@ -812,7 +851,7 @@ class LlamaAttention(nn.Module):
                     # --------------------------------------
                     #full inference
                     bsz, q_len, _ = hidden_states.size()
-
+                    print('hidden state after norm', torch.isnan(hidden_states).any())
                     query_states = self.q_proj(hidden_states, out_dim_indices=probe_qk_out_dim_indices)
                     key_states = self.k_proj(hidden_states, out_dim_indices=probe_qk_out_dim_indices)
                     value_states = self.v_proj(hidden_states, out_dim_indices=probe_vo_out_dim_indices)
@@ -841,7 +880,12 @@ class LlamaAttention(nn.Module):
                         key_states = repeat_kv(key_states, self.num_key_value_groups)
                         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
+                    print('q before softmax', check_nan_inf(query_states))
+                    print('k before softmax', check_nan_inf(key_states))
+                    print('v before softmax', check_nan_inf(value_states))
+
                     attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+                    print('attn_weights w/o attention_mask', check_nan_inf(attn_weights), torch.max(attn_weights), torch.min(attn_weights))
                     if attn_weights.size() != (bsz, self.q_num_heads, q_len, kv_seq_len):
                         raise ValueError(
                             f"Attention weights should be of size {(bsz, self.q_num_heads, q_len, kv_seq_len)}, but is"
@@ -854,8 +898,25 @@ class LlamaAttention(nn.Module):
                                 f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                             )
                         attn_weights = attn_weights + attention_mask
-
+                        attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
+                        
+                    print('attn_weights before softmax', check_nan_inf(attn_weights))
+                    temp = attn_weights
                     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+                    # if 'mask' in cfg['prune_method']:
+                        # print('attn_weights before', attn_weights[0][0], attention_mask[0][0])
+                    # attn_weights = attn_weights + cfg['padding_mask']
+                    print('attn_weights after softmax', self.layer_order, attn_weights[0][0], check_nan_inf(attn_weights))
+                    has_nan = torch.isnan(attn_weights).any()
+                    print('Contains NaN:', has_nan)
+
+                    if has_nan:
+                        # Find indices where NaN values occur
+                        nan_indices = torch.where(torch.isnan(attn_weights))
+                        torch.set_printoptions(threshold=5000)
+                        print('Indices of NaN values:', nan_indices, temp[nan_indices], nan_indices[0])
+                    else:
+                        print('No NaN values found')
 
                     attn_output = torch.matmul(attn_weights, value_states)
                     if attn_output.size() != (bsz, self.q_num_heads, q_len, self.head_dim):
@@ -865,9 +926,12 @@ class LlamaAttention(nn.Module):
                         )
                     attn_output = attn_output.transpose(1, 2).contiguous()
                     attn_output = attn_output.reshape(bsz, q_len, self.q_num_heads * self.head_dim)
+                    # torch.set_printoptions(threshold=10000)
+                    print('attn_output after v', attn_output[0][-1], check_nan_inf(attn_output))
 
                     attn_output = self.o_proj(attn_output, in_dim_indices=probe_vo_out_dim_indices)
-
+                    # torch.set_printoptions(threshold=10000)
+                    print('attn_output after o', attn_output[0][-1], probe_vo_out_dim_indices, torch.isnan(attn_output).any())
                     # if cfg['mode'] == 'asyncinter':
                     #     with torch.cuda.stream(cfg['cuda_stream1']):
                     #         _, _, _, _, _, _ = self.probe_process(hidden_states, attention_mask, position_ids, past_key_value, output_attentions, use_cache, **kwargs)
@@ -925,6 +989,7 @@ class LlamaAttention(nn.Module):
                                 f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                             )
                         attn_weights = attn_weights + attention_mask
+                        attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
 
                     attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
 
@@ -1020,6 +1085,7 @@ class LlamaAttention(nn.Module):
                                     f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
                                 )
                             attn_weights = attn_weights + attention_mask
+                            attn_weights = torch.max(attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device))
 
                         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
                         attn_output = torch.matmul(attn_weights, value_states)
@@ -1261,7 +1327,7 @@ class LlamaDecoderLayer(nn.Module):
 
         
         residual = hidden_states
-
+        print('residual start new layer', self.layer_order, residual[0], check_nan_inf(residual), flush=True)
 
         # l2_layer_norm = torch.linalg.norm(hidden_states, dim=-1)
         # print('max_residual', self.layer_order, torch.max(residual), flush=True)
@@ -1278,12 +1344,17 @@ class LlamaDecoderLayer(nn.Module):
         torch.cuda.synchronize()
         start_time = time.time()
         hidden_states = self.input_layernorm(hidden_states)
+        print('hidden state after input_layernorm', self.layer_order, hidden_states[0], check_nan_inf(hidden_states), flush=True)
+        if torch.isnan(hidden_states).any():
+            nan_indices = torch.where(torch.isnan(hidden_states))
+            torch.set_printoptions(threshold=5000)
+            print('Indices of NaN values:', nan_indices, hidden_states[nan_indices], residual[nan_indices])
         # if 
         # l2_layer_norm = torch.linalg.norm(hidden_states, dim=-1)
         # print('torch.liang', l2_layer_norm, torch.max(l2_layer_norm), flush=True)
 
         
-
+        print('residual_id', id(residual), flush=True)
         if self.check_asyncintra_for_attention():
             input_layernorm_mlp_residual = self.input_layernorm(kwargs['last_layer_residual'])
             hidden_states, self_attn_weights, present_key_value = self.self_attn(
@@ -1309,6 +1380,9 @@ class LlamaDecoderLayer(nn.Module):
                 # norm=residual,
                 respick=residual,
             )
+        
+        print('hidden state after attn', self.layer_order, hidden_states[0], check_nan_inf(hidden_states), flush=True)
+        print('residual after attn', self.layer_order, id(residual), residual[0], check_nan_inf(residual), flush=True)
         hidden_states = residual + hidden_states
         if 'resinfo' in cfg['prune_method']:
             self.attn_sign_match_percentage, self.attn_l2_magnitude_ratio, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
@@ -1323,7 +1397,7 @@ class LlamaDecoderLayer(nn.Module):
             post_layernorm_attn_residual = None
 
         residual = hidden_states
-
+        print('output after attn', self.layer_order, check_nan_inf(residual), residual[0], flush=True)
         torch.cuda.synchronize()
         if hasattr(self, 'cur_attn_inference_duration') and cfg['cur_batch_index'] >= 1:
             self.cur_attn_inference_duration += time.time() - start_time
@@ -1331,12 +1405,14 @@ class LlamaDecoderLayer(nn.Module):
         torch.cuda.synchronize()
         start_time = time.time()
         hidden_states = self.post_attention_layernorm(hidden_states)
+        print('hidden_states after mlp input norm', self.layer_order, check_nan_inf(hidden_states), hidden_states[0], flush=True)
         if self.check_asyncintra_for_mlp():
             hidden_states = self.mlp(hidden_states, respick=respick, post_layernorm_attn_residual=post_layernorm_attn_residual)
         else:
             hidden_states = self.mlp(hidden_states, respick=residual)
+        print('hidden_states mlp output', self.layer_order, check_nan_inf(hidden_states), hidden_states[0], flush=True)
         hidden_states = residual + hidden_states
-        
+        print('hidden_states after mlp', self.layer_order, check_nan_inf(hidden_states), hidden_states[0], flush=True)
         if 'resinfo' in cfg['prune_method']:
             self.mlp_sign_match_percentage, self.mlp_l2_magnitude_ratio, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
             print('self.layer_order', self.layer_order, flush=True)
@@ -1546,16 +1622,30 @@ class LlamaModel(LlamaPreTrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
- 
 
+        # for pad token, set to 0
+        inputs_embeds[attention_mask == 0] = 0
+        print('inputs_embeds', inputs_embeds.size(), inputs_embeds.dtype, inputs_embeds.device, inputs_embeds, flush=True)
         if getattr(self.config, "_flash_attn_2_enabled", False):
             # 2d mask is passed through the layers
             attention_mask = attention_mask if (attention_mask is not None and 0 in attention_mask) else None
         else:
+            padding_mask = attention_mask
+            cfg['first_one_indices'] = torch.argmax((attention_mask == 1).int(), dim=1).unsqueeze_(1)
+            print('attention_mask', attention_mask.size(), attention_mask.dtype, attention_mask.device, attention_mask, flush=True)
             # 4d mask is passed through the layers
             attention_mask = _prepare_4d_causal_attention_mask(
                 attention_mask, (batch_size, seq_length), inputs_embeds, past_key_values_length
             )
+
+            print('4d attention_mask', attention_mask.size(), attention_mask.dtype, attention_mask.device, attention_mask[0][0], flush=True)
+            print('4d attention_mask', attention_mask.size(), attention_mask.dtype, attention_mask.device, attention_mask[0][0][0], attention_mask[0][0][-1], flush=True)
+
+            padding_mask = custom_expand_mask(padding_mask, inputs_embeds.dtype, seq_length).to(
+                attention_mask.device)
+            
+            cfg['padding_mask'] = padding_mask
+            print('padding_mask', padding_mask.size(), padding_mask.dtype, padding_mask.device, padding_mask, flush=True)
         # embed positions
         hidden_states = inputs_embeds
         # hidden_states = torch.zeros_like(inputs_embeds)

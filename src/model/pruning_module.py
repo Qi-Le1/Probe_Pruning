@@ -306,6 +306,9 @@ class HiddenRepresentationPruning():
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
             num_prune_heads = int(prune_ratio * num_heads)
             heads_to_preserve = sorted_indices[num_prune_heads:]
+            print('heads_to_preserve', heads_to_preserve)
+            heads_to_preserve = torch.sort(heads_to_preserve)[0]
+            print('heads_to_preserve sort', heads_to_preserve)
             # sorted_heads, _ = torch.sort(heads_to_preserve)
 
             # print(sorted_heads)  # Output: tensor([1, 2, 3, 5, 8])
@@ -320,6 +323,7 @@ class HiddenRepresentationPruning():
         sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
         num_prune = int(prune_ratio * probe_out_dim_metric.shape[0])
         num_prune = nearest_multiple(num_prune, probe_out_dim_metric.shape[0], multiple)
+        # return torch.sort(sorted_indices[num_prune:])[0], torch.sort(sorted_indices[:num_prune])[0]
         return sorted_indices[num_prune:], sorted_indices[:num_prune]
     
     def cal_multiple_flops_for_flap(self, model):

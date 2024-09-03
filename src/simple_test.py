@@ -51,6 +51,77 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from LLMPruner.peft import PeftModel
 
+
+# Sequence length
+# seq_length = 10
+# bsz = 2
+# # Creating an example attention mask where last 3 elements are masked out (set to 0)
+# attention_mask = torch.ones(bsz, seq_length)
+# attention_mask[:, -3:] = 0
+# print(attention_mask)
+# expanded_mask = attention_mask[:, None, None, :].expand(bsz, 1, seq_length, seq_length)
+
+# expanded_mask = expanded_mask.transpose(-1, -2)
+# # expanded_mask = attention_mask.unsqueeze(2).repeat(1, 1, seq_length)  # Expand to (bsz, seq_length, seq_length)
+
+# print(expanded_mask)
+
+
+import torch
+import torch.nn.functional as F
+
+# # Create a tensor with -inf and very large negative values (-65504)
+# values = torch.tensor([-65504., -float('inf')] * 30, dtype=torch.float32)  # Using float16 to match your context
+
+# values = torch.tensor([-65504.] * 30, dtype=torch.float32)
+# # Apply softmax
+# softmax_output = F.softmax(values, dim=0)
+
+# print("Softmax Output:", softmax_output)
+
+
+import torch
+
+
+import torch
+
+# # Simulating attn_weights with NaN values for demonstration
+# attn_weights = torch.tensor([[0.1, 0.2, 0.3],
+#                              [0.4, float('nan'), 0.6],
+#                              [float('nan'), 0.8, 0.9]])
+
+# # Find indices where NaN values occur
+# nan_indices = torch.where(torch.isnan(attn_weights))
+
+# # Printing indices of NaN values
+# print('Row indices of NaN values:', nan_indices[0])
+# print('Column indices of NaN values:', nan_indices[1])
+# print(attn_weights[nan_indices])
+
+
+# Create a 3D tensor of size (3, 4, 5)
+tensor_3d = torch.randn(3, 4, 5)  # Random values
+
+# Create a 2D boolean tensor with the same shape as the first two dimensions of the 3D tensor
+tensor_2d = torch.rand(3, 4) > 0.5  # Random True/False based on a threshold
+
+print("3D Tensor:")
+print(tensor_3d)
+print("\n2D Boolean Tensor:")
+print(tensor_2d)
+tensor_3d[tensor_2d] = 999
+print("\nUpdated 3D Tensor:", tensor_3d)
+# Example attention mask tensor (bsz x seq_length)
+# attention_mask = torch.tensor([
+#     [0, 0, 1, 1, 1],
+#     [1, 1, 1, 0, 0],
+#     [0, 1, 1, 1, 1]
+# ])
+
+# # Find the indices of the first occurrence of 1 in each row
+# first_one_indices = torch.argmax((attention_mask == 1).int(), dim=1).unsqueeze_(1)
+
+# print(first_one_indices)
 # def load(model_type: str = 'pruneLLM', base_model: str = 'llama2-7b', ckpt: str = '', lora_ckpt: str = ''):
 #     if model_type == 'pruneLLM':
 #         pruned_dict = torch.load(ckpt, map_location='cpu')

@@ -583,9 +583,13 @@ def process_dataset(dataset, tokenizer):
                             temp_label = temp_label[-max_length_in_batch:]
                         else:
                             padding_length = max_length_in_batch - len(temp_input)
-                            temp_input += [tokenizer.pad_token_id] * padding_length
-                            temp_attention_mask += [0] * padding_length
-                            temp_label += [-100] * padding_length
+                            # temp_input += [tokenizer.pad_token_id] * padding_length
+                            # temp_attention_mask += [0] * padding_length
+                            # temp_label += [-100] * padding_length
+
+                            temp_input = [tokenizer.pad_token_id] * padding_length + temp_input
+                            temp_attention_mask = [0] * padding_length + temp_attention_mask
+                            temp_label = [-100] * padding_length + temp_label
 
                         model_inputs["input_ids"][i] = torch.tensor(temp_input[-max_length:])
                         model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask[-max_length:])
@@ -687,9 +691,13 @@ def process_dataset(dataset, tokenizer):
                             temp_label = temp_label[-max_length_in_batch:]
                         else:
                             padding_length = max_length_in_batch - len(temp_input)
-                            temp_input += [tokenizer.pad_token_id] * padding_length
-                            temp_attention_mask += [0] * padding_length
-                            temp_label += [-100] * padding_length
+                            # temp_input += [tokenizer.pad_token_id] * padding_length
+                            # temp_attention_mask += [0] * padding_length
+                            # temp_label += [-100] * padding_length
+
+                            temp_input = [tokenizer.pad_token_id] * padding_length + temp_input
+                            temp_attention_mask = [0] * padding_length + temp_attention_mask
+                            temp_label = [-100] * padding_length + temp_label
 
                         model_inputs["input_ids"][i] = torch.tensor(temp_input[-max_length:])
                         model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask[-max_length:])
@@ -791,9 +799,13 @@ def process_dataset(dataset, tokenizer):
                             temp_label = temp_label[-max_length_in_batch:]
                         else:
                             padding_length = max_length_in_batch - len(temp_input)
-                            temp_input += [tokenizer.pad_token_id] * padding_length
-                            temp_attention_mask += [0] * padding_length
-                            temp_label += [-100] * padding_length
+                            # temp_input += [tokenizer.pad_token_id] * padding_length
+                            # temp_attention_mask += [0] * padding_length
+                            # temp_label += [-100] * padding_length
+
+                            temp_input = [tokenizer.pad_token_id] * padding_length + temp_input
+                            temp_attention_mask = [0] * padding_length + temp_attention_mask
+                            temp_label = [-100] * padding_length + temp_label
 
                         model_inputs["input_ids"][i] = torch.tensor(temp_input[-max_length:])
                         model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask[-max_length:])
@@ -885,6 +897,7 @@ def process_dataset(dataset, tokenizer):
                         # Combine the current input ids and label input ids
                         temp_input = sample_input_ids + label_input_ids
                         max_length_in_batch = max(max_length_in_batch, len(temp_input))
+                        # max_length_in_batch = 100
 
                     # Second pass: adjust sequences to the max length in this batch
                     for i in range(batch_index, batch_end):
@@ -909,14 +922,20 @@ def process_dataset(dataset, tokenizer):
                             temp_label = temp_label[-max_length_in_batch:]
                         else:
                             padding_length = max_length_in_batch - len(temp_input)
-                            temp_input += [tokenizer.pad_token_id] * padding_length
-                            temp_attention_mask += [0] * padding_length
-                            temp_label += [-100] * padding_length
+                            temp_input = [tokenizer.pad_token_id] * padding_length + temp_input
+                            temp_attention_mask = [0] * padding_length + temp_attention_mask
+                            temp_label = [-100] * padding_length + temp_label
+
+                            # temp_input += [tokenizer.pad_token_id] * padding_length
+                            # temp_attention_mask += [0] * padding_length
+                            # temp_label += [-100] * padding_length
 
                         # Update the model inputs and labels
                         model_inputs["input_ids"][i] = torch.tensor(temp_input[-max_length:])
                         model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask[-max_length:])
                         labels["input_ids"][i] = torch.tensor(temp_label[-max_length:])
+                        print('attention_mask', torch.tensor(temp_attention_mask[-max_length:]))
+                        print('tokens', tokenizer.decode(torch.tensor(temp_input[-max_length:])))
                 # for i in range(len(correct_labels_extended)):
                 #     sample_input_ids = model_inputs["input_ids"][i]
                     
@@ -1077,9 +1096,13 @@ def process_dataset(dataset, tokenizer):
                             temp_label = temp_label[-max_length_in_batch:]
                         else:
                             padding_length = max_length_in_batch - len(temp_input)
-                            temp_input += [tokenizer.pad_token_id] * padding_length
-                            temp_attention_mask += [0] * padding_length
-                            temp_label += [-100] * padding_length
+                            # temp_input += [tokenizer.pad_token_id] * padding_length
+                            # temp_attention_mask += [0] * padding_length
+                            # temp_label += [-100] * padding_length
+
+                            temp_input = [tokenizer.pad_token_id] * padding_length + temp_input
+                            temp_attention_mask = [0] * padding_length + temp_attention_mask
+                            temp_label = [-100] * padding_length + temp_label
 
                         model_inputs["input_ids"][i] = torch.tensor(temp_input[-max_length:])
                         model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask[-max_length:])
@@ -1198,9 +1221,13 @@ def process_dataset(dataset, tokenizer):
                             temp_label = temp_label[-max_length_in_batch:]
                         else:
                             padding_length = max_length_in_batch - len(temp_input)
-                            temp_input += [tokenizer.pad_token_id] * padding_length
-                            temp_attention_mask += [0] * padding_length
-                            temp_label += [-100] * padding_length
+                            # temp_input += [tokenizer.pad_token_id] * padding_length
+                            # temp_attention_mask += [0] * padding_length
+                            # temp_label += [-100] * padding_length
+
+                            temp_input = [tokenizer.pad_token_id] * padding_length + temp_input
+                            temp_attention_mask = [0] * padding_length + temp_attention_mask
+                            temp_label = [-100] * padding_length + temp_label
 
                         model_inputs["input_ids"][i] = torch.tensor(temp_input[-max_length:])
                         model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask[-max_length:])
@@ -1383,9 +1410,13 @@ def process_dataset(dataset, tokenizer):
                             temp_label = temp_label[-max_length_in_batch:]
                         else:
                             padding_length = max_length_in_batch - len(temp_input)
-                            temp_input += [tokenizer.pad_token_id] * padding_length
-                            temp_attention_mask += [0] * padding_length
-                            temp_label += [-100] * padding_length
+                            # temp_input += [tokenizer.pad_token_id] * padding_length
+                            # temp_attention_mask += [0] * padding_length
+                            # temp_label += [-100] * padding_length
+
+                            temp_input = [tokenizer.pad_token_id] * padding_length + temp_input
+                            temp_attention_mask = [0] * padding_length + temp_attention_mask
+                            temp_label = [-100] * padding_length + temp_label
 
                         model_inputs["input_ids"][i] = torch.tensor(temp_input[-max_length:])
                         model_inputs["attention_mask"][i] = torch.tensor(temp_attention_mask[-max_length:])

@@ -496,6 +496,9 @@ class Linear(nn.Linear, EriLayer):
                         weight = self.extract_in_dim_weight(weight, kwargs['in_dim_indices'])
                         result = F.linear(x, weight, bias=None)
                         if 'o_proj' in self.key or 'down_proj' in self.key:
+                            print('in_dim_indices: ', kwargs['in_dim_indices'])
+                            print('weight', weight)
+                            print('result', result[0][-1])
                             if 'bias' in cfg['prune_method']:
                                 compensate_bias = self.get_compensate_bias(x, self.weight, kwargs['in_dim_indices'])
                                 result += compensate_bias

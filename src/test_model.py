@@ -118,6 +118,7 @@ def run_calibration(model, data_loader):
 
 def identify_pad_tokens(input):
     pad_tokens = input['input_ids'] == cfg['pad_token_id'] 
+    print('pad_tokens', pad_tokens[0], input['attention_mask'][0])
     no_padding = (~pad_tokens).all()
     # if there is padding, need to zero out the padding token
     if no_padding == False:
@@ -173,6 +174,7 @@ def test(data_loader, model, model_prof, metric, logger):
             output_ = {'target': output['target'], 'loss': output['loss']}
         torch.cuda.synchronize()
 
+        # return
 
 
         model_prof.start_profile()

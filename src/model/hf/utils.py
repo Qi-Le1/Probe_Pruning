@@ -2,9 +2,31 @@ import math
 import torch
 from config import cfg
 
-# torch.set_printoptions(threshold=1000)
+def custom_expand_mask(mask, dtype, tgt_len=None):
+        """
+        Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
+        """
+        bsz, src_len = mask.size()
+        tgt_len = tgt_len if tgt_len is not None else src_len
+
+        expanded_mask = mask[:, None, None, :].expand(bsz, 1, tgt_len, src_len).to(dtype)
+        expanded_mask = expanded_mask.transpose(-1, -2)
+        # expanded_mask = mask.unsqueeze(2).repeat(1, 1, tgt_len) 
+
+        inverted_mask = 1.0 - expanded_mask
+
+        return inverted_mask.masked_fill(inverted_mask.to(torch.bool), -1/src_len)
+
 def rank_process(x, probe_num, probe_type, residual):
+    
     if residual is not None:
+        print('residual_ranking', flush=True)
+        print(torch.isnan(residual).any(), torch.isinf(residual).any())
+
+        if torch.isnan(residual).any():
+            print('nan residual', flush=True)
+            print(residual, flush=True)
+            raise ValueError('nan residual')
         if 'bsz' in probe_type:
             l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(1, 2))
         elif 'seq' in probe_type:
@@ -15,7 +37,7 @@ def rank_process(x, probe_num, probe_type, residual):
         elif 'seq' in probe_type:
             l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
 
-
+    print('l2_norms', l2_norms, flush=True)
     # all_sorted_values, all_sorted_indices = torch.sort(l2_norms, descending=True)
     # all_sorted_values = all_sorted_values.to(torch.float32)
     # print('values', all_sorted_values, all_sorted_indices, flush=True)
@@ -29,9 +51,25 @@ def rank_process(x, probe_num, probe_type, residual):
     # indices = all_sorted_indices[selected_indices]
 
     values, indices = torch.topk(l2_norms, probe_num)
-
+    print(probe_type, indices, values)
 
     sorted_indices = indices.sort()[0]
+    # sorted_values = values.sort()[0]
+    # if 'seq' in probe_type:
+
+    #     first_indices = torch.arange(1)
+
+    #     # Calculate the start index for the last elements
+    #     # start_index_from_end = max(4, last_dim_length - num_elements_from_end)  # Ensure there's no overlap with the first 4 indices
+
+    #     # Generate indices for the last elements
+    #     last_indices = torch.arange(int(x.shape[1]//2) - probe_num, int(x.shape[1]//2))
+
+    #     # Combine the two sets of indices
+    #     sorted_indices = torch.cat((first_indices, last_indices)).to(x.device)
+
+    #     # sorted_indices = last_indices.to(x.device)
+    #     print('sorted_indices', sorted_indices, flush=True)
 
     if 'bsz' in probe_type:
         return x[sorted_indices, :, :], sorted_indices
@@ -45,11 +83,15 @@ def generate_probe(x, probe_ratio_list, residual=None):
     seq_selected_indices = None
     pad_tokens = cfg['pad_tokens']
 
-    if pad_tokens is not None:
-        if residual is not None:
-            residual[pad_tokens] = 0
-        else:
-            x[pad_tokens] = 0
+    if 'mask' in cfg['prune_method']:
+        pass
+    else:
+        if pad_tokens is not None:
+            if residual is not None:
+                residual[pad_tokens] = 0
+                print('residual_generate_probe', id(residual), flush=True)
+            else:
+                x[pad_tokens] = 0
 
     for i in range(len(cfg['probe_generation_type'])):
         probe_type = cfg['probe_generation_type'][i]
@@ -58,7 +100,7 @@ def generate_probe(x, probe_ratio_list, residual=None):
         if 'bsz' in probe_type:
             probe_num = math.ceil(x.size(0) * probe_ratio)
         elif 'seq' in probe_type:
-            probe_num = max(math.ceil(x.size(1) * probe_ratio), 5)
+            probe_num = max(math.ceil(x.size(1) * probe_ratio), 1)
 
         if 'rank' in probe_type:
             x, selected_indices = rank_process(x, probe_num, probe_type, residual)
@@ -69,8 +111,142 @@ def generate_probe(x, probe_ratio_list, residual=None):
         else:
             raise NotImplementedError
     return x, bsz_selected_indices, seq_selected_indices
+
+# torch.set_printoptions(threshold=1000)
+# def rank_process(x, probe_num, probe_type, residual):
+    
+#     if residual is not None:
+#         print('residual_ranking', flush=True)
+#         print(torch.isnan(residual).any(), torch.isinf(residual).any())
+
+#         if torch.isnan(residual).any():
+#             print('nan residual', flush=True)
+#             print(residual, flush=True)
+#             raise ValueError('nan residual')
+#         if 'bsz' in probe_type:
+#             l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(1, 2))
+#         elif 'seq' in probe_type:
+#             l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(0, 2))
+#     else:
+#         if 'bsz' in probe_type:
+#             l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(1, 2))
+#         elif 'seq' in probe_type:
+#             l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
+
+#     print('l2_norms', l2_norms, flush=True)
+#     # all_sorted_values, all_sorted_indices = torch.sort(l2_norms, descending=True)
+#     # all_sorted_values = all_sorted_values.to(torch.float32)
+#     # print('values', all_sorted_values, all_sorted_indices, flush=True)
+
+#     # sum_values = all_sorted_values.sum()
+#     # probabilities = (all_sorted_values / sum_values)
+#     # print('probabilities', probabilities, flush=True)
+#     # selected_indices = torch.multinomial(probabilities, probe_num, replacement=False)
+#     # all_sorted_values = all_sorted_values.to(torch.float16)
+#     # values = all_sorted_values[selected_indices]
+#     # indices = all_sorted_indices[selected_indices]
+
+#     values, indices = torch.topk(l2_norms, probe_num)
+#     print(probe_type, indices, values)
+
+#     sorted_indices = indices.sort()[0]
+#     # sorted_values = values.sort()[0]
+#     # if 'seq' in probe_type:
+
+#     #     first_indices = torch.arange(1)
+
+#     #     # Calculate the start index for the last elements
+#     #     # start_index_from_end = max(4, last_dim_length - num_elements_from_end)  # Ensure there's no overlap with the first 4 indices
+
+#     #     # Generate indices for the last elements
+#     #     last_indices = torch.arange(int(x.shape[1]//2) - probe_num, int(x.shape[1]//2))
+
+#     #     # Combine the two sets of indices
+#     #     sorted_indices = torch.cat((first_indices, last_indices)).to(x.device)
+
+#     #     # sorted_indices = last_indices.to(x.device)
+#     #     print('sorted_indices', sorted_indices, flush=True)
+
+#     if 'bsz' in probe_type:
+#         return x[sorted_indices, :, :], sorted_indices
+#     elif 'seq' in probe_type:        
+#         sorted_indices = sorted_indices.unsqueeze(0).repeat(x.shape[0], 1)
+#         # print('sorted_indices', sorted_indices, flush=True)
+#         # sorted_indices[:, 0] = cfg['first_one_indices']
+#         # print('sorted_indices after', sorted_indices, flush=True)
+
+#         # sorted_indices = sorted_indices.unsqueeze(-1)
+#         # new_x = torch.gather(x, 1, sorted_indices.expand(-1, -1, x.shape[2]))
+
+#         # print('sorted_indices after update:', sorted_indices.squeeze(-1))
+#         # print('new_x shape:', new_x.shape)
+
+#         # # Returning new_x and sorted_indices for further use
+#         # return new_x, sorted_indices.squeeze(-1)
+#         for i in range(x.shape[0]):
+#             sorted_indices[i][0] = cfg['first_one_indices'][i][0]
+#             # sorted_indices[i].sort_()
+#             sorted_indices[i], _ = sorted_indices[i].sort() 
+
+#         # Correct indexing
+#         # You need to ensure each batch item uses its corresponding sorted_indices for advanced indexing
+#         new_x = torch.stack([x[i, sorted_indices[i], :] for i in range(x.shape[0])])
+
+#         # print('sorted_indices', sorted_indices)
+#         # print('new_x shape:', new_x)
+
+#         return new_x, sorted_indices
+
+#         return x[:, sorted_indices, :], sorted_indices
+
+
+# def generate_probe(x, probe_ratio_list, residual=None):
+#     # seq rank needs selected_indices to combine with the global metric
+#     bsz_selected_indices = None
+#     seq_selected_indices = None
+#     pad_tokens = cfg['pad_tokens']
+
+#     if 'mask' in cfg['prune_method']:
+#         pass
+#     else:
+#         if pad_tokens is not None:
+#             if residual is not None:
+#                 residual[pad_tokens] = 0
+#             else:
+#                 x[pad_tokens] = 0
+
+#     for i in range(len(cfg['probe_generation_type'])):
+#         probe_type = cfg['probe_generation_type'][i]
+#         probe_ratio = probe_ratio_list[i]
+
+#         if 'bsz' in probe_type:
+#             probe_num = math.ceil(x.size(0) * probe_ratio)
+#         elif 'seq' in probe_type:
+#             probe_num = max(math.ceil(x.size(1) * probe_ratio), 1)
+
+#         if 'rank' in probe_type:
+#             x, selected_indices = rank_process(x, probe_num, probe_type, residual)
+#             if 'bsz' in probe_type:
+#                 bsz_selected_indices = selected_indices
+#             elif 'seq' in probe_type:
+#                 seq_selected_indices = selected_indices
+#         else:
+#             raise NotImplementedError
+#     # print('probeshape', x.shape, bsz_selected_indices, flush=True)
+#     seq_selected_indices = seq_selected_indices[bsz_selected_indices].squeeze(0)
+#     # print('seq_selected_indices', seq_selected_indices, seq_selected_indices.shape, flush=True)
+#     return x, bsz_selected_indices, seq_selected_indices
     
 
+def check_nan_inf(x):
+    if torch.isnan(x).any():
+        print('nan', flush=True)
+        print(x, torch.max(x), torch.min(x), flush=True)
+        raise ValueError('nan')
+    if torch.isinf(x).any():
+        print('inf', flush=True)
+        print(x, torch.max(x), torch.min(x), flush=True)
+        raise ValueError('inf')
 
 
 
