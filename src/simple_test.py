@@ -45,204 +45,314 @@
 # import seaborn as sns
 # import numpy as np
 
-import argparse
-
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from LLMPruner.peft import PeftModel
+# Example l2_norms tensor
+l2_norms = torch.randn(4, 10) * 1000  # 4 batches, 10 sequences each
+
+# Condition to check
+threshold = 500
+
+# Finding indices where condition is met
+rows, cols = torch.where(l2_norms > threshold)
 
 
-# Sequence length
-# seq_length = 10
-# bsz = 2
-# # Creating an example attention mask where last 3 elements are masked out (set to 0)
-# attention_mask = torch.ones(bsz, seq_length)
-# attention_mask[:, -3:] = 0
-# print(attention_mask)
-# expanded_mask = attention_mask[:, None, None, :].expand(bsz, 1, seq_length, seq_length)
 
-# expanded_mask = expanded_mask.transpose(-1, -2)
-# # expanded_mask = attention_mask.unsqueeze(2).repeat(1, 1, seq_length)  # Expand to (bsz, seq_length, seq_length)
-
-# print(expanded_mask)
+print(rows, cols)\
 
 
-import torch
-import torch.nn.functional as F
+batch_indices = torch.tensor([0, 0, 1, 1, ])
+sequence_indices = torch.tensor([2, 4, 5, 7])
 
-# # Create a tensor with -inf and very large negative values (-65504)
-# values = torch.tensor([-65504., -float('inf')] * 30, dtype=torch.float32)  # Using float16 to match your context
+unique_batches, counts = torch.unique_consecutive(batch_indices, return_counts=True)
 
-# values = torch.tensor([-65504.] * 30, dtype=torch.float32)
-# # Apply softmax
-# softmax_output = F.softmax(values, dim=0)
+# Use counts to split the sequence indices
+result_tensors = torch.split(sequence_indices, counts.tolist())
+print(result_tensors, result_tensors.dtype)
+# result = [[2,4],[5,7]]
+# import torch
 
-# print("Softmax Output:", softmax_output)
+# Dimensions for the tensor x
+N = 3  # Number of batches
+T = 5  # Number of sequences per batch
+D = 3   # Number of features per sequence
+
+# Create a random 3-dimensional tensor x
+x = torch.randn(N, T, D)
+# print('x start', x)
+# Create some sorted_indices as a 2D tensor
+# Let's assume you want to pick 3 pairs from the tensor
+sorted_indices = torch.tensor([
+    [0, 2],  # From batch 0, pick sequence index 0, 2
+    [1, 4],  # From batch 1, pick sequence index 1, 4
+    [2, 3]   # From batch 2, pick sequence index 2, 3
+])
+
+# Extract batch and sequence indices from sorted_indices
+
+batch_indices = torch.arange(sorted_indices.size(0)).repeat_interleave(sorted_indices.size(1))
 
 
-import torch
+# batch_indices = torch.arange(sorted_indices.size(0))
+sequence_indices = sorted_indices.flatten()
+
+# Use advanced indexing to retrieve the elements
+selected_elements = x[batch_indices, sequence_indices]
+
+# Reshape selected_elements back into the desired shape if needed
+selected_elements = selected_elements.view(N, -1, D)
+
+# Print the original tensor x for reference
+print("Tensor x:")
+print(x)
+
+# Print the selected elements
+print("\nSelected elements from x using sorted_indices:")
+print(selected_elements)
+
+# batch_indices = torch.arange(N).unsqueeze(1).expand(-1, sorted_indices.size(1))
+# print('batch_indices2', batch_indices)
+# sequence_indices = sorted_indices
+
+# # Use advanced indexing to retrieve the elements
+# selected_elements = x[batch_indices, sequence_indices]
+# print('selected_elements2', selected_elements)
+# # # Your tensors
+# # l2_norms = torch.tensor([1035., 1035., 1035., 1035., 1035., 1035., 1035., 1035., 1035., 1035.,
+# #                          1035., 1035., 1035., 1035., 1035., 1035., 1035., 1035., 1035., 1035.],
+# #                         device='cuda:0', dtype=torch.float16)
+# # noise = torch.tensor([-0.19, 0.08, -0.06, -0.04, -0.09, -0.03, 0.15, 0.05, -0.03, 0.01,
+# #                       -0.03, 0.19, -0.16, 0.05, 0.10, -0.09, 0.01, -0.09, 0.08, 0.20],
+# #                      device='cuda:0', dtype=torch.float16)
+# # print('l2_norms before noise', l2_norms)
+# # # Convert both tensors to float32
+# # # l2_norms = l2_norms.float()
+# # # noise = noise.float()
+# # noise = torch.randn(l2_norms.size(), device=l2_norms.device, dtype=l2_norms.dtype) * 0.5
+# # # Add noise and print results
+# # l2_norms += noise
+# # print('l2_norms after noise', l2_norms)
 
 
-import torch
+# import argparse
 
-# # Simulating attn_weights with NaN values for demonstration
-# attn_weights = torch.tensor([[0.1, 0.2, 0.3],
-#                              [0.4, float('nan'), 0.6],
-#                              [float('nan'), 0.8, 0.9]])
-
-# # Find indices where NaN values occur
-# nan_indices = torch.where(torch.isnan(attn_weights))
-
-# # Printing indices of NaN values
-# print('Row indices of NaN values:', nan_indices[0])
-# print('Column indices of NaN values:', nan_indices[1])
-# print(attn_weights[nan_indices])
+# import torch
+# from transformers import AutoTokenizer, AutoModelForCausalLM
+# from LLMPruner.peft import PeftModel
 
 
-# Create a 3D tensor of size (3, 4, 5)
-tensor_3d = torch.randn(3, 4, 5)  # Random values
+# # Sequence length
+# # seq_length = 10
+# # bsz = 2
+# # # Creating an example attention mask where last 3 elements are masked out (set to 0)
+# # attention_mask = torch.ones(bsz, seq_length)
+# # attention_mask[:, -3:] = 0
+# # print(attention_mask)
+# # expanded_mask = attention_mask[:, None, None, :].expand(bsz, 1, seq_length, seq_length)
 
-# Create a 2D boolean tensor with the same shape as the first two dimensions of the 3D tensor
-tensor_2d = torch.rand(3, 4) > 0.5  # Random True/False based on a threshold
+# # expanded_mask = expanded_mask.transpose(-1, -2)
+# # # expanded_mask = attention_mask.unsqueeze(2).repeat(1, 1, seq_length)  # Expand to (bsz, seq_length, seq_length)
 
-print("3D Tensor:")
-print(tensor_3d)
-print("\n2D Boolean Tensor:")
-print(tensor_2d)
-tensor_3d[tensor_2d] = 999
-print("\nUpdated 3D Tensor:", tensor_3d)
-# Example attention mask tensor (bsz x seq_length)
+# # print(expanded_mask)
+
+
+# import torch
+# import torch.nn.functional as F
+
+# # # Create a tensor with -inf and very large negative values (-65504)
+# # values = torch.tensor([-65504., -float('inf')] * 30, dtype=torch.float32)  # Using float16 to match your context
+
+# # values = torch.tensor([-65504.] * 30, dtype=torch.float32)
+# # # Apply softmax
+# # softmax_output = F.softmax(values, dim=0)
+
+# # print("Softmax Output:", softmax_output)
+
+
+# import torch
+
+
+# import torch
+
+# # # Simulating attn_weights with NaN values for demonstration
+# # attn_weights = torch.tensor([[0.1, 0.2, 0.3],
+# #                              [0.4, float('nan'), 0.6],
+# #                              [float('nan'), 0.8, 0.9]])
+
+# # # Find indices where NaN values occur
+# # nan_indices = torch.where(torch.isnan(attn_weights))
+
+# # # Printing indices of NaN values
+# # print('Row indices of NaN values:', nan_indices[0])
+# # print('Column indices of NaN values:', nan_indices[1])
+# # print(attn_weights[nan_indices])
+
+# import torch
+
+# # Example tensor representing an 'attention_mask'
 # attention_mask = torch.tensor([
-#     [0, 0, 1, 1, 1],
 #     [1, 1, 1, 0, 0],
-#     [0, 1, 1, 1, 1]
+#     [1, 1, 0, 0, 0],
+#     [1, 1, 1, 1, 1],
+#     [0, 1, 1, 1, 0],
+#     [1, 0, 0, 0, 0]
 # ])
 
-# # Find the indices of the first occurrence of 1 in each row
-# first_one_indices = torch.argmax((attention_mask == 1).int(), dim=1).unsqueeze_(1)
+# # Flip each row to make the last '1' be the first '1' from the left
+# flipped = torch.flip(attention_mask, dims=[1])
+# print("Flipped Tensor:", flipped)
+# # Find the index of the first '1' in each flipped row (now the last '1' in the original)
+# last_one_indices = torch.argmax(flipped, dim=1)
 
-# print(first_one_indices)
-# def load(model_type: str = 'pruneLLM', base_model: str = 'llama2-7b', ckpt: str = '', lora_ckpt: str = ''):
-#     if model_type == 'pruneLLM':
-#         pruned_dict = torch.load(ckpt, map_location='cpu')
-#         tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
-#     elif model_type == 'tune_prune_LLM':
-#         pruned_dict = torch.load(ckpt, map_location='cpu')
-#         tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
-#         model = PeftModel.from_pretrained(
-#             model,
-#             lora_ckpt,
-#             torch_dtype=torch.float16,
-#         )
-#     else:
-#         raise NotImplementedError
+# # Correct the indices to reflect their positions in the original tensor
+# non_padding_tokens = flipped.size(1) - last_one_indices
 
-#     if torch.cuda.is_available():
-#         device = "cuda"
-#     else:
-#         device = "cpu"
+# print("Last positions of 1 in each row:", correct_indices)
 
-#     if device == "cuda":
-#         model.half()
-#         model = model.cuda()
 
-#     # unwind broken decapoda-research config
-#     model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
-#     model.config.bos_token_id = 1
-#     model.config.eos_token_id = 2
-#     return model, tokenizer
+# # Create a 3D tensor of size (3, 4, 5)
+# # tensor_3d = torch.randn(3, 4, 5)  # Random values
 
-# base_model = 'pytorch_model.bin'
-# for i in ['results/seed0', 'results/seed1']:
-#     for j in ['llmpruner_prune_tune_block_param1_3_31_0.23_0.2_c4',
-#                 'llmpruner_prune_tune_block_param1_3_31_0.46_0.4_c4',
-#                 'llmpruner_prune_tune_block_param1_3_31_0.68_0.6_c4']:
-#         model, tokenizer = load("pruneLLM", ckpt=i + '/' + j + '/' + base_model)
-#         model.eval()
-#         # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
-#         # print(f"pruneLLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
-#         # del model
+# # # Create a 2D boolean tensor with the same shape as the first two dimensions of the 3D tensor
+# # tensor_2d = torch.rand(3, 4) > 0.5  # Random True/False based on a threshold
 
-#         # model, tokenizer = load("tune_prune_LLM", ckpt=i + '/' + j + '/' + base_model, lora_ckpt=i + '/' + j)
-#         # model.eval()
-#         # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
-#         # print(f"tune_prune_LLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
-#         # del model
+# # print("3D Tensor:")
+# # print(tensor_3d)
+# # print("\n2D Boolean Tensor:")
+# # print(tensor_2d)
+# # tensor_3d[tensor_2d] = 999
+# # print("\nUpdated 3D Tensor:", tensor_3d)
+# # Example attention mask tensor (bsz x seq_length)
+# # attention_mask = torch.tensor([
+# #     [0, 0, 1, 1, 1],
+# #     [1, 1, 1, 0, 0],
+# #     [0, 1, 1, 1, 1]
+# # ])
+
+# # # Find the indices of the first occurrence of 1 in each row
+# # first_one_indices = torch.argmax((attention_mask == 1).int(), dim=1).unsqueeze_(1)
+
+# # print(first_one_indices)
+# # def load(model_type: str = 'pruneLLM', base_model: str = 'llama2-7b', ckpt: str = '', lora_ckpt: str = ''):
+# #     if model_type == 'pruneLLM':
+# #         pruned_dict = torch.load(ckpt, map_location='cpu')
+# #         tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
+# #     elif model_type == 'tune_prune_LLM':
+# #         pruned_dict = torch.load(ckpt, map_location='cpu')
+# #         tokenizer, model = pruned_dict['tokenizer'], pruned_dict['model']
+# #         model = PeftModel.from_pretrained(
+# #             model,
+# #             lora_ckpt,
+# #             torch_dtype=torch.float16,
+# #         )
+# #     else:
+# #         raise NotImplementedError
+
+# #     if torch.cuda.is_available():
+# #         device = "cuda"
+# #     else:
+# #         device = "cpu"
+
+# #     if device == "cuda":
+# #         model.half()
+# #         model = model.cuda()
+
+# #     # unwind broken decapoda-research config
+# #     model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
+# #     model.config.bos_token_id = 1
+# #     model.config.eos_token_id = 2
+# #     return model, tokenizer
+
+# # base_model = 'pytorch_model.bin'
+# # for i in ['results/seed0', 'results/seed1']:
+# #     for j in ['llmpruner_prune_tune_block_param1_3_31_0.23_0.2_c4',
+# #                 'llmpruner_prune_tune_block_param1_3_31_0.46_0.4_c4',
+# #                 'llmpruner_prune_tune_block_param1_3_31_0.68_0.6_c4']:
+# #         model, tokenizer = load("pruneLLM", ckpt=i + '/' + j + '/' + base_model)
+# #         model.eval()
+# #         # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
+# #         # print(f"pruneLLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
+# #         # del model
+
+# #         # model, tokenizer = load("tune_prune_LLM", ckpt=i + '/' + j + '/' + base_model, lora_ckpt=i + '/' + j)
+# #         # model.eval()
+# #         # ppl = PPLMetric(model, tokenizer, ['wikitext2', 'ptb'], 128, device='cuda')
+# #         # print(f"tune_prune_LLM from {i + '/' + j}", " PPL after pruning: {}".format(ppl))
+# #         # del model
+# # import numpy as np
+# # data_latest = [
+# #     [68.4, 77.7, 74.3, 67.8, 41.8, 66.9, 41.3],
+# #     [71.1, 78.6, 74.7, 66.3, 42.9, 69.0, 43.1],
+# #     [65.9, 76.0, 69.4, 63.8, 36.5, 62.4, 40.3],
+# #     [65.3, 77.2, 69.3, 58.4, 38.1, 64.9, 40.3],
+# #     [62.8, 71.1, 55.3, 58.6, 31.4, 53.4, 34.8],
+# #     [60.8, 71.4, 42.2, 51.8, 29.9, 49.8, 36.4],
+# #     [67.7, 75.4, 69.1, 62.7, 38.3, 64.1, 41.0],
+# #     [65.0, 76.4, 68.4, 59.3, 39.0, 64.8, 40.6],
+# #     [62.5, 70.8, 55.6, 58.5, 33.2, 54.6, 36.2],
+# #     [62.0, 72.6, 43.7, 51.0, 29.9, 52.3, 38.5],
+# #     [60.6, 70.3, 50.7, 53.8, 30.1, 52.8, 35.9],
+# #     [62.0, 70.8, 42.8, 51.0, 29.0, 51.2, 36.9]
+# # ]
+
+# # # Calculate the average for each row using numpy for precision
+# # averages_latest = np.mean(data_latest, axis=1)
+# # print(averages_latest)
+
+
+# # data_latest = [[81.7, 79.0, 75.1, 79.4, 78.5, 78.7, 78.5],
+# #  [77.8, 73.4, 73.5, 76.3, 73.9, 66.0, 67.1],
+# #  [70.9, 76.3, 74.8, 69.6, 70.3, 73.1, 70.5],
+# #  [56.7, 57.2, 65.3, 59.1, 41.2, 44.0, 50.5],
+# #  [72.5, 73.9, 71.4, 72.5, 70.3, 63.2, 66.7],
+# #  [67.2, 63.7, 55.0, 57.4, 59.1, 47.2, 44.9],
+# #  [38.7, 40.8, 43.2, 42.9, 31.8, 31.7, 39.0],
+# #  [35.1, 25.0, 25.9, 32.1, 61.7, 60.7, 56.9],
+# #  [57.8, 59.1, 58.9, 47.05, 44.0, 6.0, 57.4],
+# #  [54.4, 36.6, 37.1, 49.0, 40.2, 40.2, 39.0],
+# #  [39.4, 40.2, 39.8, 34.5, 24.4, 36.9, 35.6],
+# #  [29.3, 31.8, 33.9]]
+
+# # # Calculate the average for each row using numpy for precision
+# # averages_latest = np.mean(data_latest, axis=1)
+# # print(averages_latest)
 # import numpy as np
-# data_latest = [
-#     [68.4, 77.7, 74.3, 67.8, 41.8, 66.9, 41.3],
-#     [71.1, 78.6, 74.7, 66.3, 42.9, 69.0, 43.1],
-#     [65.9, 76.0, 69.4, 63.8, 36.5, 62.4, 40.3],
-#     [65.3, 77.2, 69.3, 58.4, 38.1, 64.9, 40.3],
-#     [62.8, 71.1, 55.3, 58.6, 31.4, 53.4, 34.8],
-#     [60.8, 71.4, 42.2, 51.8, 29.9, 49.8, 36.4],
-#     [67.7, 75.4, 69.1, 62.7, 38.3, 64.1, 41.0],
-#     [65.0, 76.4, 68.4, 59.3, 39.0, 64.8, 40.6],
-#     [62.5, 70.8, 55.6, 58.5, 33.2, 54.6, 36.2],
-#     [62.0, 72.6, 43.7, 51.0, 29.9, 52.3, 38.5],
-#     [60.6, 70.3, 50.7, 53.8, 30.1, 52.8, 35.9],
-#     [62.0, 70.8, 42.8, 51.0, 29.0, 51.2, 36.9]
-# ]
+# import re
+# data_str = """
+# 68.4(0.0)	75.8(0.0)	70.4(0.0)	63.2(0.0)	38.9(0.0)	64.4(0.0)	42.2(0.0)
+# 69.8(0.0)	75.7(0.0)	70.7(0.0)	63.7(0.0)	39.2(0.0)	64.9(0.0)	41.4(0.0)
+# 69.3(0.0)	76.7(0.0)	70.9(0.0)	63.8(0.0)	40.1(0.0)	65.4(0.0)	40.2(0.0)
+# 69.0(0.1)	78.1(0.0)	73.5(0.0)	66.7(0.3)	42.8(0.1)	68.5(0.0)	40.9(0.2)
+# 67.3(0.1)	77.8(0.1)	73.7(0.0)	64.8(0.1)	41.5(0.1)	67.4(0.2)	41.3(0.3)
+# 68.1(0.1)	77.5(0.1)	73.7(0.0)	66.7(0.3)	42.2(0.1)	68.2(0.1)	42.7(0.4)
+# 57.4(0.0)	71.3(0.0)	55.7(0.0)	54.6(0.0)	31.7(0.0)	53.3(0.0)	34.6(0.0)
+# 62.1(0.0)	72.1(0.0)	56.9(0.0)	58.3(0.0)	34.3(0.0)	57.9(0.0)	35.4(0.0)
+# 63.8(0.0)	72.3(0.0)	57.6(0.0)	56.5(0.0)	33.5(0.0)	57.7(0.0)	36.0(0.0)
+# 62.7(0.2)	74.9(0.1)	63.6(0.0)	57.5(0.2)	35.5(0.1)	61.7(0.2)	40.3(0.4)
+# 64.3(0.1)	74.5(0.1)	64.2(0.1)	57.9(0.4)	37.6(0.1)	62.9(0.2)	40.7(1.1)
+# 64.7(0.1)	74.3(0.1)	64.4(0.1)	58.1(0.3)	37.7(0.3)	62.5(0.1)	41.3(0.2)
+# 58.5(0.0)	63.4(0.0)	35.3(0.0)	48.4(0.0)	23.6(0.0)	39.1(0.0)	32.0(0.0)
+# 60.7(0.0)	63.6(0.0)	36.1(0.0)	49.7(0.0)	24.9(0.0)	41.8(0.0)	31.8(0.0)
+# 61.7(0.0)	66.4(0.0)	36.8(0.0)	50.4(0.0)	25.6(0.0)	42.8(0.0)	32.0(0.0)
+# 61.6(0.2)	66.9(0.2)	36.7(0.0)	52.2(0.4)	27.0(0.1)	46.2(0.2)	33.9(0.1)
+# 62.0(0.1)	67.6(0.3)	37.2(0.2)	50.6(0.4)	26.9(0.2)	48.2(0.3)	31.5(0.2)
+# 62.1(0.0)	68.3(0.3)	37.1(0.0)	51.9(0.3)	27.4(0.2)	48.7(0.1)	33.3(0.1)
 
-# # Calculate the average for each row using numpy for precision
-# averages_latest = np.mean(data_latest, axis=1)
-# print(averages_latest)
+# """
 
+# # Extract only the primary numbers not in parentheses
+# cleaned_numbers = re.findall(r'(\d+\.\d+)(?=\(\d+\.\d+\))', data_str)
+# print('cleaned_numbers', cleaned_numbers)
+# # Convert to float for calculations
+# cleaned_floats = [float(num) for num in cleaned_numbers]
 
-# data_latest = [[81.7, 79.0, 75.1, 79.4, 78.5, 78.7, 78.5],
-#  [77.8, 73.4, 73.5, 76.3, 73.9, 66.0, 67.1],
-#  [70.9, 76.3, 74.8, 69.6, 70.3, 73.1, 70.5],
-#  [56.7, 57.2, 65.3, 59.1, 41.2, 44.0, 50.5],
-#  [72.5, 73.9, 71.4, 72.5, 70.3, 63.2, 66.7],
-#  [67.2, 63.7, 55.0, 57.4, 59.1, 47.2, 44.9],
-#  [38.7, 40.8, 43.2, 42.9, 31.8, 31.7, 39.0],
-#  [35.1, 25.0, 25.9, 32.1, 61.7, 60.7, 56.9],
-#  [57.8, 59.1, 58.9, 47.05, 44.0, 6.0, 57.4],
-#  [54.4, 36.6, 37.1, 49.0, 40.2, 40.2, 39.0],
-#  [39.4, 40.2, 39.8, 34.5, 24.4, 36.9, 35.6],
-#  [29.3, 31.8, 33.9]]
+# # # Organize these into rows of 7 for calculation
+# rows = np.array(cleaned_floats).reshape(-1, 7)
 
-# # Calculate the average for each row using numpy for precision
-# averages_latest = np.mean(data_latest, axis=1)
-# print(averages_latest)
-import numpy as np
-import re
-data_str = """
-68.4(0.0)	75.8(0.0)	70.4(0.0)	63.2(0.0)	38.9(0.0)	64.4(0.0)	42.2(0.0)
-69.8(0.0)	75.7(0.0)	70.7(0.0)	63.7(0.0)	39.2(0.0)	64.9(0.0)	41.4(0.0)
-69.3(0.0)	76.7(0.0)	70.9(0.0)	63.8(0.0)	40.1(0.0)	65.4(0.0)	40.2(0.0)
-69.0(0.1)	78.1(0.0)	73.5(0.0)	66.7(0.3)	42.8(0.1)	68.5(0.0)	40.9(0.2)
-67.3(0.1)	77.8(0.1)	73.7(0.0)	64.8(0.1)	41.5(0.1)	67.4(0.2)	41.3(0.3)
-68.1(0.1)	77.5(0.1)	73.7(0.0)	66.7(0.3)	42.2(0.1)	68.2(0.1)	42.7(0.4)
-57.4(0.0)	71.3(0.0)	55.7(0.0)	54.6(0.0)	31.7(0.0)	53.3(0.0)	34.6(0.0)
-62.1(0.0)	72.1(0.0)	56.9(0.0)	58.3(0.0)	34.3(0.0)	57.9(0.0)	35.4(0.0)
-63.8(0.0)	72.3(0.0)	57.6(0.0)	56.5(0.0)	33.5(0.0)	57.7(0.0)	36.0(0.0)
-62.7(0.2)	74.9(0.1)	63.6(0.0)	57.5(0.2)	35.5(0.1)	61.7(0.2)	40.3(0.4)
-64.3(0.1)	74.5(0.1)	64.2(0.1)	57.9(0.4)	37.6(0.1)	62.9(0.2)	40.7(1.1)
-64.7(0.1)	74.3(0.1)	64.4(0.1)	58.1(0.3)	37.7(0.3)	62.5(0.1)	41.3(0.2)
-58.5(0.0)	63.4(0.0)	35.3(0.0)	48.4(0.0)	23.6(0.0)	39.1(0.0)	32.0(0.0)
-60.7(0.0)	63.6(0.0)	36.1(0.0)	49.7(0.0)	24.9(0.0)	41.8(0.0)	31.8(0.0)
-61.7(0.0)	66.4(0.0)	36.8(0.0)	50.4(0.0)	25.6(0.0)	42.8(0.0)	32.0(0.0)
-61.6(0.2)	66.9(0.2)	36.7(0.0)	52.2(0.4)	27.0(0.1)	46.2(0.2)	33.9(0.1)
-62.0(0.1)	67.6(0.3)	37.2(0.2)	50.6(0.4)	26.9(0.2)	48.2(0.3)	31.5(0.2)
-62.1(0.0)	68.3(0.3)	37.1(0.0)	51.9(0.3)	27.4(0.2)	48.7(0.1)	33.3(0.1)
+# print('rows', rows)
+# # Calculate averages for each row
+# averages = np.mean(rows, axis=1)
 
-"""
-
-# Extract only the primary numbers not in parentheses
-cleaned_numbers = re.findall(r'(\d+\.\d+)(?=\(\d+\.\d+\))', data_str)
-print('cleaned_numbers', cleaned_numbers)
-# Convert to float for calculations
-cleaned_floats = [float(num) for num in cleaned_numbers]
-
-# Organize these into rows of 7 for calculation
-rows = np.array(cleaned_floats).reshape(-1, 7)
-
-print('rows', rows)
-# Calculate averages for each row
-averages = np.mean(rows, axis=1)
-
-print('averages', averages)
+# print('averages', averages)
 # data = [
 #     [65.3, 77.2, 74.1, 67.1, 41.1, 63.9, 41.8],
 #     [68.7, 77.7, 73.7, 64.2, 41.3, 67.7, 41.3],

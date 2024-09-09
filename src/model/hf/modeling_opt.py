@@ -236,6 +236,17 @@ class OPTAttention(nn.Module):
         attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
         attn_output = torch.bmm(attn_probs, value_states)
 
+        if cfg['pad_tokens'] is not None:
+            # print('devices', seq_selected_indices.device, cfg['pad_tokens'].device, flush=True)
+            cfg['pad_tokens'] = cfg['pad_tokens'].to(seq_selected_indices.device)
+            if bsz_selected_indices is None:
+                probe_pad_tokens = cfg['pad_tokens'][:, seq_selected_indices]
+            else:
+                probe_pad_tokens = cfg['pad_tokens'][bsz_selected_indices, :][:, seq_selected_indices]
+            # print('probe_pad_tokens',probe_pad_tokens,probe_pad_tokens.shape, flush=True)
+            # print('attn_output before probe_pad_tokens', attn_output, attn_output.shape, flush=True)
+            attn_output[probe_pad_tokens] = 0
+            
         if attn_output.size() != (bsz * self.num_heads, src_len, self.head_dim):
             raise ValueError(
                 f"`attn_output` should be of size {(bsz, self.num_heads, src_len, self.head_dim)}, but is"
@@ -359,6 +370,9 @@ class OPTAttention(nn.Module):
         attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
 
         attn_output = torch.bmm(attn_probs, value_states)
+        if cfg['pad_tokens'] is not None:
+            cfg['pad_tokens'].to(attn_weights.device) 
+            attn_output[cfg['pad_tokens']] = 0
 
         if attn_output.size() != (bsz * self.num_heads, tgt_len, self.head_dim):
             raise ValueError(
@@ -481,7 +495,9 @@ class OPTAttention(nn.Module):
                     attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
 
                     attn_output = torch.bmm(attn_probs, value_states)
-
+                    if cfg['pad_tokens'] is not None:
+                        cfg['pad_tokens'].to(attn_weights.device) 
+                        attn_output[cfg['pad_tokens']] = 0
                     if attn_output.size() != (bsz * self.q_num_heads, tgt_len, self.head_dim):
                         raise ValueError(
                             f"`attn_output` should be of size {(bsz, self.q_num_heads, tgt_len, self.head_dim)}, but is"

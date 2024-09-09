@@ -303,14 +303,20 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['512'], ['0.4'], 
+            #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.05-0.05-0.05-0.05-0.05-seqrank', '0.9-0.9-0.9-0.9-0.9-seqrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
             control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['512'], ['0.4'], 
-                             ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.05-0.05-0.05-0.05-0.05-seqrank', '0.9-0.9-0.9-0.9-0.9-seqrank'],
+                             ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-seqrank+bszrank', '0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-bszrank+seqrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['512'], ['0.4'], 
-                             ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-seqrank+bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-6.7b'], ['clm'], ['20'], ['512'], ['0.4'], 
+                             ['ppwandasp'], ['probe-default', 'probe-default-randomrank', 'probe-default-rulerank-last', 'probe-rulerank', 'probe-respick'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', '0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-bszrank+seqrank', '0.05-0.05-0.05-0.05-0.05-seqrank', '0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-bszrank+seqrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -401,12 +407,17 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['obqa', 'arc-c'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0', '0.2', '0.4'], 
-                             ['ppwandasp'], ['probe-default', 'probe-default-mask'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+            # control_name = [[['obqa', 'arc-c'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
+            #                  ['ppwandasp'], ['probe-calib-respick', 'probe-calib-respick-ema', 'probe-calib-respick-rightpad'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', '0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-bszrank+seqrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+            
+            control_name = [[['obqa', 'arc-c'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4', '0'], 
+                             ['ppwandasp'], ['probe-default-randomrank', 'probe-default-rulerank', 'probe-default-rulerank-last', 'probe-default', 'probe-rulerank', 'probe-respick'], ['sync'], ['c4-2000'], ['0.1-0.1-0.1-0.1-0.1-seqrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', '0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-bszrank+seqrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
-            
             pass
     elif file == 'save_calib_info':
         controls = []

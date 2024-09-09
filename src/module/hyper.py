@@ -74,7 +74,7 @@ def process_control():
             cfg['prune_method'] += '-calib'
         elif 'probe' in cfg['prune_method']:
             cfg['prune_method'] += '-calib'
-            # cfg['prune_method'] += '-ema'
+            cfg['prune_method'] += '-ema'
             cfg['prune_method'] += '-respick'
 
     cfg['mode'] = cfg['control']['mode']

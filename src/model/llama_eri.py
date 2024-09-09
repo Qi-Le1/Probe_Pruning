@@ -247,7 +247,7 @@ class Linear(nn.Linear, EriLayer):
                 if cfg['pad_tokens'] is not None:
                     cfg['pad_tokens'] = cfg['pad_tokens'].to(cur_device)
                     cfg['nonpad_tokens_denominator'] = cfg['nonpad_tokens_denominator'].to(cur_device)
-                    inp[cfg['pad_tokens']] = 0
+                    # inp[cfg['pad_tokens']] = 0
                     self.scaler_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + cfg['nonpad_tokens_denominator'])
                     norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
                     denominator = (self.nsamples[update_indices] + cfg['nonpad_tokens_denominator'])
@@ -496,9 +496,6 @@ class Linear(nn.Linear, EriLayer):
                         weight = self.extract_in_dim_weight(weight, kwargs['in_dim_indices'])
                         result = F.linear(x, weight, bias=None)
                         if 'o_proj' in self.key or 'down_proj' in self.key:
-                            print('in_dim_indices: ', kwargs['in_dim_indices'])
-                            print('weight', weight)
-                            print('result', result[0][-1])
                             if 'bias' in cfg['prune_method']:
                                 compensate_bias = self.get_compensate_bias(x, self.weight, kwargs['in_dim_indices'])
                                 result += compensate_bias

@@ -104,14 +104,15 @@ class CsrAccuracy:
         # acc
         for i in range(input['input_indices'].shape[0]):
             self.acc_output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item())
-            self.acc_correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
+            self.acc_correct_labels_for_one_question[input['input_indices'][i].item()].append(int(input['correct_labels'][i].item()))
         
 
     def __call__(self, *args, **kwargs):    
         total_acc = 0
         for key in self.acc_output_for_one_question:
             # argmin for positive loss
-            acc = 1 if np.argmin(self.acc_output_for_one_question[key]) == self.acc_correct_labels_for_one_question[key][0] else 0
+            correct_index = next((i for i, item in enumerate(self.acc_correct_labels_for_one_question[key]) if item == 1), None)
+            acc = 1 if np.argmin(self.acc_output_for_one_question[key]) == correct_index else 0
             total_acc += acc
 
         ppl = np.exp(np.mean(self.average))
@@ -150,13 +151,16 @@ class CsrAccuracyNorm:
         # print('label_length_per_sample', label_length_per_sample)
         for i in range(input['input_indices'].shape[0]):
             self.acc_norm_output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item()/label_length_per_sample[i].item())
-            self.acc_norm_correct_labels_for_one_question[input['input_indices'][i].item()].append(input['correct_labels'][i].item())
+            self.acc_norm_correct_labels_for_one_question[input['input_indices'][i].item()].append(int(input['correct_labels'][i].item()))
 
     def __call__(self, *args, **kwargs):    
         total_acc = 0
         for key in self.acc_norm_output_for_one_question:
             # argmin for positive loss
-            acc = 1 if np.argmin(self.acc_norm_output_for_one_question[key]) == self.acc_norm_correct_labels_for_one_question[key][0] else 0
+            print('self.acc_norm_correct_labels_for_one_question[key]', self.acc_norm_correct_labels_for_one_question[key])
+            correct_index = next((i for i, item in enumerate(self.acc_norm_correct_labels_for_one_question[key]) if item == 1), None)
+            print('correct_index', correct_index, np.argmin(self.acc_norm_correct_labels_for_one_question[key]))
+            acc = 1 if np.argmin(self.acc_norm_output_for_one_question[key]) == correct_index else 0
             total_acc += acc
 
         ppl = np.exp(np.mean(self.average))
