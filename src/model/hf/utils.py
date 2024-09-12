@@ -36,7 +36,13 @@ def rank_process(x, probe_num, probe_type, residual):
         print('rulerank', flush=True)
         if 'bsz' in probe_type:
             # TODO: sort
-            sorted_indices = torch.randperm(x.size(0))[:probe_num]
+            # sorted_indices = torch.randperm(x.size(0))[:probe_num]
+            l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(1, 2))
+            values, indices = torch.topk(l2_norms, probe_num)
+            print(probe_type, indices, values)
+
+            sorted_indices = indices.sort()[0]
+            print('sorted_Indicesbsz', sorted_indices)
             # sorted_indices = torch.arange(probe_num)
             x = x[sorted_indices, :, :]
             cfg['temp_input_ids'] = cfg['temp_input_ids'][sorted_indices, :]
@@ -59,7 +65,7 @@ def rank_process(x, probe_num, probe_type, residual):
             if 'last' in cfg['prune_method']:
                 last_indices = torch.arange(x.size(1) - probe_num + 1, x.size(1))
             else:
-                last_indices = torch.arange(max(x.size(1) - probe_num - 1, 1), x.size(1))
+                # last_indices = torch.arange(max(x.size(1) - probe_num - 1, 1), x.size(1))
                 last_indices = torch.arange(1, probe_num)
             # last_indices = torch.arange(30)
 
@@ -103,7 +109,7 @@ def rank_process(x, probe_num, probe_type, residual):
             x = x[:, sorted_indices, :]
 
             cfg['temp_input_ids'] = cfg['temp_input_ids'][:, sorted_indices]
-            print('sorted_indices', sorted_indices, flush=True)
+            print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
         decoded_string = cfg['tokenizer'].batch_decode(cfg['temp_input_ids'], skip_special_tokens=False)
 
         print(f'decoded_string_{probe_type}', decoded_string)
@@ -160,17 +166,43 @@ def rank_process(x, probe_num, probe_type, residual):
     # indices = all_sorted_indices[selected_indices]
         print('x.size(1) - int(probe_num//2)', x.size(1) - int(probe_num//2))
         if 'seq' in probe_type:
-            values, indices = torch.topk(l2_norms[:x.size(1) - int(probe_num//2)], int(probe_num//2))
-            
 
-            sorted_indices = indices.sort()[0]
-            if sorted_indices[0] != 0:
-                sorted_indices[0] = 0
-            print(probe_type, sorted_indices, sorted_indices.shape, values)
+            if 'mixing' in cfg['prune_method']:
+                values, indices = torch.topk(l2_norms[:x.size(1) - int(probe_num//2)], int(probe_num//2))
+                
 
-            last_indices = torch.arange(x.size(1) - int(probe_num//2), x.size(1)).to(x.device)
-            sorted_indices = torch.cat((sorted_indices, last_indices)).to(x.device)
-            print('sorted_indices', sorted_indices, flush=True)
+                sorted_indices = indices.sort()[0]
+                if sorted_indices[0] != 0:
+                    sorted_indices[0] = 0
+                print(probe_type, sorted_indices, sorted_indices.shape, values)
+
+                last_indices = torch.arange(x.size(1) - int(probe_num//2), x.size(1)).to(x.device)
+                sorted_indices = torch.cat((sorted_indices, last_indices)).to(x.device)
+                print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
+            else:
+                values, indices = torch.topk(l2_norms, probe_num)
+                sorted_indices = indices.sort()[0]
+                print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
+
+                each_l2_norm = torch.linalg.vector_norm(residual, ord=2, dim=2)
+                each_seq_mean = torch.mean(each_l2_norm, dim=1)
+                print('each_l2_norm', each_l2_norm, flush=True)
+                print('each_seq_mean', each_seq_mean, flush=True)
+                
+
+                # Calculate twice the mean for each sequence
+                twice_seq_mean = 2 * each_seq_mean[:, None]  # Add dimension for broadcasting
+
+                # Find elements where each element in each_l2_norm is greater than twice the corresponding sequence mean
+                mask = each_l2_norm > twice_seq_mean
+
+                # Extract the values and their indices where the condition is true
+                values = each_l2_norm[mask]
+                indices = torch.nonzero(mask, as_tuple=True)
+
+                # Printing the results
+                print("Values greater than twice the sequence mean:", values, values.size())
+                print("Indices of these values (batch_index, sequence_index):", indices)
         else:
             values, indices = torch.topk(l2_norms, probe_num)
             print(probe_type, indices, values)

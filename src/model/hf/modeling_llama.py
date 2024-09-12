@@ -774,7 +774,7 @@ class LlamaAttention(nn.Module):
 
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.reshape(bsz, q_len, self.num_heads * self.head_dim)
-        if cfg['pad_tokens'] is not None:
+        if cfg['calibration_stage'] == False and cfg['pad_tokens'] is not None:
             cfg['pad_tokens'].to(attn_weights.device) 
             attn_output[cfg['pad_tokens']] = 0
         # attn_output[]

@@ -300,7 +300,7 @@ def make_data_name():
                                            }                       
                          },
             'ptb': {'data_name': 'ptb_text_only',
-                          'subset_name_dict': {'none': {'subset_name': None,
+                          'subset_name_dict': {'none': {'subset_name': 'penn_treebank',
                                                    'text_column': ['sentence'],
                                                    'label_column': None}
                                            }                       

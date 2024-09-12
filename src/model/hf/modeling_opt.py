@@ -370,7 +370,7 @@ class OPTAttention(nn.Module):
         attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
 
         attn_output = torch.bmm(attn_probs, value_states)
-        if cfg['pad_tokens'] is not None:
+        if cfg['calibration_stage'] == False and cfg['pad_tokens'] is not None:
             cfg['pad_tokens'].to(attn_weights.device) 
             attn_output[cfg['pad_tokens']] = 0
 
