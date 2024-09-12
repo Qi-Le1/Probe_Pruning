@@ -409,8 +409,14 @@ def main():
             # controls.extend(CIFAR10_controls_9)
 
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['512'], ['0.4', '0.6'], 
-                            ['ppwandasp'], ['probe-calib-respick-ema-rulerank'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', '0.05-0.05-0.05-0.05-0.05-seqrank'],
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['512'], ['0.4', '0.6'], 
+            #                 ['ppwandasp'], ['probe-respick-calib-ema-ruleranklast-allpivot', 'probe-respick-calib-ema-ruleranklast'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+            #             ['q-proj+k-proj+v-proj+o-proj', 'gate-proj+up-proj+down-proj', 'default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['512'], ['0.4'], 
+                            ['ppwandasp'], ['probe-respick-calib-ema'], ['sync'], ['c4-2000'], ['0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-seqrank+bszrank', '0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-0.05+0.05-bszrank+seqrank'],
                         ['q-proj+k-proj+v-proj+o-proj', 'gate-proj+up-proj+down-proj', 'default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -954,13 +960,13 @@ def main():
         # s += '#SBATCH --gres=gpu:a100:1\n'
        
 
-        s += f'#SBATCH -A aanwar\n'
-        s += f'#SBATCH --gres=gpu:a100:{gpu_num}\n'
-        s += '#SBATCH --partition=a100-4\n'
+        # s += f'#SBATCH -A aanwar\n'
+        # s += f'#SBATCH --gres=gpu:a100:{gpu_num}\n'
+        # s += '#SBATCH --partition=a100-4\n'
 
-        # s += f'#SBATCH -A dingj\n'
-        # s += f'#SBATCH --gres=gpu:{gpu_num}\n'
-        # s += '#SBATCH --partition=jd-4a100\n'
+        s += f'#SBATCH -A dingj\n'
+        s += f'#SBATCH --gres=gpu:{gpu_num}\n'
+        s += '#SBATCH --partition=jd-4a100\n'
 
 
         s += f'#SBATCH --mem={temp_mem}gb\n'

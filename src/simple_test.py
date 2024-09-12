@@ -46,68 +46,75 @@
 # import numpy as np
 
 import torch
+
+
+empty_tensor = torch.tensor([])
+print(empty_tensor.size()) 
+
+
+
 # Example l2_norms tensor
-l2_norms = torch.randn(4, 10) * 1000  # 4 batches, 10 sequences each
+# l2_norms = torch.randn(4, 10) * 1000  # 4 batches, 10 sequences each
 
-# Condition to check
-threshold = 500
+# # Condition to check
+# threshold = 500
 
-# Finding indices where condition is met
-rows, cols = torch.where(l2_norms > threshold)
-
-
-
-print(rows, cols)\
+# # Finding indices where condition is met
+# rows, cols = torch.where(l2_norms > threshold)
 
 
-batch_indices = torch.tensor([0, 0, 1, 1, ])
-sequence_indices = torch.tensor([2, 4, 5, 7])
 
-unique_batches, counts = torch.unique_consecutive(batch_indices, return_counts=True)
-
-# Use counts to split the sequence indices
-result_tensors = torch.split(sequence_indices, counts.tolist())
-print(result_tensors, result_tensors.dtype)
-# result = [[2,4],[5,7]]
-# import torch
-
-# Dimensions for the tensor x
-N = 3  # Number of batches
-T = 5  # Number of sequences per batch
-D = 3   # Number of features per sequence
-
-# Create a random 3-dimensional tensor x
-x = torch.randn(N, T, D)
-# print('x start', x)
-# Create some sorted_indices as a 2D tensor
-# Let's assume you want to pick 3 pairs from the tensor
-sorted_indices = torch.tensor([
-    [0, 2],  # From batch 0, pick sequence index 0, 2
-    [1, 4],  # From batch 1, pick sequence index 1, 4
-    [2, 3]   # From batch 2, pick sequence index 2, 3
-])
-
-# Extract batch and sequence indices from sorted_indices
-
-batch_indices = torch.arange(sorted_indices.size(0)).repeat_interleave(sorted_indices.size(1))
+# print(rows, cols)\
 
 
-# batch_indices = torch.arange(sorted_indices.size(0))
-sequence_indices = sorted_indices.flatten()
+# batch_indices = torch.tensor([0, 0, 1, 1, ])
+# sequence_indices = torch.tensor([2, 4, 5, 7])
 
-# Use advanced indexing to retrieve the elements
-selected_elements = x[batch_indices, sequence_indices]
+# unique_batches, counts = torch.unique_consecutive(batch_indices, return_counts=True)
 
-# Reshape selected_elements back into the desired shape if needed
-selected_elements = selected_elements.view(N, -1, D)
+# # Use counts to split the sequence indices
+# result_tensors = torch.split(sequence_indices, counts.tolist())
+# print(result_tensors, result_tensors.dtype)
+# # result = [[2,4],[5,7]]
+# # import torch
 
-# Print the original tensor x for reference
-print("Tensor x:")
-print(x)
+# # Dimensions for the tensor x
+# N = 3  # Number of batches
+# T = 5  # Number of sequences per batch
+# D = 3   # Number of features per sequence
 
-# Print the selected elements
-print("\nSelected elements from x using sorted_indices:")
-print(selected_elements)
+# # Create a random 3-dimensional tensor x
+# x = torch.randn(N, T, D)
+# # print('x start', x)
+# # Create some sorted_indices as a 2D tensor
+# # Let's assume you want to pick 3 pairs from the tensor
+# sorted_indices = torch.tensor([
+#     [0, 2],  # From batch 0, pick sequence index 0, 2
+#     [1, 4],  # From batch 1, pick sequence index 1, 4
+#     [2, 3]   # From batch 2, pick sequence index 2, 3
+# ])
+
+# # Extract batch and sequence indices from sorted_indices
+
+# batch_indices = torch.arange(sorted_indices.size(0)).repeat_interleave(sorted_indices.size(1))
+
+
+# # batch_indices = torch.arange(sorted_indices.size(0))
+# sequence_indices = sorted_indices.flatten()
+
+# # Use advanced indexing to retrieve the elements
+# selected_elements = x[batch_indices, sequence_indices]
+
+# # Reshape selected_elements back into the desired shape if needed
+# selected_elements = selected_elements.view(N, -1, D)
+
+# # Print the original tensor x for reference
+# print("Tensor x:")
+# print(x)
+
+# # Print the selected elements
+# print("\nSelected elements from x using sorted_indices:")
+# print(selected_elements)
 
 # batch_indices = torch.arange(N).unsqueeze(1).expand(-1, sorted_indices.size(1))
 # print('batch_indices2', batch_indices)
