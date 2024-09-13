@@ -108,7 +108,7 @@ class HiddenRepresentationPruning():
                 cur_global_metric_score_distribution = global_metric_score_distribution[seq_selected_indices, :] if seq_selected_indices is not None else global_metric_score_distribution
                 cur_global_metric_score_distribution = cur_global_metric_score_distribution.to(probe_out.device)
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
-
+                print('norm_probe_out_square', norm_probe_out_square, seq_selected_indices, torch.sum(norm_probe_out_square, dim=0), torch.sum(cur_global_metric_score_distribution, dim=0))
                 if 'probefixratio' in cfg['prune_method']:
                     combined_probe_out = cfg['probefixratio'] * cur_global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
                 # dynaratio, since all nonnegative, no need to abs

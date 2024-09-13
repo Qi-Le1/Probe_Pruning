@@ -17,6 +17,43 @@ def custom_expand_mask(mask, dtype, tgt_len=None):
 
         return inverted_mask.masked_fill(inverted_mask.to(torch.bool), -1/src_len)
 
+def delete_massive_tokens(residual):
+    each_l2_norm = torch.linalg.vector_norm(residual, ord=2, dim=2)
+    each_seq_mean = torch.mean(each_l2_norm, dim=1)
+    print('each_l2_norm', each_l2_norm, flush=True)
+    print('each_seq_mean', each_seq_mean, flush=True)
+    
+
+    # Calculate twice the mean for each sequence
+    threshold = 3 * each_seq_mean[:, None]  # Add dimension for broadcasting
+
+    mask = each_l2_norm > threshold
+    each_l2_norm[mask] = 0
+    l2_norms = torch.linalg.vector_norm(each_l2_norm, ord=2, dim=0)
+    has_true = mask.any()
+    return l2_norms, has_true
+
+
+    #     last_indices = torch.arange(x.size(1) - probe_num, x.size(1))
+    # else:
+    #     last_indices = torch.arange(max(x.size(1) - probe_num - 1, 1), x.size(1))
+
+    # l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=2)
+    # massive_tokens = torch.where(l2_norms > 500)
+    # unique_batches, counts = torch.unique_consecutive(massive_tokens[0], return_counts=True)
+    # result_tensors = torch.split(massive_tokens[1], counts.tolist())
+    # print('massive_tokens', massive_tokens, flush=True)
+    # # Stack the indices to create a 2D tensor of index pairs
+    # if (l2_norms > 500).any():
+    #     massive_tokens_index_pairs = torch.stack(result_tensors, dim=0).to(x.device)
+    #     print('massive_tokens_index_pairs', massive_tokens_index_pairs, flush=True)
+    #     last_indices = last_indices.repeat(x.size(0), 1).to(x.device)
+    #     print('last_indices', last_indices, flush=True)
+    #     select_indices = torch.cat((last_indices, massive_tokens_index_pairs), dim=1)
+    # else:
+    #     select_indices = last_indices.repeat(x.size(0), 1).to(x.device)
+
+
 def rank_process(x, probe_num, probe_type, residual):
     print('rank_process', flush=True)
     print('x_size', x.size(), flush=True)
@@ -218,8 +255,14 @@ def rank_process(x, probe_num, probe_type, residual):
                 sorted_indices = torch.cat((sorted_indices, last_indices)).to(x.device)
                 print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
             else:
+                if 'deleteoutlier' in cfg['prune_method']:
+                    l2_norms, has_outlier = delete_massive_tokens(residual)
+                    print('l2_norms', l2_norms, flush=True)
                 values, indices = torch.topk(l2_norms, probe_num)
                 sorted_indices = indices.sort()[0]
+                if 'deleteoutlier' in cfg['prune_method']:
+                    if has_outlier:
+                        sorted_indices[0] = 0
                 print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
 
                 each_l2_norm = torch.linalg.vector_norm(residual, ord=2, dim=2)
