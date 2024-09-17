@@ -47,9 +47,176 @@
 
 import torch
 
+bsz, seq, dim = 4, 5, 10  # Example sizes
+hidden_states = torch.randn(bsz, seq, dim)
+residual = torch.randn(bsz, seq, dim)
 
-empty_tensor = torch.tensor([])
-print(empty_tensor.size()) 
+
+def cal_res_hidden_state_diff(hidden_states, residual):
+    # # cfg['resinfo_ratio'] = 0.8
+    # print('resinfo_ratio', cfg['resinfo_ratio'], flush=True)
+    # # torch.set_printoptions(threshold=float('inf')) 
+    # flattened_hidden_states = hidden_states.flatten()
+    # num_elements_to_select = max(1, int(cfg['resinfo_ratio']* flattened_hidden_states.numel()))  # Top 10% of elements
+    # # Select the top 10% elements based on their absolute value
+    # abs_flattened_hidden_states = -flattened_hidden_states.abs()
+    # values, indices = torch.topk(abs_flattened_hidden_states, num_elements_to_select)
+
+    # ## Retrieve the actual values from the original tensor using these indices
+    # selected_hidden_values = flattened_hidden_states[indices]
+    # # print('selected_hidden_values', selected_hidden_values, flush=True)
+    # flattened_residual = residual.flatten()
+    # selected_residual = flattened_residual[indices]
+
+
+    # # calculate sign match percentage
+    sign_matches = torch.sign(hidden_states) == torch.sign(residual)
+    sign_match_percentage = torch.sum(sign_matches).item() / max(1, int(cfg['resinfo_ratio']* hidden_states.numel())) * 100
+
+    # # calculate l1 difference percentage
+    # # to float32 avoid overflow
+    # selected_hidden_values = selected_hidden_values.to(torch.float32)
+    # selected_residual = selected_residual.to(torch.float32)
+    # l1_norm = selected_hidden_values.abs().sum()
+    # l2_norm_hidden_values = torch.linalg.vector_norm(selected_hidden_values, ord=2)
+
+    # l2_norm_residual = torch.linalg.vector_norm(selected_residual, ord=2)
+
+    # if l2_norm_hidden_values.item() > l2_norm_residual.item():
+    #     l2_magnitude_ratio = l2_norm_residual.item() / l2_norm_hidden_values.item()
+    # else:
+    #     l2_magnitude_ratio = l2_norm_hidden_values.item() / l2_norm_residual.item()
+    
+
+    # cosine_similarity = torch.nn.functional.cosine_similarity(
+    #     selected_hidden_values,  # Ensure the data type is float for cosine similarity computation
+    #     selected_residual,
+    #     dim=0  # Compute the cosine similarity across the dimension 0 (element-wise for vectors)
+    # ).item()
+
+
+    prune_percentage = 1 - cfg['resinfo_ratio']
+
+    # Get the number of elements to prune per sequence
+    num_elements_to_prune = int(prune_percentage * dim)
+
+    # Function to prune top k elements based on absolute value
+    def prune_topk(tensor, k, topk_indices=None):
+        # Find the absolute values and the indices of the top k largest values in each sequence
+        if topk_indices is None:
+            abs_tensor = tensor.abs()
+            topk_values, topk_indices = torch.topk(abs_tensor, k, dim=-1, largest=True)
+        
+        # Create a mask for the top k indices and set those values to 0
+        mask = torch.zeros_like(tensor, dtype=torch.bool)
+        mask.scatter_(-1, topk_indices, True)
+        tensor = tensor.masked_fill(mask, 0)
+        
+        return tensor, topk_indices
+
+    # Prune hidden_states and residual by removing the top 10% largest absolute values
+    pruned_hidden_states, topk_indices = prune_topk(hidden_states, num_elements_to_prune)
+    pruned_residual = prune_topk(residual, num_elements_to_prune, topk_indices)[0]
+
+    # Cosine similarity calculation along the last dimension (dim)
+    cosine_similarity = torch.nn.functional.cosine_similarity(pruned_hidden_states, pruned_residual, dim=-1)
+
+    # L2 norm calculation along the last dimension (dim)
+    l2_norm_hidden_values_pruned = torch.linalg.vector_norm(pruned_hidden_states, ord=2, dim=-1)
+    l2_norm_residual_pruned = torch.linalg.vector_norm(pruned_residual, ord=2, dim=-1)
+
+    l2_magnitude_ratio = l2_norm_hidden_values_pruned / l2_norm_residual_pruned
+    # Print or store the results for each sequence in all batches
+    print("Cosine Similarity After Pruning:")
+    print(cosine_similarity)  # Shape: (bsz, seq)
+
+    print("\nL2 Norm - Hidden States After Pruning:")
+    print(l2_norm_hidden_values_pruned)  # Shape: (bsz, seq)
+
+    print("\nL2 Norm - Residual After Pruning:")
+    print(l2_norm_residual_pruned)  # Shape: (bsz, seq)
+
+    return sign_match_percentage, l2_magnitude_ratio, cosine_similarity
+
+cal_res_hidden_state_diff(hidden_states, residual)
+# device = 'cuda'
+# linear_layer = torch.nn.Linear(4096, 4096).to(device)
+
+# # Access the weight matrix
+# weight = linear_layer.weight
+
+# extraction_sizes = [640, 1280, 2560, 4096]
+# start_event = torch.cuda.Event(enable_timing=True)
+# stop_event = torch.cuda.Event(enable_timing=True)
+# for size in extraction_sizes:
+#     indices = torch.arange(size, device=device)
+#     torch.cuda.synchronize()
+#     start_event.record()
+#     for _ in range(1000):
+#         temp_weight = weight[:, indices]
+    
+#     stop_event.record()
+#     torch.cuda.synchronize()
+#     elapsed_time_ms = start_event.elapsed_time(stop_event)
+
+#     print('extract column')
+#     print('Elapsed time for size {}: {} ms'.format(size, elapsed_time_ms / 1000))
+
+
+# start_event = torch.cuda.Event(enable_timing=True)
+# stop_event = torch.cuda.Event(enable_timing=True)
+# for size in extraction_sizes:
+#     indices = torch.arange(size, device=device)
+#     torch.cuda.synchronize()
+#     start_event.record()
+#     for _ in range(1000):
+#         temp_weight = weight[indices, :]
+    
+#     stop_event.record()
+#     torch.cuda.synchronize()
+#     elapsed_time_ms = start_event.elapsed_time(stop_event)
+
+#     print('extract column')
+#     print('Elapsed time for size {}: {} ms'.format(size, elapsed_time_ms / 1000))
+
+
+# start_event = torch.cuda.Event(enable_timing=True)
+                # stop_event = torch.cuda.Event(enable_timing=True)
+                
+                # start_event.record()
+                # if idx + 1 < len(self.layers) and self.layers[idx + 1].mlp.gate_proj.weight.device == self.layers[idx].mlp.gate_proj.weight.device:
+                #     next_layer = self.layers[idx + 1]
+                # else:
+                #     next_layer = None
+
+                # layer_outputs, last_layer_residual = decoder_layer(
+                #     hidden_states,
+                #     attention_mask=attention_mask,
+                #     position_ids=position_ids,
+                #     past_key_value=past_key_value,
+                #     output_attentions=output_attentions,
+                #     use_cache=use_cache,
+                #     # next_layer=self.layers[idx + 1] if idx + 1 < len(self.layers) and self.layers[idx + 1].mlp.gate_proj.weight.device == self.layers[idx].mlp.gate_proj.weight.device else None,
+                #     last_layer_residual=last_layer_residual
+                # )
+
+                # print('layer_outputs', idx, layer_outputs[0])
+                # Record the end time
+                # stop_event.record()
+
+                # Wait for all the operations to complete
+                 # Wait for the events to be recorded!
+
+                # Calculate the elapsed time
+                # elapsed_time_ms = start_event.elapsed_time(stop_event)
+
+
+
+
+
+
+# empty_tensor = torch.tensor([])
+# print(empty_tensor.size()) 
 
 
 
@@ -944,27 +1111,27 @@ exit()
 # #     torch.cuda.synchronize()  # Wait for GPU operations to complete
 # #     return 
 
-# # # Extraction sizes and their corresponding times
+# # Extraction sizes and their corresponding times
 # extraction_sizes = [640, 1280, 2560, 4096]
-# # sorted_times = []
-# # unsorted_times = []
-# # # stream1 = torch.cuda.Stream()
-# # # stream2 = torch.cuda.Stream()
+# sorted_times = []
+# unsorted_times = []
+# stream1 = torch.cuda.Stream()
+# stream2 = torch.cuda.Stream()
 
-# #     # start_time = time.time()
-# #     # with torch.cuda.stream(stream1):
-# #     #     time_sorted = measure_extraction_time(sorted_indices)
+    # start_time = time.time()
+    # with torch.cuda.stream(stream1):
+    #     time_sorted = measure_extraction_time(sorted_indices)
  
-# #     # with torch.cuda.stream(stream2):
-# #     #     time_unsorted = measure_extraction_time(unsorted_indices)
+    # with torch.cuda.stream(stream2):
+    #     time_unsorted = measure_extraction_time(unsorted_indices)
     
-# #     # # 
-# #     # # torch.cuda.synchronize(stream1)
-# #     # # torch.cuda.synchronize(stream2)
-# #     # end_time_1 = time.time() - start_time
+    # # 
+    # # torch.cuda.synchronize(stream1)
+    # # torch.cuda.synchronize(stream2)
+    # end_time_1 = time.time() - start_time
 
-# # # for size in extraction_sizes:
-# # #     # Sorted indices
+# for size in extraction_sizes:
+# #     # Sorted indices
 
 
 # # #     sorted_indices = torch.arange(size, device=device)
@@ -1203,92 +1370,92 @@ iterations = 1000000
 
 
 
-import torch
+# import torch
 
 
-from numba import cuda
-import numpy as np
+# from numba import cuda
+# import numpy as np
 
-# Define a CUDA kernel using Numba
-@cuda.jit
-def multiply_kernel(x, y, out):
-    # Calculate the index of the current thread in the grid
-    tx = cuda.threadIdx.x  # Thread index in the block
-    ty = cuda.blockIdx.x   # Block index in the grid
-    bw = cuda.blockDim.x   # Number of threads per block
+# # Define a CUDA kernel using Numba
+# @cuda.jit
+# def multiply_kernel(x, y, out):
+#     # Calculate the index of the current thread in the grid
+#     tx = cuda.threadIdx.x  # Thread index in the block
+#     ty = cuda.blockIdx.x   # Block index in the grid
+#     bw = cuda.blockDim.x   # Number of threads per block
 
-    # Calculate the flat index
-    index = ty * bw + tx
+#     # Calculate the flat index
+#     index = ty * bw + tx
 
-    # Check if the index is within the bounds of the arrays
-    if index < x.size:
-        out[index] = x[index] * y[index]
+#     # Check if the index is within the bounds of the arrays
+#     if index < x.size:
+#         out[index] = x[index] * y[index]
 
-# Example usage
-def multiply_arrays(x, y):
-    # Ensure the arrays are of the same size and type
-    assert x.size == y.size
-    assert x.dtype == y.dtype
+# # Example usage
+# def multiply_arrays(x, y):
+#     # Ensure the arrays are of the same size and type
+#     assert x.size == y.size
+#     assert x.dtype == y.dtype
     
-    # Output array
-    out = np.zeros_like(x)
+#     # Output array
+#     out = np.zeros_like(x)
 
-    # Number of threads per block
-    threads_per_block = 1024
-    # Number of blocks in the grid
-    blocks = (x.size + (threads_per_block - 1)) // threads_per_block
+#     # Number of threads per block
+#     threads_per_block = 1024
+#     # Number of blocks in the grid
+#     blocks = (x.size + (threads_per_block - 1)) // threads_per_block
 
-    # Launch the CUDA kernel
-    multiply_kernel[blocks, threads_per_block](x, y, out)
+#     # Launch the CUDA kernel
+#     multiply_kernel[blocks, threads_per_block](x, y, out)
 
-    return out
+#     return out
 
 
 
-@cuda.jit
-def multiply_2d_kernel(x, y, out):
-    # Calculate the row and column index for each thread
-    row = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
-    col = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+# @cuda.jit
+# def multiply_2d_kernel(x, y, out):
+#     # Calculate the row and column index for each thread
+#     row = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
+#     col = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
 
-    # Check if the row and column are within the bounds of the matrices
-    if row < x.shape[0] and col < x.shape[1]:
-        out[row, col] = x[row, col] * y[row, col]
+#     # Check if the row and column are within the bounds of the matrices
+#     if row < x.shape[0] and col < x.shape[1]:
+#         out[row, col] = x[row, col] * y[row, col]
 
-# Example usage for 2D matrices
-def multiply_matrices(x, y):
-    # Ensure the arrays are of the same size and type
-    assert x.shape == y.shape
-    assert x.dtype == y.dtype
+# # Example usage for 2D matrices
+# def multiply_matrices(x, y):
+#     # Ensure the arrays are of the same size and type
+#     assert x.shape == y.shape
+#     assert x.dtype == y.dtype
     
-    # Output array
-    out = np.zeros_like(x)
+#     # Output array
+#     out = np.zeros_like(x)
 
-    # Define the number of threads in a block
-    threads_per_block = (16, 16)  # 16x16 is a common block size
-    # Calculate the number of blocks in the grid
-    blocks_in_grid_x = (x.shape[1] + (threads_per_block[1] - 1)) // threads_per_block[1]
-    blocks_in_grid_y = (x.shape[0] + (threads_per_block[0] - 1)) // threads_per_block[0]
+#     # Define the number of threads in a block
+#     threads_per_block = (16, 16)  # 16x16 is a common block size
+#     # Calculate the number of blocks in the grid
+#     blocks_in_grid_x = (x.shape[1] + (threads_per_block[1] - 1)) // threads_per_block[1]
+#     blocks_in_grid_y = (x.shape[0] + (threads_per_block[0] - 1)) // threads_per_block[0]
 
-    # Launch the CUDA kernel
-    multiply_2d_kernel[(blocks_in_grid_x, blocks_in_grid_y), threads_per_block](x, y, out)
+#     # Launch the CUDA kernel
+#     multiply_2d_kernel[(blocks_in_grid_x, blocks_in_grid_y), threads_per_block](x, y, out)
 
-    return out
-# Create example data
-# x = np.random.rand(10000).astype(np.float32)
-a = torch.rand(10000, 10000, device='cuda')
-b = torch.rand(10000, 10000, device='cuda')
-c = torch.rand(1000, 1000, device='cuda')
-# y = np.random.rand(10000).astype(np.float32)
+#     return out
+# # Create example data
+# # x = np.random.rand(10000).astype(np.float32)
+# a = torch.rand(10000, 10000, device='cuda')
+# b = torch.rand(10000, 10000, device='cuda')
+# c = torch.rand(1000, 1000, device='cuda')
+# # y = np.random.rand(10000).astype(np.float32)
 
-stream1 = torch.cuda.Stream()
-with torch.cuda.stream(stream1):
-    for i in range(1000000):
-        result1 = torch.multiply(c, c)  # a * a
+# stream1 = torch.cuda.Stream()
+# with torch.cuda.stream(stream1):
+#     for i in range(1000000):
+#         result1 = torch.multiply(c, c)  # a * a
 
-# Multiply arrays on the GPU
-for i in range(10):
-    result = multiply_matrices(a.cpu().numpy(), b.cpu().numpy())
+# # Multiply arrays on the GPU
+# for i in range(10):
+#     result = multiply_matrices(a.cpu().numpy(), b.cpu().numpy())
 
 
 

@@ -872,16 +872,16 @@ def process_dataset(dataset, tokenizer):
                         labels["attention_mask"][i] = labels["attention_mask"][i][1:]
 
                 # mp_input_indices = copy.deepcopy(input_indices)
-                sequence_lengths = [len(inp_ids) + len(lbl_ids) for inp_ids, lbl_ids in zip(model_inputs["input_ids"], labels["input_ids"])]
+                # sequence_lengths = [len(inp_ids) + len(lbl_ids) for inp_ids, lbl_ids in zip(model_inputs["input_ids"], labels["input_ids"])]
 
-                # Sort indices based on sequence lengths for batching
-                sorted_indices = sorted(range(len(sequence_lengths)), key=lambda k: sequence_lengths[k])
-                print('sorted_indicesdataset', sorted_indices)
-                # Sort all inputs and labels based on sorted indices
-                model_inputs = {key: [val[idx] for idx in sorted_indices] for key, val in model_inputs.items()}
-                labels = {key: [val[idx] for idx in sorted_indices] for key, val in labels.items()}
-                correct_labels_extended = [correct_labels_extended[idx] for idx in sorted_indices]
-                input_indices = [input_indices[idx] for idx in sorted_indices]
+                # # Sort indices based on sequence lengths for batching
+                # sorted_indices = sorted(range(len(sequence_lengths)), key=lambda k: sequence_lengths[k])
+                # print('sorted_indicesdataset', sorted_indices)
+                # # Sort all inputs and labels based on sorted indices
+                # model_inputs = {key: [val[idx] for idx in sorted_indices] for key, val in model_inputs.items()}
+                # labels = {key: [val[idx] for idx in sorted_indices] for key, val in labels.items()}
+                # correct_labels_extended = [correct_labels_extended[idx] for idx in sorted_indices]
+                # input_indices = [input_indices[idx] for idx in sorted_indices]
 
                 for batch_index in range(0, len(correct_labels_extended), cur_input_bsz):
                     # Determine the batch boundaries
@@ -1412,17 +1412,17 @@ def process_dataset(dataset, tokenizer):
                         labels["attention_mask"][i] = labels["attention_mask"][i][1:]
 
 
-                temp_input_indices = copy.deepcopy(input_indices)
-                sequence_lengths = [len(inp_ids) + len(lbl_ids) for inp_ids, lbl_ids in zip(model_inputs["input_ids"], labels["input_ids"])]
+                # temp_input_indices = copy.deepcopy(input_indices)
+                # sequence_lengths = [len(inp_ids) + len(lbl_ids) for inp_ids, lbl_ids in zip(model_inputs["input_ids"], labels["input_ids"])]
 
-                # Sort indices based on sequence lengths for batching
-                sorted_indices = sorted(range(len(sequence_lengths)), key=lambda k: sequence_lengths[k])
-                print('sorted_indicesdataset', sorted_indices)
-                # Sort all inputs and labels based on sorted indices
-                model_inputs = {key: [val[idx] for idx in sorted_indices] for key, val in model_inputs.items()}
-                labels = {key: [val[idx] for idx in sorted_indices] for key, val in labels.items()}
-                correct_labels_extended = [correct_labels_extended[idx] for idx in sorted_indices]
-                input_indices = [input_indices[idx] for idx in sorted_indices]
+                # # Sort indices based on sequence lengths for batching
+                # sorted_indices = sorted(range(len(sequence_lengths)), key=lambda k: sequence_lengths[k])
+                # print('sorted_indicesdataset', sorted_indices)
+                # # Sort all inputs and labels based on sorted indices
+                # model_inputs = {key: [val[idx] for idx in sorted_indices] for key, val in model_inputs.items()}
+                # labels = {key: [val[idx] for idx in sorted_indices] for key, val in labels.items()}
+                # correct_labels_extended = [correct_labels_extended[idx] for idx in sorted_indices]
+                # input_indices = [input_indices[idx] for idx in sorted_indices]
 
                 # print('temp_input_indices', temp_input_indices)
                 print('input_indices', input_indices)

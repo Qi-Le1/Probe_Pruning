@@ -516,76 +516,88 @@ def check_nan_inf(x):
 
 
 def cal_res_hidden_state_diff(hidden_states, residual):
-    # cfg['resinfo_ratio'] = 0.8
-    print('resinfo_ratio', cfg['resinfo_ratio'], flush=True)
-    # torch.set_printoptions(threshold=float('inf')) 
-    flattened_hidden_states = hidden_states.flatten()
-    print('flattened_hidden_states', flattened_hidden_states, flush=True)
-    num_elements_to_select = max(1, int(cfg['resinfo_ratio']* flattened_hidden_states.numel()))  # Top 10% of elements
-    # Select the top 10% elements based on their absolute value
-    abs_flattened_hidden_states = -flattened_hidden_states.abs()
-    values, indices = torch.topk(abs_flattened_hidden_states, num_elements_to_select)
+    # # cfg['resinfo_ratio'] = 0.8
+    # print('resinfo_ratio', cfg['resinfo_ratio'], flush=True)
+    # # torch.set_printoptions(threshold=float('inf')) 
+    # flattened_hidden_states = hidden_states.flatten()
+    # num_elements_to_select = max(1, int(cfg['resinfo_ratio']* flattened_hidden_states.numel()))  # Top 10% of elements
+    # # Select the top 10% elements based on their absolute value
+    # abs_flattened_hidden_states = -flattened_hidden_states.abs()
+    # values, indices = torch.topk(abs_flattened_hidden_states, num_elements_to_select)
 
-    ## Retrieve the actual values from the original tensor using these indices
-    selected_hidden_values = flattened_hidden_states[indices]
-    # print('selected_hidden_values', selected_hidden_values, flush=True)
-    flattened_residual = residual.flatten()
-    selected_residual = flattened_residual[indices]
+    # ## Retrieve the actual values from the original tensor using these indices
+    # selected_hidden_values = flattened_hidden_states[indices]
+    # # print('selected_hidden_values', selected_hidden_values, flush=True)
+    # flattened_residual = residual.flatten()
+    # selected_residual = flattened_residual[indices]
 
 
-    # calculate sign match percentage
-    sign_matches = torch.sign(selected_hidden_values) == torch.sign(selected_residual)
-    sign_match_percentage = torch.sum(sign_matches).item() / num_elements_to_select * 100
+    # # calculate sign match percentage
+    sign_matches = torch.sign(hidden_states) == torch.sign(residual)
+    sign_match_percentage = torch.sum(sign_matches).item() / max(1, int(cfg['resinfo_ratio']* hidden_states.numel())) * 100
 
-    # calculate l1 difference percentage
-    # to float32 avoid overflow
-    selected_hidden_values = selected_hidden_values.to(torch.float32)
-    selected_residual = selected_residual.to(torch.float32)
-    l1_norm = selected_hidden_values.abs().sum()
-    l2_norm_hidden_values = torch.linalg.vector_norm(selected_hidden_values, ord=2)
+    # # calculate l1 difference percentage
+    # # to float32 avoid overflow
+    # selected_hidden_values = selected_hidden_values.to(torch.float32)
+    # selected_residual = selected_residual.to(torch.float32)
+    # l1_norm = selected_hidden_values.abs().sum()
+    # l2_norm_hidden_values = torch.linalg.vector_norm(selected_hidden_values, ord=2)
 
-    l2_norm_residual = torch.linalg.vector_norm(selected_residual, ord=2)
-    # l1_diff_norm = (selected_hidden_values - selected_residual).abs().sum()
-    # l1_diff_percentage = (l2_norm_residual.item() - l2_norm_hidden_values.item()) / l2_norm_hidden_values.item() * 100
+    # l2_norm_residual = torch.linalg.vector_norm(selected_residual, ord=2)
 
-#     magnitude_ratio = np.linalg.norm(A) / np.linalg.norm(B) if np.linalg.norm(B) > np.linalg.norm(A) else np.linalg.norm(B) / np.linalg.norm(A)
-# print("Magnitude Ratio:", magnitude_ratio)
-
-    if l2_norm_hidden_values.item() > l2_norm_residual.item():
-        l2_magnitude_ratio = l2_norm_residual.item() / l2_norm_hidden_values.item()
-    else:
-        l2_magnitude_ratio = l2_norm_hidden_values.item() / l2_norm_residual.item()
+    # if l2_norm_hidden_values.item() > l2_norm_residual.item():
+    #     l2_magnitude_ratio = l2_norm_residual.item() / l2_norm_hidden_values.item()
+    # else:
+    #     l2_magnitude_ratio = l2_norm_hidden_values.item() / l2_norm_residual.item()
     
-    # sort_residual, sort_residual_indices = torch.sort(selected_residual)
-    # sort_hidden, sort_hidden_indices = torch.sort(selected_hidden_values)
-    
-    # print('sort_residual', sort_residual, sort_residual_indices, flush=True)
-    # print('sort_hidden', sort_hidden, sort_hidden_indices, flush=True)
-    # for val in sort_residual[:100]:
-    #     print(val, 'sort_residual')
-    # for val in sort_residual_indices[:100]:
-    #     print(val, 'sort_residual_indices')
 
-    # for val in sort_hidden[:100]:
-    #     print(val, 'sort_hidden')
-    # for val in sort_hidden_indices[:100]:
-    #     print(val, 'sort_hidden_indices')
+    # cosine_similarity = torch.nn.functional.cosine_similarity(
+    #     selected_hidden_values,  # Ensure the data type is float for cosine similarity computation
+    #     selected_residual,
+    #     dim=0  # Compute the cosine similarity across the dimension 0 (element-wise for vectors)
+    # ).item()
 
-    # for val in sort_residual[-100:]:
-    #     print(val, 'sort_residual')
-    # for val in sort_residual_indices[-100:]:
-    #     print(val, 'sort_residual_indices')
-    # for val in sort_hidden[-100:]:
-    #     print(val, 'sort_hidden')
-    # for val in sort_hidden_indices[-100:]:
-    #     print(val, 'sort_hidden_indices')
-    # calculate cosine similarity
-    cosine_similarity = torch.nn.functional.cosine_similarity(
-        selected_hidden_values,  # Ensure the data type is float for cosine similarity computation
-        selected_residual,
-        dim=0  # Compute the cosine similarity across the dimension 0 (element-wise for vectors)
-    ).item()
 
+    prune_percentage = 1 - cfg['resinfo_ratio']
+
+    # Get the number of elements to prune per sequence
+    num_elements_to_prune = int(prune_percentage * dim)
+
+    # Function to prune top k elements based on absolute value
+    def prune_topk(tensor, k, topk_indices=None):
+        # Find the absolute values and the indices of the top k largest values in each sequence
+        if topk_indices is None:
+            abs_tensor = tensor.abs()
+            topk_values, topk_indices = torch.topk(abs_tensor, k, dim=-1, largest=True)
+        
+        # Create a mask for the top k indices and set those values to 0
+        mask = torch.zeros_like(tensor, dtype=torch.bool)
+        mask.scatter_(-1, topk_indices, True)
+        tensor = tensor.masked_fill(mask, 0)
+        
+        return tensor, topk_indices
+
+    # Prune hidden_states and residual by removing the top 10% largest absolute values
+    pruned_hidden_states, topk_indices = prune_topk(hidden_states, num_elements_to_prune)
+    pruned_residual = prune_topk(residual, num_elements_to_prune, topk_indices)[0]
+
+    # Cosine similarity calculation along the last dimension (dim)
+    cosine_similarity = torch.nn.functional.cosine_similarity(pruned_hidden_states, pruned_residual, dim=-1)
+
+    # L2 norm calculation along the last dimension (dim)
+    l2_norm_hidden_values_pruned = torch.linalg.vector_norm(pruned_hidden_states, ord=2, dim=-1)
+    l2_norm_residual_pruned = torch.linalg.vector_norm(pruned_residual, ord=2, dim=-1)
+
+    l2_magnitude_ratio = l2_norm_hidden_values_pruned / l2_norm_residual_pruned
+    # Print or store the results for each sequence in all batches
+    print("Cosine Similarity After Pruning:")
+    print(cosine_similarity)  # Shape: (bsz, seq)
+
+    print("\nL2 Norm - Hidden States After Pruning:")
+    print(l2_norm_hidden_values_pruned)  # Shape: (bsz, seq)
+
+    print("\nL2 Norm - Residual After Pruning:")
+    print(l2_norm_residual_pruned)  # Shape: (bsz, seq)
 
     return sign_match_percentage, l2_magnitude_ratio, cosine_similarity
 
