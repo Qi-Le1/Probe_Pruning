@@ -6,12 +6,19 @@ from config import cfg
 MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70b']
 
 def list_available_gpus():
+    cfg['custom_cuda_streams'] = {}
     # Check if CUDA is available
     if torch.cuda.is_available():
         # Get the number of GPUs available
         num_gpus = torch.cuda.device_count()
         print(f"Number of CUDA Devices: {num_gpus}")
         
+        for gpu_id in range(num_gpus):
+            # Set the current device to the GPU
+            stream = torch.cuda.Stream(device=gpu_id)
+            
+            # Store the stream for the corresponding GPU
+            cfg['custom_cuda_streams'][gpu_id] = stream
         # # List each GPU
         # for i in range(num_gpus):
         #     print(f"Device {i}: {torch.cuda.get_device_name(i)}")

@@ -234,31 +234,31 @@ def test(data_loader, model, model_prof, metric, logger):
                 print('evaluation_for_batch', evaluation, flush=True)
                 logger.append(evaluation, 'test', input_size)
 
-            for name, module in model.named_modules():
-                for attr_name in dir(module):
-                    # Check if the attribute name contains 'mean_intersection_ratio'
-                    if 'attn_sign_match_percentage' in attr_name or 'attn_l2_magnitude_ratio' in attr_name or 'attn_cosine_similarity' in attr_name\
-                        or 'mlp_sign_match_percentage' in attr_name or 'mlp_l2_magnitude_ratio' in attr_name or 'mlp_cosine_similarity' in attr_name:
-                        # Retrieve the attribute value
-                        attr_value = getattr(module, attr_name)
-                        # Print the module name and attribute name
-                        # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
-                        # Append the attribute to the logger
-                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-                        print('name', name, 'attr_name', attr_name)
-                    if 'diff_ratio' in attr_name:
-                        # Retrieve the attribute value
-                        attr_value = getattr(module, attr_name)
+            # for name, module in model.named_modules():
+            #     for attr_name in dir(module):
+            #         # Check if the attribute name contains 'mean_intersection_ratio'
+            #         if 'attn_sign_match_percentage' in attr_name or 'attn_l2_magnitude_ratio' in attr_name or 'attn_cosine_similarity' in attr_name\
+            #             or 'mlp_sign_match_percentage' in attr_name or 'mlp_l2_magnitude_ratio' in attr_name or 'mlp_cosine_similarity' in attr_name:
+            #             # Retrieve the attribute value
+            #             attr_value = getattr(module, attr_name)
+            #             # Print the module name and attribute name
+            #             # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
+            #             # Append the attribute to the logger
+            #             logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+            #             print('name', name, 'attr_name', attr_name)
+            #         if 'diff_ratio' in attr_name:
+            #             # Retrieve the attribute value
+            #             attr_value = getattr(module, attr_name)
                         
-                            # Append the attribute to the logger
-                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-                        print('name', name, attr_name, attr_value)
-                    if 'cur_select_indices' in attr_name:
-                        # Retrieve the attribute value
-                        attr_value = getattr(module, attr_name)
-                        # Append the attribute to the logger
-                        logger.accumulate({f'{name}_{attr_name}': attr_value}, 'test')
-                        # print('name', name, attr_name, attr_value)
+            #                 # Append the attribute to the logger
+            #             logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+            #             print('name', name, attr_name, attr_value)
+            #         if 'cur_select_indices' in attr_name:
+            #             # Retrieve the attribute value
+            #             attr_value = getattr(module, attr_name)
+            #             # Append the attribute to the logger
+            #             logger.accumulate({f'{name}_{attr_name}': attr_value}, 'test')
+            #             # print('name', name, attr_name, attr_value)
                         
                     # Check if the attribute name contains 'mean_intersection_ratio'
                     

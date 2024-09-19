@@ -431,10 +431,17 @@ def main():
             #                 ['ppwandasp'], ['probe-calib-respick-ema'], ['sync'], ['c4-2000'], ['0.05-0.05-0.05-0.05-0.05-seqrank'],
             #             ['default']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            # controls.extend(CIFAR10_controls_9)
+            # controls.extend(CIFAR10_controls_9)'0.05-0.05-0.05-0.05-0.05-seqrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['512'], ['0.4'], 
-                            ['ppwandasp'], ['probe-calib-respick-ema'], ['asyncintra', 'sync'], ['c4-2000'], ['0.05-0.05-0.05-0.05-0.05-seqrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                            ['ppwandasp'], ['probe-calib-respick-ema', 'probe-calib-respick-ema-ruleranklast', 'probe-calib-respick-ema-deleteoutlier'], ['asyncintra'], ['c4-2000'], ['0.5-0.5-0.5-0.5-0.5-seqrank'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                            ['ppwandasp'], ['probe-calib-respick-ema', 'probe-calib-respick-ema-ruleranklast', 'probe-calib-respick-ema-deleteoutlier'], ['asyncintra'], ['c4-2000'], ['0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-bszrank+seqrank'],
                         ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -661,7 +668,7 @@ def main():
 
 
             control_name = [[['arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
-                            ['ppwandasp'], ['probe-calib-respick-ema'], ['asyncintra', 'sync'], ['c4-2000'], ['0.05-0.05-0.05-0.05-0.05-seqrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['ppwandasp'], ['probe-calib-respick-ema', 'probe-calib-respick-ema-deleteoutlier', 'probe-calib-respick-ema-ruleranklast'], ['asyncintra'], ['c4-2000'], ['0.05-0.05-0.05-0.05-0.05-seqrank'],
                         ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)

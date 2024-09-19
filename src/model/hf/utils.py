@@ -25,11 +25,29 @@ def delete_massive_tokens(residual):
     
 
     # Calculate twice the mean for each sequence
-    threshold = 3 * each_seq_mean[:, None]  # Add dimension for broadcasting
+    threshold = 4 * each_seq_mean[:, None]  # Add dimension for broadcasting
 
     mask = each_l2_norm > threshold
+
+    mask[:, 0] = False
+
+    num_total_elements = each_l2_norm.size(0)
     each_l2_norm[mask] = 0
+    # l2_norms = torch.linalg.vector_norm(each_l2_norm, ord=2, dim=0)
+    num_nonzero_elements = (each_l2_norm != 0).sum(dim=0)
+
+    # Recompute the L2 norm along the desired dimension (in this case, dim=0)
     l2_norms = torch.linalg.vector_norm(each_l2_norm, ord=2, dim=0)
+    # print('l2_norms delete_massive_tokens', l2_norms, flush=True)
+    # Calculate the scaling factor for each column based on non-zero elements
+    # Scaling factor: sqrt(total_elements) / sqrt(non_zero_elements)
+    # To avoid division by zero, we use a conditional check
+    scaling_factors = torch.sqrt(torch.tensor(num_total_elements, dtype=torch.float32)) / \
+                    torch.sqrt(num_nonzero_elements.float().clamp(min=1))  # clamp to avoid division by zero
+
+    # Scale the L2 norms
+    l2_norms = l2_norms * scaling_factors
+    # print('l2_norms after scaling', l2_norms, flush=True)
     has_true = mask.any()
     return l2_norms, has_true
 
@@ -260,9 +278,9 @@ def rank_process(x, probe_num, probe_type, residual):
                     print('l2_norms', l2_norms, flush=True)
                 values, indices = torch.topk(l2_norms, probe_num)
                 sorted_indices = indices.sort()[0]
-                if 'deleteoutlier' in cfg['prune_method']:
-                    if has_outlier:
-                        sorted_indices[0] = 0
+                # if 'deleteoutlier' in cfg['prune_method']:
+                #     if has_outlier:
+                sorted_indices[0] = 0
                 print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
 
                 each_l2_norm = torch.linalg.vector_norm(residual, ord=2, dim=2)
@@ -561,7 +579,7 @@ def cal_res_hidden_state_diff(hidden_states, residual):
     prune_percentage = 1 - cfg['resinfo_ratio']
 
     # Get the number of elements to prune per sequence
-    num_elements_to_prune = int(prune_percentage * dim)
+    num_elements_to_prune = int(prune_percentage * hidden_states.shape[-1])
 
     # Function to prune top k elements based on absolute value
     def prune_topk(tensor, k, topk_indices=None):
@@ -590,14 +608,14 @@ def cal_res_hidden_state_diff(hidden_states, residual):
 
     l2_magnitude_ratio = l2_norm_hidden_values_pruned / l2_norm_residual_pruned
     # Print or store the results for each sequence in all batches
-    print("Cosine Similarity After Pruning:")
-    print(cosine_similarity)  # Shape: (bsz, seq)
+    # print("Cosine Similarity After Pruning:")
+    # print(cosine_similarity)  # Shape: (bsz, seq)
 
-    print("\nL2 Norm - Hidden States After Pruning:")
-    print(l2_norm_hidden_values_pruned)  # Shape: (bsz, seq)
+    # print("\nL2 Norm - Hidden States After Pruning:")
+    # print(l2_norm_hidden_values_pruned)  # Shape: (bsz, seq)
 
-    print("\nL2 Norm - Residual After Pruning:")
-    print(l2_norm_residual_pruned)  # Shape: (bsz, seq)
+    # print("\nL2 Norm - Residual After Pruning:")
+    # print(l2_norm_residual_pruned)  # Shape: (bsz, seq)
 
     return sign_match_percentage, l2_magnitude_ratio, cosine_similarity
 

@@ -147,6 +147,8 @@ class Linear(nn.Linear, EriLayer):
         self.async_interbatch_in_dim_indices = None
         self.async_intrabatch_in_dim_indices = None
 
+        self.retrieve_weight = torch.cuda.Event(enable_timing=False, blocking=False)
+
         if ('o_proj' in self.key or 'down_proj' in self.key):
             self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)   
             if 'wandasp' in self.prune_metric:
@@ -347,8 +349,10 @@ class Linear(nn.Linear, EriLayer):
             self.async_interbatch_in_dim_indices = kwargs['in_dim_indices']
         else:
             raise ValueError('Not valid input')
-        self.async_interbatch_weight_index = self.async_interbatch_weight_index.to(self.weight.device)
-        self.async_interbatch_weight_index += 1
+        # self.async_interbatch_weight_index = self.async_interbatch_weight_index.to(self.weight.device)
+        # self.async_interbatch_weight_index += 1
+
+        self.retrieve_weight.record()
         return
     
     def prepare_async_intrabatch_weight(self, **kwargs):
@@ -360,8 +364,10 @@ class Linear(nn.Linear, EriLayer):
             self.async_intrabatch_in_dim_indices = kwargs['in_dim_indices']
         else:
             raise ValueError('Not valid input')
-        self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
-        self.async_intrabatch_weight_index += 1
+        # self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
+        # self.async_intrabatch_weight_index += 1
+
+        self.retrieve_weight.record()
         return
 
     
@@ -385,13 +391,18 @@ class Linear(nn.Linear, EriLayer):
         elif cfg['mode'] == 'asyncinter':
             if cfg['cur_batch_index'] == 0:
                 return self.weight
-            if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:              
-                while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
-                    time.sleep(0.001)
+            # if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:        
+            stream = torch.cuda.current_stream()
+            stream.wait_event(self.retrieve_weight)    
+                # while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
+                #     time.sleep(0.001)
             return self.async_interbatch_weight
         elif cfg['mode'] == 'asyncintra':    
-            while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
-                time.sleep(0.001)  # Sleep for 1 millisecond
+            # while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
+            #     time.sleep(0.001)  # Sleep for 1 millisecond
+            
+            stream = torch.cuda.current_stream()
+            stream.wait_event(self.retrieve_weight)   
             return self.async_intrabatch_weight
     
     def get_async_in_dim_indices(self):
