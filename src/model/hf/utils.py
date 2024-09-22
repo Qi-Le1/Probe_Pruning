@@ -52,326 +52,37 @@ def delete_massive_tokens(residual):
     return l2_norms, has_true
 
 
-    #     last_indices = torch.arange(x.size(1) - probe_num, x.size(1))
-    # else:
-    #     last_indices = torch.arange(max(x.size(1) - probe_num - 1, 1), x.size(1))
-
-    # l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=2)
-    # massive_tokens = torch.where(l2_norms > 500)
-    # unique_batches, counts = torch.unique_consecutive(massive_tokens[0], return_counts=True)
-    # result_tensors = torch.split(massive_tokens[1], counts.tolist())
-    # print('massive_tokens', massive_tokens, flush=True)
-    # # Stack the indices to create a 2D tensor of index pairs
-    # if (l2_norms > 500).any():
-    #     massive_tokens_index_pairs = torch.stack(result_tensors, dim=0).to(x.device)
-    #     print('massive_tokens_index_pairs', massive_tokens_index_pairs, flush=True)
-    #     last_indices = last_indices.repeat(x.size(0), 1).to(x.device)
-    #     print('last_indices', last_indices, flush=True)
-    #     select_indices = torch.cat((last_indices, massive_tokens_index_pairs), dim=1)
-    # else:
-    #     select_indices = last_indices.repeat(x.size(0), 1).to(x.device)
-
-
-def rank_process(x, probe_num, probe_type, residual):
-    print('rank_process', flush=True)
-    print('x_size', x.size(), flush=True)
-    # print('residual_size', residual.size(), flush=True)
-
+def rank_process(norm_across_feature, probe_num, probe_type):
     if 'randomrank' in cfg['prune_method']:
-        print('randomrank', flush=True)
         if 'bsz' in probe_type:
-            sorted_indices = torch.randperm(x.size(0))[:probe_num]
-            x = x[sorted_indices, :, :]
+            sorted_indices = torch.randperm(norm_across_feature.size(0))[:probe_num]
         elif 'seq' in probe_type:
-            sorted_indices = torch.randperm(x.size(1))[:probe_num]
-            x = x[:, sorted_indices, :]
-        return x, residual, sorted_indices
-    elif 'rulerank' in cfg['prune_method']:
-        cfg['temp_input_ids'] = cfg['temp_input_ids'].to(x.device)
-        print('rulerank', flush=True)
-        if 'bsz' in probe_type:
-            # TODO: sort
-            # sorted_indices = torch.randperm(x.size(0))[:probe_num]
-            sorted_indices = torch.tensor([0]).to(x.device)
-            # l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(1, 2))
-            # values, indices = torch.topk(l2_norms, probe_num)
-            # print(probe_type, indices, values)
-
-            # sorted_indices = indices.sort()[0]
-            print('sorted_Indicesbsz', sorted_indices)
-            
-
-            # sorted_indices = torch.arange(probe_num)
-            x = x[sorted_indices, :, :]
-            cfg['temp_input_ids'] = cfg['temp_input_ids'][sorted_indices, :]
-            if residual is not None:
-                residual = residual[sorted_indices, :, :]
-        elif 'seq' in probe_type:
-            
-
-            first_indices = torch.arange(1)
-
-            if 'allpivot' in cfg['prune_method']:
-                each_l2_norm = torch.linalg.vector_norm(residual[0], ord=2, dim=1)
-                each_seq_mean = torch.mean(each_l2_norm)
-                print('each_l2_norm', each_l2_norm, flush=True)
-                print('each_seq_mean', each_seq_mean, flush=True)
-                
-
-                # Calculate twice the mean for each sequence
-                twice_seq_mean = 2 * each_seq_mean  # Add dimension for broadcasting
-
-                # Find elements where each element in each_l2_norm is greater than twice the corresponding sequence mean
-                mask = each_l2_norm > twice_seq_mean
-
-                # Extract the values and their indices where the condition is true
-                values = each_l2_norm[mask]
-                print('mask', mask, mask.size(), flush=True)
-                print('values', values, values.size(), flush=True)
-                first_indices = torch.nonzero(mask, as_tuple=True)
-                print('first_indices', first_indices, flush=True)
-                first_indices = first_indices[0]
-                print('Values greater than twice the sequence mean:', values, values.size(), first_indices, first_indices.size())
-
-                if first_indices.size(0) == 0:
-                    first_indices = torch.arange(1)
-            
-            first_indices = first_indices.to(x.device)
-
-            # Calculate the start index for the last elements
-            # start_index_from_end = max(4, last_dim_length - num_elements_from_end)  # Ensure there's no overlap with the first 4 indices
-
-            # Generate indices for the last elements
-            # probe_num = 1
-
-            # cfg['num_nonpad_tokens'] = cfg['num_nonpad_tokens'].to(x.device)
-            # probe_num = torch.tensor(probe_num).unsqueeze(0).repeat(x.shape[0], 1).to(x.device)
-            # a = torch.max(cfg['num_nonpad_tokens'] - probe_num, 1)[0].unsqueeze(1)
-            # print('aaaaa', a)
-            # last_indices = torch.arange(torch.max(cfg['num_nonpad_tokens'] - probe_num, 1)[0], cfg['num_nonpad_tokens'])
-            if 'last' in cfg['prune_method']:
-                last_indices = torch.arange(x.size(1) - probe_num + first_indices.size(0), x.size(1))
-
-                
-            else:
-                # last_indices = torch.arange(max(x.size(1) - probe_num - 1, 1), x.size(1))
-                last_indices = torch.arange(1, probe_num)
-            # last_indices = torch.arange(30)
-
-            # Combine the two sets of indices
-            last_indices = last_indices.to(x.device)
-            print('firstindicesdevice', first_indices.device, flush=True)
-            print('lastindicesdevice', last_indices.device, flush=True)
-            sorted_indices = torch.cat((first_indices, last_indices)).to(x.device)
-            # print('sorted_indices', sorted_indices, sorted_indices.shape, x.shape, flush=True)
-            # sorted_indices = last_indices.to(x.device)
-            # sorted_indices = first_indices.to(x.device)
-
-
-            # if 'last' in cfg['prune_method']:
-            #     last_indices = torch.arange(x.size(1) - probe_num, x.size(1))
-            # else:
-            #     last_indices = torch.arange(max(x.size(1) - probe_num - 1, 1), x.size(1))
-
-            # l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=2)
-            # massive_tokens = torch.where(l2_norms > 500)
-            # unique_batches, counts = torch.unique_consecutive(massive_tokens[0], return_counts=True)
-            # result_tensors = torch.split(massive_tokens[1], counts.tolist())
-            # print('massive_tokens', massive_tokens, flush=True)
-            # # Stack the indices to create a 2D tensor of index pairs
-            # if (l2_norms > 500).any():
-            #     massive_tokens_index_pairs = torch.stack(result_tensors, dim=0).to(x.device)
-            #     print('massive_tokens_index_pairs', massive_tokens_index_pairs, flush=True)
-            #     last_indices = last_indices.repeat(x.size(0), 1).to(x.device)
-            #     print('last_indices', last_indices, flush=True)
-            #     select_indices = torch.cat((last_indices, massive_tokens_index_pairs), dim=1)
-            # else:
-            #     select_indices = last_indices.repeat(x.size(0), 1).to(x.device)
-
-
-            # sorted_indices = torch.sort(select_indices, dim=1)[0]
-            # sorted_indices = torch.stack([torch.unique(row) for row in sorted_indices])
-            # batch_indices = torch.arange(x.size(0)).unsqueeze(1).expand(-1, sorted_indices.size(1))
-            # sequence_indices = sorted_indices
-
-
-            # # Use advanced indexing to retrieve the elements
-            # x = x[batch_indices, sequence_indices]
-            # print('xshape', x.shape, flush=True)
-            sorted_indices = torch.sort(sorted_indices)[0]
-            x = x[:, sorted_indices, :]
-
-            cfg['temp_input_ids'] = cfg['temp_input_ids'][:, sorted_indices]
-            print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
-        decoded_string = cfg['tokenizer'].batch_decode(cfg['temp_input_ids'], skip_special_tokens=False)
-
-        print(f'decoded_string_{probe_type}', decoded_string)
-        return x, residual, sorted_indices
+            sorted_indices = torch.randperm(norm_across_feature.size(1))[:probe_num]
+        return sorted_indices
     else:
-        # torch.set_printoptions(precision=2, sci_mode=False)
-        if residual is not None:
-            print('residual_ranking', flush=True)
-            print(torch.isnan(residual).any(), torch.isinf(residual).any())
-
-            if torch.isnan(residual).any():
-                print('nan residual', flush=True)
-                print(residual, flush=True)
-                raise ValueError('nan residual')
-            if 'bsz' in probe_type:
-                l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(1, 2))
-                # if values are the same, add little randomness to avoid the same probe
-                # torch.float16 has the rounding issue
-                noise = torch.randn(l2_norms.size(), device=l2_norms.device, dtype=l2_norms.dtype) * 0.5
-                print('noise', noise, flush=True)
-                l2_norms = l2_norms + noise
-                print('l2_norms after noise', l2_norms, flush=True)
-                print('l2_norms bsz', l2_norms, flush=True)
-            elif 'seq' in probe_type:
-                l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(0, 2))
-                print('l2_norms seq', l2_norms, flush=True)
-        else:
-            if 'bsz' in probe_type:
-                l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(1, 2))
-            elif 'seq' in probe_type:
-                l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
-
-        
-
-    # if 'seq' in probe_type:
-    #     x_l2_norms = torch.linalg.vector_norm(x, ord=2, dim=2)
-    #     l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=2)
-    # first_30_tokens = l2_norms[:, :30]
-    # print('first_30_tokens l2_norms', first_30_tokens, flush=True)
-    # first_30_x_tokens = x_l2_norms[:, :30]
-    # print('first_30_tokens x_l2_norms', first_30_x_tokens, flush=True)
-
-
-    # all_sorted_values, all_sorted_indices = torch.sort(l2_norms, descending=True)
-    # all_sorted_values = all_sorted_values.to(torch.float32)
-    # print('values', all_sorted_values, all_sorted_indices, flush=True)
-
-    # sum_values = all_sorted_values.sum()
-    # probabilities = (all_sorted_values / sum_values)
-    # print('probabilities', probabilities, flush=True)
-    # selected_indices = torch.multinomial(probabilities, probe_num, replacement=False)
-    # all_sorted_values = all_sorted_values.to(torch.float16)
-    # values = all_sorted_values[selected_indices]
-    # indices = all_sorted_indices[selected_indices]
-        print('x.size(1) - int(probe_num//2)', x.size(1) - int(probe_num//2))
-        if 'seq' in probe_type:
-
-            if 'mixing' in cfg['prune_method']:
-                values, indices = torch.topk(l2_norms[:x.size(1) - int(probe_num//2)], int(probe_num//2))
-                
-
-                sorted_indices = indices.sort()[0]
-                if sorted_indices[0] != 0:
-                    sorted_indices[0] = 0
-                print(probe_type, sorted_indices, sorted_indices.shape, values)
-
-                last_indices = torch.arange(x.size(1) - int(probe_num//2), x.size(1)).to(x.device)
-                sorted_indices = torch.cat((sorted_indices, last_indices)).to(x.device)
-                print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
-            else:
-                if 'deleteoutlier' in cfg['prune_method']:
-                    l2_norms, has_outlier = delete_massive_tokens(residual)
-                    print('l2_norms', l2_norms, flush=True)
-                values, indices = torch.topk(l2_norms, probe_num)
-                sorted_indices = indices.sort()[0]
-                # if 'deleteoutlier' in cfg['prune_method']:
-                #     if has_outlier:
-                sorted_indices[0] = 0
-                print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
-
-                each_l2_norm = torch.linalg.vector_norm(residual, ord=2, dim=2)
-                each_seq_mean = torch.mean(each_l2_norm, dim=1)
-                print('each_l2_norm', each_l2_norm, flush=True)
-                print('each_seq_mean', each_seq_mean, flush=True)
-                
-
-                # Calculate twice the mean for each sequence
-                twice_seq_mean = 2 * each_seq_mean[:, None]  # Add dimension for broadcasting
-
-                # Find elements where each element in each_l2_norm is greater than twice the corresponding sequence mean
-                mask = each_l2_norm > twice_seq_mean
-
-                # Extract the values and their indices where the condition is true
-                values = each_l2_norm[mask]
-                indices = torch.nonzero(mask, as_tuple=True)
-
-                # Printing the results
-                print("Values greater than twice the sequence mean:", values, values.size())
-                print("Indices of these values (batch_index, sequence_index):", indices)
-        else:
-            values, indices = torch.topk(l2_norms, probe_num)
-            print(probe_type, indices, values)
-
-            sorted_indices = indices.sort()[0]
-            print('sorted_indices', sorted_indices, flush=True)
-    # sorted_values = values.sort()[0]
-    # if 'seq' in probe_type:
-
-    #     first_indices = torch.arange(1)
-
-    #     # Calculate the start index for the last elements
-    #     # start_index_from_end = max(4, last_dim_length - num_elements_from_end)  # Ensure there's no overlap with the first 4 indices
-
-    #     # Generate indices for the last elements
-    #     # probe_num = 1
-    #     last_indices = torch.arange(x.shape[1] - probe_num, x.shape[1])
-
-    #     # last_indices = torch.arange(30)
-
-    #     # Combine the two sets of indices
-    #     sorted_indices = torch.cat((first_indices, last_indices)).to(x.device)
-
-    #     # sorted_indices = last_indices.to(x.device)
-    #     # sorted_indices = first_indices.to(x.device)
-    #     print('sorted_indices', sorted_indices, flush=True)
-        cfg['temp_input_ids'] = cfg['temp_input_ids'].to(x.device)
-        # print('cfg[temp_input_ids]', cfg['temp_input_ids'], x, flush=True)
         if 'bsz' in probe_type:
-            sorted_indices = torch.tensor([0]).to(x.device)
-            cfg['temp_input_ids'] = cfg['temp_input_ids'][sorted_indices, :]
-            # sorted_indices = torch.arange(probe_num)
-            # sorted_indices = torch.randperm(x.size(0))[:probe_num]
-            print('bsz_sorted_indices', sorted_indices, flush=True)
-            x = x[sorted_indices, :, :]
-        elif 'seq' in probe_type:      
-            cfg['temp_input_ids'] = cfg['temp_input_ids'][:, sorted_indices]
-            x = x[:, sorted_indices, :]
+            l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=1)
+        elif 'seq' in probe_type:
+            l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=0)
 
-        if residual is not None:
-            if 'bsz' in probe_type:
-                residual = residual[sorted_indices, :, :]
-            elif 'seq' in probe_type:
-                residual = residual[:, sorted_indices, :]
+        values, indices = torch.topk(l2_norms, probe_num)
+        sorted_indices = indices.sort()[0]
+        if 'seq' in probe_type:
+            # keep the first token in the extreme case, like only select 2 tokens
+            sorted_indices[0] = 0
         
-        # print("cfg['temp_input_ids']", cfg['temp_input_ids'])
-        decoded_string = cfg['tokenizer'].batch_decode(cfg['temp_input_ids'], skip_special_tokens=False)
+    return sorted_indices
 
-        print(f'decoded_string_{probe_type}', decoded_string)
-    return x, residual, sorted_indices
+def get_norm_across_feature(x, residual=None):
+    if residual is not None:
+        return torch.linalg.vector_norm(residual, ord=2, dim=2)
+    return torch.linalg.vector_norm(x, ord=2, dim=2)
 
 def generate_probe(x, probe_ratio_list, residual=None):
-    # seq rank needs selected_indices to combine with the global metric
     bsz_selected_indices = None
     seq_selected_indices = None
-    pad_tokens = cfg['pad_tokens']
-    cfg['temp_input_ids'] = cfg['input_ids']
-    print("cfg['temp_input_ids'] shape", cfg['temp_input_ids'].shape, cfg['input_ids'].shape, flush=True)
-    print('x shape', x.shape, flush=True)
 
-    # if 'mask' in cfg['prune_method']:
-    #     pass
-    # else:
-        # if pad_tokens is not None:
-        #     if residual is not None:
-        #         residual[pad_tokens] = 0
-        #         print('residual_generate_probe', id(residual), flush=True)
-        #     else:
-        #         x[pad_tokens] = 0
-
+    norm_across_feature = get_norm_across_feature(x, residual)
     for i in range(len(cfg['probe_generation_type'])):
         probe_type = cfg['probe_generation_type'][i]
         probe_ratio = probe_ratio_list[i]
@@ -380,21 +91,456 @@ def generate_probe(x, probe_ratio_list, residual=None):
             probe_num = math.ceil(x.size(0) * probe_ratio)
         elif 'seq' in probe_type:
             probe_num = max(math.ceil(x.size(1) * probe_ratio), 2)
-            if probe_num % 2 != 0:
-                probe_num += 1
-            probe_num = min(probe_num, x.size(1))
-
 
         if 'rank' in probe_type:
-            x, residual, selected_indices = rank_process(x, probe_num, probe_type, residual)
             if 'bsz' in probe_type:
-                bsz_selected_indices = selected_indices
+                bsz_selected_indices = rank_process(norm_across_feature, probe_num, probe_type)
+                norm_across_feature = norm_across_feature[bsz_selected_indices, :]
             elif 'seq' in probe_type:
-                seq_selected_indices = selected_indices
+                seq_selected_indices = rank_process(norm_across_feature, probe_num, probe_type)
+                norm_across_feature = norm_across_feature[:, seq_selected_indices]
         else:
             raise NotImplementedError
-    return x, bsz_selected_indices, seq_selected_indices
+    
+    if bsz_selected_indices is not None and seq_selected_indices is not None:
+        ii, jj = torch.meshgrid(bsz_selected_indices, seq_selected_indices, indexing='ij')
+        probe = x[ii, jj, :]
+    elif bsz_selected_indices is not None:
+        probe = x[bsz_selected_indices, :, :]
+    elif seq_selected_indices is not None:
+        probe = x[:, seq_selected_indices, :]
+    else:
+        raise ValueError('No selected indices')
+    return probe, bsz_selected_indices, seq_selected_indices
 
+
+# -----
+# def delete_massive_tokens(residual):
+#     each_l2_norm = torch.linalg.vector_norm(residual, ord=2, dim=2)
+#     each_seq_mean = torch.mean(each_l2_norm, dim=1)
+#     print('each_l2_norm', each_l2_norm, flush=True)
+#     print('each_seq_mean', each_seq_mean, flush=True)
+    
+
+#     # Calculate twice the mean for each sequence
+#     threshold = 4 * each_seq_mean[:, None]  # Add dimension for broadcasting
+
+#     mask = each_l2_norm > threshold
+
+#     mask[:, 0] = False
+
+#     num_total_elements = each_l2_norm.size(0)
+#     each_l2_norm[mask] = 0
+#     # l2_norms = torch.linalg.vector_norm(each_l2_norm, ord=2, dim=0)
+#     num_nonzero_elements = (each_l2_norm != 0).sum(dim=0)
+
+#     # Recompute the L2 norm along the desired dimension (in this case, dim=0)
+#     l2_norms = torch.linalg.vector_norm(each_l2_norm, ord=2, dim=0)
+#     # print('l2_norms delete_massive_tokens', l2_norms, flush=True)
+#     # Calculate the scaling factor for each column based on non-zero elements
+#     # Scaling factor: sqrt(total_elements) / sqrt(non_zero_elements)
+#     # To avoid division by zero, we use a conditional check
+#     scaling_factors = torch.sqrt(torch.tensor(num_total_elements, dtype=torch.float32)) / \
+#                     torch.sqrt(num_nonzero_elements.float().clamp(min=1))  # clamp to avoid division by zero
+
+#     # Scale the L2 norms
+#     l2_norms = l2_norms * scaling_factors
+#     # print('l2_norms after scaling', l2_norms, flush=True)
+#     has_true = mask.any()
+#     return l2_norms, has_true
+
+
+#     #     last_indices = torch.arange(x.size(1) - probe_num, x.size(1))
+#     # else:
+#     #     last_indices = torch.arange(max(x.size(1) - probe_num - 1, 1), x.size(1))
+
+#     # l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=2)
+#     # massive_tokens = torch.where(l2_norms > 500)
+#     # unique_batches, counts = torch.unique_consecutive(massive_tokens[0], return_counts=True)
+#     # result_tensors = torch.split(massive_tokens[1], counts.tolist())
+#     # print('massive_tokens', massive_tokens, flush=True)
+#     # # Stack the indices to create a 2D tensor of index pairs
+#     # if (l2_norms > 500).any():
+#     #     massive_tokens_index_pairs = torch.stack(result_tensors, dim=0).to(x.device)
+#     #     print('massive_tokens_index_pairs', massive_tokens_index_pairs, flush=True)
+#     #     last_indices = last_indices.repeat(x.size(0), 1).to(x.device)
+#     #     print('last_indices', last_indices, flush=True)
+#     #     select_indices = torch.cat((last_indices, massive_tokens_index_pairs), dim=1)
+#     # else:
+#     #     select_indices = last_indices.repeat(x.size(0), 1).to(x.device)
+
+
+# def rank_process(x, probe_num, probe_type, residual):
+#     print('rank_process', flush=True)
+#     print('x_size', x.size(), flush=True)
+#     # print('residual_size', residual.size(), flush=True)
+
+#     if 'randomrank' in cfg['prune_method']:
+#         print('randomrank', flush=True)
+#         if 'bsz' in probe_type:
+#             sorted_indices = torch.randperm(x.size(0))[:probe_num]
+#             x = x[sorted_indices, :, :]
+#         elif 'seq' in probe_type:
+#             sorted_indices = torch.randperm(x.size(1))[:probe_num]
+#             x = x[:, sorted_indices, :]
+#         return x, residual, sorted_indices
+#     elif 'rulerank' in cfg['prune_method']:
+#         cfg['temp_input_ids'] = cfg['temp_input_ids'].to(x.device)
+#         print('rulerank', flush=True)
+#         if 'bsz' in probe_type:
+#             # TODO: sort
+#             # sorted_indices = torch.randperm(x.size(0))[:probe_num]
+#             sorted_indices = torch.tensor([0]).to(x.device)
+#             # l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(1, 2))
+#             # values, indices = torch.topk(l2_norms, probe_num)
+#             # print(probe_type, indices, values)
+
+#             # sorted_indices = indices.sort()[0]
+#             print('sorted_Indicesbsz', sorted_indices)
+            
+
+#             # sorted_indices = torch.arange(probe_num)
+#             x = x[sorted_indices, :, :]
+#             cfg['temp_input_ids'] = cfg['temp_input_ids'][sorted_indices, :]
+#             if residual is not None:
+#                 residual = residual[sorted_indices, :, :]
+#         elif 'seq' in probe_type:
+            
+
+#             first_indices = torch.arange(1)
+
+#             if 'allpivot' in cfg['prune_method']:
+#                 each_l2_norm = torch.linalg.vector_norm(residual[0], ord=2, dim=1)
+#                 each_seq_mean = torch.mean(each_l2_norm)
+#                 print('each_l2_norm', each_l2_norm, flush=True)
+#                 print('each_seq_mean', each_seq_mean, flush=True)
+                
+
+#                 # Calculate twice the mean for each sequence
+#                 twice_seq_mean = 2 * each_seq_mean  # Add dimension for broadcasting
+
+#                 # Find elements where each element in each_l2_norm is greater than twice the corresponding sequence mean
+#                 mask = each_l2_norm > twice_seq_mean
+
+#                 # Extract the values and their indices where the condition is true
+#                 values = each_l2_norm[mask]
+#                 print('mask', mask, mask.size(), flush=True)
+#                 print('values', values, values.size(), flush=True)
+#                 first_indices = torch.nonzero(mask, as_tuple=True)
+#                 print('first_indices', first_indices, flush=True)
+#                 first_indices = first_indices[0]
+#                 print('Values greater than twice the sequence mean:', values, values.size(), first_indices, first_indices.size())
+
+#                 if first_indices.size(0) == 0:
+#                     first_indices = torch.arange(1)
+            
+#             first_indices = first_indices.to(x.device)
+
+#             # Calculate the start index for the last elements
+#             # start_index_from_end = max(4, last_dim_length - num_elements_from_end)  # Ensure there's no overlap with the first 4 indices
+
+#             # Generate indices for the last elements
+#             # probe_num = 1
+
+#             # cfg['num_nonpad_tokens'] = cfg['num_nonpad_tokens'].to(x.device)
+#             # probe_num = torch.tensor(probe_num).unsqueeze(0).repeat(x.shape[0], 1).to(x.device)
+#             # a = torch.max(cfg['num_nonpad_tokens'] - probe_num, 1)[0].unsqueeze(1)
+#             # print('aaaaa', a)
+#             # last_indices = torch.arange(torch.max(cfg['num_nonpad_tokens'] - probe_num, 1)[0], cfg['num_nonpad_tokens'])
+#             if 'last' in cfg['prune_method']:
+#                 last_indices = torch.arange(x.size(1) - probe_num + first_indices.size(0), x.size(1))
+
+                
+#             else:
+#                 # last_indices = torch.arange(max(x.size(1) - probe_num - 1, 1), x.size(1))
+#                 last_indices = torch.arange(1, probe_num)
+#             # last_indices = torch.arange(30)
+
+#             # Combine the two sets of indices
+#             last_indices = last_indices.to(x.device)
+#             print('firstindicesdevice', first_indices.device, flush=True)
+#             print('lastindicesdevice', last_indices.device, flush=True)
+#             sorted_indices = torch.cat((first_indices, last_indices)).to(x.device)
+#             # print('sorted_indices', sorted_indices, sorted_indices.shape, x.shape, flush=True)
+#             # sorted_indices = last_indices.to(x.device)
+#             # sorted_indices = first_indices.to(x.device)
+
+
+#             # if 'last' in cfg['prune_method']:
+#             #     last_indices = torch.arange(x.size(1) - probe_num, x.size(1))
+#             # else:
+#             #     last_indices = torch.arange(max(x.size(1) - probe_num - 1, 1), x.size(1))
+
+#             # l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=2)
+#             # massive_tokens = torch.where(l2_norms > 500)
+#             # unique_batches, counts = torch.unique_consecutive(massive_tokens[0], return_counts=True)
+#             # result_tensors = torch.split(massive_tokens[1], counts.tolist())
+#             # print('massive_tokens', massive_tokens, flush=True)
+#             # # Stack the indices to create a 2D tensor of index pairs
+#             # if (l2_norms > 500).any():
+#             #     massive_tokens_index_pairs = torch.stack(result_tensors, dim=0).to(x.device)
+#             #     print('massive_tokens_index_pairs', massive_tokens_index_pairs, flush=True)
+#             #     last_indices = last_indices.repeat(x.size(0), 1).to(x.device)
+#             #     print('last_indices', last_indices, flush=True)
+#             #     select_indices = torch.cat((last_indices, massive_tokens_index_pairs), dim=1)
+#             # else:
+#             #     select_indices = last_indices.repeat(x.size(0), 1).to(x.device)
+
+
+#             # sorted_indices = torch.sort(select_indices, dim=1)[0]
+#             # sorted_indices = torch.stack([torch.unique(row) for row in sorted_indices])
+#             # batch_indices = torch.arange(x.size(0)).unsqueeze(1).expand(-1, sorted_indices.size(1))
+#             # sequence_indices = sorted_indices
+
+
+#             # # Use advanced indexing to retrieve the elements
+#             # x = x[batch_indices, sequence_indices]
+#             # print('xshape', x.shape, flush=True)
+#             sorted_indices = torch.sort(sorted_indices)[0]
+#             x = x[:, sorted_indices, :]
+
+#             cfg['temp_input_ids'] = cfg['temp_input_ids'][:, sorted_indices]
+#             print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
+#         decoded_string = cfg['tokenizer'].batch_decode(cfg['temp_input_ids'], skip_special_tokens=False)
+
+#         print(f'decoded_string_{probe_type}', decoded_string)
+#         return x, residual, sorted_indices
+#     else:
+#         # torch.set_printoptions(precision=2, sci_mode=False)
+#         if residual is not None:
+#             print('residual_ranking', flush=True)
+#             print(torch.isnan(residual).any(), torch.isinf(residual).any())
+
+#             if torch.isnan(residual).any():
+#                 print('nan residual', flush=True)
+#                 print(residual, flush=True)
+#                 raise ValueError('nan residual')
+#             if 'bsz' in probe_type:
+#                 l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(1, 2))
+#                 # if values are the same, add little randomness to avoid the same probe
+#                 # torch.float16 has the rounding issue
+#                 noise = torch.randn(l2_norms.size(), device=l2_norms.device, dtype=l2_norms.dtype) * 0.5
+#                 print('noise', noise, flush=True)
+#                 l2_norms = l2_norms + noise
+#                 print('l2_norms after noise', l2_norms, flush=True)
+#                 print('l2_norms bsz', l2_norms, flush=True)
+#             elif 'seq' in probe_type:
+#                 l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=(0, 2))
+#                 print('l2_norms seq', l2_norms, flush=True)
+#         else:
+#             if 'bsz' in probe_type:
+#                 l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(1, 2))
+#             elif 'seq' in probe_type:
+#                 l2_norms = torch.linalg.vector_norm(x, ord=2, dim=(0, 2))
+
+        
+
+#     # if 'seq' in probe_type:
+#     #     x_l2_norms = torch.linalg.vector_norm(x, ord=2, dim=2)
+#     #     l2_norms = torch.linalg.vector_norm(residual, ord=2, dim=2)
+#     # first_30_tokens = l2_norms[:, :30]
+#     # print('first_30_tokens l2_norms', first_30_tokens, flush=True)
+#     # first_30_x_tokens = x_l2_norms[:, :30]
+#     # print('first_30_tokens x_l2_norms', first_30_x_tokens, flush=True)
+
+
+#     # all_sorted_values, all_sorted_indices = torch.sort(l2_norms, descending=True)
+#     # all_sorted_values = all_sorted_values.to(torch.float32)
+#     # print('values', all_sorted_values, all_sorted_indices, flush=True)
+
+#     # sum_values = all_sorted_values.sum()
+#     # probabilities = (all_sorted_values / sum_values)
+#     # print('probabilities', probabilities, flush=True)
+#     # selected_indices = torch.multinomial(probabilities, probe_num, replacement=False)
+#     # all_sorted_values = all_sorted_values.to(torch.float16)
+#     # values = all_sorted_values[selected_indices]
+#     # indices = all_sorted_indices[selected_indices]
+#         print('x.size(1) - int(probe_num//2)', x.size(1) - int(probe_num//2))
+#         if 'seq' in probe_type:
+
+#             if 'mixing' in cfg['prune_method']:
+#                 values, indices = torch.topk(l2_norms[:x.size(1) - int(probe_num//2)], int(probe_num//2))
+                
+
+#                 sorted_indices = indices.sort()[0]
+#                 if sorted_indices[0] != 0:
+#                     sorted_indices[0] = 0
+#                 print(probe_type, sorted_indices, sorted_indices.shape, values)
+
+#                 last_indices = torch.arange(x.size(1) - int(probe_num//2), x.size(1)).to(x.device)
+#                 sorted_indices = torch.cat((sorted_indices, last_indices)).to(x.device)
+#                 print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
+#             else:
+#                 if 'deleteoutlier' in cfg['prune_method']:
+#                     l2_norms, has_outlier = delete_massive_tokens(residual)
+#                     print('l2_norms', l2_norms, flush=True)
+#                 values, indices = torch.topk(l2_norms, probe_num)
+#                 sorted_indices = indices.sort()[0]
+#                 # if 'deleteoutlier' in cfg['prune_method']:
+#                 #     if has_outlier:
+#                 sorted_indices[0] = 0
+#                 print('sorted_indices seq', sorted_indices, sorted_indices.size(), flush=True)
+
+#                 each_l2_norm = torch.linalg.vector_norm(residual, ord=2, dim=2)
+#                 each_seq_mean = torch.mean(each_l2_norm, dim=1)
+#                 print('each_l2_norm', each_l2_norm, flush=True)
+#                 print('each_seq_mean', each_seq_mean, flush=True)
+                
+
+#                 # Calculate twice the mean for each sequence
+#                 twice_seq_mean = 2 * each_seq_mean[:, None]  # Add dimension for broadcasting
+
+#                 # Find elements where each element in each_l2_norm is greater than twice the corresponding sequence mean
+#                 mask = each_l2_norm > twice_seq_mean
+
+#                 # Extract the values and their indices where the condition is true
+#                 values = each_l2_norm[mask]
+#                 indices = torch.nonzero(mask, as_tuple=True)
+
+#                 # Printing the results
+#                 print("Values greater than twice the sequence mean:", values, values.size())
+#                 print("Indices of these values (batch_index, sequence_index):", indices)
+#         else:
+#             values, indices = torch.topk(l2_norms, probe_num)
+#             print(probe_type, indices, values)
+
+#             sorted_indices = indices.sort()[0]
+#             print('sorted_indices', sorted_indices, flush=True)
+#     # sorted_values = values.sort()[0]
+#     # if 'seq' in probe_type:
+
+#     #     first_indices = torch.arange(1)
+
+#     #     # Calculate the start index for the last elements
+#     #     # start_index_from_end = max(4, last_dim_length - num_elements_from_end)  # Ensure there's no overlap with the first 4 indices
+
+#     #     # Generate indices for the last elements
+#     #     # probe_num = 1
+#     #     last_indices = torch.arange(x.shape[1] - probe_num, x.shape[1])
+
+#     #     # last_indices = torch.arange(30)
+
+#     #     # Combine the two sets of indices
+#     #     sorted_indices = torch.cat((first_indices, last_indices)).to(x.device)
+
+#     #     # sorted_indices = last_indices.to(x.device)
+#     #     # sorted_indices = first_indices.to(x.device)
+#     #     print('sorted_indices', sorted_indices, flush=True)
+#         cfg['temp_input_ids'] = cfg['temp_input_ids'].to(x.device)
+#         # print('cfg[temp_input_ids]', cfg['temp_input_ids'], x, flush=True)
+#         if 'bsz' in probe_type:
+#             sorted_indices = torch.tensor([0]).to(x.device)
+#             cfg['temp_input_ids'] = cfg['temp_input_ids'][sorted_indices, :]
+#             # sorted_indices = torch.arange(probe_num)
+#             # sorted_indices = torch.randperm(x.size(0))[:probe_num]
+#             print('bsz_sorted_indices', sorted_indices, flush=True)
+#             x = x[sorted_indices, :, :]
+#         elif 'seq' in probe_type:      
+#             cfg['temp_input_ids'] = cfg['temp_input_ids'][:, sorted_indices]
+#             x = x[:, sorted_indices, :]
+
+#         if residual is not None:
+#             if 'bsz' in probe_type:
+#                 residual = residual[sorted_indices, :, :]
+#             elif 'seq' in probe_type:
+#                 residual = residual[:, sorted_indices, :]
+        
+#         # print("cfg['temp_input_ids']", cfg['temp_input_ids'])
+#         decoded_string = cfg['tokenizer'].batch_decode(cfg['temp_input_ids'], skip_special_tokens=False)
+
+#         print(f'decoded_string_{probe_type}', decoded_string)
+#     return x, residual, sorted_indices
+
+# def generate_probe(x, probe_ratio_list, residual=None):
+#     # seq rank needs selected_indices to combine with the global metric
+#     bsz_selected_indices = None
+#     seq_selected_indices = None
+#     pad_tokens = cfg['pad_tokens']
+#     cfg['temp_input_ids'] = cfg['input_ids']
+#     print("cfg['temp_input_ids'] shape", cfg['temp_input_ids'].shape, cfg['input_ids'].shape, flush=True)
+#     print('x shape', x.shape, flush=True)
+
+#     # if 'mask' in cfg['prune_method']:
+#     #     pass
+#     # else:
+#         # if pad_tokens is not None:
+#         #     if residual is not None:
+#         #         residual[pad_tokens] = 0
+#         #         print('residual_generate_probe', id(residual), flush=True)
+#         #     else:
+#         #         x[pad_tokens] = 0
+
+#     for i in range(len(cfg['probe_generation_type'])):
+#         probe_type = cfg['probe_generation_type'][i]
+#         probe_ratio = probe_ratio_list[i]
+
+#         if 'bsz' in probe_type:
+#             probe_num = math.ceil(x.size(0) * probe_ratio)
+#         elif 'seq' in probe_type:
+#             probe_num = max(math.ceil(x.size(1) * probe_ratio), 2)
+#             if probe_num % 2 != 0:
+#                 probe_num += 1
+#             probe_num = min(probe_num, x.size(1))
+
+
+#         if 'rank' in probe_type:
+#             x, residual, selected_indices = rank_process(x, probe_num, probe_type, residual)
+#             if 'bsz' in probe_type:
+#                 bsz_selected_indices = selected_indices
+#             elif 'seq' in probe_type:
+#                 seq_selected_indices = selected_indices
+#         else:
+#             raise NotImplementedError
+#     return x, bsz_selected_indices, seq_selected_indices
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ---------
 # torch.set_printoptions(threshold=1000)
 # def rank_process(x, probe_num, probe_type, residual):
     

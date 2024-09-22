@@ -156,10 +156,10 @@ class OPTAttention(nn.Module):
         full_bsz, tgt_len, _ = hidden_states.size()
         if cfg['q_probe_ratio'] == cfg['k_probe_ratio'] and cfg['q_probe_ratio'] == cfg['v_probe_ratio']:
             if 'respick' in cfg['prune_method']:
-                inforank = kwargs['respick']
+                residual_for_probe = kwargs['respick']
             else:
-                inforank = None
-            probe, bsz_selected_indices, seq_selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], inforank)
+                residual_for_probe = None
+            probe, bsz_selected_indices, seq_selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], residual_for_probe)
         else:
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
 
@@ -776,10 +776,10 @@ class OPTDecoderLayer(nn.Module):
         cur_batch_seq_len = x.size(1)
         
         if 'respick' in cfg['prune_method']:
-            inforank = kwargs['respick']
+            residual_for_probe = kwargs['respick']
         else:
-            inforank = None
-        probe, bsz_selected_indices, seq_selected_indices = generate_probe(x, cfg['fc1_probe_ratio'], inforank)
+            residual_for_probe = None
+        probe, bsz_selected_indices, seq_selected_indices = generate_probe(x, cfg['fc1_probe_ratio'], residual_for_probe)
         
         probe_out = self.activation_fn(self.fc1(probe, cal_mlp_probe_out_dim_metric=True))
         print('probe_out', probe_out.shape)

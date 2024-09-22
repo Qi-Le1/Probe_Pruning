@@ -324,11 +324,11 @@ class LlamaMLP(nn.Module):
         cur_batch_seq_len = x.size(1)
         if cfg['gate_probe_ratio'] == cfg['up_probe_ratio']:
             if 'respick' in cfg['prune_method']:
-                inforank = kwargs['respick']
+                residual_for_probe = kwargs['respick']
             else:
-                inforank = None
+                residual_for_probe = None
             
-            probe, bsz_selected_indices, seq_selected_indices = generate_probe(x, cfg['gate_probe_ratio'], inforank)
+            probe, bsz_selected_indices, seq_selected_indices = generate_probe(x, cfg['gate_probe_ratio'], residual_for_probe)
         else:
             raise ValueError('gate_probe_num should be equal to up_probe_num for now')
         
@@ -555,10 +555,10 @@ class LlamaAttention(nn.Module):
         # generate probe: rank
         if cfg['q_probe_ratio'] == cfg['k_probe_ratio'] and cfg['q_probe_ratio'] == cfg['v_probe_ratio']:
             if 'respick' in cfg['prune_method']:
-                inforank = kwargs['respick']
+                residual_for_probe = kwargs['respick']
             else:
-                inforank = None
-            probe, bsz_selected_indices, seq_selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], inforank)
+                residual_for_probe = None
+            probe, bsz_selected_indices, seq_selected_indices = generate_probe(hidden_states, cfg[f'q_probe_ratio'], residual_for_probe)
         else:
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
 
