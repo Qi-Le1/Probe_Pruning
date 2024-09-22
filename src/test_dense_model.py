@@ -14,7 +14,7 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, update_model_prof, model_forward, remove_non_picklable_items
+    get_model_profile, summarize_info_list, match_prefix, update_model_prof, model_forward, remove_non_picklable_items
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 
 
@@ -166,25 +166,25 @@ def test(data_loader, model, model_prof, metric, logger):
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
 
-        cur_attn_inference_duration_list = []
-        cur_mlp_inference_duration_list = []
-        for name, module in model.named_modules():
-            for attr_name in dir(module):
-                if 'cur_attn_inference_duration' in attr_name:
-                    # Retrieve the attribute value
-                    attr_value = getattr(module, attr_name)
-                    cur_attn_inference_duration_list.append(attr_value)
-                    # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-                    # print('name', name, attr_name, attr_value)
-                if 'cur_mlp_inference_duration' in attr_name:
-                    # Retrieve the attribute value
-                    attr_value = getattr(module, attr_name)
-                    cur_mlp_inference_duration_list.append(attr_value)
-                    # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-                    # print('name', name, attr_name, attr_value)
-        print('mean_cur_attn_inference_duration', sum(cur_attn_inference_duration_list)/len(cur_attn_inference_duration_list))
-        print('mean_cur_mlp_inference_duration', sum(cur_mlp_inference_duration_list)/len(cur_mlp_inference_duration_list))
-        print('mean_inference_duration', inference_duration/len(data_loader))
+        # cur_attn_inference_duration_list = []
+        # cur_mlp_inference_duration_list = []
+        # for name, module in model.named_modules():
+        #     for attr_name in dir(module):
+        #         if 'cur_attn_inference_duration' in attr_name:
+        #             # Retrieve the attribute value
+        #             attr_value = getattr(module, attr_name)
+        #             cur_attn_inference_duration_list.append(attr_value)
+        #             # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+        #             # print('name', name, attr_name, attr_value)
+        #         if 'cur_mlp_inference_duration' in attr_name:
+        #             # Retrieve the attribute value
+        #             attr_value = getattr(module, attr_name)
+        #             cur_mlp_inference_duration_list.append(attr_value)
+        #             # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+        #             # print('name', name, attr_name, attr_value)
+        # print('mean_cur_attn_inference_duration', sum(cur_attn_inference_duration_list)/len(cur_attn_inference_duration_list))
+        # print('mean_cur_mlp_inference_duration', sum(cur_mlp_inference_duration_list)/len(cur_mlp_inference_duration_list))
+        # print('mean_inference_duration', inference_duration/len(data_loader))
             
             # break
         print('inference_duration', inference_duration)

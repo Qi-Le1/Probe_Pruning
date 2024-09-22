@@ -207,13 +207,13 @@ def nearest_multiple(num_prune, total, multiple):
         return adjusted_prune
 
 
-def record_pruing_info(model, logger):
-    for name, module in model.named_modules():
-        if hasattr(module, 'pruning_module'):
-            # print('module.pruning_module.pruning_info', module.pruning_module.pruning_info)
-            logger.append(module.pruning_module.pruning_info, 'test')
-            module.pruning_module.reset_pruning_info()
-    return
+# def record_pruing_info(model, logger):
+#     for name, module in model.named_modules():
+#         if hasattr(module, 'pruning_module'):
+#             # print('module.pruning_module.pruning_info', module.pruning_module.pruning_info)
+#             logger.append(module.pruning_module.pruning_info, 'test')
+#             module.pruning_module.reset_pruning_info()
+#     return
 
 
 def update_model_prof(model_prof):

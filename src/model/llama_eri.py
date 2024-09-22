@@ -191,9 +191,7 @@ class Linear(nn.Linear, EriLayer):
                 self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * norm_squared / batch_size
             elif cfg['calibration_stage'] == False:
                 if cfg['pad_tokens'] is not None:
-                    cfg['pad_tokens'] = cfg['pad_tokens'].to(cur_device)
                     cfg['nonpad_tokens_denominator'] = cfg['nonpad_tokens_denominator'].to(cur_device)
-                    inp[cfg['pad_tokens']] = 0
                     norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
                     self.scaler_inp[:seq_len, update_indices] += (1 - momentum) * torch.clamp(norm_squared / cfg['nonpad_tokens_denominator'], max=cfg['data_type_max'])
                 else:
@@ -247,9 +245,7 @@ class Linear(nn.Linear, EriLayer):
             elif cfg['calibration_stage'] == False:
                 self.scaler_inp = self.scaler_inp.to(cfg['data_type'])
                 if cfg['pad_tokens'] is not None:
-                    cfg['pad_tokens'] = cfg['pad_tokens'].to(cur_device)
                     cfg['nonpad_tokens_denominator'] = cfg['nonpad_tokens_denominator'].to(cur_device)
-                    # inp[cfg['pad_tokens']] = 0
                     self.scaler_inp[:seq_len, update_indices] *= self.nsamples[update_indices] / (self.nsamples[update_indices] + cfg['nonpad_tokens_denominator'])
                     norm_squared = torch.clamp(torch.linalg.vector_norm(inp, ord=2, dim=0) ** 2, max=cfg['data_type_max'])
                     denominator = (self.nsamples[update_indices] + cfg['nonpad_tokens_denominator'])
@@ -278,7 +274,10 @@ class Linear(nn.Linear, EriLayer):
                 # It is the sum of the variance between each element in the channel and the average of the channel.
                 # We follow their github code
                 self.fluc_inp[:seq_len, update_indices] += torch.sum((inp - torch.mean(self.baseline_inp[:seq_len, update_indices], dim=0).unsqueeze(0).unsqueeze(0)) * (inp - torch.mean(old_baseline_inp[:seq_len, update_indices], dim=0).unsqueeze(0).unsqueeze(0)), dim=0) / (self.nsamples[update_indices] + batch_size)  
-        self.nsamples[update_indices] += batch_size
+        if cfg['pad_tokens'] is not None:
+            self.nsamples[update_indices] += cfg['nonpad_tokens_denominator']
+        else:
+            self.nsamples[update_indices] += batch_size
 
         
     def get_global_metric_score_distribution(self, cur_seq_len=None):

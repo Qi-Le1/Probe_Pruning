@@ -48,22 +48,56 @@
 import torch
 
 import torch
+# tensor_3d = torch.rand(3, 4, 5)
+# print(tensor_3d)
+
+# # Calculate the L2 norm across dimension 2
+# norm_dim2 = torch.linalg.vector_norm(tensor_3d, ord=2, dim=2)
+
+# # Calculate the L2 norm across dimension 1 of the resulting tensor
+# final_norm = torch.linalg.vector_norm(norm_dim2, ord=2, dim=1)
+
+# # tensor_3d, norm_dim2, final_norm
+
+# direct_norm = torch.linalg.vector_norm(tensor_3d, ord=2, dim=(1, 2))
+
+# print(final_norm == direct_norm, final_norm, direct_norm)
+# Generate a 3D tensor of shape (3, 4, 5)
+# tensor_3d = torch.rand(3, 4, 5)
+
+# # Generate two 1D indices for dimension 1 and dimension 2
+# indices_dim1 = torch.randint(0, 3, (2,))  # 3 random indices for dimension 1 (size 4)
+# indices_dim2 = torch.randint(0, 4, (3,))  # 3 random indices for dimension 2 (size 5)
+
+# print("Original 3D Tensor:")
+# print(tensor_3d)
+# print(indices_dim1)
+# print(indices_dim2)
+
+# print(tensor_3d[indices_dim1, indices_dim2, :])
+
 
 # Generate a 3D tensor of shape (3, 4, 5)
-tensor_3d = torch.rand(3, 4, 5)
+tensor_3d = torch.rand(3, 4)
 
 # Generate two 1D indices for dimension 1 and dimension 2
-indices_dim1 = torch.randint(0, 3, (2,))  # 3 random indices for dimension 1 (size 4)
-indices_dim2 = torch.randint(0, 4, (3,))  # 3 random indices for dimension 2 (size 5)
+indices_dim1 = torch.arange(3)
+indices_dim2 = torch.arange(3)  # Adjust to match the length of indices_dim1
 
 print("Original 3D Tensor:")
 print(tensor_3d)
-print(indices_dim1)
-print(indices_dim2)
+print("Indices for Dimension 1:", indices_dim1)
+print("Indices for Dimension 2:", indices_dim2)
 
-print(tensor_3d[indices_dim1, indices_dim2, :])
+# Using meshgrid to generate broadcastable indices for tensor indexing
+ii, jj = torch.meshgrid(indices_dim1, indices_dim2, indexing='ij')
+print(ii)
+print(tensor_3d[ii, jj])
+print(tensor_3d[ii], tensor_3d[ii].shape)
 
-
+iii = ii == 0
+print(iii)
+print(tensor_3d[iii], tensor_3d[iii].shape)
 
 # bsz, seq, dim = 4, 5, 10  # Example sizes
 # hidden_states = torch.randn(bsz, seq, dim)

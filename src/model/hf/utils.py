@@ -2,54 +2,20 @@ import math
 import torch
 from config import cfg
 
-def custom_expand_mask(mask, dtype, tgt_len=None):
-        """
-        Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
-        """
-        bsz, src_len = mask.size()
-        tgt_len = tgt_len if tgt_len is not None else src_len
+# def custom_expand_mask(mask, dtype, tgt_len=None):
+#         """
+#         Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
+#         """
+#         bsz, src_len = mask.size()
+#         tgt_len = tgt_len if tgt_len is not None else src_len
 
-        expanded_mask = mask[:, None, None, :].expand(bsz, 1, tgt_len, src_len).to(dtype)
-        expanded_mask = expanded_mask.transpose(-1, -2)
-        # expanded_mask = mask.unsqueeze(2).repeat(1, 1, tgt_len) 
+#         expanded_mask = mask[:, None, None, :].expand(bsz, 1, tgt_len, src_len).to(dtype)
+#         expanded_mask = expanded_mask.transpose(-1, -2)
+#         # expanded_mask = mask.unsqueeze(2).repeat(1, 1, tgt_len) 
 
-        inverted_mask = 1.0 - expanded_mask
+#         inverted_mask = 1.0 - expanded_mask
 
-        return inverted_mask.masked_fill(inverted_mask.to(torch.bool), -1/src_len)
-
-def delete_massive_tokens(residual):
-    each_l2_norm = torch.linalg.vector_norm(residual, ord=2, dim=2)
-    each_seq_mean = torch.mean(each_l2_norm, dim=1)
-    print('each_l2_norm', each_l2_norm, flush=True)
-    print('each_seq_mean', each_seq_mean, flush=True)
-    
-
-    # Calculate twice the mean for each sequence
-    threshold = 4 * each_seq_mean[:, None]  # Add dimension for broadcasting
-
-    mask = each_l2_norm > threshold
-
-    mask[:, 0] = False
-
-    num_total_elements = each_l2_norm.size(0)
-    each_l2_norm[mask] = 0
-    # l2_norms = torch.linalg.vector_norm(each_l2_norm, ord=2, dim=0)
-    num_nonzero_elements = (each_l2_norm != 0).sum(dim=0)
-
-    # Recompute the L2 norm along the desired dimension (in this case, dim=0)
-    l2_norms = torch.linalg.vector_norm(each_l2_norm, ord=2, dim=0)
-    # print('l2_norms delete_massive_tokens', l2_norms, flush=True)
-    # Calculate the scaling factor for each column based on non-zero elements
-    # Scaling factor: sqrt(total_elements) / sqrt(non_zero_elements)
-    # To avoid division by zero, we use a conditional check
-    scaling_factors = torch.sqrt(torch.tensor(num_total_elements, dtype=torch.float32)) / \
-                    torch.sqrt(num_nonzero_elements.float().clamp(min=1))  # clamp to avoid division by zero
-
-    # Scale the L2 norms
-    l2_norms = l2_norms * scaling_factors
-    # print('l2_norms after scaling', l2_norms, flush=True)
-    has_true = mask.any()
-    return l2_norms, has_true
+#         return inverted_mask.masked_fill(inverted_mask.to(torch.bool), -1/src_len)
 
 
 def rank_process(norm_across_feature, probe_num, probe_type):
@@ -64,7 +30,7 @@ def rank_process(norm_across_feature, probe_num, probe_type):
             l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=1)
         elif 'seq' in probe_type:
             l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=0)
-
+        
         values, indices = torch.topk(l2_norms, probe_num)
         sorted_indices = indices.sort()[0]
         if 'seq' in probe_type:

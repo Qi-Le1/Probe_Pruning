@@ -108,7 +108,6 @@ class HiddenRepresentationPruning():
                 cur_global_metric_score_distribution = global_metric_score_distribution[seq_selected_indices, :] if seq_selected_indices is not None else global_metric_score_distribution
                 cur_global_metric_score_distribution = cur_global_metric_score_distribution.to(probe_out.device)
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
-                print('norm_probe_out_square', norm_probe_out_square, seq_selected_indices, torch.sum(norm_probe_out_square, dim=0), torch.sum(cur_global_metric_score_distribution, dim=0))
                 if 'probefixratio' in cfg['prune_method']:
                     combined_probe_out = cfg['probefixratio'] * cur_global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
                 # dynaratio, since all nonnegative, no need to abs
@@ -192,7 +191,6 @@ class HiddenRepresentationPruning():
                 cur_global_metric_score_distribution = cur_global_metric_score_distribution.to(probe_out.device)
 
                 temp = torch.sum(cur_global_metric_score_distribution, dim=1)
-                print('seq calibration', temp)
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
 
                 if 'probefixratio' in cfg['prune_method']:
@@ -356,12 +354,7 @@ class HiddenRepresentationPruning():
             sorted_value, sorted_indices = torch.sort(summed_metrics, dim=0)
             num_prune_heads = int(prune_ratio * num_heads)
             heads_to_preserve = sorted_indices[num_prune_heads:]
-            print('heads_to_preserve', heads_to_preserve)
             heads_to_preserve = torch.sort(heads_to_preserve)[0]
-            print('heads_to_preserve sort', heads_to_preserve)
-            # sorted_heads, _ = torch.sort(heads_to_preserve)
-
-            # print(sorted_heads)  # Output: tensor([1, 2, 3, 5, 8])
             full_indices_to_preserve = (torch.arange(head_dim, device=probe_out_dim_metric.device) + heads_to_preserve.unsqueeze(1) * head_dim).view(-1)
             num_heads = num_heads - num_prune_heads
             return full_indices_to_preserve, num_heads, heads_to_preserve

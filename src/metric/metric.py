@@ -157,9 +157,7 @@ class CsrAccuracyNorm:
         total_acc = 0
         for key in self.acc_norm_output_for_one_question:
             # argmin for positive loss
-            print('self.acc_norm_correct_labels_for_one_question[key]', self.acc_norm_correct_labels_for_one_question[key])
             correct_index = next((i for i, item in enumerate(self.acc_norm_correct_labels_for_one_question[key]) if item == 1), None)
-            print('correct_index', correct_index, np.argmin(self.acc_norm_correct_labels_for_one_question[key]))
             acc = 1 if np.argmin(self.acc_norm_output_for_one_question[key]) == correct_index else 0
             total_acc += acc
 

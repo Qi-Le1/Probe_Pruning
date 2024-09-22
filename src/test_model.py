@@ -13,7 +13,7 @@ from dataset import make_dataset, make_data_loader, process_dataset, collate, ma
 from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
-    record_pruing_info, get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward, remove_non_picklable_items, check_dense_model, \
+    get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward, remove_non_picklable_items, check_dense_model, \
     check_calib_saving_info, load_calib_saving_info, save_calib_info
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 import matplotlib.pyplot as plt
@@ -118,9 +118,7 @@ def run_calibration(model, data_loader):
 
 
 def identify_pad_tokens(input):
-    cfg['input_ids'] = input['input_ids']
     pad_tokens = input['input_ids'] == cfg['pad_token_id'] 
-    print('pad_tokens', pad_tokens[0], input['attention_mask'][0])
     no_padding = (~pad_tokens).all()
     # if there is padding, need to zero out the padding token
     if no_padding == False:
@@ -133,16 +131,16 @@ def identify_pad_tokens(input):
         # cfg['non_pad_tokens'] = None
         cfg['nonpad_tokens_denominator'] = None
 
-    print('attentionmasdk', input['attention_mask'])
-    flipped = torch.flip(input['attention_mask'], dims=[1])
-    print("Flipped Tensor:", flipped)
-    # Find the index of the first '1' in each flipped row (now the last '1' in the original)
-    last_one_indices = torch.argmax(flipped, dim=1)
-    print('last_one_indices', last_one_indices)
-    # Correct the indices to reflect their positions in the original tensor
-    num_nonpad_tokens = flipped.size(1) - last_one_indices
-    cfg['num_nonpad_tokens'] = num_nonpad_tokens
-    print("cfg['num_nonpad_tokens'] ", cfg['num_nonpad_tokens'] )
+    # print('attentionmasdk', input['attention_mask'])
+    # flipped = torch.flip(input['attention_mask'], dims=[1])
+    # print("Flipped Tensor:", flipped)
+    # # Find the index of the first '1' in each flipped row (now the last '1' in the original)
+    # last_one_indices = torch.argmax(flipped, dim=1)
+    # print('last_one_indices', last_one_indices)
+    # # Correct the indices to reflect their positions in the original tensor
+    # num_nonpad_tokens = flipped.size(1) - last_one_indices
+    # cfg['num_nonpad_tokens'] = num_nonpad_tokens
+    # print("cfg['num_nonpad_tokens'] ", cfg['num_nonpad_tokens'] )
     return
 
 def test(data_loader, model, model_prof, metric, logger):
