@@ -431,7 +431,7 @@ class OPTAttention(nn.Module):
                         # if not, do full inference
                         if 'input_layernorm_mlp_residual' in kwargs:
                             _, _, _, _, _ = self.probe_process(kwargs['input_layernorm_mlp_residual'], key_value_states, past_key_value, attention_mask, layer_head_mask, output_attentions, **kwargs)
-                            return
+                            # return
                         else:
                             pass
                             # raise ValueError('Invalid input for asyncintra mode')
@@ -826,7 +826,7 @@ class OPTDecoderLayer(nn.Module):
                     elif cfg['mode'] == 'asyncintra':
                         if 'post_layernorm_attn_residual' in kwargs:
                             _, _ = self.probe_process(kwargs['post_layernorm_attn_residual'], **kwargs)
-                            return
+                            # return
                         else:
                             pass
                             # raise ValueError('Invalid input for asyncintra mode')
@@ -881,7 +881,7 @@ class OPTDecoderLayer(nn.Module):
                 hidden_states = self.fc2(self.activation_fn(self.fc1(hidden_states))) 
                 return hidden_states  
 
-    def check_asyncintra_for_mlp(self):
+    def check_asyncintra_for_next_mlp(self):
         if ('fc1' in cfg['cust_tgt_modules'] or 'fc2' in cfg['cust_tgt_modules']) \
             and self.layer_order not in cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
@@ -890,17 +890,29 @@ class OPTDecoderLayer(nn.Module):
             return True
         return False
     
-    def check_asyncintra_for_attention(self, **kwargs):
+    # def check_asyncintra_for_attention(self, **kwargs):
+    #     # TODO: hardcode skip layers
+    #     if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) \
+    #         and self.layer_order not in cfg['skip_layers'][:-1] \
+    #         and cfg['calibration_stage'] == False \
+    #         and cfg['mode'] == 'asyncintra' \
+    #         and 'probe' in cfg['prune_method']:
+            
+    #         # if kwargs['next_layer'] != 'changing_gpu' and kwargs['next_layer'] != 'last_layer':
+    #         if kwargs['next_layer'] != None:
+    #             return True
+            
+    #     return False
+    
+    def check_asyncintra_for_next_attention(self, **kwargs):
         # TODO: hardcode skip layers
         if ('q_proj' in cfg['cust_tgt_modules'] or 'k_proj' in cfg['cust_tgt_modules'] or 'v_proj' in cfg['cust_tgt_modules'] or 'o_proj' in cfg['cust_tgt_modules']) \
-            and self.layer_order not in cfg['skip_layers'][:-1] \
+            and self.layer_order not in cfg['skip_layers'] \
             and cfg['calibration_stage'] == False \
             and cfg['mode'] == 'asyncintra' \
             and 'probe' in cfg['prune_method']:
             
-            # if kwargs['next_layer'] != 'changing_gpu' and kwargs['next_layer'] != 'last_layer':
-            if kwargs['next_layer'] != None:
-                return True
+            return True
             
         return False
 
@@ -931,93 +943,93 @@ class OPTDecoderLayer(nn.Module):
         """
         print('layerorder', self.layer_order, flush=True)
 
-        residual = hidden_states
-        def probe_mlp_inf(residual):
-            if self.check_asyncintra_for_next_mlp():
-                # with torch.cuda.stream(cur_custom_stream):
-                # cur_custom_stream.wait_event(self.whole_batch_calculation)  
-                print('cur_custom_stream in thread', cur_custom_stream.device, flush=True) 
-                try:
-                    post_layernorm_attn_residual = self.final_layer_norm(residual)
-                    self.mlp_layer(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual, respick=residual)
-                except Exception as e:
-                    print(f"Error in probe_mlp_inf: {e}")
-                    traceback.print_exc() 
+        # residual = hidden_states
+        # def probe_mlp_inf(residual):
+        #     if self.check_asyncintra_for_next_mlp():
+        #         # with torch.cuda.stream(cur_custom_stream):
+        #         # cur_custom_stream.wait_event(self.whole_batch_calculation)  
+        #         print('cur_custom_stream in thread', cur_custom_stream.device, flush=True) 
+        #         try:
+        #             post_layernorm_attn_residual = self.final_layer_norm(residual)
+        #             self.mlp_layer(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual, respick=residual)
+        #         except Exception as e:
+        #             print(f"Error in probe_mlp_inf: {e}")
+        #             traceback.print_exc() 
 
 
-        def full_attn_inf(hidden_states, residual):
-            # with torch.cuda.stream(cur_default_stream):
-            if self.layer_order in cfg['gpu_breakpoints'] and cfg['mode'] == 'asyncintra':
-                print('breakpoint', self.layer_order, flush=True)
-                full_indices = torch.arange(self.hidden_size, dtype=torch.int32)
-                self.self_attn.q_proj.prepare_async_weight(out_dim_indices=full_indices)
-                self.self_attn.out_proj.prepare_async_weight(in_dim_indices=full_indices)
-                self.self_attn.k_proj.prepare_async_weight(out_dim_indices=full_indices)
-                self.self_attn.v_proj.prepare_async_weight(out_dim_indices=full_indices)
-            try:
-                hidden_states = self.self_attn_layer_norm(hidden_states)
-                hidden_states, self_attn_weights, present_key_value = self.self_attn(
-                    hidden_states=hidden_states,
-                    past_key_value=past_key_value,
-                    attention_mask=attention_mask,
-                    layer_head_mask=layer_head_mask,
-                    output_attentions=output_attentions,
-                    respick=residual
-                )
-                hidden_states = residual + hidden_states
-                return hidden_states
-            except Exception as e:
-                print(f"Error in full_attn_inf: {e}")
-                traceback.print_exc() 
+        # def full_attn_inf(hidden_states, residual):
+        #     # with torch.cuda.stream(cur_default_stream):
+        #     if self.layer_order in cfg['gpu_breakpoints'] and cfg['mode'] == 'asyncintra':
+        #         print('breakpoint', self.layer_order, flush=True)
+        #         full_indices = torch.arange(self.hidden_size, dtype=torch.int32)
+        #         self.self_attn.q_proj.prepare_async_weight(out_dim_indices=full_indices)
+        #         self.self_attn.out_proj.prepare_async_weight(in_dim_indices=full_indices)
+        #         self.self_attn.k_proj.prepare_async_weight(out_dim_indices=full_indices)
+        #         self.self_attn.v_proj.prepare_async_weight(out_dim_indices=full_indices)
+        #     try:
+        #         hidden_states = self.self_attn_layer_norm(hidden_states)
+        #         hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        #             hidden_states=hidden_states,
+        #             past_key_value=past_key_value,
+        #             attention_mask=attention_mask,
+        #             layer_head_mask=layer_head_mask,
+        #             output_attentions=output_attentions,
+        #             respick=residual
+        #         )
+        #         hidden_states = residual + hidden_states
+        #         return hidden_states
+        #     except Exception as e:
+        #         print(f"Error in full_attn_inf: {e}")
+        #         traceback.print_exc() 
 
-        probe_mlp_inf(residual)
-        hidden_states = full_attn_inf(hidden_states, residual)
-        residual = hidden_states
+        # probe_mlp_inf(residual)
+        # hidden_states = full_attn_inf(hidden_states, residual)
+        # residual = hidden_states
 
-        def probe_attn_inf(residual):
-            if self.check_asyncintra_for_next_attention(**kwargs):
-                # with torch.cuda.stream(cur_custom_stream):
-                    # cur_custom_stream.wait_event(self.whole_batch_calculation)
-                try:
-                    # cfg[f'cuda_events_mlp_{self.layer_order}'].wait(cfg['cuda_stream1'])
-                    input_layernorm_mlp_residual = kwargs['next_layer'].self_attn_layer_norm(residual)
-                    kwargs['next_layer'].self_attn(
-                        hidden_states=hidden_states,
-                        past_key_value=past_key_value,
-                        attention_mask=attention_mask,                        
-                        layer_head_mask=layer_head_mask,
-                        output_attentions=output_attentions,
-                        input_layernorm_mlp_residual=input_layernorm_mlp_residual,
-                        respick=residual
-                    )
-                except Exception as e:
-                    print(f"Error in probe_attn_inf: {e}")
-                    traceback.print_exc() 
-            else:
-                # break point
-                pass
+        # def probe_attn_inf(residual):
+        #     if self.check_asyncintra_for_next_attention(**kwargs):
+        #         # with torch.cuda.stream(cur_custom_stream):
+        #             # cur_custom_stream.wait_event(self.whole_batch_calculation)
+        #         try:
+        #             # cfg[f'cuda_events_mlp_{self.layer_order}'].wait(cfg['cuda_stream1'])
+        #             input_layernorm_mlp_residual = kwargs['next_layer'].self_attn_layer_norm(residual)
+        #             kwargs['next_layer'].self_attn(
+        #                 hidden_states=hidden_states,
+        #                 past_key_value=past_key_value,
+        #                 attention_mask=attention_mask,                        
+        #                 layer_head_mask=layer_head_mask,
+        #                 output_attentions=output_attentions,
+        #                 input_layernorm_mlp_residual=input_layernorm_mlp_residual,
+        #                 respick=residual
+        #             )
+        #         except Exception as e:
+        #             print(f"Error in probe_attn_inf: {e}")
+        #             traceback.print_exc() 
+        #     else:
+        #         # break point
+        #         pass
         
-        def full_mlp_inf(hidden_states, residual):
-            # with torch.cuda.stream(cur_default_stream):
-            try:
-                hidden_states = self.final_layer_norm(hidden_states)
-                hidden_states = self.mlp_layer(hidden_states, respick=residual)
-                return hidden_states
-            except Exception as e:
-                print(f"Error in full_mlp_inf: {e}")
-                traceback.print_exc() 
+        # def full_mlp_inf(hidden_states, residual):
+        #     # with torch.cuda.stream(cur_default_stream):
+        #     try:
+        #         hidden_states = self.final_layer_norm(hidden_states)
+        #         hidden_states = self.mlp_layer(hidden_states, respick=residual)
+        #         return hidden_states
+        #     except Exception as e:
+        #         print(f"Error in full_mlp_inf: {e}")
+        #         traceback.print_exc() 
     
         
 
-        probe_attn_inf(residual)
-        hidden_states = full_mlp_inf(hidden_states, residual)
+        # probe_attn_inf(residual)
+        # hidden_states = full_mlp_inf(hidden_states, residual)
 
 
-        # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
-        hidden_states = residual + hidden_states
+        # # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+        # hidden_states = residual + hidden_states
 
 
-        outputs = (hidden_states,)
+        # outputs = (hidden_states,)
 
         # residual = hidden_states
         # if self.check_asyncintra_mlp():
@@ -1133,57 +1145,57 @@ class OPTDecoderLayer(nn.Module):
         #     print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
 
-        # residual = hidden_states
-        # hidden_states = self.self_attn_layer_norm(hidden_states)
-        # if self.check_asyncintra_for_attention():
-        #     input_layernorm_mlp_residual = self.self_attn_layer_norm(kwargs['last_layer_residual'])
-        #     hidden_states, self_attn_weights, present_key_value = self.self_attn(
-        #     hidden_states=hidden_states,
-        #     past_key_value=past_key_value,
-        #     attention_mask=attention_mask,
-        #     layer_head_mask=layer_head_mask,
-        #     output_attentions=output_attentions,
-        #     respick=kwargs['last_layer_residual'],
-        #     input_layernorm_mlp_residual=input_layernorm_mlp_residual
-        # )
-        # else:
-        #     input_layernorm_mlp_residual = None
-        #     hidden_states, self_attn_weights, present_key_value = self.self_attn(
-        #         hidden_states=hidden_states,
-        #         past_key_value=past_key_value,
-        #         attention_mask=attention_mask,
-        #         layer_head_mask=layer_head_mask,
-        #         output_attentions=output_attentions,
-        #         respick=residual
-        #     )
-        # # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
-        # hidden_states = residual + hidden_states
+        residual = hidden_states
+        hidden_states = self.self_attn_layer_norm(hidden_states)
+        if self.check_asyncintra_for_next_attention():
+            input_layernorm_mlp_residual = self.self_attn_layer_norm(kwargs['last_layer_residual'])
+            hidden_states, self_attn_weights, present_key_value = self.self_attn(
+            hidden_states=hidden_states,
+            past_key_value=past_key_value,
+            attention_mask=attention_mask,
+            layer_head_mask=layer_head_mask,
+            output_attentions=output_attentions,
+            respick=kwargs['last_layer_residual'],
+            input_layernorm_mlp_residual=input_layernorm_mlp_residual
+        )
+        else:
+            input_layernorm_mlp_residual = None
+            hidden_states, self_attn_weights, present_key_value = self.self_attn(
+                hidden_states=hidden_states,
+                past_key_value=past_key_value,
+                attention_mask=attention_mask,
+                layer_head_mask=layer_head_mask,
+                output_attentions=output_attentions,
+                respick=residual
+            )
+        # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+        hidden_states = residual + hidden_states
 
 
-        # # Fully Connected
-        # # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
-        # if self.check_asyncintra_for_mlp():
-        #     post_layernorm_attn_residual = self.final_layer_norm(residual)
-        #     respick = residual
-        # else:
-        #     post_layernorm_attn_residual = None
+        # Fully Connected
+        # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
+        if self.check_asyncintra_for_next_mlp():
+            post_layernorm_attn_residual = self.final_layer_norm(residual)
+            respick = residual
+        else:
+            post_layernorm_attn_residual = None
 
-        # residual = hidden_states
+        residual = hidden_states
 
         
 
-        # hidden_states = self.final_layer_norm(hidden_states)
+        hidden_states = self.final_layer_norm(hidden_states)
 
-        # if self.check_asyncintra_for_mlp():
-        #     hidden_states = self.mlp_layer(hidden_states, respick=respick, post_layernorm_attn_residual=post_layernorm_attn_residual)
-        # else:
-        #     hidden_states = self.mlp_layer(hidden_states, respick=residual)
+        if self.check_asyncintra_for_mlp():
+            hidden_states = self.mlp_layer(hidden_states, respick=respick, post_layernorm_attn_residual=post_layernorm_attn_residual)
+        else:
+            hidden_states = self.mlp_layer(hidden_states, respick=residual)
 
-        # # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
-        # hidden_states = residual + hidden_states
+        # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+        hidden_states = residual + hidden_states
 
 
-        # outputs = (hidden_states,)
+        outputs = (hidden_states,)
 
         if output_attentions:
             outputs += (self_attn_weights,)
