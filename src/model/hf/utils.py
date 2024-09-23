@@ -17,6 +17,19 @@ from config import cfg
 
 #         return inverted_mask.masked_fill(inverted_mask.to(torch.bool), -1/src_len)
 
+def get_next_layer(layers, idx):
+    def get_layer_device(layer):
+        return next(layer.parameters()).device
+
+    if idx + 1 < len(layers) and get_layer_device(layers[idx + 1]) == get_layer_device(layers[idx]):
+        next_layer = layers[idx + 1]
+    elif idx + 1 < len(layers) and get_layer_device(layers[idx + 1]) != get_layer_device(layers[idx]):
+        next_layer = None
+    elif idx + 1 == len(layers):
+        next_layer = None
+    
+    return next_layer
+
 
 def rank_process(norm_across_feature, probe_num, probe_type):
     if 'randomrank' in cfg['prune_method']:
@@ -33,6 +46,7 @@ def rank_process(norm_across_feature, probe_num, probe_type):
         
         values, indices = torch.topk(l2_norms, probe_num)
         sorted_indices = indices.sort()[0]
+        # print('sorted_indices', sorted_indices, flush=True)
         if 'seq' in probe_type:
             # keep the first token in the extreme case, like only select 2 tokens
             sorted_indices[0] = 0
@@ -67,10 +81,11 @@ def generate_probe(x, probe_ratio_list, residual=None):
                 norm_across_feature = norm_across_feature[:, seq_selected_indices]
         else:
             raise NotImplementedError
-    
+    print('xshape', x.shape, flush=True)
     if bsz_selected_indices is not None and seq_selected_indices is not None:
         ii, jj = torch.meshgrid(bsz_selected_indices, seq_selected_indices, indexing='ij')
         probe = x[ii, jj, :]
+        print('baole?')
     elif bsz_selected_indices is not None:
         probe = x[bsz_selected_indices, :, :]
     elif seq_selected_indices is not None:

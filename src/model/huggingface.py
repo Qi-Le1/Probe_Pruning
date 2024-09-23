@@ -175,6 +175,31 @@ def make_local_tuned_model(model_name):
     model.config.use_cache = False
     return model, tokenizer
 
+def identify_gpu_breakpoints(model, model_name):
+    previous_device = None
+    breakpoints = []
+
+    # Assuming the model structure has 'model.model.layers' as the layer attribute
+    if 'llama' in model_name.lower():
+        layers = model.model.layers
+    else:
+        # If the model structure is different or not specified
+        print(f"No specific layer path for model name {model_name}")
+        return
+
+    for i, layer in enumerate(layers):
+        current_device = next(layer.parameters()).device
+
+        # Check if the current layer is on a different device from the previous layer
+        if previous_device is not None and current_device != previous_device:
+            print(f"Layer {i} is on {current_device}, but previous layer was on {previous_device}")
+            breakpoints.append(i)
+        
+        previous_device = current_device
+    print('breakpoints', breakpoints)
+    return breakpoints
+            
+    
 def make_hf_model(model_name):
     from .hf.modeling_llama import LlamaForCausalLM
     from .hf.modeling_opt import OPTForCausalLM
@@ -227,6 +252,7 @@ def make_hf_model(model_name):
     else:
         raise ValueError('Not valid model name')
     
+    cfg['gpu_breakpoints'] = identify_gpu_breakpoints(model, model_name)
     if any(k in cfg['model_name_or_path'] for k in ("opt", "llama")):
         padding_side = "left"
     else:

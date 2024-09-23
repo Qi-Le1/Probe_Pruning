@@ -106,11 +106,11 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            # control_name = [[['wikitext-2v1', 'ptb'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
-            #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
-            #                 ['default']]]
-            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            # controls.extend(CIFAR10_controls_9)
+            control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
+                             ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
 
             # control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], [ '0.4', '0.6'], 
             #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
@@ -433,15 +433,15 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)'0.05-0.05-0.05-0.05-0.05-seqrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                            ['ppwandasp'], ['probe-calib-respick-ema', 'probe-calib-respick-ema-ruleranklast', 'probe-calib-respick-ema-deleteoutlier'], ['asyncintra'], ['c4-2000'], ['0.5-0.5-0.5-0.5-0.5-seqrank'],
-                        ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                 ['ppwandasp'], ['probe-calib-respick-ema', 'probe-calib-respick-ema-ruleranklast', 'probe-calib-respick-ema-deleteoutlier'], ['asyncintra'], ['c4-2000'], ['0.5-0.5-0.5-0.5-0.5-seqrank'],
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
 
             control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                            ['ppwandasp'], ['probe-calib-respick-ema', 'probe-calib-respick-ema-ruleranklast', 'probe-calib-respick-ema-deleteoutlier'], ['asyncintra'], ['c4-2000'], ['0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-0.05+0.5-bszrank+seqrank'],
+                            ['ppwandasp'], ['probe-calib-respick-ema'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -954,7 +954,7 @@ def main():
             elif '13b' in controls[i-1][4]:
                 gpu_num = 2
             else:
-                gpu_num = 1
+                gpu_num = 2
 
             # if 'probe' in controls[i-1][4]:
             #     if '30b' in controls[i-1][4] or '70b' in controls[i-1][4]:

@@ -159,7 +159,7 @@ def test(data_loader, model, model_prof, metric, logger):
         identify_pad_tokens(input)
         # TODO: delete this
         cfg['input_ids'] = input['input_ids']
-        print('start input_ids', input['input_ids'], input['input_ids'].size())
+        # print('start input_ids', input['input_ids'], input['input_ids'].size())
         cfg['cur_batch_index'] += 1
         if cfg['task_name'] in ['clm']:
             input_size = input['labels'].size(0)

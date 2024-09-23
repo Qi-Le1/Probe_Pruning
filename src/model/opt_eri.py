@@ -149,11 +149,13 @@ class Linear(nn.Linear, EriLayer):
         self.async_interbatch_bias = None
         self.async_intrabatch_bias = None
 
-        self.async_interbatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
-        self.async_intrabatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
+        # self.async_interbatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
+        # self.async_intrabatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
 
         self.async_interbatch_in_dim_indices = None
         self.async_intrabatch_in_dim_indices = None
+
+        self.retrieve_weight = torch.cuda.Event(enable_timing=False, blocking=False)
 
         if ('out_proj' in self.key or 'fc2' in self.key):
             self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)   
@@ -358,8 +360,10 @@ class Linear(nn.Linear, EriLayer):
             self.async_interbatch_in_dim_indices = kwargs['in_dim_indices']
         else:
             raise ValueError('Not valid input')
-        self.async_interbatch_weight_index = self.async_interbatch_weight_index.to(self.weight.device)
-        self.async_interbatch_weight_index += 1
+        # self.async_interbatch_weight_index = self.async_interbatch_weight_index.to(self.weight.device)
+        # self.async_interbatch_weight_index += 1
+
+        self.retrieve_weight.record()
         return
     
     def prepare_async_intrabatch_weight(self, **kwargs):
@@ -373,8 +377,10 @@ class Linear(nn.Linear, EriLayer):
             self.async_intrabatch_in_dim_indices = kwargs['in_dim_indices']
         else:
             raise ValueError('Not valid input')
-        self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
-        self.async_intrabatch_weight_index += 1
+        # self.async_intrabatch_weight_index = self.async_intrabatch_weight_index.to(self.weight.device)
+        # self.async_intrabatch_weight_index += 1
+
+        self.retrieve_weight.record()
         return
 
     
@@ -395,14 +401,18 @@ class Linear(nn.Linear, EriLayer):
         elif cfg['mode'] == 'asyncinter':
             if cfg['cur_batch_index'] == 0:
                 return self.weight
-            if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:              
-                while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
-                    time.sleep(0.001)
+            # if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:              
+            #     while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
+            #         time.sleep(0.001)
+            stream = torch.cuda.current_stream()
+            stream.wait_event(self.retrieve_weight)    
             return self.async_interbatch_weight
         elif cfg['mode'] == 'asyncintra':    
             # sync now, now need
-            while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
-                time.sleep(0.001)  # Sleep for 1 millisecond
+            # while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
+            #     time.sleep(0.001)  # Sleep for 1 millisecond
+            stream = torch.cuda.current_stream()
+            stream.wait_event(self.retrieve_weight)    
             return self.async_intrabatch_weight
         
     def get_bias(self):        
@@ -411,13 +421,17 @@ class Linear(nn.Linear, EriLayer):
         elif cfg['mode'] == 'asyncinter':
             if cfg['cur_batch_index'] == 0:
                 return self.bias
-            if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:              
-                while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
-                    time.sleep(0.001)
+            # if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:              
+            #     while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
+            #         time.sleep(0.001)
+            stream = torch.cuda.current_stream()
+            stream.wait_event(self.retrieve_weight)    
             return self.async_interbatch_bias
         elif cfg['mode'] == 'asyncintra':    
-            while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
-                time.sleep(0.001)  # Sleep for 1 millisecond
+            # while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
+            #     time.sleep(0.001)  # Sleep for 1 millisecond
+            stream = torch.cuda.current_stream()
+            stream.wait_event(self.retrieve_weight)    
             return self.async_intrabatch_bias
 
     
@@ -516,7 +530,6 @@ class Linear(nn.Linear, EriLayer):
                     if 'out_dim_indices' in kwargs:
                         weight = self.extract_out_dim_weight(weight, kwargs['out_dim_indices'])
                         bias = self.extract_bias(bias, kwargs['out_dim_indices'])
-                        print(x.shape, weight.shape)
                         result = F.linear(x, weight, bias=bias)
                         result = result.to(previous_dtype)
                         return result

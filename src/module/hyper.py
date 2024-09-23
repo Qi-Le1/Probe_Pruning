@@ -7,6 +7,7 @@ MULTIGPUS_MODEL_NAME_LIST = ['llama-2-70b']
 
 def list_available_gpus():
     cfg['custom_cuda_streams'] = {}
+    cfg['default_cuda_streams'] = {}
     # Check if CUDA is available
     if torch.cuda.is_available():
         # Get the number of GPUs available
@@ -16,9 +17,13 @@ def list_available_gpus():
         for gpu_id in range(num_gpus):
             # Set the current device to the GPU
             stream = torch.cuda.Stream(device=gpu_id)
-            
+            print('initialized stream device', stream.device, stream.device.index, id(stream))
             # Store the stream for the corresponding GPU
             cfg['custom_cuda_streams'][gpu_id] = stream
+
+            default_stream = torch.cuda.default_stream(device=gpu_id)
+            cfg['default_cuda_streams'][gpu_id] = default_stream
+            print('initialized default stream device', default_stream.device, default_stream.device.index, id(default_stream))
         # # List each GPU
         # for i in range(num_gpus):
         #     print(f"Device {i}: {torch.cuda.get_device_name(i)}")
@@ -280,6 +285,8 @@ def process_control():
     # cfg['onlyprobeinfo'] = True
     cfg['onlyprobeinfo'] = False
     cfg['test_speed'] = False
+
+    cfg['asyncintra_on_diff_gpu'] = False
     print('cfg: ', cfg, flush=True)
     return
 

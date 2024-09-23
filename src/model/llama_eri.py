@@ -141,8 +141,8 @@ class Linear(nn.Linear, EriLayer):
         self.async_interbatch_weight = None
         self.async_intrabatch_weight = None
 
-        self.async_interbatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
-        self.async_intrabatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
+        # self.async_interbatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
+        # self.async_intrabatch_weight_index = torch.tensor(-1).to(self.weight.data.device)
 
         self.async_interbatch_in_dim_indices = None
         self.async_intrabatch_in_dim_indices = None
@@ -381,7 +381,7 @@ class Linear(nn.Linear, EriLayer):
             raise ValueError('Not valid mode')
         return
     
-    def get_weight(self):        
+    def get_weight(self, cur_default_stream=None):        
         # for GQA, just return the original weight
         if ('k_proj' in self.key or 'v_proj' in self.key) and self.is_GQA == True:
             return self.weight
@@ -391,8 +391,9 @@ class Linear(nn.Linear, EriLayer):
             if cfg['cur_batch_index'] == 0:
                 return self.weight
             # if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:        
-            stream = torch.cuda.current_stream()
-            stream.wait_event(self.retrieve_weight)    
+            # stream = torch.cuda.current_stream()
+            # stream.wait_event(self.retrieve_weight)   
+            cur_default_stream.wait_event(self.retrieve_weight)  
                 # while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
                 #     time.sleep(0.001)
             return self.async_interbatch_weight
@@ -400,8 +401,8 @@ class Linear(nn.Linear, EriLayer):
             # while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
             #     time.sleep(0.001)  # Sleep for 1 millisecond
             
-            stream = torch.cuda.current_stream()
-            stream.wait_event(self.retrieve_weight)   
+            # print('getweight - cur_default_stream', cur_default_stream.device, id(cur_default_stream))
+            cur_default_stream.wait_event(self.retrieve_weight)   
             return self.async_intrabatch_weight
     
     def get_async_in_dim_indices(self):
@@ -463,23 +464,27 @@ class Linear(nn.Linear, EriLayer):
                     result = result.to(previous_dtype)
                     return result
                 elif cfg['mode'] == 'asyncintra':
-                    weight = self.get_weight()
-                    if 'o_proj' in self.key or 'down_proj' in self.key:
-                        async_in_dim_indices = self.get_async_in_dim_indices()
-                        if 'runningmean' in cfg['prune_method']:
-                            self.update_global_metric_score_distribution(x, async_in_dim_indices)    
-                        elif 'ema' in cfg['prune_method']:
-                            self.update_global_metric_score_distribution_ema(x, async_in_dim_indices)
+                    # print('get weight')
+                    cur_gpu_index = x.device.index
+                    cur_default_stream = cfg['default_cuda_streams'][cur_gpu_index]
+                    with torch.cuda.stream(cur_default_stream):
+                        weight = self.get_weight(cur_default_stream)
+                        if 'o_proj' in self.key or 'down_proj' in self.key:
+                            async_in_dim_indices = self.get_async_in_dim_indices()
+                            if 'runningmean' in cfg['prune_method']:
+                                self.update_global_metric_score_distribution(x, async_in_dim_indices)    
+                            elif 'ema' in cfg['prune_method']:
+                                self.update_global_metric_score_distribution_ema(x, async_in_dim_indices)
 
-                    previous_dtype = x.dtype
-                    result = F.linear(x, weight, bias=None)
+                        previous_dtype = x.dtype
+                        result = F.linear(x, weight, bias=None)
 
-                    if 'o_proj' in self.key or 'down_proj' in self.key:
-                        if 'bias' in cfg['prune_method']:
-                            compensate_bias = self.get_compensate_bias(x, self.weight, async_in_dim_indices)
-                            result += compensate_bias
-                    result = result.to(previous_dtype)
-                    return result
+                        if 'o_proj' in self.key or 'down_proj' in self.key:
+                            if 'bias' in cfg['prune_method']:
+                                compensate_bias = self.get_compensate_bias(x, self.weight, async_in_dim_indices)
+                                result += compensate_bias
+                        result = result.to(previous_dtype)
+                        return result
                 elif cfg['mode'] == 'sync':
                     weight = self.get_weight()
                     if 'o_proj' in self.key or 'down_proj' in self.key:
