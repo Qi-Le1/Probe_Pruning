@@ -404,15 +404,16 @@ class Linear(nn.Linear, EriLayer):
             # if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:              
             #     while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
             #         time.sleep(0.001)
-            stream = torch.cuda.current_stream()
+            device = self.weight.device
+            stream = torch.cuda.current_stream(device=device)
             stream.wait_event(self.retrieve_weight)    
             return self.async_interbatch_weight
         elif cfg['mode'] == 'asyncintra':    
             # sync now, now need
             # while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
             #     time.sleep(0.001)  # Sleep for 1 millisecond
-            stream = torch.cuda.current_stream()
-            stream.wait_event(self.retrieve_weight)    
+            # stream = torch.cuda.current_stream()
+            # stream.wait_event(self.retrieve_weight)    
             return self.async_intrabatch_weight
         
     def get_bias(self):        
@@ -424,14 +425,15 @@ class Linear(nn.Linear, EriLayer):
             # if 'ema' in cfg['prune_method'] or 'runningmean' in cfg['prune_method']:              
             #     while self.async_interbatch_weight_index.item() != cfg['cur_batch_index'] - 1:
             #         time.sleep(0.001)
-            stream = torch.cuda.current_stream()
+            device = self.weight.device
+            stream = torch.cuda.current_stream(device=device)
             stream.wait_event(self.retrieve_weight)    
             return self.async_interbatch_bias
         elif cfg['mode'] == 'asyncintra':    
             # while self.async_intrabatch_weight_index.item() != cfg['cur_batch_index']:
             #     time.sleep(0.001)  # Sleep for 1 millisecond
-            stream = torch.cuda.current_stream()
-            stream.wait_event(self.retrieve_weight)    
+            # stream = torch.cuda.current_stream()
+            # stream.wait_event(self.retrieve_weight)    
             return self.async_intrabatch_bias
 
     
