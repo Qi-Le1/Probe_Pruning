@@ -107,7 +107,7 @@ def main():
             # controls.extend(CIFAR10_controls_9)
 
             control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
-                             ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                             ['ppwandasp'], ['probe-default'], ['asyncintra', 'sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                             ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -440,7 +440,7 @@ def main():
             # controls.extend(CIFAR10_controls_9)
 
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4', '0.6'], 
                             ['ppwandasp'], ['probe-calib-respick-ema'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
@@ -667,8 +667,9 @@ def main():
             # controls.extend(CIFAR10_controls_9)
 
 
-            control_name = [[['arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
-                            ['ppwandasp'], ['probe-calib-respick-ema', 'probe-calib-respick-ema-deleteoutlier', 'probe-calib-respick-ema-ruleranklast'], ['asyncintra'], ['c4-2000'], ['0.05-0.05-0.05-0.05-0.05-seqrank'],
+            # 923/2024
+            control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-3-8b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4', '0.6'], 
+                            ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -954,7 +955,7 @@ def main():
             elif '13b' in controls[i-1][4]:
                 gpu_num = 2
             else:
-                gpu_num = 2
+                gpu_num = 1
 
             # if 'probe' in controls[i-1][4]:
             #     if '30b' in controls[i-1][4] or '70b' in controls[i-1][4]:

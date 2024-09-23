@@ -1186,7 +1186,6 @@ class LlamaDecoderLayer(nn.Module):
             warnings.warn(
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
-
         print('self.layer_order', self.layer_order, self.mlp.gate_proj.weight.device, self.mlp.gate_proj.weight.device.index, flush=True)
         residual = hidden_states
         self.whole_batch_calculation.record()   
@@ -1198,86 +1197,62 @@ class LlamaDecoderLayer(nn.Module):
 
         cur_default_stream = cfg['default_cuda_streams'][cur_gpu_index]
         print('cur_default_stream', cur_default_stream.device, id(cur_default_stream), flush=True)
-        def full_attn_inf(result_dict, hidden_states, residual, cur_default_stream):
-            with torch.cuda.stream(cur_default_stream):
-                if self.layer_order in cfg['gpu_breakpoints'] and cfg['mode'] == 'asyncintra':
-                    print('breakpoint', self.layer_order, flush=True)
-                    full_indices = torch.arange(self.hidden_size, dtype=torch.int32)
-                    self.self_attn.q_proj.prepare_async_weight(out_dim_indices=full_indices)
-                    self.self_attn.o_proj.prepare_async_weight(in_dim_indices=full_indices)
-                    self.self_attn.k_proj.prepare_async_weight(out_dim_indices=full_indices)
-                    self.self_attn.v_proj.prepare_async_weight(out_dim_indices=full_indices)
-                try:
-                    hidden_states = self.input_layernorm(hidden_states)
-                    hidden_states, self_attn_weights, present_key_value = self.self_attn(
-                        hidden_states=hidden_states,
-                        attention_mask=attention_mask,
-                        position_ids=position_ids,
-                        past_key_value=past_key_value,
-                        output_attentions=output_attentions,
-                        use_cache=use_cache,
-                        respick=residual
-                    )
-                    hidden_states = residual + hidden_states
-                    result_dict['hidden_states'] = hidden_states
-                except Exception as e:
-                    print(f"Error in full_attn_inf: {e}")
-                    traceback.print_exc() 
-
-        def probe_mlp_inf(result_dict, residual, cur_custom_stream):
+        def probe_mlp_inf(residual):
             if self.check_asyncintra_for_next_mlp():
                 with torch.cuda.stream(cur_custom_stream):
                     cur_custom_stream.wait_event(self.whole_batch_calculation)  
                     print('cur_custom_stream in thread', cur_custom_stream.device, flush=True) 
                     try:
                         post_layernorm_attn_residual = self.post_attention_layernorm(residual)
-                        if 'resinfo' in cfg['prune_method']: 
-                            result_dict['post_layernorm_attn_residual'] = post_layernorm_attn_residual
                         self.mlp(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual, respick=residual)
                     except Exception as e:
                         print(f"Error in probe_mlp_inf: {e}")
                         traceback.print_exc() 
 
-        # Create threads
-        full_attn_inf_result = {}
-        probe_mlp_inf_result = {}
-        thread1 = threading.Thread(target=full_attn_inf, args=(full_attn_inf_result, hidden_states, residual, cur_default_stream))
-        thread2 = threading.Thread(target=probe_mlp_inf, args=(probe_mlp_inf_result, residual, cur_custom_stream))
 
-        # Start the threads
-        thread1.start()
-        thread2.start()
-        thread1.join()
-        thread2.join()
+        def full_attn_inf(hidden_states, residual):
+            # with torch.cuda.stream(cur_default_stream):
+            if self.layer_order in cfg['gpu_breakpoints'] and cfg['mode'] == 'asyncintra':
+                print('breakpoint', self.layer_order, flush=True)
+                full_indices = torch.arange(self.hidden_size, dtype=torch.int32)
+                self.self_attn.q_proj.prepare_async_weight(out_dim_indices=full_indices)
+                self.self_attn.o_proj.prepare_async_weight(in_dim_indices=full_indices)
+                self.self_attn.k_proj.prepare_async_weight(out_dim_indices=full_indices)
+                self.self_attn.v_proj.prepare_async_weight(out_dim_indices=full_indices)
+            try:
+                hidden_states = self.input_layernorm(hidden_states)
+                hidden_states, self_attn_weights, present_key_value = self.self_attn(
+                    hidden_states=hidden_states,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_value,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                    respick=residual
+                )
+                hidden_states = residual + hidden_states
+                return hidden_states
+            except Exception as e:
+                print(f"Error in full_attn_inf: {e}")
+                traceback.print_exc() 
 
+        
+
+        probe_mlp_inf(residual)
+        hidden_states = full_attn_inf(hidden_states, residual)
+        
+    
 
         
         # if self.check_asyncintra_for_next_attention(**kwargs):
         # torch.cuda.synchronize()
 
-        hidden_states = full_attn_inf_result['hidden_states']
-        if 'resinfo' in cfg['prune_method']:
-            self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+
         residual = hidden_states
         self.whole_batch_calculation.record()
-        # if cfg['change_back_to_asyncintra_on_diff_gpu'] == True:
-        #     cfg['mode'] = 'asyncintra'
-        #     cfg['change_back_to_asyncintra_on_diff_gpu'] = False
 
-        
-            
 
-        def full_mlp_inf(result_dict, hidden_states, residual, cur_default_stream):
-            with torch.cuda.stream(cur_default_stream):
-                try:
-                    hidden_states = self.post_attention_layernorm(hidden_states)
-                    hidden_states = self.mlp(hidden_states, respick=residual)
-                    result_dict['hidden_states'] = hidden_states
-                except Exception as e:
-                    print(f"Error in full_mlp_inf: {e}")
-                    traceback.print_exc() 
-    
-        def probe_attn_inf(result_dict, residual, cur_custom_stream):
+        def probe_attn_inf(residual):
             if self.check_asyncintra_for_next_attention(**kwargs):
                 with torch.cuda.stream(cur_custom_stream):
                     cur_custom_stream.wait_event(self.whole_batch_calculation)
@@ -1294,43 +1269,177 @@ class LlamaDecoderLayer(nn.Module):
                             input_layernorm_mlp_residual=input_layernorm_mlp_residual,
                             respick=residual
                         )
-                        if 'resinfo' in cfg['prune_method']: 
-                            result_dict['input_layernorm_mlp_residual'] = input_layernorm_mlp_residual
-                        
                     except Exception as e:
                         print(f"Error in probe_attn_inf: {e}")
                         traceback.print_exc() 
             else:
                 # break point
                 pass
-
         
-        full_mlp_inf_result = {}
-        probe_attn_inf_result = {}
-        thread1 = threading.Thread(target=full_mlp_inf, args=(full_mlp_inf_result, hidden_states, residual, cur_default_stream))
-        thread2 = threading.Thread(target=probe_attn_inf, args=(probe_attn_inf_result, residual, cur_custom_stream))
+        def full_mlp_inf(hidden_states, residual):
+            # with torch.cuda.stream(cur_default_stream):
+            try:
+                hidden_states = self.post_attention_layernorm(hidden_states)
+                hidden_states = self.mlp(hidden_states, respick=residual)
+                return hidden_states
+            except Exception as e:
+                print(f"Error in full_mlp_inf: {e}")
+                traceback.print_exc() 
+    
+        
 
-        # Start the threads
-        thread1.start()
-        thread2.start()
-
-        thread1.join()
-        thread2.join()
-
-        # if self.check_asyncintra_for_next_mlp():
-        #     torch.cuda.synchronize()
-        # torch.cuda.synchronize()
-        hidden_states = full_mlp_inf_result['hidden_states']
-        # print('hidden_states_shape', hidden_states.shape, hidden_states.device, flush=True)
-        # print('residual_shape', residual.shape, residual.device, flush=True)
+        probe_attn_inf(residual)
+        hidden_states = full_mlp_inf(hidden_states, residual)
+        
         hidden_states = residual + hidden_states
+
         
-        if 'resinfo' in cfg['prune_method']:
-            self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
-            print('self.layer_order', self.layer_order, flush=True)
-            print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
-            print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
-            print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
+
+        # ---
+        # print('self.layer_order', self.layer_order, self.mlp.gate_proj.weight.device, self.mlp.gate_proj.weight.device.index, flush=True)
+        # residual = hidden_states
+        # self.whole_batch_calculation.record()   
+        
+        
+        # cur_gpu_index = self.mlp.gate_proj.weight.device.index
+        # cur_custom_stream = cfg['custom_cuda_streams'][cur_gpu_index]
+        # print('cur_custom_stream', cur_custom_stream.device, id(cur_custom_stream), flush=True)
+
+        # cur_default_stream = cfg['default_cuda_streams'][cur_gpu_index]
+        # print('cur_default_stream', cur_default_stream.device, id(cur_default_stream), flush=True)
+        # def full_attn_inf(result_dict, hidden_states, residual, cur_default_stream):
+        #     # with torch.cuda.stream(cur_default_stream):
+        #     if self.layer_order in cfg['gpu_breakpoints'] and cfg['mode'] == 'asyncintra':
+        #         print('breakpoint', self.layer_order, flush=True)
+        #         full_indices = torch.arange(self.hidden_size, dtype=torch.int32)
+        #         self.self_attn.q_proj.prepare_async_weight(out_dim_indices=full_indices)
+        #         self.self_attn.o_proj.prepare_async_weight(in_dim_indices=full_indices)
+        #         self.self_attn.k_proj.prepare_async_weight(out_dim_indices=full_indices)
+        #         self.self_attn.v_proj.prepare_async_weight(out_dim_indices=full_indices)
+        #     try:
+        #         hidden_states = self.input_layernorm(hidden_states)
+        #         hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        #             hidden_states=hidden_states,
+        #             attention_mask=attention_mask,
+        #             position_ids=position_ids,
+        #             past_key_value=past_key_value,
+        #             output_attentions=output_attentions,
+        #             use_cache=use_cache,
+        #             respick=residual
+        #         )
+        #         hidden_states = residual + hidden_states
+        #         result_dict['hidden_states'] = hidden_states
+        #     except Exception as e:
+        #         print(f"Error in full_attn_inf: {e}")
+        #         traceback.print_exc() 
+
+        # def probe_mlp_inf(result_dict, residual, cur_custom_stream):
+        #     if self.check_asyncintra_for_next_mlp():
+        #         with torch.cuda.stream(cur_custom_stream):
+        #             cur_custom_stream.wait_event(self.whole_batch_calculation)  
+        #             print('cur_custom_stream in thread', cur_custom_stream.device, flush=True) 
+        #             try:
+        #                 post_layernorm_attn_residual = self.post_attention_layernorm(residual)
+        #                 if 'resinfo' in cfg['prune_method']: 
+        #                     result_dict['post_layernorm_attn_residual'] = post_layernorm_attn_residual
+        #                 self.mlp(hidden_states, post_layernorm_attn_residual=post_layernorm_attn_residual, respick=residual)
+        #             except Exception as e:
+        #                 print(f"Error in probe_mlp_inf: {e}")
+        #                 traceback.print_exc() 
+
+        # # Create threads
+        # full_attn_inf_result = {}
+        # probe_mlp_inf_result = {}
+        # thread1 = threading.Thread(target=full_attn_inf, args=(full_attn_inf_result, hidden_states, residual, cur_default_stream))
+        # thread2 = threading.Thread(target=probe_mlp_inf, args=(probe_mlp_inf_result, residual, cur_custom_stream))
+
+        # # Start the threads
+        # thread1.start()
+        # thread2.start()
+        # thread1.join()
+        # thread2.join()
+
+
+        
+        # # if self.check_asyncintra_for_next_attention(**kwargs):
+        # # torch.cuda.synchronize()
+
+        # hidden_states = full_attn_inf_result['hidden_states']
+        # if 'resinfo' in cfg['prune_method']:
+        #     self.attn_sign_match_percentage, self.attn_l1_diff_percentage, self.attn_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+        # residual = hidden_states
+        # self.whole_batch_calculation.record()
+        # # if cfg['change_back_to_asyncintra_on_diff_gpu'] == True:
+        # #     cfg['mode'] = 'asyncintra'
+        # #     cfg['change_back_to_asyncintra_on_diff_gpu'] = False
+
+        
+            
+
+        # def full_mlp_inf(result_dict, hidden_states, residual, cur_default_stream):
+        #     # with torch.cuda.stream(cur_default_stream):
+        #     try:
+        #         hidden_states = self.post_attention_layernorm(hidden_states)
+        #         hidden_states = self.mlp(hidden_states, respick=residual)
+        #         result_dict['hidden_states'] = hidden_states
+        #     except Exception as e:
+        #         print(f"Error in full_mlp_inf: {e}")
+        #         traceback.print_exc() 
+    
+        # def probe_attn_inf(result_dict, residual, cur_custom_stream):
+        #     if self.check_asyncintra_for_next_attention(**kwargs):
+        #         with torch.cuda.stream(cur_custom_stream):
+        #             cur_custom_stream.wait_event(self.whole_batch_calculation)
+        #             try:
+        #                 # cfg[f'cuda_events_mlp_{self.layer_order}'].wait(cfg['cuda_stream1'])
+        #                 input_layernorm_mlp_residual = kwargs['next_layer'].input_layernorm(residual)
+        #                 kwargs['next_layer'].self_attn(
+        #                     hidden_states=hidden_states,
+        #                     attention_mask=attention_mask,
+        #                     position_ids=position_ids,
+        #                     past_key_value=past_key_value,
+        #                     output_attentions=output_attentions,
+        #                     use_cache=use_cache,
+        #                     input_layernorm_mlp_residual=input_layernorm_mlp_residual,
+        #                     respick=residual
+        #                 )
+        #                 if 'resinfo' in cfg['prune_method']: 
+        #                     result_dict['input_layernorm_mlp_residual'] = input_layernorm_mlp_residual
+                        
+        #             except Exception as e:
+        #                 print(f"Error in probe_attn_inf: {e}")
+        #                 traceback.print_exc() 
+        #     else:
+        #         # break point
+        #         pass
+
+        
+        # full_mlp_inf_result = {}
+        # probe_attn_inf_result = {}
+        # thread1 = threading.Thread(target=full_mlp_inf, args=(full_mlp_inf_result, hidden_states, residual, cur_default_stream))
+        # thread2 = threading.Thread(target=probe_attn_inf, args=(probe_attn_inf_result, residual, cur_custom_stream))
+
+        # # Start the threads
+        # thread1.start()
+        # thread2.start()
+
+        # thread1.join()
+        # thread2.join()
+
+        # # if self.check_asyncintra_for_next_mlp():
+        # #     torch.cuda.synchronize()
+        # # torch.cuda.synchronize()
+        # hidden_states = full_mlp_inf_result['hidden_states']
+        # # print('hidden_states_shape', hidden_states.shape, hidden_states.device, flush=True)
+        # # print('residual_shape', residual.shape, residual.device, flush=True)
+        # hidden_states = residual + hidden_states
+        
+        # if 'resinfo' in cfg['prune_method']:
+        #     self.mlp_sign_match_percentage, self.mlp_l1_diff_percentage, self.mlp_cosine_similarity = cal_res_hidden_state_diff(hidden_states, residual)
+        #     print('self.layer_order', self.layer_order, flush=True)
+        #     print('self.mlp_sign_match_percentage', self.mlp_sign_match_percentage, flush=True)
+        #     print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
+        #     print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
 
         
