@@ -1186,7 +1186,7 @@ class OPTDecoderLayer(nn.Module):
 
         hidden_states = self.final_layer_norm(hidden_states)
 
-        if self.check_asyncintra_for_mlp():
+        if self.check_asyncintra_for_next_mlp():
             hidden_states = self.mlp_layer(hidden_states, respick=respick, post_layernorm_attn_residual=post_layernorm_attn_residual)
         else:
             hidden_states = self.mlp_layer(hidden_states, respick=residual)

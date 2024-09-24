@@ -424,7 +424,7 @@ class Linear(nn.Linear, EriLayer):
             #     time.sleep(0.001)  # Sleep for 1 millisecond
             # stream = torch.cuda.current_stream()
             # stream.wait_event(self.retrieve_weight)    
-            return self.async_intrabatch_bias
+            return self.bias
 
     
     def get_async_in_dim_indices(self):
@@ -487,6 +487,7 @@ class Linear(nn.Linear, EriLayer):
                     return result
                 elif cfg['mode'] == 'asyncintra':
                     weight = self.get_weight()
+                    bias = self.get_bias()
                     if 'o_proj' in self.key or 'down_proj' in self.key:
                         async_in_dim_indices = self.get_async_in_dim_indices()
                         if 'runningmean' in cfg['prune_method']:
@@ -495,16 +496,14 @@ class Linear(nn.Linear, EriLayer):
                             self.update_global_metric_score_distribution_ema(x, async_in_dim_indices)
        
                     if 'out_dim_indices' in kwargs:
-                        if ('k_proj' in self.key or 'v_proj' in self.key) and self.is_GQA == True:
-                            weight = weight
-                        else:
-                            weight = self.extract_out_dim_weight(weight, self.async_intrabatch_out_dim_indices)
-                        result = F.linear(x, weight, bias=None)
+                        weight = self.extract_out_dim_weight(weight, self.async_intrabatch_out_dim_indices)
+                        bias = self.extract_bias(bias, self.async_intrabatch_out_dim_indices)
+                        result = F.linear(x, weight, bias=bias)
                         result = result.to(previous_dtype)
                         return result
                     elif 'in_dim_indices' in kwargs:
                         weight = self.extract_in_dim_weight(weight, self.async_intrabatch_in_dim_indices)
-                        result = F.linear(x, weight, bias=None)
+                        result = F.linear(x, weight, bias=bias)
                         if 'o_proj' in self.key or 'down_proj' in self.key:
                             if 'bias' in cfg['prune_method']:
                                 compensate_bias = self.get_compensate_bias(x, self.weight, self.async_intrabatch_in_dim_indices)
