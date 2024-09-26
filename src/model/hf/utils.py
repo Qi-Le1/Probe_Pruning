@@ -47,8 +47,8 @@ def rank_process(norm_across_feature, probe_num, probe_type):
         values, indices = torch.topk(l2_norms, probe_num)
         sorted_indices = indices.sort()[0]
         # print('sorted_indices', sorted_indices, flush=True)
-        if 'seq' in probe_type:
-            # keep the first token in the extreme case, like only select 2 tokens
+        if 'seq' in probe_type and probe_num <= 10:
+            # keep the first token in the extreme case
             sorted_indices[0] = 0
         
     return sorted_indices

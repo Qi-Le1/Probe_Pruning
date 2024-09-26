@@ -287,6 +287,7 @@ def process_control():
     cfg['test_speed'] = False
 
     cfg['asyncintra_on_diff_gpu'] = False
+    cfg['pad_tokens'] = None
     print('cfg: ', cfg, flush=True)
     return
 

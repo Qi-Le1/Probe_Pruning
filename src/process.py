@@ -620,60 +620,84 @@ def make_control_list(file):
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
     elif file == 'differentprobestudy':
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.6'], 
-                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
-                [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
-                                                                                               '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
-                                                                                               '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
-                        ['q-proj+k-proj+v-proj+o-proj']]]
+        def probe_combination():
+                return_list = []
+                # for seq in ['0.05', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']:
+                #     for bsz in ['0.05', '0.25', '0.5', '1']:
+                for seq in ['0.05', '0.1', '1.0']:
+                    for bsz in ['0.05', '0.25', '0.5', '1']:
+                        # for rank in ['seqrank', 'bszrank']:
+                            # Create the repeated sequence-bsz pattern
+                        pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
+                        pattern = pattern[:-1]  # remove the last extra hyphen
+
+                        # Append 'seqrank' and 'bszrank' placeholders or values
+                        final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
+
+                        # Append to the return list
+                        return_list.append(final_string)
+                return return_list
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                        ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], probe_combination(),
+                    ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.6'], 
-                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
-                [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
-                                                                                                '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
-                                                                                                '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
-                        ['q-proj+k-proj+v-proj+o-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.6'], 
+        #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
+        #         [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
+        #                                                                                        '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
+        #                                                                                        '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
+        #                 ['q-proj+k-proj+v-proj+o-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.6'], 
-                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
-                [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
-                                                                                               '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
-                                                                                               '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
-                        ['gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.6'], 
+        #                     ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
+        #         [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
+        #                                                                                         '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
+        #                                                                                         '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
+        #                 ['q-proj+k-proj+v-proj+o-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.6'], 
-                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
-                [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
-                                                                                                '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
-                                                                                                '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
-                        [ 'gate-proj+up-proj+down-proj']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.6'], 
+        #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
+        #         [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
+        #                                                                                        '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
+        #                                                                                        '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
+        #                 ['gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.6'], 
+        #                     ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
+        #         [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
+        #                                                                                         '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
+        #                                                                                         '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
+        #                 [ 'gate-proj+up-proj+down-proj']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
 
-        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.6'], 
-                         ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
-                [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
-                                                                                               '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
-                                                                                               '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
-                        ['default']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.6'], 
+        #                  ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
+        #         [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
+        #                                                                                        '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
+        #                                                                                        '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
-        control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.6'], 
-                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
-                [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
-                                                                                                '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
-                                                                                                '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
-                        ['default']]]
-        CIFAR10_controls_9 = make_controls(control_name)
-        controls.extend(CIFAR10_controls_9)
+        # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.6'], 
+        #                     ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], 
+        #         [ '0.05-0.05-0.05-0.05-0.05-seqrank', '0.1-0.1-0.1-0.1-0.1-seqrank', 
+        #                                                                                         '0.2-0.2-0.2-0.2-0.2-seqrank', '0.05-0.05-0.05-0.05-0.05-bszrank', '0.1-0.1-0.1-0.1-0.1-bszrank',
+        #                                                                                         '0.2-0.2-0.2-0.2-0.2-bszrank', '0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank', ],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
     return controls
 
 
@@ -919,6 +943,7 @@ def make_df_history(extracted_processed_result_history):
 
 
 def make_vis(df_history):
+    global file
     color = {
              'probe': 'orange',
              'flap': 'purple',
@@ -931,6 +956,10 @@ def make_vis(df_history):
             'Pruning Ratio 0.6': 'green',
             'PP': 'orange',
              'FLAP': 'purple',
+             'Batch size 1': 'orange',
+            'Batch size 5': 'purple',
+            'Batch size 10': 'red',
+            'Batch size 20': 'green',
              }
     linestyle = {
                 'probe': (5, (10, 3)),
@@ -944,6 +973,10 @@ def make_vis(df_history):
                 'Pruning Ratio 0.2': (5, (10, 3)),
             'Pruning Ratio 0.4': (0, (3, 1, 1, 1)),
             'Pruning Ratio 0.6': (10, (2, 5)),
+                'Batch size 1': (5, (10, 3)),
+            'Batch size 5': (0, (3, 1, 1, 1)),
+            'Batch size 10': (10, (2, 5)),
+            'Batch size 20': '--',
                 }
     marker = {
                 'probe': 'D',
@@ -957,6 +990,10 @@ def make_vis(df_history):
                 'Pruning Ratio 0.2': 'o',
             'Pruning Ratio 0.4': 's',
             'Pruning Ratio 0.6': 'p',
+                'Batch size 1': 'o',
+            'Batch size 5': 's',
+            'Batch size 10': 'p',
+            'Batch size 20': 'x',
                 }
     # marker = {}
     # prune_ratios = [0, 0.001, 0.01, 0.03, 0.05, 0.06, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 9999]
@@ -1151,6 +1188,23 @@ def make_vis(df_history):
         layer_number = int(''.join(layer_number)) if layer_number else None
         return layer_number
     
+    def get_probe_type_ratio(prune_info, batch_size):
+        probe_seq_ratio = None
+        probe_batch_size = None
+        prune_info_list = prune_info.split('-')
+        probe_type_list = prune_info_list[-1].split('+')
+        prune_info_sub_list = prune_info_list[0].split('+')
+        for i in range(len(probe_type_list)):
+            probe_type = probe_type_list[i]
+            ratio = prune_info_sub_list[i]
+            
+            if 'seq' in probe_type:
+                probe_seq_ratio = float(ratio)
+            elif 'bsz' in probe_type:
+                probe_batch_size = int(ratio * batch_size)
+
+        return probe_seq_ratio, probe_batch_size
+
 
     select_channels_indices = {}
     for df_name in df_history:
@@ -1300,6 +1354,22 @@ def make_vis(df_history):
                         key_for_dict = f"Pruning Ratio {prune_ratio}"
                         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Different Channel Ratio')
                     
+
+                    # probe generation on different size
+                    if file == 'differentprobestudy' and any(metric_name in index for metric_name in metric_name_list):
+                        metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                        metric_name = metric_name.split('/')[1]
+                        print('metric_name', metric_name)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, calib_info, cust_tgt_modules, f'FIG:{metric_name}'])
+                        fig[fig_name] = plt.figure(fig_name)
+
+                        probe_seq_ratio, probe_batch_size = get_probe_type_ratio(prune_info, batch_size)
+                        x = probe_seq_ratio
+                        y = row.tolist()[0]
+                        yerr = row_se.tolist()[0]
+                        prune_ratio_list = prune_ratio.split('-')
+                        key_for_dict = f"Batch size {probe_batch_size}"
+                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Sequence Ratio', y_label=metric_name)
             #         if 'cur_select_indices' in index:
             #             layer_number = find_layer_number(index)
             #             print('prune_method', prune_method, prune_info, index)

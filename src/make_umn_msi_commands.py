@@ -452,32 +452,54 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
+            # iclr
             control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
-                            ['ppwandasp'], ['probe-calib-respick-ema'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            # control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
-            #                 ['ppwandasp'], ['probe-calib-respick-ema'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
-            #             ['default']]]
+            # 'llama-2-7b', 'llama-2-13b', 
+            control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
+                            ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            # Full batch probing
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
+            #                  ['ppwandasp'], ['probe'], ['asyncintra'], ['None'], ['1-1-1-1-1-bszrank'],
+            #                 ['default']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            # Full batch probing
-            control_name = [[['wikitext-2v1'], ['llama-2-7b', 'llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
-                             ['ppwandasp'], ['probe'], ['asyncintra'], ['None'], ['1-1-1-1-1-bszrank'],
-                            ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
-
-            control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
-                             ['ppwandasp'], ['probe'], ['asyncintra'], ['None'], ['1-1-1-1-1-bszrank'],
-                            ['gate-proj+up-proj+down-proj']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-3-8b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
+            #                  ['ppwandasp'], ['probe'], ['asyncintra'], ['None'], ['1-1-1-1-1-bszrank'],
+            #                 ['gate-proj+up-proj+down-proj']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             
-            # pass
+            def probe_combination():
+                return_list = []
+                for seq in ['0.05', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']:
+                    for bsz in ['0.05', '0.25', '0.5', '1']:
+                        # for rank in ['seqrank', 'bszrank']:
+                            # Create the repeated sequence-bsz pattern
+                        pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
+                        pattern = pattern[:-1]  # remove the last extra hyphen
+
+                        # Append 'seqrank' and 'bszrank' placeholders or values
+                        final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
+
+                        # Append to the return list
+                        return_list.append(final_string)
+                return return_list
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                            ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], probe_combination(),
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
         
         elif 'csr' in data:
             
@@ -712,11 +734,11 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['opt-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
-                            ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
-                        ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['opt-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
+            #                 ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             # full batch probing
             # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b'], ['csr'], ['20'], ['512'], ['0.2','0.4'], 
             #                  ['ppwandasp'], ['probe'], ['asyncintra'], ['None'], ['1-1-1-1-1-bszrank'],
@@ -1009,10 +1031,10 @@ def main():
         if 'clm' in controls[i-1][4] and '1024' in controls[i-1][4]:
             if '70b' in controls[i-1][4]:
                 gpu_num = 6
-            elif '13b' in controls[i-1][4]:
+            elif '13b' in controls[i-1][4] or '8b' in controls[i-1][4]:
                 gpu_num = 2
             else:
-                gpu_num = 2
+                gpu_num = 1
 
             # if 'probe' in controls[i-1][4]:
             #     if '30b' in controls[i-1][4] or '70b' in controls[i-1][4]:
@@ -1029,10 +1051,10 @@ def main():
         if 'csr' in controls[i-1][4]:
             if '70b' in controls[i-1][4]:
                 gpu_num = 6
-            elif '13b' in controls[i-1][4]:
+            elif '13b' in controls[i-1][4] or '8b' in controls[i-1][4]:
                 gpu_num = 2
             else:
-                gpu_num = 2
+                gpu_num = 1
 
         s = '#!/bin/bash -l\n'
         
