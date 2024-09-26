@@ -81,11 +81,10 @@ def generate_probe(x, probe_ratio_list, residual=None):
                 norm_across_feature = norm_across_feature[:, seq_selected_indices]
         else:
             raise NotImplementedError
-    print('xshape', x.shape, flush=True)
+ 
     if bsz_selected_indices is not None and seq_selected_indices is not None:
         ii, jj = torch.meshgrid(bsz_selected_indices, seq_selected_indices, indexing='ij')
         probe = x[ii, jj, :]
-        print('baole?')
     elif bsz_selected_indices is not None:
         probe = x[bsz_selected_indices, :, :]
     elif seq_selected_indices is not None:

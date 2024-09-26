@@ -54,28 +54,57 @@ class HiddenRepresentationPruning():
         else:
             return cfg['prune_ratio']
     
-    def handle_pad_tokens(self, probe_out, bsz_selected_indices, seq_selected_indices):
+    def handle_attn_pad_tokens(self, probe_out, bsz_selected_indices, seq_selected_indices):
         # handling padding tokens
         # tbh, it is a little annoying for padding tokens
         if cfg['pad_tokens'] is not None:
             cfg['pad_tokens'] = cfg['pad_tokens'].to(probe_out.device)
-            if bsz_selected_indices is not None:
-                probe_pad_tokens = cfg['pad_tokens'][bsz_selected_indices]
-            else:
-                probe_pad_tokens = cfg['pad_tokens']
+            # if bsz_selected_indices is not None:
+            #     probe_pad_tokens = cfg['pad_tokens'][bsz_selected_indices]
+            # else:
+            #     probe_pad_tokens = cfg['pad_tokens']
 
-            if seq_selected_indices is not None:
-                probe_pad_tokens = probe_pad_tokens[:, seq_selected_indices]
+            # if seq_selected_indices is not None:
+            #     probe_pad_tokens = probe_pad_tokens[:, seq_selected_indices]
+            if bsz_selected_indices is not None and seq_selected_indices is not None:
+                ii, jj = torch.meshgrid(bsz_selected_indices, seq_selected_indices, indexing='ij')
+                probe_pad_tokens = cfg['pad_tokens'][ii, jj]
+            elif bsz_selected_indices is None:
+                probe_pad_tokens = cfg['pad_tokens'][:, seq_selected_indices]
+            elif seq_selected_indices is None:
+                probe_pad_tokens = cfg['pad_tokens'][bsz_selected_indices, :]
 
             probe_out[probe_pad_tokens] = 0
             probe_num = (probe_out.size(0) - torch.sum(probe_pad_tokens, dim=0) + 1e-3).to(probe_out.dtype).unsqueeze(1)
             return probe_out, probe_num
         else:
             return probe_out, probe_out.size(0)
-        
+    
+    def handle_mlp_pad_tokens(self, probe_out, bsz_selected_indices, seq_selected_indices):
+        if cfg['pad_tokens'] is not None:
+            cfg['pad_tokens'] = cfg['pad_tokens'].to(probe_out.device)
+            # if bsz_selected_indices is not None:
+            #     probe_pad_tokens = cfg['pad_tokens'][bsz_selected_indices]
+            # else:
+            #     probe_pad_tokens = cfg['pad_tokens']
+
+            # if seq_selected_indices is not None:
+            #     probe_pad_tokens = probe_pad_tokens[:, seq_selected_indices]
+            if bsz_selected_indices is not None and seq_selected_indices is not None:
+                ii, jj = torch.meshgrid(bsz_selected_indices, seq_selected_indices, indexing='ij')
+                probe_pad_tokens = cfg['pad_tokens'][ii, jj]
+            elif bsz_selected_indices is None:
+                probe_pad_tokens = cfg['pad_tokens'][:, seq_selected_indices]
+            elif seq_selected_indices is None:
+                probe_pad_tokens = cfg['pad_tokens'][bsz_selected_indices, :]
+
+            probe_num = (probe_out.size(0) - torch.sum(probe_pad_tokens, dim=0) + 1e-3).to(probe_out.dtype).unsqueeze(1)
+            return probe_out, probe_num
+        else:
+            return probe_out, probe_out.size(0)
 
     def cal_attn_prune_metric(self, probe_out, weight, metric_type, bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=None):
-        probe_out, probe_num = self.handle_pad_tokens(probe_out, bsz_selected_indices, seq_selected_indices)
+        probe_out, probe_num = self.handle_attn_pad_tokens(probe_out, bsz_selected_indices, seq_selected_indices)
         # if 'ppwandaspsum' in metric_type:
         #     combined_probe_out = None
         #     if global_metric_score_distribution is not None:
@@ -183,7 +212,7 @@ class HiddenRepresentationPruning():
 
     
     def cal_mlp_prune_metric(self, probe_out, weight, metric_type, bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=None):
-        probe_out, probe_num = self.handle_pad_tokens(probe_out, bsz_selected_indices, seq_selected_indices)
+        probe_out, probe_num = self.handle_mlp_pad_tokens(probe_out, bsz_selected_indices, seq_selected_indices)
         if 'ppwandasp' in metric_type:
             combined_probe_out = None
             if global_metric_score_distribution is not None:

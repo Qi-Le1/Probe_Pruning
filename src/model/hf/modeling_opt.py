@@ -235,20 +235,6 @@ class OPTAttention(nn.Module):
         attn_weights_reshaped = None
         attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
         attn_output = torch.bmm(attn_probs, value_states)
-
-        if cfg['pad_tokens'] is not None:
-            if bsz_selected_indices is not None and seq_selected_indices is not None:
-                cfg['pad_tokens'] = cfg['pad_tokens'].to(seq_selected_indices.device)
-                ii, jj = torch.meshgrid(bsz_selected_indices, seq_selected_indices, indexing='ij')
-                probe_pad_tokens = cfg['pad_tokens'][ii, jj]
-            elif bsz_selected_indices is None:
-                cfg['pad_tokens'] = cfg['pad_tokens'].to(bsz_selected_indices.device)
-                probe_pad_tokens = cfg['pad_tokens'][:, seq_selected_indices]
-            elif seq_selected_indices is None:
-                cfg['pad_tokens'] = cfg['pad_tokens'].to(seq_selected_indices.device)
-                probe_pad_tokens = cfg['pad_tokens'][bsz_selected_indices, :]
-            
-            attn_output[probe_pad_tokens] = 0
             
         if attn_output.size() != (bsz * self.num_heads, src_len, self.head_dim):
             raise ValueError(
@@ -373,9 +359,6 @@ class OPTAttention(nn.Module):
         attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
 
         attn_output = torch.bmm(attn_probs, value_states)
-        if cfg['calibration_stage'] == False and cfg['pad_tokens'] is not None:
-            cfg['pad_tokens'].to(attn_weights.device) 
-            attn_output[cfg['pad_tokens']] = 0
 
         if attn_output.size() != (bsz * self.num_heads, tgt_len, self.head_dim):
             raise ValueError(
@@ -390,7 +373,7 @@ class OPTAttention(nn.Module):
         # partitioned aross GPUs when using tensor-parallelism.
         attn_output = attn_output.reshape(bsz, tgt_len, self.embed_dim)
 
-        if cfg['calibration_stage'] == False and cfg['pad_tokens'] is not None:
+        if cfg['pad_tokens'] is not None:
             cfg['pad_tokens'].to(attn_weights.device) 
             attn_output[cfg['pad_tokens']] = 0
         attn_output = self.out_proj(attn_output)
@@ -502,9 +485,7 @@ class OPTAttention(nn.Module):
                     attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
 
                     attn_output = torch.bmm(attn_probs, value_states)
-                    if cfg['pad_tokens'] is not None:
-                        cfg['pad_tokens'].to(attn_weights.device) 
-                        attn_output[cfg['pad_tokens']] = 0
+
                     if attn_output.size() != (bsz * self.q_num_heads, tgt_len, self.head_dim):
                         raise ValueError(
                             f"`attn_output` should be of size {(bsz, self.q_num_heads, tgt_len, self.head_dim)}, but is"

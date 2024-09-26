@@ -622,19 +622,6 @@ class LlamaAttention(nn.Module):
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.reshape(key_states.shape[0], q_len, self.hidden_size)
         
-        if cfg['pad_tokens'] is not None:
-            if bsz_selected_indices is not None and seq_selected_indices is not None:
-                cfg['pad_tokens'] = cfg['pad_tokens'].to(seq_selected_indices.device)
-                ii, jj = torch.meshgrid(bsz_selected_indices, seq_selected_indices, indexing='ij')
-                probe_pad_tokens = cfg['pad_tokens'][ii, jj]
-            elif bsz_selected_indices is None:
-                cfg['pad_tokens'] = cfg['pad_tokens'].to(bsz_selected_indices.device)
-                probe_pad_tokens = cfg['pad_tokens'][:, seq_selected_indices]
-            elif seq_selected_indices is None:
-                cfg['pad_tokens'] = cfg['pad_tokens'].to(seq_selected_indices.device)
-                probe_pad_tokens = cfg['pad_tokens'][bsz_selected_indices, :]
-            
-            attn_output[probe_pad_tokens] = 0
         if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
             probe_out_dim_metric = self.pruning_module.cal_attn_prune_metric(attn_output, self.o_proj.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.o_proj.get_global_metric_score_distribution(cur_batch_seq_len))
         else:
@@ -752,7 +739,7 @@ class LlamaAttention(nn.Module):
 
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.reshape(bsz, q_len, self.num_heads * self.head_dim)
-        if cfg['calibration_stage'] == False and cfg['pad_tokens'] is not None:
+        if cfg['pad_tokens'] is not None:
             cfg['pad_tokens'].to(attn_weights.device) 
             attn_output[cfg['pad_tokens']] = 0
 

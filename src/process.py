@@ -622,10 +622,10 @@ def make_control_list(file):
     elif file == 'differentprobestudy':
         def probe_combination():
                 return_list = []
-                # for seq in ['0.05', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']:
-                #     for bsz in ['0.05', '0.25', '0.5', '1']:
-                for seq in ['0.05', '0.1', '1.0']:
+                for seq in ['0.05', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']:
                     for bsz in ['0.05', '0.25', '0.5', '1']:
+                # for seq in ['0.05', '0.1', '1.0']:
+                #     for bsz in ['0.05', '0.25', '0.5', '1']:
                         # for rank in ['seqrank', 'bszrank']:
                             # Create the repeated sequence-bsz pattern
                         pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
@@ -943,7 +943,7 @@ def make_df_history(extracted_processed_result_history):
 
 
 def make_vis(df_history):
-    global file
+    file = args['file']
     color = {
              'probe': 'orange',
              'flap': 'purple',
@@ -1189,6 +1189,7 @@ def make_vis(df_history):
         return layer_number
     
     def get_probe_type_ratio(prune_info, batch_size):
+        batch_size = int(batch_size)
         probe_seq_ratio = None
         probe_batch_size = None
         prune_info_list = prune_info.split('-')
@@ -1196,10 +1197,10 @@ def make_vis(df_history):
         prune_info_sub_list = prune_info_list[0].split('+')
         for i in range(len(probe_type_list)):
             probe_type = probe_type_list[i]
-            ratio = prune_info_sub_list[i]
+            ratio = float(prune_info_sub_list[i])
             
             if 'seq' in probe_type:
-                probe_seq_ratio = float(ratio)
+                probe_seq_ratio = ratio
             elif 'bsz' in probe_type:
                 probe_batch_size = int(ratio * batch_size)
 
@@ -1322,19 +1323,19 @@ def make_vis(df_history):
                     #         # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
                     #         ppl_performance_vs_total_FLOPs_ratio = [None, None, None]
 
-                    if any(metric_name in index for metric_name in metric_name_list):
-                        metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                        metric_name = metric_name.split('/')[1]
-                        print('metric_name', metric_name)
-                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, \
-                        calib_info, cust_tgt_modules, f'FIG:{metric_name}'])
-                        fig[fig_name] = plt.figure(fig_name)
-                        x = prune_ratio
-                        y = row.tolist()[0]
-                        yerr = row_se.tolist()[0]
-                        prune_ratio_list = prune_ratio.split('-')
-                        key_for_dict = f"{prune_method}_{mode}_{prune_info}_{metric_name}"
-                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Prune Ratio', y_label=metric_name)
+                    # if any(metric_name in index for metric_name in metric_name_list):
+                    #     metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                    #     metric_name = metric_name.split('/')[1]
+                    #     print('metric_name', metric_name)
+                    #     fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, \
+                    #     calib_info, cust_tgt_modules, f'FIG:{metric_name}'])
+                    #     fig[fig_name] = plt.figure(fig_name)
+                    #     x = prune_ratio
+                    #     y = row.tolist()[0]
+                    #     yerr = row_se.tolist()[0]
+                    #     prune_ratio_list = prune_ratio.split('-')
+                    #     key_for_dict = f"{prune_method}_{mode}_{prune_info}_{metric_name}"
+                    #     record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Prune Ratio', y_label=metric_name)
 
                     
                     if 'diff_ratio' in index:

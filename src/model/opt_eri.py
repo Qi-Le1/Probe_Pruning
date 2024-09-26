@@ -488,7 +488,7 @@ class Linear(nn.Linear, EriLayer):
                 elif cfg['mode'] == 'asyncintra':
                     weight = self.get_weight()
                     bias = self.get_bias()
-                    if 'o_proj' in self.key or 'down_proj' in self.key:
+                    if 'out_proj' in self.key or 'fc2' in self.key:
                         async_in_dim_indices = self.get_async_in_dim_indices()
                         if 'runningmean' in cfg['prune_method']:
                             self.update_global_metric_score_distribution(x, async_in_dim_indices)    
@@ -504,7 +504,7 @@ class Linear(nn.Linear, EriLayer):
                     elif 'in_dim_indices' in kwargs:
                         weight = self.extract_in_dim_weight(weight, self.async_intrabatch_in_dim_indices)
                         result = F.linear(x, weight, bias=bias)
-                        if 'o_proj' in self.key or 'down_proj' in self.key:
+                        if 'out_proj' in self.key or 'fc2' in self.key:
                             if 'bias' in cfg['prune_method']:
                                 compensate_bias = self.get_compensate_bias(x, self.weight, self.async_intrabatch_in_dim_indices)
                                 result += compensate_bias
