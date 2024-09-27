@@ -164,7 +164,7 @@ class OPTAttention(nn.Module):
             raise ValueError('q_probe_num should be equal to k_probe_num and v_probe_num for now')
 
         bsz, src_len, _ = probe.size()
-        print('probeshape', probe.shape)
+        # print('probeshape', probe.shape)
         self.q_num_heads, self.k_num_heads, self.v_num_heads = self.num_heads, self.num_heads, self.num_heads
 
         # get query proj
@@ -184,7 +184,7 @@ class OPTAttention(nn.Module):
             past_key_value = (key_states, value_states)
 
         proj_shape = (bsz * self.num_heads, -1, self.head_dim)
-        print('src_len', src_len, query_states.shape)
+        # print('src_len', src_len, query_states.shape)
         query_states = self._shape(query_states, src_len, bsz).view(*proj_shape)
         key_states = key_states.view(*proj_shape)
         value_states = value_states.view(*proj_shape)
@@ -209,7 +209,7 @@ class OPTAttention(nn.Module):
         else:
             probe_attn_mask = attention_mask[bsz_selected_indices, :, :src_len, :src_len]
 
-        print('probe_attn_mask', probe_attn_mask.shape)
+        # print('probe_attn_mask', probe_attn_mask.shape)
         attn_weights = attn_weights.view(bsz, self.num_heads, src_len, src_len) + probe_attn_mask
         attn_weights = torch.max(
             attn_weights, torch.tensor(torch.finfo(attn_weights.dtype).min, device=attn_weights.device)
@@ -241,7 +241,7 @@ class OPTAttention(nn.Module):
                 f"`attn_output` should be of size {(bsz, self.num_heads, src_len, self.head_dim)}, but is"
                 f" {attn_output.size()}"
             )
-        print('attn_output', attn_output.shape)
+        # print('attn_output', attn_output.shape)
         attn_output = attn_output.view(bsz, self.num_heads, src_len, self.head_dim)
         attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(bsz, src_len, self.embed_dim)
@@ -401,7 +401,7 @@ class OPTAttention(nn.Module):
                 bsz, q_len, _ = hidden_states.size()
                 probe_qk_out_dim_indices, probe_vo_out_dim_indices = None, None
                 if 'probe' in cfg['prune_method']:
-                    print('yes')
+                    # print('yes')
                     qk_prune_way = cfg['qk_prune_way']
                     vo_prune_way = cfg['vo_prune_way']
                     if cfg['mode'] == 'sync':
@@ -419,7 +419,7 @@ class OPTAttention(nn.Module):
                             pass
                             # raise ValueError('Invalid input for asyncintra mode')
                     
-                    print('attn probe done')
+                    # print('attn probe done')
                     # --------------------------------------
                     is_cross_attention = key_value_states is not None
                     qk_prune_way = cfg['qk_prune_way']
@@ -634,8 +634,8 @@ class OPTAttention(nn.Module):
                             past_key_value = (key_states, value_states)
 
                         proj_shape = (bsz * self.q_num_heads, -1, self.head_dim)
-                        print('proj_shape', proj_shape, bsz, self.q_num_heads, self.head_dim)
-                        print('query_states', query_states.shape)
+                        # print('proj_shape', proj_shape, bsz, self.q_num_heads, self.head_dim)
+                        # print('query_states', query_states.shape)
                         query_states = self._shape(query_states, tgt_len, bsz, self.q_num_heads).view(*proj_shape)
                         key_states = key_states.view(*proj_shape)
                         value_states = value_states.view(*proj_shape)
@@ -749,6 +749,12 @@ class OPTDecoderLayer(nn.Module):
         self.fc2 = nn.Linear(config.ffn_dim, self.embed_dim, bias=config.enable_bias)
         self.final_layer_norm = nn.LayerNorm(self.embed_dim, elementwise_affine=config.layer_norm_elementwise_affine)
 
+        self.cur_attn_inference_duration = 0
+        self.cur_mlp_inference_duration = 0
+
+        self.start_event = torch.cuda.Event(enable_timing=True, blocking=False)
+        self.end_event = torch.cuda.Event(enable_timing=True, blocking=False)
+
         self.layer_order = layer_order
         self.pruning_module = HiddenRepresentationPruning(cfg, f'opt_mlp_{layer_order}', config)
 
@@ -772,7 +778,7 @@ class OPTDecoderLayer(nn.Module):
         probe, bsz_selected_indices, seq_selected_indices = generate_probe(x, cfg['fc1_probe_ratio'], residual_for_probe)
         
         probe_out = self.activation_fn(self.fc1(probe, cal_mlp_probe_out_dim_metric=True))
-        print('probe_out', probe_out.shape)
+        # print('probe_out', probe_out.shape)
         # calculate score
         if 'calib' in cfg['prune_method'] or 'runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']:
             probe_out_dim_metric = self.pruning_module.cal_mlp_prune_metric(probe_out, self.fc2.weight.data, cfg['prune_metric'], bsz_selected_indices, seq_selected_indices, global_metric_score_distribution=self.fc2.get_global_metric_score_distribution(cur_batch_seq_len))
@@ -922,7 +928,7 @@ class OPTDecoderLayer(nn.Module):
                 (see `past_key_values`).
             past_key_value (`Tuple(torch.FloatTensor)`, *optional*): cached past key and value projection states
         """
-        print('layerorder', self.layer_order, flush=True)
+        # print('layerorder', self.layer_order, flush=True)
 
         # residual = hidden_states
         # def probe_mlp_inf(residual):
@@ -1125,8 +1131,11 @@ class OPTDecoderLayer(nn.Module):
         #     print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
         #     print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
-
+        cur_gpu_index = self.fc1.weight.device.index
         residual = hidden_states
+
+        torch.cuda.synchronize()
+        self.start_event.record()
         hidden_states = self.self_attn_layer_norm(hidden_states)
         if self.check_asyncintra_for_next_attention():
             input_layernorm_mlp_residual = self.self_attn_layer_norm(kwargs['last_layer_residual'])
@@ -1163,7 +1172,12 @@ class OPTDecoderLayer(nn.Module):
 
         residual = hidden_states
 
-        
+        self.end_event.record()
+        torch.cuda.synchronize()
+        if hasattr(self, 'cur_attn_inference_duration') and cfg['cur_batch_index'] >= 1:
+            self.cur_attn_inference_duration += self.start_event.elapsed_time(self.end_event)
+
+        self.start_event.record()
 
         hidden_states = self.final_layer_norm(hidden_states)
 
@@ -1174,7 +1188,10 @@ class OPTDecoderLayer(nn.Module):
 
         # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
-
+        self.end_event.record()
+        torch.cuda.synchronize()
+        if hasattr(self, 'cur_mlp_inference_duration') and cfg['cur_batch_index'] >= 1:
+            self.cur_mlp_inference_duration += self.start_event.elapsed_time(self.end_event)
 
         outputs = (hidden_states,)
 

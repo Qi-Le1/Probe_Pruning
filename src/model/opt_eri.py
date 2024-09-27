@@ -121,7 +121,7 @@ class EriLayer:
         # return torch.index_select(weight, dim=1, index=indices.to(self.weight.device))
            
     def extract_out_dim_weight(self, weight, indices):
-        print('key', self.key, weight.shape)
+        # print('key', self.key, weight.shape)
         return weight[indices.to(self.weight.device), :]
         # return torch.index_select(weight, dim=0, index=indices.to(self.weight.device))
     
@@ -157,6 +157,8 @@ class Linear(nn.Linear, EriLayer):
         self.async_intrabatch_in_dim_indices = None
 
         self.retrieve_weight = torch.cuda.Event(enable_timing=False, blocking=False)
+
+        self.compensate_bias = None
 
         if ('out_proj' in self.key or 'fc2' in self.key):
             self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)   
@@ -434,13 +436,25 @@ class Linear(nn.Linear, EriLayer):
             return self.async_intrabatch_in_dim_indices
     
     def get_compensate_bias(self, x, weight, in_dim_indices):
+        # return torch.zeros(weight.shape[0], device=x.device)
         if cfg['cur_batch_index'] == 0:
             return torch.zeros(weight.shape[0], device=x.device)
-        calib = torch.mean(self.baseline_inp, dim=0)
-        calib = calib.to(x.device)
-        in_dim_indices = in_dim_indices.to(device=x.device)
-        calib[in_dim_indices] = 0
-        compensate_bias = F.linear(calib, weight, bias=None)
+
+        if cfg['mode'] == 'asyncinter':
+            if self.compensate_bias == None:
+                calib = torch.mean(self.baseline_inp, dim=0)
+                calib = calib.to(x.device)
+                in_dim_indices = in_dim_indices.to(device=x.device)
+                calib[in_dim_indices] = 0
+                compensate_bias = F.linear(calib, weight, bias=None)
+            else:
+                compensate_bias = self.compensate_bias
+        else:
+            calib = torch.mean(self.baseline_inp, dim=0)
+            calib = calib.to(x.device)
+            in_dim_indices = in_dim_indices.to(device=x.device)
+            calib[in_dim_indices] = 0
+            compensate_bias = F.linear(calib, weight, bias=None)
         return compensate_bias
     
     # opt has bias

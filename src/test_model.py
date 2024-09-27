@@ -14,7 +14,7 @@ from metric import make_metric, make_logger
 from model import make_model, make_prune_model
 from module import save, to_device, process_control, resume, makedir_exist_ok, \
     get_model_profile, summarize_info_list, match_prefix, load, update_model_prof, model_forward, remove_non_picklable_items, check_dense_model, \
-    check_calib_saving_info, load_calib_saving_info, save_calib_info
+    check_calib_saving_info, load_calib_saving_info, save_calib_info, get_layer_order
 from deepspeed.profiling.flops_profiler import FlopsProfiler
 import matplotlib.pyplot as plt
 
@@ -232,31 +232,31 @@ def test(data_loader, model, model_prof, metric, logger):
                 print('evaluation_for_batch', evaluation, flush=True)
                 logger.append(evaluation, 'test', input_size)
 
-            # for name, module in model.named_modules():
-            #     for attr_name in dir(module):
-            #         # Check if the attribute name contains 'mean_intersection_ratio'
-            #         if 'attn_sign_match_percentage' in attr_name or 'attn_l2_magnitude_ratio' in attr_name or 'attn_cosine_similarity' in attr_name\
-            #             or 'mlp_sign_match_percentage' in attr_name or 'mlp_l2_magnitude_ratio' in attr_name or 'mlp_cosine_similarity' in attr_name:
-            #             # Retrieve the attribute value
-            #             attr_value = getattr(module, attr_name)
-            #             # Print the module name and attribute name
-            #             # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
-            #             # Append the attribute to the logger
-            #             logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-            #             print('name', name, 'attr_name', attr_name)
-            #         if 'diff_ratio' in attr_name:
-            #             # Retrieve the attribute value
-            #             attr_value = getattr(module, attr_name)
+            for name, module in model.named_modules():
+                for attr_name in dir(module):
+                    # Check if the attribute name contains 'mean_intersection_ratio'
+                    if 'attn_sign_match_percentage' in attr_name or 'attn_l2_magnitude_ratio' in attr_name or 'attn_cosine_similarity' in attr_name\
+                        or 'mlp_sign_match_percentage' in attr_name or 'mlp_l2_magnitude_ratio' in attr_name or 'mlp_cosine_similarity' in attr_name:
+                        # Retrieve the attribute value
+                        attr_value = getattr(module, attr_name)
+                        # Print the module name and attribute name
+                        # print('name', name, 'attr_name', attr_name, 'attr_value', attr_value)
+                        # Append the attribute to the logger
+                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+                        print('name', name, 'attr_name', attr_name)
+                    if 'diff_ratio' in attr_name:
+                        # Retrieve the attribute value
+                        attr_value = getattr(module, attr_name)
                         
-            #                 # Append the attribute to the logger
-            #             logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-            #             print('name', name, attr_name, attr_value)
-            #         if 'cur_select_indices' in attr_name:
-            #             # Retrieve the attribute value
-            #             attr_value = getattr(module, attr_name)
-            #             # Append the attribute to the logger
-            #             logger.accumulate({f'{name}_{attr_name}': attr_value}, 'test')
-            #             # print('name', name, attr_name, attr_value)
+                            # Append the attribute to the logger
+                        logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+                        print('name', name, attr_name, attr_value)
+                    if 'cur_select_indices' in attr_name:
+                        # Retrieve the attribute value
+                        attr_value = getattr(module, attr_name)
+                        # Append the attribute to the logger
+                        logger.accumulate({f'{name}_{attr_name}': attr_value}, 'test')
+                        # print('name', name, attr_name, attr_value)
                         
                     # Check if the attribute name contains 'mean_intersection_ratio'
                     
@@ -267,25 +267,32 @@ def test(data_loader, model, model_prof, metric, logger):
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
 
-        # cur_attn_inference_duration_list = []
-        # cur_mlp_inference_duration_list = []
-        # for name, module in model.named_modules():
-        #     for attr_name in dir(module):
-        #         if 'cur_attn_inference_duration' in attr_name:
-        #             # Retrieve the attribute value
-        #             attr_value = getattr(module, attr_name)
-        #             cur_attn_inference_duration_list.append(attr_value)
-        #             # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-        #             # print('name', name, attr_name, attr_value)
-        #         if 'cur_mlp_inference_duration' in attr_name:
-        #             # Retrieve the attribute value
-        #             attr_value = getattr(module, attr_name)
-        #             cur_mlp_inference_duration_list.append(attr_value)
-        #             # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-        #             # print('name', name, attr_name, attr_value)
-        # print('mean_cur_attn_inference_duration', sum(cur_attn_inference_duration_list)/len(cur_attn_inference_duration_list))
-        # print('mean_cur_mlp_inference_duration', sum(cur_mlp_inference_duration_list)/len(cur_mlp_inference_duration_list))
-        # print('mean_inference_duration', inference_duration/len(data_loader))
+        cur_attn_inference_duration_list = []
+        cur_mlp_inference_duration_list = []
+        for name, module in model.named_modules():
+            for attr_name in dir(module):
+                if 'cur_attn_inference_duration' in attr_name:
+                    # Retrieve the attribute value
+                    if 'opt-13b' in cfg['model_name'] and get_layer_order(name) >= 20:
+                        continue
+                    attr_value = getattr(module, attr_name)
+                    cur_attn_inference_duration_list.append(attr_value)
+                    # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+                    print('name', name, attr_name, attr_value)
+                if 'cur_mlp_inference_duration' in attr_name:
+                    # diff gpu cannt measure the inference time correctly
+                    if 'opt-13b' in cfg['model_name'] and get_layer_order(name) >= 20:
+                        continue
+                    # Retrieve the attribute value
+                    attr_value = getattr(module, attr_name)
+                    cur_mlp_inference_duration_list.append(attr_value)
+                    # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+                    print('name', name, attr_name, attr_value)
+        
+        print('mean_cur_attn_inference_duration', sum(cur_attn_inference_duration_list)/len(cur_attn_inference_duration_list))
+        print('mean_cur_mlp_inference_duration', sum(cur_mlp_inference_duration_list)/len(cur_mlp_inference_duration_list))
+        print('mean_inference_duration', inference_duration/len(data_loader))
+        print('inference_duration', inference_duration)
 
         if cfg['onlyprobe'] == False: 
             evaluation = metric.evaluate('test', 'full')

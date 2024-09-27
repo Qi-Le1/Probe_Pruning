@@ -67,7 +67,7 @@ class Logger:
             if isinstance(result[k], Number):
                 self.history[name].append(result[k])
             elif isinstance(result[k], list) and len(result[k]) > 0:
-                self.history[name].extend(result[k])
+                self.history[name].append(result[k])
             else:
                 print(result[k], type(result[k]), k)
                 raise ValueError('Not valid data type for logger')

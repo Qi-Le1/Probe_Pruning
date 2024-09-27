@@ -152,6 +152,8 @@ class Linear(nn.Linear, EriLayer):
 
         self.retrieve_weight = torch.cuda.Event(enable_timing=False, blocking=False)
 
+        self.compensate_bias = None
+
         if ('o_proj' in self.key or 'down_proj' in self.key):
             self.nsamples = torch.zeros(in_features, dtype=torch.int32, device=self.weight.data.device)   
             if 'wandasp' in self.prune_metric:
@@ -406,14 +408,26 @@ class Linear(nn.Linear, EriLayer):
             return self.async_intrabatch_in_dim_indices
     
     def get_compensate_bias(self, x, weight, in_dim_indices):
+        # return torch.zeros(weight.shape[0], device=x.device)
         if cfg['cur_batch_index'] == 0:
             return torch.zeros(weight.shape[0], device=x.device)
-        
-        calib = torch.mean(self.baseline_inp, dim=0)
-        calib = calib.to(x.device)
-        in_dim_indices = in_dim_indices.to(device=x.device)
-        calib[in_dim_indices] = 0
-        compensate_bias = F.linear(calib, weight, bias=None)
+
+        if cfg['mode'] == 'asyncinter':
+            if self.compensate_bias == None:
+                calib = torch.mean(self.baseline_inp, dim=0)
+                calib = calib.to(x.device)
+                in_dim_indices = in_dim_indices.to(device=x.device)
+                calib[in_dim_indices] = 0
+                compensate_bias = F.linear(calib, weight, bias=None)
+                self.compensate_bias = compensate_bias
+            else:
+                compensate_bias = self.compensate_bias
+        else:
+            calib = torch.mean(self.baseline_inp, dim=0)
+            calib = calib.to(x.device)
+            in_dim_indices = in_dim_indices.to(device=x.device)
+            calib[in_dim_indices] = 0
+            compensate_bias = F.linear(calib, weight, bias=None)
         return compensate_bias
     
     # no bias in llama-2

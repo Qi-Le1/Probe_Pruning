@@ -479,48 +479,98 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
             
-            def probe_combination():
-                return_list = []
-                for seq in ['0.05', '0.1', '0.2', '0.3', '0.4', '0.5']:
-                    for bsz in ['0.05', '0.25', '0.5', '1']:
-                    # for bsz in ['1']:
-                        # for rank in ['seqrank', 'bszrank']:
-                            # Create the repeated sequence-bsz pattern
-                        pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
-                        pattern = pattern[:-1]  # remove the last extra hyphen
+            # def probe_combination():
+            #     return_list = []
+            #     for seq in ['0.05', '0.1', '0.3',  '0.5',  '0.7', '0.8', '1.0']:
+            #         for bsz in ['0.05', '0.25', '1']:
+            #         # for bsz in ['1']:
+            #             # for rank in ['seqrank', 'bszrank']:
+            #                 # Create the repeated sequence-bsz pattern
+            #             pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
+            #             pattern = pattern[:-1]  # remove the last extra hyphen
 
-                        # Append 'seqrank' and 'bszrank' placeholders or values
-                        final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
+            #             # Append 'seqrank' and 'bszrank' placeholders or values
+            #             final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
 
-                        # Append to the return list
-                        return_list.append(final_string)
-                return return_list
-            # , 'opt-13b'
-            control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                            ['ppwandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], probe_combination(),
-                        ['q-proj+k-proj+v-proj+out-proj', 'fc1+fc2']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            #             # Append to the return list
+            #             return_list.append(final_string)
+            #     return return_list
+            # # # , 'opt-13b'
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                 ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], probe_combination(),
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                            ['wandasp'], ['probe-default'], ['asyncintra'], ['c4-2000'], probe_combination(),
-                        ['q-proj+k-proj+v-proj+o-proj', 'gate-proj+up-proj+down-proj']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                 ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], probe_combination(),
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            # metric
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                             ['wandasp', 'ppwandasp', 'flap'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['q-proj+k-proj+v-proj+o-proj', 'gate-proj+up-proj+down-proj', 'default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # # metric
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                  ['wandasp', 'ppwandasp', 'flap'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['q-proj+k-proj+v-proj+o-proj', 'gate-proj+up-proj+down-proj', 'default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             
-            control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                             ['wandasp', 'ppwandasp', 'flap'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['q-proj+k-proj+v-proj+out-proj', 'fc1+fc2', 'default']]]
+            # q-proj+k-proj+v-proj+out-proj', 'fc1+fc2', 
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                  ['wandasp', 'ppwandasp', 'flap'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # flap speed vs pp speed
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2'], 
+            #                  ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2'], 
+            #                 ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # ----- record common channel
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                  ['ppwandasp'], ['probe'], ['sync'], ['None'], ['1-1-1-1-1-seqrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                     ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                     ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                             ['flap'], ['probe-flap-default'], ['sync'], ['None'], ['1-1-1-1-1-seqrank'],
+                            ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                                ['flap'], ['probe-flap-flapratio-bias-respick-ema-calib'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                     ['flap'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
         elif 'csr' in data:
             
             # opt chongpao
@@ -772,7 +822,52 @@ def main():
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
 
+            # def probe_combination():
+            #     return_list = []
+            #     for seq in ['0.05', '0.1', '0.3',  '0.5',  '0.7', '0.8', '1.0']:
+            #         for bsz in ['0.05', '0.25', '1']:
+            #         # for bsz in ['1']:
+            #             # for rank in ['seqrank', 'bszrank']:
+            #                 # Create the repeated sequence-bsz pattern
+            #             pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
+            #             pattern = pattern[:-1]  # remove the last extra hyphen
 
+            #             # Append 'seqrank' and 'bszrank' placeholders or values
+            #             final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
+
+            #             # Append to the return list
+            #             return_list.append(final_string)
+            #     return return_list
+
+            # control_name = [[['arc-e'], ['opt-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
+            #                 ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], probe_combination(),
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
+            #                 ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], probe_combination(),
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['arc-e'], ['opt-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                            ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                            ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            # control_name = [[['boolq'], ['opt-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4'], 
+            #                 ['ppwandasp'], ['probe'], ['sync'], ['c4-2000'], ['1-1-1-1-1-seqrank'],
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             pass
     # gather calib info to save time
     # model, seq, metric, calib, target module important
@@ -837,6 +932,9 @@ def main():
                             ['gate-proj+up-proj+down-proj']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+
+
+            
             pass
         elif 'csr' in data:
             # control_name = [[['obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0.2'], 
@@ -902,11 +1000,16 @@ def main():
             # controls.extend(CIFAR10_controls_9)
 
             # ---- 8/4/2024 break latency
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0'], 
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['512', '1024', '2048'], ['0'], 
                              ['None'], ['dense'], ['None'], ['None'], ['None'],        
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0'], 
+            #                  ['None'], ['dense'], ['None'], ['None'], ['None'],        
+            #                 ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
             pass
         elif 'csr' in data:
             # control_name = [[['boolq', 'piqa', 'hellaswag', 'winogrande', 'arc-c', 'arc-e', 'obqa'], ['llama-2-7b', 'llama-2-13b', 'opt-13b'], ['csr'], ['20'], ['512'], ['0'], 
@@ -952,6 +1055,7 @@ def main():
                             ['None']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
+    
     else:
         raise ValueError('Not valid file')
 

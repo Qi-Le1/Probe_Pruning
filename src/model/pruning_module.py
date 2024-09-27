@@ -205,7 +205,8 @@ class HiddenRepresentationPruning():
                 probe_out_dim_metric = (combined_probe_out * torch.sum(torch.pow(weight, 2), dim=0)).clamp(max=cfg['data_type_max'])
                 return probe_out_dim_metric
             else:
-                mean_probe_out = torch.mean(probe_out, dim=(0, 1), max=cfg['data_type_max'])
+                print('flap_probe_num', probe_num)
+                mean_probe_out = torch.mean(probe_out, dim=(0, 1)).clamp(max=cfg['data_type_max'])
                 probe_variance = torch.sum(torch.pow(probe_out - mean_probe_out.reshape(1, 1, -1), 2), dim=0).clamp(max=cfg['data_type_max']) / probe_num
                 probe_out_dim_metric = (probe_variance * torch.sum(torch.pow(weight, 2), dim=0)).clamp(max=cfg['data_type_max'])
                 return probe_out_dim_metric
@@ -394,7 +395,10 @@ class HiddenRepresentationPruning():
         prune_ratio = pruning_ratio if pruning_ratio is not None else self.prune_ratio
         sorted_value, sorted_indices = torch.sort(probe_out_dim_metric, dim=0)
         num_prune = int(prune_ratio * probe_out_dim_metric.shape[0])
-        num_prune = nearest_multiple(num_prune, probe_out_dim_metric.shape[0], multiple)
+        if 'noround' in cfg['prune_method']:
+            pass
+        else:
+            num_prune = nearest_multiple(num_prune, probe_out_dim_metric.shape[0], multiple)
         # return torch.sort(sorted_indices[num_prune:])[0], torch.sort(sorted_indices[:num_prune])[0]
         return sorted_indices[num_prune:], sorted_indices[:num_prune]
     

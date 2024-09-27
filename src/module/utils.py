@@ -20,6 +20,11 @@ FLOPS_UNIT = (1000000, 'Million')
 # already in seconds unit
 TIME_UNIT = (1, 's')
 
+def get_layer_order(name):
+    layer_order = int(name.split('.')[-1])
+    print('layer_order', layer_order)
+    return layer_order
+
 def check_skip_layers(name):
     layer_order_matches = re.findall(r'\d+', name)
     if layer_order_matches:  # Check if the list is not empty
