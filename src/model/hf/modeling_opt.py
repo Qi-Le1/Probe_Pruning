@@ -1131,80 +1131,81 @@ class OPTDecoderLayer(nn.Module):
         #     print('self.mlp_l1_diff_percentage', self.mlp_l1_diff_percentage, flush=True)
         #     print('self.mlp_cosine_similarity', self.mlp_cosine_similarity, flush=True)
 
-        cur_gpu_index = self.fc1.weight.device.index
-        residual = hidden_states
+        cur_gpu = self.fc1.weight.device
+        with torch.cuda.device(cur_gpu):
+            residual = hidden_states
 
-        torch.cuda.synchronize()
-        self.start_event.record()
-        hidden_states = self.self_attn_layer_norm(hidden_states)
-        if self.check_asyncintra_for_next_attention():
-            input_layernorm_mlp_residual = self.self_attn_layer_norm(kwargs['last_layer_residual'])
-            hidden_states, self_attn_weights, present_key_value = self.self_attn(
-            hidden_states=hidden_states,
-            past_key_value=past_key_value,
-            attention_mask=attention_mask,
-            layer_head_mask=layer_head_mask,
-            output_attentions=output_attentions,
-            respick=kwargs['last_layer_residual'],
-            input_layernorm_mlp_residual=input_layernorm_mlp_residual
-        )
-        else:
-            input_layernorm_mlp_residual = None
-            hidden_states, self_attn_weights, present_key_value = self.self_attn(
+            torch.cuda.synchronize()
+            self.start_event.record()
+            hidden_states = self.self_attn_layer_norm(hidden_states)
+            if self.check_asyncintra_for_next_attention():
+                input_layernorm_mlp_residual = self.self_attn_layer_norm(kwargs['last_layer_residual'])
+                hidden_states, self_attn_weights, present_key_value = self.self_attn(
                 hidden_states=hidden_states,
                 past_key_value=past_key_value,
                 attention_mask=attention_mask,
                 layer_head_mask=layer_head_mask,
                 output_attentions=output_attentions,
-                respick=residual
+                respick=kwargs['last_layer_residual'],
+                input_layernorm_mlp_residual=input_layernorm_mlp_residual
             )
-        # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
-        hidden_states = residual + hidden_states
+            else:
+                input_layernorm_mlp_residual = None
+                hidden_states, self_attn_weights, present_key_value = self.self_attn(
+                    hidden_states=hidden_states,
+                    past_key_value=past_key_value,
+                    attention_mask=attention_mask,
+                    layer_head_mask=layer_head_mask,
+                    output_attentions=output_attentions,
+                    respick=residual
+                )
+            # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+            hidden_states = residual + hidden_states
 
 
-        # Fully Connected
-        # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
-        if self.check_asyncintra_for_next_mlp():
-            post_layernorm_attn_residual = self.final_layer_norm(residual)
-            respick = residual
-        else:
-            post_layernorm_attn_residual = None
+            # Fully Connected
+            # hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
+            if self.check_asyncintra_for_next_mlp():
+                post_layernorm_attn_residual = self.final_layer_norm(residual)
+                respick = residual
+            else:
+                post_layernorm_attn_residual = None
 
-        residual = hidden_states
+            residual = hidden_states
 
-        self.end_event.record()
-        torch.cuda.synchronize()
-        if hasattr(self, 'cur_attn_inference_duration') and cfg['cur_batch_index'] >= 1:
-            self.cur_attn_inference_duration += self.start_event.elapsed_time(self.end_event)
+            self.end_event.record()
+            torch.cuda.synchronize()
+            if hasattr(self, 'cur_attn_inference_duration') and cfg['cur_batch_index'] >= 1:
+                self.cur_attn_inference_duration += self.start_event.elapsed_time(self.end_event)
 
-        self.start_event.record()
+            self.start_event.record()
 
-        hidden_states = self.final_layer_norm(hidden_states)
+            hidden_states = self.final_layer_norm(hidden_states)
 
-        if self.check_asyncintra_for_next_mlp():
-            hidden_states = self.mlp_layer(hidden_states, respick=respick, post_layernorm_attn_residual=post_layernorm_attn_residual)
-        else:
-            hidden_states = self.mlp_layer(hidden_states, respick=residual)
+            if self.check_asyncintra_for_next_mlp():
+                hidden_states = self.mlp_layer(hidden_states, respick=respick, post_layernorm_attn_residual=post_layernorm_attn_residual)
+            else:
+                hidden_states = self.mlp_layer(hidden_states, respick=residual)
 
-        # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
-        hidden_states = residual + hidden_states
-        self.end_event.record()
-        torch.cuda.synchronize()
-        if hasattr(self, 'cur_mlp_inference_duration') and cfg['cur_batch_index'] >= 1:
-            self.cur_mlp_inference_duration += self.start_event.elapsed_time(self.end_event)
+            # hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+            hidden_states = residual + hidden_states
+            self.end_event.record()
+            torch.cuda.synchronize()
+            if hasattr(self, 'cur_mlp_inference_duration') and cfg['cur_batch_index'] >= 1:
+                self.cur_mlp_inference_duration += self.start_event.elapsed_time(self.end_event)
 
-        outputs = (hidden_states,)
+            outputs = (hidden_states,)
 
-        if output_attentions:
-            outputs += (self_attn_weights,)
+            if output_attentions:
+                outputs += (self_attn_weights,)
 
-        if use_cache:
-            outputs += (present_key_value,)
+            if use_cache:
+                outputs += (present_key_value,)
 
-        if 'asyncintra' in cfg['mode']:
-            return outputs, residual
-        else:
-            return outputs, None
+            if 'asyncintra' in cfg['mode']:
+                return outputs, residual
+            else:
+                return outputs, None
 
 
 OPT_START_DOCSTRING = r"""

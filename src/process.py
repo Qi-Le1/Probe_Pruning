@@ -14,7 +14,9 @@ import argparse
 import random
 import collections
 
-
+plt.rcParams.update({
+    'font.family': 'Nimbus Roman'
+})
 # os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 parser = argparse.ArgumentParser(description='analyze_data')
@@ -667,25 +669,99 @@ def make_control_list(file):
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
+
+        control_name = [[['wikitext-2v1'], ['opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                        ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                        ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e'], ['opt-13b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                        ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                        ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
         
     elif file == 'recordcommonchannel':
+        
         control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                             ['ppwandasp'], ['probe'], ['sync'], ['None'], ['1-1-1-1-1-seqrank'],
+                             ['ppwandasp'], ['probe-recordcommonchannel'], ['sync'], ['None'], ['1-1-1-1-1-seqrank'],
                             ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+        #                      ['ppwandasp'], ['probe-recordcommonchannel-calib-ema'], ['sync'], ['c4-2000'], ['1-1-1-1-1-seqrank'],
+        #                     ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
         control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                            ['ppwandasp'], ['probe-default-recordcommonchannel'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
 
         control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                            ['ppwandasp'], ['calib'], ['asyncinter'], ['c4-2000'], ['None'],
+                            ['ppwandasp'], ['calib-recordcommonchannel'], ['asyncinter'], ['c4-2000'], ['None'],
                         ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                             ['ppwandasp'], ['probe-recordcommonchannel'], ['sync'], ['None'], ['1-1-1-1-1-seqrank'],
+                            ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                            ['ppwandasp'], ['probe-default-recordcommonchannel'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['arc-e'], ['llama-2-7b'], ['csr'], ['20'], ['512'], ['0.4'], 
+                            ['ppwandasp'], ['calib-recordcommonchannel'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+        
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+        #                      ['wandasp'], ['probe-recordcommonchannel'], ['sync'], ['None'], ['1-1-1-1-1-seqrank'],
+        #                     ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+        #                      ['wandasp'], ['probe-recordcommonchannel-calib-ema'], ['sync'], ['c4-2000'], ['1-1-1-1-1-seqrank'],
+        #                     ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+        #                     ['wandasp'], ['probe-default-recordcommonchannel'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
+
+        # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+        #                     ['wandasp'], ['calib-recordcommonchannel'], ['asyncinter'], ['c4-2000'], ['None'],
+        #                 ['default']]]
+        # CIFAR10_controls_9 = make_controls(control_name)
+        # controls.extend(CIFAR10_controls_9)
 
         # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
         #                     ['flap'], ['probe-flap-flapratio-bias'], ['sync'], ['None'], ['1-1-1-1-1-seqrank'],
@@ -719,6 +795,53 @@ def make_control_list(file):
     elif file == 'csr_task':
         control_name = [[['boolq'], ['opt-13b'], ['csr'], ['20'], ['512'], ['0.2', '0.4'], 
                         ['ppwandasp'], ['probe'], ['sync'], ['c4-2000'], ['1-1-1-1-1-seqrank'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'inferencespeed':
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                            ['flap'], ['flap-default-recordspeed'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                            ['wandasp'], ['calib-recordspeed'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                        ['ppwandasp'], ['probe-default-recordspeed'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                    ['default']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b', 'opt-13b'], ['clm'], ['20'], ['1024'], ['0'], 
+                            ['None'], ['dense-recordspeed'], ['None'], ['None'], ['None'],        
+                        ['None']]]
+        CIFAR10_controls_9 = make_controls(control_name)
+        controls.extend(CIFAR10_controls_9)
+    elif file == 'ablationforfusion':
+        def probe_combination():
+            return_list = []
+            for seq in ['0.05', '0.1', '0.3',  '0.5',  '0.7', '0.8', '1.0']:
+                for bsz in ['0.05']:
+                # for bsz in ['1']:
+                    # for rank in ['seqrank', 'bszrank']:
+                        # Create the repeated sequence-bsz pattern
+                    pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
+                    pattern = pattern[:-1]  # remove the last extra hyphen
+
+                    # Append 'seqrank' and 'bszrank' placeholders or values
+                    final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
+
+                    # Append to the return list
+                    return_list.append(final_string)
+            return return_list
+
+        control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+                        ['ppwandasp'], ['probe-default-probefixratio0.1', 'probe-default-probefixratio0.5', 'probe-default-probefixratio0.9', 'probe-default'], ['sync'], ['c4-2000'], probe_combination(),
                     ['default']]]
         CIFAR10_controls_9 = make_controls(control_name)
         controls.extend(CIFAR10_controls_9)
@@ -780,7 +903,7 @@ def extract_result(control, model_tag, processed_result_history):
                             processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
                         processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
                 elif file == 'inferencespeed':
-                    if 'duration' in k:
+                    if 'inference_duration' in k:
                         if k not in processed_result_history:
                             processed_result_history[k] = {'history': [None for _ in range(num_experiments)]}
                         processed_result_history[k]['history'][exp_idx] = base_result['logger']['test'].history[k]
@@ -828,16 +951,16 @@ def summarize_result(processed_result, key):
     if 'history' in processed_result:
         pivot = 'history'
         results = []
-        for i in range(len(processed_result[pivot])):
-            x = processed_result[pivot][i]
-            results.append(x)
-
-        processed_result[pivot] = results
+        # for i in range(len(processed_result[pivot])):
+        #     x = processed_result[pivot][i]
+        #     results.append(x)
+        print('processed_result[pivot]size', len(processed_result[pivot]))
+        processed_result[pivot] = np.array(processed_result[pivot])
         processed_result[pivot] = np.stack(processed_result[pivot], axis=0)
         processed_result['mean'] = np.mean(processed_result[pivot], axis=0)
         processed_result['std'] = np.std(processed_result[pivot], axis=0)
         processed_result['se'] = cal_se(processed_result['std'], len(processed_result[pivot]))
-        processed_result[pivot] = processed_result[pivot].tolist()
+        # processed_result[pivot] = processed_result[pivot].tolist()
         # processed_result['max'] = np.max(processed_result[pivot], axis=1)
         # processed_result['min'] = np.min(processed_result[pivot], axis=1)
         # processed_result['mean_of_max'] = np.mean(np.max(processed_result[pivot], axis=1))
@@ -887,8 +1010,13 @@ def extract_processed_result(extracted_processed_result, processed_result, contr
             decimal_places = 2
         else:
             decimal_places = 1
-        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = trunc(processed_result['mean'], decimal_places)
-        extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = trunc(processed_result['se'], decimal_places)
+        if args['file'] == 'recordcommonchannel':
+            extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = processed_result['history']
+            # print("processed_result['history']", len(processed_result['history']), processed_result['history'])
+            extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = np.array(1)
+        else:
+            extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = trunc(processed_result['mean'], decimal_places)
+            extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = trunc(processed_result['se'], decimal_places)
 
         # extracted_processed_result[exp_name]['{}_se'.format(metric_name)] = np.round(processed_result['se'], 2)
     else:
@@ -925,18 +1053,59 @@ def make_df_history(extracted_processed_result_history):
 
             substring = ''
             for k in extracted_processed_result_history[exp_name]:
+                # print('k', k)
+                # index_name = ['_'.join(control + [k])]
+                # df[df_name].append(
+                #     pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
+                
+                # if 'fullinf_FLOPs_ratio_for_all_layers' in k or 'probe_FLOPs_ratio_for_all_layers' in k or \
+                #     any(metric_name in k for metric_name in metric_name_list) or 'attn_sign_match_percentage' in k or 'attn_l2_magnitude_ratio' in k or 'attn_cosine_similarity' in k\
+                #         or 'mlp_sign_match_percentage' in k or 'mlp_l2_magnitude_ratio' in k or 'mlp_cosine_similarity' in k or 'duration' in k or 'average_pruning_ratio' in k or 'diff_ratio' in k\
+                #             or 'cur_select_indices' in k:
+                #     print('inxlsxk', k, extracted_processed_result_history[exp_name][k].reshape(1, -1))
+                #     if '_se' in k:
+                #         value = extracted_processed_result_history[exp_name][k].reshape(1, -1)
+                #         # value_type = type(value[0][0])
+                #         # print('value_type', value_type, value[0][0])
+                #         # # value[0][0] = f"({value[0][0]})"
+
+                #         # value = pd.Series([f"({value[0][0]})"], dtype="string")
+
+                #     else:
+                #         value = extracted_processed_result_history[exp_name][k].reshape(1, -1)
+                #     print('pdvalue', value)
+                #     df_for_xlsx[df_name].append(
+                #         pd.DataFrame(data=value, index=index_name))
+                    
+                #     if substring == '':
+                #         substring += f'{index_name}: {value[0][0]}'
+                #     else:
+                #         substring += f'({value[0][0]})\n'
+                #         output_string += substring
+                #         substring = ''
+                
                 print('k', k)
-                index_name = ['_'.join(control + [k])]
-                df[df_name].append(
-                    pd.DataFrame(data=extracted_processed_result_history[exp_name][k].reshape(1, -1), index=index_name))
+                index_name = '_'.join(control + [k])
+
+                cur_value = extracted_processed_result_history[exp_name][k]
+                # if cur_value.ndim == 3:
+                #     cur_value = cur_value[0]
+                # else:
+                #     cur_value = cur_value.reshape(1, -1)
+
+                if df_name not in df:
+                    df[df_name] = collections.defaultdict()
+                
+                df[df_name][index_name] = cur_value
+                # df[df_name].append(
+                #     pd.DataFrame(data=cur_value, index=index_name))
                 
                 if 'fullinf_FLOPs_ratio_for_all_layers' in k or 'probe_FLOPs_ratio_for_all_layers' in k or \
                     any(metric_name in k for metric_name in metric_name_list) or 'attn_sign_match_percentage' in k or 'attn_l2_magnitude_ratio' in k or 'attn_cosine_similarity' in k\
-                        or 'mlp_sign_match_percentage' in k or 'mlp_l2_magnitude_ratio' in k or 'mlp_cosine_similarity' in k or 'duration' in k or 'average_pruning_ratio' in k or 'diff_ratio' in k\
-                            or 'cur_select_indices' in k:
-                    print('inxlsxk', k, extracted_processed_result_history[exp_name][k].reshape(1, -1))
+                        or 'mlp_sign_match_percentage' in k or 'mlp_l2_magnitude_ratio' in k or 'mlp_cosine_similarity' in k or 'inference_duration' in k or 'average_pruning_ratio' in k or 'diff_ratio' in k:
+                    # print('inxlsxk', k, cur_value)
                     if '_se' in k:
-                        value = extracted_processed_result_history[exp_name][k].reshape(1, -1)
+                        value = cur_value
                         # value_type = type(value[0][0])
                         # print('value_type', value_type, value[0][0])
                         # # value[0][0] = f"({value[0][0]})"
@@ -944,15 +1113,15 @@ def make_df_history(extracted_processed_result_history):
                         # value = pd.Series([f"({value[0][0]})"], dtype="string")
 
                     else:
-                        value = extracted_processed_result_history[exp_name][k].reshape(1, -1)
-                    print('pdvalue', value)
-                    df_for_xlsx[df_name].append(
-                        pd.DataFrame(data=value, index=index_name))
+                        value = cur_value
+                    # print('pdvalue', value)
+                    # df_for_xlsx[df_name].append(
+                    #     pd.DataFrame(data=value, index=index_name))
                     
                     if substring == '':
-                        substring += f'{index_name}: {value[0][0]}'
+                        substring += f'{index_name}: {value[0]}'
                     else:
-                        substring += f'({value[0][0]})\n'
+                        substring += f'({value[0]})\n'
                         output_string += substring
                         substring = ''
         else:
@@ -979,14 +1148,19 @@ def make_vis(df_history):
              'Pruning Ratio 0.2': 'purple',
             'Pruning Ratio 0.4': 'red',
             'Pruning Ratio 0.6': 'green',
-            'w/o PP': 'purple',
-            'w/ PP': 'red',
+            'w/o PP': 'brown',
+            'w/ PP': 'blue',
             'PP': 'orange',
              'FLAP': 'purple',
-             'Batch size 1': 'orange',
-            'Batch size 5': 'purple',
-            'Batch size 10': 'red',
-            'Batch size 20': 'green',
+            'Probe Batch Size 1': 'orange',
+            'Probe Batch Size 5': 'purple',
+            'Probe Batch Size 10': 'red',
+            'Probe Batch Size 20': 'green',
+
+            'Fix-0.1': 'orange',
+            'Fix-0.5': 'purple',
+            'Fix-0.9': 'red',
+            'Importance-Scaled Fusion': 'blue',
              }
     linestyle = {
                 'probe': (5, (10, 3)),
@@ -1004,10 +1178,10 @@ def make_vis(df_history):
              'w/o PP': (5, (10, 3)),
             'w/ PP': (0, (3, 1, 1, 1)),
 
-                'Batch size 1': (5, (10, 3)),
-            'Batch size 5': (0, (3, 1, 1, 1)),
-            'Batch size 10': (10, (2, 5)),
-            'Batch size 20': '--',
+                'Probe Batch Size 1': (5, (10, 3)),
+            'Probe Batch Size 5': (0, (3, 1, 1, 1)),
+            'Probe Batch Size 10': (10, (2, 5)),
+            'Probe Batch Size 20': '--',
                 }
     marker = {
                 'probe': 'D',
@@ -1025,10 +1199,10 @@ def make_vis(df_history):
             'w/o PP': 'o',
             'w/ PP': 's',
 
-                'Batch size 1': 'o',
-            'Batch size 5': 's',
-            'Batch size 10': 'p',
-            'Batch size 20': 'x',
+                'Probe Batch Size 1': 'o',
+            'Probe Batch Size 5': 's',
+            'Probe Batch Size 10': 'p',
+            'Probe Batch Size 20': 'x',
                 }
     # marker = {}
     # prune_ratios = [0, 0.001, 0.01, 0.03, 0.05, 0.06, 0.07, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 9999]
@@ -1083,9 +1257,10 @@ def make_vis(df_history):
     # marker['Full model'] = '*'
     # linestyle['pqnobias-0.5-0.5'] = '-.'
     # linestyle['pqnobiasglobal-0.5-0.5'] = '-.'
-    loc_dict = {'test/Perplexity': 'lower left', 'label': 'upper right', 'test/CsrAccuracy': 'lower left', 'test/CsrAccuracyNorm': 'lower left'}
-    fontsize = {'legend': 17, 'label': 15, 'ticks': 14, 'group_x_ticks': 8}
-    metric_name_list = ['test/Loss', 'test/Perplexity', 'test/CsrAccuracyNorm', 'test/CsrAccuracy']
+    loc_dict = {'test/Perplexity': 'lower left', 'label': 'center right', 'test/CsrAccuracy': 'lower left', 'test/CsrAccuracyNorm': 'lower left'}
+    fontsize = {'legend': 17, 'label': 13, 'ticks': 14, 'group_x_ticks': 8}
+    # , 'test/CsrAccuracy', 'test/Loss',
+    metric_name_list = [ 'test/Perplexity', 'test/CsrAccuracyNorm']
 
     fig = {}
     fig_data_across_multi_indices = collections.defaultdict(dict)
@@ -1104,7 +1279,7 @@ def make_vis(df_history):
 
 
 
-    def draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy'):
+    def draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label='Activation Layers in Order', y_label='Accuracy', label_loc=None, x_label_font_size=None, y_label_font_size=None, legend_size=None):
         fig_color = color.get(key_for_dict, random.choice(list(backup_color_set)))
         fig_linestyle = linestyle.get(key_for_dict, random.choice(list(backup_linestyle_set)))
         fig_marker = marker.get(key_for_dict, random.choice(list(backup_marker_set)))
@@ -1126,11 +1301,30 @@ def make_vis(df_history):
         plt.plot(x, y, color=fig_color, linestyle=fig_linestyle, marker=fig_marker, label=key_for_dict)
         # plt.fill_between(x, (y - yerr), (y + yerr), color=color[algo_mode], alpha=.1)
         plt.errorbar(x, y, yerr=yerr, color=fig_color, linestyle=fig_linestyle)
-        plt.xlabel(x_label, fontsize=fontsize['label'])
-        plt.ylabel(y_label, fontsize=fontsize['label'])
+        if x_label_font_size:
+            x_fontsize = x_label_font_size
+        else:
+            x_fontsize = fontsize['label']
+        
+        if y_label_font_size:
+            y_fontsize = y_label_font_size
+        else:
+            y_fontsize = fontsize['label']
+
+        plt.xlabel(x_label, fontsize=x_fontsize)
+        plt.ylabel(y_label, fontsize=y_fontsize)
         plt.xticks(fontsize=fontsize['ticks'])
         plt.yticks(fontsize=fontsize['ticks'])
-        plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'])
+        if label_loc:
+            loc = label_loc
+        else:
+            loc = loc_dict['label']
+        
+        if legend_size:
+            legend_size = legend_size
+        else:
+            legend_size = fontsize['legend']
+        plt.legend(loc=loc, fontsize=legend_size)
         # plt.legend(loc=loc_dict['label'], fontsize=fontsize['legend'], bbox_to_anchor=(1, 0.5))
         return
     
@@ -1243,7 +1437,7 @@ def make_vis(df_history):
 
 
     select_channels_indices = {}
-    for df_name in df_history:
+    for df_name in df_history.keys():
         loss_performance_vs_total_FLOPs_ratio = [None, None, None]
         ppl_performance_vs_total_FLOPs_ratio = [None, None, None]
         performance_vs_prunedflops = [None, None, None]
@@ -1264,7 +1458,37 @@ def make_vis(df_history):
             #     nsamples = prune_name_list[1]
             #     prune_name = prune_name + '+' + nsamples
 
-            temp = copy.deepcopy(df_history[df_name]) 
+            # temp = copy.deepcopy(df_history[df_name]) 
+            # '''
+            #     1. norm_across_other_dims distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
+            #     2. dense_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
+            #     3. pruned_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
+            #     2. pq_indices for each prune layer (y is pq_indices, x is all the layers, 1 for each prune_ratio)
+            #     3. pruned_ratio for each prune layer (y is pruned_ratio, x is all the layers, 1 for each prune_ratio)
+            #     4. pruned_FLOPs_ratio for each prune layer (y is pruned_FLOPs_ratio, x is all the layers, 1 for each prune_ratio)
+            #     5. performance vs total_FLOPs_ratio (y is performance, x is total_FLOPs_ratio, all prune_ratio in 1)
+            # '''
+
+            # pq_indices_order = 0
+            # pruned_ratio_order = 0
+            # pruned_FLOPs_ratio_order = 0
+            # norm_across_other_dims = None
+            # temp_norm_across_other_dims_key = None
+
+
+            # fullinf_vs_optimal_select_mean_intersection_ratio_order = 0
+            # probe_vs_optimal_select_mean_intersection_ratio_order = 0
+            # probe_vs_fullinf_select_mean_intersection_ratio_order = 0
+            # fullinf_vs_optimal_prune_mean_intersection_ratio_order = 0
+            # probe_vs_optimal_prune_mean_intersection_ratio_order = 0
+            # probe_vs_fullinf_prune_mean_intersection_ratio_order = 0
+            
+            # for i in range(0, len(temp), 2):
+            #     cur_item = temp[i]
+            #     cur_se_item = temp[i+1]
+            #     for ((index, row), (index_std, row_se)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
+
+            # temp = copy.deepcopy(df_history[df_name]) 
             '''
                 1. norm_across_other_dims distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
                 2. dense_hist distribution for each prune layer (y is number of shown, x is number, 1 for each layer)
@@ -1289,215 +1513,291 @@ def make_vis(df_history):
             probe_vs_optimal_prune_mean_intersection_ratio_order = 0
             probe_vs_fullinf_prune_mean_intersection_ratio_order = 0
             
-            for i in range(0, len(temp), 2):
-                cur_item = temp[i]
-                cur_se_item = temp[i+1]
-                for ((index, row), (index_std, row_se)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
-                    # print('index before', index)
-                    if 'mean' not in index:
-                        continue
-                    
-                    index_list = index.split('/')
-                    temp_key = index_list[-1]
+            cur_dict = df_history[df_name]
+            keys = list(cur_dict.keys())
 
-                    # layer_number = find_layer_number(index)
-                    # if layer_number > 5:
-                    #     continue
-                    # print('index', index)
-                    # if 'gridsearch' in prune_method and ('Loss' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
-                    #     if any(metric_name in index for metric_name in metric_name_list):
-                    #         flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                    #         flops_metric_name = flops_metric_name.split('/')[1]
-                    #         if loss_performance_vs_total_FLOPs_ratio[0] is None:
-                    #             loss_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
-                    #             loss_performance_vs_total_FLOPs_ratio[1] = row_se.tolist()[0]
-                    #     elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
-                    #         if loss_performance_vs_total_FLOPs_ratio[2] is None:
-                    #             loss_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
+            # Iterate over the dictionary by index, stepping by 2 to get pairs
+            for i in range(0, len(keys) - 1, 2):  # Ensures we don't go out of range
+                index, index_std = keys[i], keys[i + 1]
+                row, row_se = cur_dict[index], cur_dict[index_std]
+                # print('row', row)
+            # for i in range(0, len(temp), 2):
+            #     cur_item = temp[i]
+            #     cur_se_item = temp[i+1]
+            #     for ((index, row), (index_std, row_se)) in zip(cur_item.iterrows(), cur_se_item.iterrows()):
+                print('index before', index)
+                if 'mean' not in index:
+                    continue
+                
+                index_list = index.split('/')
+                temp_key = index_list[-1]
 
-                        
-                    #     if loss_performance_vs_total_FLOPs_ratio[0] is not None and loss_performance_vs_total_FLOPs_ratio[2] is not None:
-                    #         print('performancevssparsity', loss_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
-                    #         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
-                    #         calib_info, prune_info, cust_tgt_modules, 'FIG:Loss_fullinf_FLOPs_ratio_for_all_layers'])
-                    #         fig[fig_name] = plt.figure(fig_name)
-                    #         x = loss_performance_vs_total_FLOPs_ratio[2]
-                    #         y = loss_performance_vs_total_FLOPs_ratio[0]
-                    #         yerr = loss_performance_vs_total_FLOPs_ratio[1]
-                    #         prune_ratio_list = prune_ratio.split('-')
-                    #         key_for_dict = f"{prune_ratio_list[0]}"
-                    #         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
-                    #         print('loss_performance_vs_total_FLOPs_ratio', loss_performance_vs_total_FLOPs_ratio)
-                    #         # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
-                    #         loss_performance_vs_total_FLOPs_ratio = [None, None, None]
-                    
-                    # if 'gridsearch' in prune_method and ('Perplexity' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
-                    #     if any(metric_name in index for metric_name in metric_name_list):
-                    #         flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                    #         flops_metric_name = flops_metric_name.split('/')[1]
-                    #         if ppl_performance_vs_total_FLOPs_ratio[0] is None:
-                    #             ppl_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
-                    #             ppl_performance_vs_total_FLOPs_ratio[1] = row_se.tolist()[0]
-                    #     elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
-                    #         if ppl_performance_vs_total_FLOPs_ratio[2] is None:
-                    #             ppl_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
-
-                        
-                    #     if ppl_performance_vs_total_FLOPs_ratio[0] is not None and ppl_performance_vs_total_FLOPs_ratio[2] is not None:
-                    #         print('performancevssparsity', ppl_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
-                    #         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
-                    #         calib_info, prune_info, cust_tgt_modules, 'FIG:Perplexity_fullinf_FLOPs_ratio_for_all_layers'])
-                    #         fig[fig_name] = plt.figure(fig_name)
-                    #         x = ppl_performance_vs_total_FLOPs_ratio[2]
-                    #         y = ppl_performance_vs_total_FLOPs_ratio[0]
-                    #         yerr = ppl_performance_vs_total_FLOPs_ratio[1]
-                    #         prune_ratio_list = prune_ratio.split('-')
-                    #         key_for_dict = f"{prune_ratio_list[0]}"
-                    #         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
-                    #         print('ppl_performance_vs_total_FLOPs_ratio', ppl_performance_vs_total_FLOPs_ratio)
-                    #         # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
-                    #         ppl_performance_vs_total_FLOPs_ratio = [None, None, None]
-
-                    if any(metric_name in index for metric_name in metric_name_list):
-                        # probe generation on different size
-                        if file == 'differentprobestudy':
-                            metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                            metric_name = metric_name.split('/')[1]
-                            print('metric_name', metric_name)
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, calib_info, cust_tgt_modules, f'FIG:{metric_name}'])
-                            fig[fig_name] = plt.figure(fig_name)
-
-                            probe_seq_ratio, probe_batch_size = get_probe_type_ratio(prune_info, batch_size)
-                            x = probe_seq_ratio
-                            y = row.tolist()[0]
-                            yerr = row_se.tolist()[0]
-                            prune_ratio_list = prune_ratio.split('-')
-                            key_for_dict = f"Batch size {probe_batch_size}"
-                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Sequence Ratio', y_label=metric_name)
-                        else:
-                            metric_name = next((metric for metric in metric_name_list if metric in index), None)
-                            metric_name = metric_name.split('/')[1]
-                            print('metric_name', metric_name)
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, \
-                            calib_info, cust_tgt_modules, f'FIG:{metric_name}'])
-                            fig[fig_name] = plt.figure(fig_name)
-                            x = prune_ratio
-                            y = row.tolist()[0]
-                            yerr = row_se.tolist()[0]
-                            prune_ratio_list = prune_ratio.split('-')
-                            key_for_dict = f"{prune_method}_{mode}_{prune_info}_{metric_name}"
-                            record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Prune Ratio', y_label=metric_name)
+                # layer_number = find_layer_number(index)
+                # if layer_number > 5:
+                #     continue
+                # print('index', index)
+                # if 'gridsearch' in prune_method and ('Loss' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
+                #     if any(metric_name in index for metric_name in metric_name_list):
+                #         flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                #         flops_metric_name = flops_metric_name.split('/')[1]
+                #         if loss_performance_vs_total_FLOPs_ratio[0] is None:
+                #             loss_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
+                #             loss_performance_vs_total_FLOPs_ratio[1] = row_se.tolist()[0]
+                #     elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
+                #         if loss_performance_vs_total_FLOPs_ratio[2] is None:
+                #             loss_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
 
                     
-            #         if 'diff_ratio' in index:
-            #             layer_number = find_layer_number(index)
-            #             if 'attn' in index:
-            #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
-            # calib_info, prune_info, cust_tgt_modules, f'FIG:attn_diff_ratio'])
-            #             elif 'mlp' in index:
-            #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
-            # calib_info, prune_info, cust_tgt_modules, f'FIG:mlp_diff_ratio'])
-                        
-            #             fig[fig_name] = plt.figure(fig_name)
-            #             x = layer_number
-            #             y = row.tolist()[0]
-            #             yerr = row_se.tolist()[0]
+                #     if loss_performance_vs_total_FLOPs_ratio[0] is not None and loss_performance_vs_total_FLOPs_ratio[2] is not None:
+                #         print('performancevssparsity', loss_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
+                #         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
+                #         calib_info, prune_info, cust_tgt_modules, 'FIG:Loss_fullinf_FLOPs_ratio_for_all_layers'])
+                #         fig[fig_name] = plt.figure(fig_name)
+                #         x = loss_performance_vs_total_FLOPs_ratio[2]
+                #         y = loss_performance_vs_total_FLOPs_ratio[0]
+                #         yerr = loss_performance_vs_total_FLOPs_ratio[1]
+                #         prune_ratio_list = prune_ratio.split('-')
+                #         key_for_dict = f"{prune_ratio_list[0]}"
+                #         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                #         print('loss_performance_vs_total_FLOPs_ratio', loss_performance_vs_total_FLOPs_ratio)
+                #         # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                #         loss_performance_vs_total_FLOPs_ratio = [None, None, None]
+                
+                # if 'gridsearch' in prune_method and ('Perplexity' in index or 'fullinf_FLOPs_ratio_for_all_layers' in index):
+                #     if any(metric_name in index for metric_name in metric_name_list):
+                #         flops_metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                #         flops_metric_name = flops_metric_name.split('/')[1]
+                #         if ppl_performance_vs_total_FLOPs_ratio[0] is None:
+                #             ppl_performance_vs_total_FLOPs_ratio[0] = row.tolist()[0]
+                #             ppl_performance_vs_total_FLOPs_ratio[1] = row_se.tolist()[0]
+                #     elif 'fullinf_FLOPs_ratio_for_all_layers' in index :
+                #         if ppl_performance_vs_total_FLOPs_ratio[2] is None:
+                #             ppl_performance_vs_total_FLOPs_ratio[2] = row.tolist()[0]
 
-            #             key_for_dict = f"Pruning Ratio {prune_ratio}"
-            #             record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Different Channel Ratio')
                     
+                #     if ppl_performance_vs_total_FLOPs_ratio[0] is not None and ppl_performance_vs_total_FLOPs_ratio[2] is not None:
+                #         print('performancevssparsity', ppl_performance_vs_total_FLOPs_ratio, flops_metric_name, prune_ratio)
+                #         fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
+                #         calib_info, prune_info, cust_tgt_modules, 'FIG:Perplexity_fullinf_FLOPs_ratio_for_all_layers'])
+                #         fig[fig_name] = plt.figure(fig_name)
+                #         x = ppl_performance_vs_total_FLOPs_ratio[2]
+                #         y = ppl_performance_vs_total_FLOPs_ratio[0]
+                #         yerr = ppl_performance_vs_total_FLOPs_ratio[1]
+                #         prune_ratio_list = prune_ratio.split('-')
+                #         key_for_dict = f"{prune_ratio_list[0]}"
+                #         record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Relative FLOPs ratio', y_label=flops_metric_name)
+                #         print('ppl_performance_vs_total_FLOPs_ratio', ppl_performance_vs_total_FLOPs_ratio)
+                #         # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, 'Relative FLOPs ratio', flops_metric_name, y_lim=performance_metric_max)
+                #         ppl_performance_vs_total_FLOPs_ratio = [None, None, None]
 
-                    
-
-                        
-            #         if 'cur_select_indices' in index:
-            #             layer_number = find_layer_number(index)
-            #             print('prune_method', prune_method, prune_info, index)
-            #             print('layer_number', layer_number)
-            #             if 'attn' in index:
-            #                 key = f'attn_{layer_number}'
-            #             elif 'mlp' in index:
-            #                 key = f'mlp_{layer_number}'
-
-            #             if '1-1-1-1-1-seq' in prune_info:
-            #                 select_channels_indices[key] = set(row.tolist())
-            #                 continue
-            #             else:
-            #                 if 'probe' in prune_method or 'flap' in prune_method:
-            #                     intersection_ratio =  (len(set(select_channels_indices[key])) - len(select_channels_indices[key].intersection(set(row.tolist())))) / len(set(select_channels_indices[key]))
-
-            #             if 'attn' in index:
-            #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio,\
-            # calib_info,  cust_tgt_modules, f'FIG:attn_same_ratio_with_upperbound'])
-            #             elif 'mlp' in index:
-            #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, \
-            # calib_info,  cust_tgt_modules, f'FIG:mlp_same_ratio_with_upperbound'])
-
-            #             fig[fig_name] = plt.figure(fig_name)
-            #             x = layer_number
-            #             y = intersection_ratio
-            #             yerr = 0
-
-            #             if 'probe' in prune_method:
-            #                 key_for_dict = 'PP'
-            #             elif 'flap' in prune_method:
-            #                 key_for_dict = 'FLAP'
-            #             record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Different Channel Ratio')
-            #             pass
-
-                    def mean_indices_common_ratio(upperbound, method):
-                        return_list = []
-                        for i in range(len(upperbound)):
-                            cur_upperbound = upperbound[i]
-                            cur_method = method[i]
-                            ratio = len(set(cur_upperbound).intersection(set(cur_method))) / len(set(cur_upperbound).union(set(cur_method)))
-                            return_list.append(ratio)
-                        
-                        mean = sum(return_list) / len(return_list)
-                        se = np.std(return_list) / np.sqrt(len(return_list))
-                        return mean, se
-                    
-                    if 'cur_select_indices' in index:
-                        layer_number = find_layer_number(index)
-                        print('prune_method', prune_method, prune_info, index)
-                        print('layer_number', layer_number)
-                        if 'attn' in index:
-                            key = f'attn_{layer_number}'
-                        elif 'mlp' in index:
-                            key = f'mlp_{layer_number}'
-
-                        if '1-1-1-1-1-seq' in prune_info:
-                            select_channels_indices[key] = row.tolist()
-                            continue
-                        else:
-                            prune_method_list = prune_method.split('-')
-                            if len(prune_method_list) == 1 and prune_method_list[0] == 'calib':
-                                # intersection_ratio = len(set(select_channels_indices[key]).intersection(set(row.tolist()))) / len(set(select_channels_indices[key]).union(set(row.tolist())))
-
-                                y, yerr = mean_indices_common_ratio = mean_indices_common_ratio(select_channels_indices[key], row.tolist())
-                                key_for_dict = f"w/o PP"
-                            elif 'probe' in prune_method or 'flap' in prune_method:
-                                # intersection_ratio = len(set(select_channels_indices[key]).intersection(set(row.tolist()))) / len(set(select_channels_indices[key]))
-                                # intersection_ratio = len(set(select_channels_indices[key]).intersection(set(row.tolist()))) / len(set(select_channels_indices[key]).union(set(row.tolist())))
-                                y, yerr = mean_indices_common_ratio = mean_indices_common_ratio(select_channels_indices[key], row.tolist())
-                                key_for_dict = f"w/ PP"
-
-                        if 'attn' in index:
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_metric, seq_len, \
-            calib_info,  cust_tgt_modules, f'FIG:attn_same_ratio_with_upperbound'])
-                        elif 'mlp' in index:
-                            fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_metric, seq_len, \
-            calib_info,  cust_tgt_modules, f'FIG:mlp_same_ratio_with_upperbound'])
-
+                if any(metric_name in index for metric_name in metric_name_list):
+                    # probe generation on different size
+                    if file == 'differentprobestudy':
+                        metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                        metric_name = metric_name.split('/')[1]
+                        if 'Accuracy' in metric_name:
+                            metric_name = 'Accuracy'
+                        print('metric_name', metric_name)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, calib_info, cust_tgt_modules, f'FIG:differentprobestudy'])
                         fig[fig_name] = plt.figure(fig_name)
-                        x = layer_number
-                        # y = intersection_ratio
-                        # yerr = 0
 
-                        # key_for_dict = f"Pruning Ratio {prune_ratio}"
-                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Ratio of Common Pruning Channels')
-                        pass
+                        if mode == 'asyncinter':
+                            ax = fig[fig_name].add_subplot(111)
+                            ax.axhline(y=row.tolist()[0], color='r', linestyle='-', linewidth=2, label=f'w/o PP')
+                            continue
+
+                        probe_seq_ratio, probe_batch_size = get_probe_type_ratio(prune_info, batch_size)
+                        x = probe_seq_ratio
+                        y = row.tolist()[0]
+                        yerr = row_se.tolist()[0]
+                        prune_ratio_list = prune_ratio.split('-')
+                        key_for_dict = f"Probe Batch Size {probe_batch_size}"
+                        print('key_for_dict', key_for_dict)
+                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Probe Sequence Ratio', y_label=metric_name)
                     
+                    elif file == 'ablationforfusion':
+                        def extract_number(input_string):
+                            # Use regular expression to find numbers in the string
+                            result = re.findall(r'\d+\.\d+', input_string)
+                            if result:
+                                # Convert the first found number from string to float
+                                return result[0]
+                            else:
+                                # Optionally handle the case where no number is found
+                                return None
+    
+                        metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                        metric_name = metric_name.split('/')[1]
+                        if 'Accuracy' in metric_name:
+                            metric_name = 'Accuracy'
+                        print('metric_name', metric_name)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, calib_info, cust_tgt_modules, f'FIG:ablationforfusion'])
+                        fig[fig_name] = plt.figure(fig_name)
+
+                        # if mode == 'asyncinter':
+                        #     ax = fig[fig_name].add_subplot(111)
+                        #     ax.axhline(y=row.tolist()[0], color='r', linestyle='-', linewidth=2, label=f'w/o PP')
+                        #     continue
+
+                        probe_seq_ratio, probe_batch_size = get_probe_type_ratio(prune_info, batch_size)
+                        x = probe_seq_ratio
+                        y = row.tolist()[0]
+                        yerr = row_se.tolist()[0]
+                        # prune_ratio_list = prune_ratio.split('-')
+                        if 'probefixratio' in prune_method:
+                            key_for_dict = f'Fix-{extract_number(prune_method)}'
+                        else:
+                            key_for_dict = 'Importance-Scaled Fusion'
+                        # key_for_dict = f"Probe Batch Size {probe_batch_size}"
+                        print('xyyerr', x, y, yerr)
+                        print('key_for_dict', key_for_dict)
+                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Probe Sequence Ratio', y_label=metric_name)
+
+                        
+                    else:
+                        metric_name = next((metric for metric in metric_name_list if metric in index), None)
+                        metric_name = metric_name.split('/')[1]
+                        print('metric_name', metric_name)
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, \
+                        calib_info, cust_tgt_modules, f'FIG:{metric_name}'])
+                        fig[fig_name] = plt.figure(fig_name)
+                        x = prune_ratio
+                        y = row.tolist()[0]
+                        yerr = row_se.tolist()[0]
+                        prune_ratio_list = prune_ratio.split('-')
+                        key_for_dict = f"{prune_method}_{mode}_{prune_info}_{metric_name}"
+                        record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Prune Ratio', y_label=metric_name)
+
+                
+        #         if 'diff_ratio' in index:
+        #             layer_number = find_layer_number(index)
+        #             if 'attn' in index:
+        #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
+        # calib_info, prune_info, cust_tgt_modules, f'FIG:attn_diff_ratio'])
+        #             elif 'mlp' in index:
+        #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_metric, prune_method, mode,\
+        # calib_info, prune_info, cust_tgt_modules, f'FIG:mlp_diff_ratio'])
+                    
+        #             fig[fig_name] = plt.figure(fig_name)
+        #             x = layer_number
+        #             y = row.tolist()[0]
+        #             yerr = row_se.tolist()[0]
+
+        #             key_for_dict = f"Pruning Ratio {prune_ratio}"
+        #             record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Different Channel Ratio')
+                
+
+                
+
+                    
+        #         if 'cur_select_indices' in index:
+        #             layer_number = find_layer_number(index)
+        #             print('prune_method', prune_method, prune_info, index)
+        #             print('layer_number', layer_number)
+        #             if 'attn' in index:
+        #                 key = f'attn_{layer_number}'
+        #             elif 'mlp' in index:
+        #                 key = f'mlp_{layer_number}'
+
+        #             if '1-1-1-1-1-seq' in prune_info:
+        #                 select_channels_indices[key] = set(row.tolist())
+        #                 continue
+        #             else:
+        #                 if 'probe' in prune_method or 'flap' in prune_method:
+        #                     intersection_ratio =  (len(set(select_channels_indices[key])) - len(select_channels_indices[key].intersection(set(row.tolist())))) / len(set(select_channels_indices[key]))
+
+        #             if 'attn' in index:
+        #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio,\
+        # calib_info,  cust_tgt_modules, f'FIG:attn_same_ratio_with_upperbound'])
+        #             elif 'mlp' in index:
+        #                 fig_name = '_'.join([data_name, model_name, task_name, batch_size, seq_len, prune_ratio, \
+        # calib_info,  cust_tgt_modules, f'FIG:mlp_same_ratio_with_upperbound'])
+
+        #             fig[fig_name] = plt.figure(fig_name)
+        #             x = layer_number
+        #             y = intersection_ratio
+        #             yerr = 0
+
+        #             if 'probe' in prune_method:
+        #                 key_for_dict = 'PP'
+        #             elif 'flap' in prune_method:
+        #                 key_for_dict = 'FLAP'
+        #             record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Different Channel Ratio')
+        #             pass
+
+                def mean_indices_common_ratio(upperbound, method):
+                    return_list = []
+                    for i in range(len(upperbound)):
+                        cur_upperbound = upperbound[i]
+                        cur_method = method[i]
+                        print('cur_upperbound', cur_upperbound)
+                        print('cur_method', cur_method)
+                        ratio = len(set(cur_upperbound).intersection(set(cur_method))) / len(set(cur_upperbound).union(set(cur_method)))
+                        return_list.append(ratio)
+                    
+                    mean = sum(return_list) / len(return_list)
+                    se = np.std(return_list) / np.sqrt(len(return_list))
+                    return mean, se
+                
+                if 'cur_select_indices' in index:
+                    row = row[0]
+
+                    layer_number = find_layer_number(index)
+                    print('prune_method', prune_method, prune_info, index)
+                    print('layer_number', layer_number)
+                    if 'attn' in index:
+                        key = f'attn_{layer_number}'
+                    elif 'mlp' in index:
+                        key = f'mlp_{layer_number}'
+
+                    if '1-1-1-1-1-seq' in prune_info:
+                        # TODO: hardcode, we only run 1 seed
+                        print('len(row)', len(row.tolist()), row.tolist())
+                        select_channels_indices[key] = row.tolist()
+                        continue
+                    else:
+                        prune_method_list = prune_method.split('-')
+                        print('prune_method_list', prune_method_list)
+                        if len(prune_method_list) == 2 and prune_method_list[0] == 'calib':
+                            # intersection_ratio = len(set(select_channels_indices[key]).intersection(set(row.tolist()))) / len(set(select_channels_indices[key]).union(set(row.tolist())))
+
+                            y, yerr = mean_indices_common_ratio = mean_indices_common_ratio(select_channels_indices[key], row.tolist())
+                            key_for_dict = f"w/o PP"
+                        elif 'probe' in prune_method or 'flap' in prune_method:
+                            # intersection_ratio = len(set(select_channels_indices[key]).intersection(set(row.tolist()))) / len(set(select_channels_indices[key]))
+                            # intersection_ratio = len(set(select_channels_indices[key]).intersection(set(row.tolist()))) / len(set(select_channels_indices[key]).union(set(row.tolist())))
+                            y, yerr = mean_indices_common_ratio = mean_indices_common_ratio(select_channels_indices[key], row.tolist())
+                            key_for_dict = f"w/ PP"
+
+                    if 'attn' in index:
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_metric, seq_len, calib_info,  cust_tgt_modules, f'FIG:attn_same_ratio_with_upperbound'])
+                    elif 'mlp' in index:
+                        fig_name = '_'.join([data_name, model_name, task_name, batch_size, prune_metric, seq_len, calib_info,  cust_tgt_modules, f'FIG:mlp_same_ratio_with_upperbound'])
+
+                    fig[fig_name] = plt.figure(fig_name)
+                    x = layer_number
+                    # y = intersection_ratio
+                    # yerr = 0
+
+                    # key_for_dict = f"Pruning Ratio {prune_ratio}"
+                    record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Layer Order', y_label='Common Pruning Channels Jaccard Index')
+                    pass
+                
+                if 'inference_duration' in index:
+                    layer_number = find_layer_number(index)
+                    if 'attn' in index:
+                        name = 'attn_inference_duration'
+                    else:
+                        name = 'mlp_inference_duration'
+                    fig_name = '_'.join([data_name, model_name, task_name, prune_ratio, batch_size, seq_len, calib_info, cust_tgt_modules, f'FIG:{name}'])
+                    fig[fig_name] = plt.figure(fig_name)
+                    x = layer_number
+                    y = row.tolist()[0]
+                    yerr = row_se.tolist()[0]
+                    # prune_ratio_list = prune_ratio.split('-')
+                    key_for_dict = prune_method
+                    record_fig_data_across_multi_indices(fig_data_across_multi_indices, fig_name, key_for_dict, x=x, y=y, yerr=yerr, x_label='Prune Ratio', y_label='ms')
+                
         
     for fig_name in fig_data_across_multi_indices:
         print('fig_name', fig_name)
@@ -1512,10 +1812,16 @@ def make_vis(df_history):
             if 'Loss' in fig_name or 'Perplexity' in fig_name or 'CsrAccuracyNorm' in fig_name or 'CsrAccuracy' in fig_name:
                 # draw_macs_perform_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, y_lim=performance_metric_max)
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
-            if 'diff_ratio' in fig_name:
-                draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
+            # if 'diff_ratio' in fig_name:
+            #     draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
             if 'same_ratio_with_upperbound' in fig_name:
+                draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, label_loc='lower right', x_label_font_size=25, y_label_font_size=15, legend_size=25)
+            if 'differentprobestudy' in fig_name:
+                draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, label_loc='center right', x_label_font_size=25, y_label_font_size=25)
+            if 'inference_duration' in fig_name:
                 draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
+            if 'ablationforfusion' in fig_name:
+                draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label, label_loc='upper right', x_label_font_size=25, y_label_font_size=25)
             # if 'all_methods_performance_vs_FLOPs_ratio_for_all_layers' in fig_name:
             #     draw_str_x_figure(plt, x, y, yerr, key_for_dict, x_label, y_label)
             # if 'time_cost_per_sample' in fig_name:

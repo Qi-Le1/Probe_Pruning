@@ -138,7 +138,7 @@ class HiddenRepresentationPruning():
                 cur_global_metric_score_distribution = cur_global_metric_score_distribution.to(probe_out.device)
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
                 if 'probefixratio' in cfg['prune_method']:
-                    combined_probe_out = cfg['probefixratio'] * cur_global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
+                    combined_probe_out = cfg['probefixratio'] * norm_probe_out_square + (1-cfg['probefixratio']) * cur_global_metric_score_distribution
                 # dynaratio, since all nonnegative, no need to abs
                 else:  
                     denominator = norm_probe_out_square + cur_global_metric_score_distribution
@@ -164,7 +164,7 @@ class HiddenRepresentationPruning():
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])
 
                 if 'probefixratio' in cfg['prune_method']:
-                    combined_probe_out = cfg['probefixratio'] * cur_global_metric_score_distribution + (1-cfg['probefixratio']) * norm_probe_out_square
+                    combined_probe_out = cfg['probefixratio'] * norm_probe_out_square + (1-cfg['probefixratio']) * cur_global_metric_score_distribution
                 # dynaratio, since all nonnegative, no need to abs
                 else:  
                     denominator = norm_probe_out_square + cur_global_metric_score_distribution
@@ -191,7 +191,7 @@ class HiddenRepresentationPruning():
                 probe_variance = torch.sum(torch.pow(probe_out - mean_probe_out.reshape(1, 1, -1), 2), dim=0).clamp(max=cfg['data_type_max']) / probe_num
 
                 if 'probefixratio' in cfg['prune_method']:
-                    combined_probe_out = cfg['probefixratio'] * cur_global_metric_score_distribution + (1-cfg['probefixratio']) * probe_variance
+                    combined_probe_out = cfg['probefixratio'] * probe_variance + (1-cfg['probefixratio']) * cur_global_metric_score_distribution
                 # dynaratio, since all nonnegative, no need to abs
                 else:  
                     denominator = probe_variance + cur_global_metric_score_distribution

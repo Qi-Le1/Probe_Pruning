@@ -267,32 +267,37 @@ def test(data_loader, model, model_prof, metric, logger):
                 info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Experiment Finished Time: {}'.format(exp_finished_time)]}
                 print('running_info', info)
 
-        cur_attn_inference_duration_list = []
-        cur_mlp_inference_duration_list = []
-        for name, module in model.named_modules():
-            for attr_name in dir(module):
-                if 'cur_attn_inference_duration' in attr_name:
-                    # Retrieve the attribute value
-                    if 'opt-13b' in cfg['model_name'] and get_layer_order(name) >= 20:
-                        continue
-                    attr_value = getattr(module, attr_name)
-                    cur_attn_inference_duration_list.append(attr_value)
-                    # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-                    print('name', name, attr_name, attr_value)
-                if 'cur_mlp_inference_duration' in attr_name:
-                    # diff gpu cannt measure the inference time correctly
-                    if 'opt-13b' in cfg['model_name'] and get_layer_order(name) >= 20:
-                        continue
-                    # Retrieve the attribute value
-                    attr_value = getattr(module, attr_name)
-                    cur_mlp_inference_duration_list.append(attr_value)
-                    # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
-                    print('name', name, attr_name, attr_value)
-        
-        print('mean_cur_attn_inference_duration', sum(cur_attn_inference_duration_list)/len(cur_attn_inference_duration_list))
-        print('mean_cur_mlp_inference_duration', sum(cur_mlp_inference_duration_list)/len(cur_mlp_inference_duration_list))
-        print('mean_inference_duration', inference_duration/len(data_loader))
-        print('inference_duration', inference_duration)
+        if 'recordspeed' in cfg['prune_method']:
+            cur_attn_inference_duration_list = []
+            cur_mlp_inference_duration_list = []
+            for name, module in model.named_modules():
+                for attr_name in dir(module):
+                    if 'cur_attn_inference_duration' in attr_name:
+                        # Retrieve the attribute value
+                        # if 'opt-13b' in cfg['model_name'] and get_layer_order(name) >= 20:
+                        #     continue
+                        attr_value = getattr(module, attr_name)
+                        cur_attn_inference_duration_list.append(attr_value)
+                        # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+                        print('name', name, attr_name, attr_value)
+                    if 'cur_mlp_inference_duration' in attr_name:
+                        # diff gpu cannt measure the inference time correctly
+                        # if 'opt-13b' in cfg['model_name'] and get_layer_order(name) >= 20:
+                        #     continue
+                        # Retrieve the attribute value
+                        attr_value = getattr(module, attr_name)
+                        cur_mlp_inference_duration_list.append(attr_value)
+                        # logger.append({f'{name}_{attr_name}': attr_value}, 'test')
+                        print('name', name, attr_name, attr_value)
+
+            mean_cur_attn_inference_duration = sum(cur_attn_inference_duration_list)/len(cur_attn_inference_duration_list)
+            mean_cur_mlp_inference_duration = sum(cur_mlp_inference_duration_list)/len(cur_mlp_inference_duration_list)
+            logger.append({f'attn_inference_duration': mean_cur_attn_inference_duration}, 'test')
+            logger.append({f'mlp_inference_duration': mean_cur_mlp_inference_duration}, 'test')
+            print('mean_cur_attn_inference_duration', mean_cur_attn_inference_duration)
+            print('mean_cur_mlp_inference_duration', mean_cur_mlp_inference_duration)
+            print('mean_inference_duration', inference_duration/len(data_loader))
+            print('inference_duration', inference_duration)
 
         if cfg['onlyprobe'] == False: 
             evaluation = metric.evaluate('test', 'full')
