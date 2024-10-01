@@ -43,7 +43,7 @@ from transformers.utils import (
 from transformers import OPTConfig
 from config import cfg
 from ..pruning_module import HiddenRepresentationPruning
-from .utils import generate_probe, cal_res_hidden_state_diff, get_next_layer  
+from .utils import generate_probe, get_next_layer  
 
 logger = logging.get_logger(__name__)
 

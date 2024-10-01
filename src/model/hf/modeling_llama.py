@@ -53,7 +53,7 @@ from transformers import LlamaConfig
 from config import cfg
 from ..pruning_module import HiddenRepresentationPruning
 from torch.nn.functional import cosine_similarity
-from .utils import generate_probe, cal_res_hidden_state_diff, check_nan_inf, get_next_layer  
+from .utils import generate_probe, check_nan_inf, get_next_layer  
 '''
 Note: transformers 4.35.0 version
 '''

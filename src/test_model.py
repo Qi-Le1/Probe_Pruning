@@ -130,17 +130,6 @@ def identify_pad_tokens(input):
         cfg['pad_tokens'] = None
         # cfg['non_pad_tokens'] = None
         cfg['nonpad_tokens_denominator'] = None
-
-    # print('attentionmasdk', input['attention_mask'])
-    # flipped = torch.flip(input['attention_mask'], dims=[1])
-    # print("Flipped Tensor:", flipped)
-    # # Find the index of the first '1' in each flipped row (now the last '1' in the original)
-    # last_one_indices = torch.argmax(flipped, dim=1)
-    # print('last_one_indices', last_one_indices)
-    # # Correct the indices to reflect their positions in the original tensor
-    # num_nonpad_tokens = flipped.size(1) - last_one_indices
-    # cfg['num_nonpad_tokens'] = num_nonpad_tokens
-    # print("cfg['num_nonpad_tokens'] ", cfg['num_nonpad_tokens'] )
     return
 
 def test(data_loader, model, model_prof, metric, logger):
@@ -157,8 +146,6 @@ def test(data_loader, model, model_prof, metric, logger):
         data_loader_iter = iter(data_loader)
         input = next(data_loader_iter)
         identify_pad_tokens(input)
-        # TODO: delete this
-        cfg['input_ids'] = input['input_ids']
         # print('start input_ids', input['input_ids'], input['input_ids'].size())
         cfg['cur_batch_index'] += 1
         if cfg['task_name'] in ['clm']:
@@ -188,8 +175,6 @@ def test(data_loader, model, model_prof, metric, logger):
             output_ = {'target': output['target'], 'loss': output['loss']}
         torch.cuda.synchronize()
 
-        # return
-
 
         model_prof.start_profile()
         model_prof.reset_profile()
@@ -197,7 +182,6 @@ def test(data_loader, model, model_prof, metric, logger):
         torch.cuda.cudart().cudaProfilerStart()
         for i, input in enumerate(data_loader):
             cfg['cur_batch_index'] += 1
-            print('cur_batch_index', cfg['cur_batch_index'])
             identify_pad_tokens(input)
             if cfg['task_name'] in ['s2s', 'sc', 'clm']:
                 input_size = input['labels'].size(0)
