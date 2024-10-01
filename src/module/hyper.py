@@ -17,19 +17,10 @@ def list_available_gpus():
         for gpu_id in range(num_gpus):
             # Set the current device to the GPU
             stream = torch.cuda.Stream(device=gpu_id)
-            print('initialized stream device', stream.device, stream.device.index, id(stream))
             # Store the stream for the corresponding GPU
             cfg['custom_cuda_streams'][gpu_id] = stream
-
             default_stream = torch.cuda.default_stream(device=gpu_id)
             cfg['default_cuda_streams'][gpu_id] = default_stream
-            print('initialized default stream device', default_stream.device, default_stream.device.index, id(default_stream))
-        # # List each GPU
-        # for i in range(num_gpus):
-        #     print(f"Device {i}: {torch.cuda.get_device_name(i)}")
-        #     # Additional details can be printed if needed
-        #     print(f"  Memory Allocated: {torch.cuda.memory_allocated(i)} bytes")
-        #     print(f"  Memory Cached: {torch.cuda.memory_reserved(i)} bytes")
     else:
         print("CUDA is not available. No GPU detected.")
 
@@ -165,14 +156,6 @@ def process_control():
     # default skip 3 layers
     cfg['skip_layers'] = [0, 1, 2]
     if 'skip' in cfg['prune_method']:
-        # match = re.search(r'skip(-?\d+)', cfg['prune_method'])
-        # if match:
-        #     # Convert the matched string to a float
-        #     int_value = int(match.group(1))
-        #     # layer index starts from 0
-        #     cfg['skip_layers'] = int_value - 1
-        # else:
-        #     int_value = None
         match = re.findall(r'skip(-?\d+(-\d+)*)', cfg['prune_method'])
         print('match: ', match)
         if match:
@@ -314,12 +297,6 @@ def make_data_name():
                                                    'label_column': None}
                                            }                       
                          },
-            'ptb': {'data_name': 'ptb_text_only',
-                          'subset_name_dict': {'none': {'subset_name': 'penn_treebank',
-                                                   'text_column': ['sentence'],
-                                                   'label_column': None}
-                                           }                       
-            },
             # piqa: piqa
             # boolq: boolq , 
             # arc-e: arc-easy 

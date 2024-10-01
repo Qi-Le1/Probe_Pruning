@@ -7,45 +7,9 @@ from module import MULTIGPUS_MODEL_NAME_LIST
 from accelerate import infer_auto_device_map ,init_empty_weights
 from LLMPruner import PeftModel
 
-# def loraprune_load(ckpt: str = ''):
-#     pruned_dict = torch.load(ckpt, map_location='cpu')
-#     model = pruned_dict['model']
 
-#     if torch.cuda.is_available():
-#         device = "cuda"
-#     else:
-#         device = "cpu"
-
-#     if device == "cuda":
-#         model.half()
-#         model = model.cuda()
-
-#     return model
 
 def loraprune_load(model_type: str = 'pruneLLM', ckpt: str = ''):
-    # if model_type == 'pruneLLM':
-    #     pruned_dict = torch.load(ckpt, map_location='cpu')
-    #     model = pruned_dict['model']
-    # elif model_type == 'tune_prune_LLM':
-    #     pruned_dict = torch.load(ckpt, map_location='cpu')
-    #     model = pruned_dict['model']
-    #     model = PeftModel.from_pretrained(
-    #         model,
-    #         lora_ckpt,
-    #         torch_dtype=torch.float16,
-    #     )
-    # else:
-    #     raise NotImplementedError
-
-    # if torch.cuda.is_available():
-    #     device = "cuda"
-    # else:
-    #     device = "cpu"
-
-    # if device == "cuda":
-    #     model.half()
-    #     model = model.cuda()
-
     if model_type == 'pruneLLM':
         pruned_dict = torch.load(ckpt, map_location='cpu')
         model = pruned_dict['model']
@@ -53,13 +17,6 @@ def loraprune_load(model_type: str = 'pruneLLM', ckpt: str = ''):
     elif model_type == 'tune_prune_LLM':
         pruned_dict = torch.load(ckpt, map_location='cpu')
         model = pruned_dict['model']
-    # model = PeftModel.from_pretrained(
-    #     model,
-    #     lora_ckpt,
-    #     torch_dtype=torch.float16,
-    # )
-    # else:
-    #     raise NotImplementedError
 
     if torch.cuda.is_available():
         device = "cuda"
@@ -129,13 +86,7 @@ def make_local_tuned_model(model_name):
             
             tokenizer = AutoTokenizer.from_pretrained(cfg['tokenizer_name_or_path'], padding_side=padding_side)
         elif 'loraprune' in cfg['prune_method']:
-
-            # lora_path = f"output/loraprune/tune/{cfg['init_seed']}_loraprune_{model_name}_{cfg['prune_ratio']}/pytorch_model.bin"
-            #
-            # if not os.path.exists(model_path):
-            #     raise FileNotFoundError(f"Model file not found: {model_path}")
-
-            
+    
             if 'loraprune-prune' in cfg['prune_method']:
                 model_path = f"output/loraprune/prune/{cfg['init_seed']}_loraprune_{model_name}_{cfg['prune_ratio']}/pytorch_model.bin"
                 if not os.path.exists(model_path):
@@ -196,7 +147,6 @@ def identify_gpu_breakpoints(model, model_name):
             breakpoints.append(i)
         
         previous_device = current_device
-    print('breakpoints', breakpoints)
     return breakpoints
             
     
@@ -227,27 +177,8 @@ def make_hf_model(model_name):
     print("cfg['model_name_or_path']", cfg['model_name_or_path'])
    
     if 'llama' in model_name:
-        # with init_empty_weights():
-        #     max_memory = {0: '20GiB', 1: "20GiB"}
-        #     model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16)
-        #     device_map = infer_auto_device_map(model, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16, max_memory=max_memory)
-        # # print('device_map', device_map, flush=True)
-        # model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map=device_map)
-        
-        # with init_empty_weights():
-        #     max_memory = {0: '30GiB', 1: "30GiB"}
-        #     model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16)
-        #     # , max_memory=max_memory
-        #     device_map = infer_auto_device_map(model, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16, max_memory=max_memory)
-        # print('device_map', device_map, flush=True)
         model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map='balanced')
-        # quantization_config = BitsAndBytesConfig(load_in_8bit=True)
-        # model = LlamaForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], quantization_config=quantization_config, device_map=device_map)
     elif 'opt' in model_name:
-        # with init_empty_weights():
-        #     model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16)
-        #     device_map = infer_auto_device_map(model, no_split_module_classes=["OPTDecoderLayer"], dtype=torch.float16)
-        # print('device_map', device_map, flush=True)
         model = OPTForCausalLM.from_pretrained(cfg['model_name_or_path'], cache_dir=cfg['cache_model_path'], torch_dtype=torch.float16, device_map='balanced')
     else:
         raise ValueError('Not valid model name')
@@ -281,35 +212,3 @@ def make_hf_model(model_name):
     print('model_config', model_config)
     model.config.use_cache = False
     return model, tokenizer
-
-
-
-    # # to fit flap and simplify for flops comparision
-    # if 'llama-2-70b' in cfg['model_name']:
-    #     with torch.no_grad():
-    #         model.train(False)
-    #         hidden_size = model.config.hidden_size
-    #         num_heads = model.config.num_attention_heads
-    #         num_key_value_heads = model.config.num_key_value_heads
-    #         head_dim = model.config.hidden_size // num_heads
-    #         num_key_value_groups = num_heads // num_key_value_heads
-
-    #         layers = model.model.layers
-    #         for layer in layers:                        
-    #             if layer.self_attn.k_proj.weight.data.size(0) == num_key_value_heads * head_dim:
-    #                 temp_weight_data = layer.self_attn.k_proj.weight.data.repeat_interleave(num_key_value_groups, dim=0, output_size=num_heads * head_dim)
-    #                 temp_weight_data = temp_weight_data.type(layer.self_attn.k_proj.weight.data.dtype)
-    #                 layer.self_attn.k_proj = nn.Linear(hidden_size, num_heads * head_dim, bias=model.config.attention_bias)
-    #                 layer.self_attn.k_proj.weight = nn.Parameter(temp_weight_data)
-    #                 layer.self_attn.k_proj.cal_total_flops = True
-    #             if layer.self_attn.v_proj.weight.data.size(0) == num_key_value_heads * head_dim:
-    #                 temp_weight_data = layer.self_attn.v_proj.weight.data.repeat_interleave(num_key_value_groups, dim=0, output_size=num_heads * head_dim)
-    #                 temp_weight_data = temp_weight_data.type(layer.self_attn.v_proj.weight.data.dtype)
-    #                 layer.self_attn.v_proj = nn.Linear(hidden_size, num_heads * head_dim, bias=model.config.attention_bias)
-    #                 layer.self_attn.v_proj.weight = nn.Parameter(temp_weight_data)
-    #                 layer.self_attn.v_proj.cal_total_flops = True
-                    
-    #             del temp_weight_data
-    #             torch.cuda.empty_cache()
-    #             layer.self_attn.num_key_value_heads = num_heads
-    #             layer.self_attn.num_key_value_groups = 1

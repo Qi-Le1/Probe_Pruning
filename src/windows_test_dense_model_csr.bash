@@ -1,4 +1,0 @@
-bash csr0obqa_llama-2-7b_csr_20_512_0_None_dense_None_None_None_None.sh
-bash csr0obqa_llama-3-8b_csr_20_512_0_None_dense_None_None_None_None.sh
-bash csr1obqa_llama-2-7b_csr_20_512_0_None_dense_None_None_None_None.sh
-bash csr1obqa_llama-3-8b_csr_20_512_0_None_dense_None_None_None_None.sh

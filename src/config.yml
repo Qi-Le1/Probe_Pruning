@@ -7,15 +7,14 @@ control:
   batch_size: 8
   max_seq_len: 128
   prune_ratio: 0.1
-  # ppwanda / wandasp / flap
+  # ppwandasp / wandasp / flap
   prune_metric: ppwanda
   # flap-default / wandasp-default / probe-default
   prune_method: probe-default
-  mode: asyncinter
+  mode: sync
   calib_info: None/ds-numsamples
   prune_info: None
   cust_tgt_modules: None
-
 
 # experiment
 pin_memory: True
