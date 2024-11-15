@@ -32,6 +32,11 @@ def make_metric(metric_name, tokenizer):
                 metric_name[k].extend(['CsrAccuracyNorm'])
         else:
             raise ValueError('Not valid data name')
+    elif cfg['task_name'] == 'mix':
+        for k in metric_name:
+            metric_name[k].extend(['CsrAccuracy'])
+            metric_name[k].extend(['CsrAccuracyNorm'])
+            metric_name[k].extend(['Perplexity'])
     else:
         raise ValueError('Not valid task name')
     metric = Metric(metric_name, pivot, pivot_direction, pivot_name, tokenizer)
@@ -66,6 +71,8 @@ class Perplexity:
     
     def add(self, input, output):
         loss = output['loss'].item()
+        if 'mix' in cfg['task_name']:
+            loss = loss[int(0.5*cfg['batch_size']):]
         self.loss_list.append(loss)
         return
        
@@ -79,8 +86,15 @@ class CsrAccuracy:
         self.average = []
     
     def add(self, input, output):
-        lm_logits = output['target']
-        labels = input['target']
+        if 'mix' in cfg['task_name']:
+            num_samples = int(cfg['batch_size'] * 0.5)
+            lm_logits = output['target'][:num_samples, ...]
+            labels = input['target'][:num_samples, ...]
+            input['input_indices'] = input['input_indices'][:num_samples]
+            input['correct_labels'] = input['correct_labels'][:num_samples]
+        else:
+            lm_logits = output['target']
+            labels = input['target']
 
         bsz = lm_logits.size(0)
         

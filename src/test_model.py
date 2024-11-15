@@ -7,6 +7,7 @@ import random
 import torch
 import traceback
 import datetime
+import itertools
 import torch.backends.cudnn as cudnn
 from config import cfg, process_args
 from dataset import make_dataset, make_data_loader, process_dataset, collate, make_batchnorm_stats, make_calibration_dataloader
@@ -49,6 +50,11 @@ def runExperiment():
         print('No dense model found, will not print out the dense model info')
     cfg['epoch'] = 0 
     dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
+    if 'mixdataset' in cfg['prune_method']:
+        dataset_csr = make_dataset('csr', 'test')
+        clm_num_samples = len(dataset_csr['test']) * cfg['batch_size']
+        dataset_clm = make_dataset('wikitext', 'test', clm_num_samples, dataset_csr['test'])
+
     model, tokenizer = make_model(cfg['model_name'])
     cfg['tokenizer'] = tokenizer
     # prepare_cude_events(model)
@@ -179,6 +185,16 @@ def test(data_loader, model, model_prof, metric, logger):
             output = model(**input)
             input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
             output_ = {'target': output['logits'], 'loss': output['loss']}
+        elif cfg['task_name'] in ['mix']:
+            input_size = input['labels'].size(0)
+            input_indices = input['input_indices']
+            correct_labels = input['correct_labels']
+            input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                    'labels': input['labels']}
+            input = to_device(input, cfg['device'])
+            output = model(**input)
+            input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
+            output_ = {'target': output['logits'], 'loss': output['loss']}
         else:
             input = collate(input)
             input_size = input['data'].size(0)
@@ -208,6 +224,18 @@ def test(data_loader, model, model_prof, metric, logger):
                 input_ = {'target': input['labels']}
                 output_ = {'target': output['logits'], 'loss': output['loss']}
             elif cfg['task_name'] in ['csr']:
+                input_size = input['labels'].size(0)
+                input_indices = input['input_indices']
+                correct_labels = input['correct_labels']
+                # print('input', input)
+                input = {'input_ids': input['input_ids'], 'attention_mask': input['attention_mask'],
+                        'labels': input['labels']}
+                input = to_device(input, cfg['device'])
+                output, inference_duration = model_forward(model, input, inference_duration, i)
+                input_ = {'input_indices': input_indices, 'target': input['labels'], 'correct_labels': correct_labels}
+                output_ = {'target': output['logits'], 'loss': output['loss']}
+            elif cfg['task_name'] in ['mix']:
+                # first half for csr, second half for clm
                 input_size = input['labels'].size(0)
                 input_indices = input['input_indices']
                 correct_labels = input['correct_labels']
@@ -291,6 +319,7 @@ def test(data_loader, model, model_prof, metric, logger):
                         print('name', name, attr_name, attr_value)
 
             mean_cur_attn_inference_duration = sum(cur_attn_inference_duration_list)/len(cur_attn_inference_duration_list)
+            print('length', len(cur_attn_inference_duration_list))
             mean_cur_mlp_inference_duration = sum(cur_mlp_inference_duration_list)/len(cur_mlp_inference_duration_list)
             logger.append({f'attn_inference_duration': mean_cur_attn_inference_duration}, 'test')
             logger.append({f'mlp_inference_duration': mean_cur_mlp_inference_duration}, 'test')

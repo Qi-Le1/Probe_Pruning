@@ -1108,8 +1108,9 @@ class LlamaDecoderLayer(nn.Module):
         self.llamaconfig = config
 
         # if self.layer_order not in cfg['skip_layers']:
-        self.cur_attn_inference_duration = 0
-        self.cur_mlp_inference_duration = 0
+        if 'recordspeed' in cfg['prune_method']:
+            self.cur_attn_inference_duration = 0
+            self.cur_mlp_inference_duration = 0
 
         self.is_changing_gpu = False
         self.whole_batch_calculation = torch.cuda.Event(enable_timing=False, blocking=False)

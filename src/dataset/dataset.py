@@ -208,6 +208,7 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
         cfg['num_steps'][k] = len(data_loader[k])
         cfg['dataset_size'][k] = len(dataset[k])
         print(f"{'tag'}_dataset_size", k, cfg['dataset_size'][k])
+        print(f"{'tag'}_batch_num", k, cfg['num_steps'][k])
     return data_loader
 
 def make_calibration_dataloader(tokenizer):
@@ -235,7 +236,7 @@ def collate(input):
 
 
 def process_calibration_dataset(dataset, tokenizer, dataset_name):
-    if cfg['task_name'] in ['clm', 'csr']:
+    if cfg['task_name'] in ['clm', 'csr', 'mix']:
         processed_calibrate_sample_num = 0
         if dataset_name == 'c4':
             max_length = cfg[cfg['model_name']]['max_length']
@@ -353,7 +354,8 @@ def custom_padding(padding_length, input_ids, attention_mask, labels, tokenizer)
     #     labels = [-100] * padding_length + labels
     return input_ids, attention_mask, labels
 
-def process_dataset(dataset, tokenizer):
+# last 2 arguments only for mixing task (clm and csr in 1 batch)
+def process_dataset(dataset, tokenizer, clm_num_samples=None, csr_data_loader=None):
     processed_c4_sample_num = 0
     if cfg['task_name'] in ['clm', 'csr']:
         text_column = cfg['text_column']
@@ -410,7 +412,7 @@ def process_dataset(dataset, tokenizer):
                 keep_in_memory=True,
             )
             processed_calibrate_sample_num = 0
-        elif cfg['data_name'] == 'wikitext':
+        elif cfg['data_name'] == 'wikitext' or 'wikitext' in cfg['data_name']:
             max_length = cfg[cfg['model_name']]['max_length']
             print('max_length', max_length)
             def preprocess_function_test(examples):   
@@ -423,6 +425,8 @@ def process_dataset(dataset, tokenizer):
                 attention_mask = model_inputs['attention_mask'][0]
 
                 num_samples = len(input_ids) // max_length
+                if 'mix' in cfg['prune_method'] and clm_num_samples is not None:
+                    num_samples = clm_num_samples
                 input_chunks = []
                 mask_chunks = []
                 if 'inorderwiki' in cfg['prune_method']:
@@ -436,13 +440,36 @@ def process_dataset(dataset, tokenizer):
                         mask_chunks.append(attention_mask[i: j])
                 
                 final_inputs = defaultdict(list)
-                for i in range(len(input_chunks)):
-                    # print('len(input_chunks[i])', len(input_chunks[i]))
-                    if len(input_chunks[i]) == max_length:
-                        final_inputs['input_ids'].append(input_chunks[i])
-                        final_inputs['attention_mask'].append(mask_chunks[i])
-                        labels = copy.deepcopy(input_chunks[i])
-                        final_inputs['labels'].append(labels)
+                if 'mix' in cfg['prune_method'] and clm_num_samples is not None:
+                    for i, input in enumerate(csr_data_loader):
+                        csr_input_ids = input['input_ids']
+                        csr_attention_mask = input['attention_mask']
+                        csr_labels = input['labels']
+                        csr_input_indices = input['input_indices']
+                        csr_correct_labels = input['correct_labels']
+                        
+                        final_inputs['input_ids'].append(csr_input_ids)
+                        final_inputs['attention_mask'].append(csr_attention_mask)
+                        final_inputs['labels'].append(csr_labels)
+                        final_inputs['input_indices'].append(csr_input_indices)
+                        final_inputs['correct_labels'].append(csr_correct_labels)
+
+                        clm_input_ids = input_chunks[i]
+                        clm_attention_mask = mask_chunks[i]
+                        clm_labels = copy.deepcopy(clm_input_ids)
+                        final_inputs['input_ids'].append(clm_input_ids)
+                        final_inputs['attention_mask'].append(clm_attention_mask)
+                        final_inputs['labels'].append(clm_labels)
+                        final_inputs['input_indices'].append(i)
+                        final_inputs['correct_labels'].append(1)
+                else:
+                    for i in range(len(input_chunks)):
+                        # print('len(input_chunks[i])', len(input_chunks[i]))
+                        if len(input_chunks[i]) == max_length:
+                            final_inputs['input_ids'].append(input_chunks[i])
+                            final_inputs['attention_mask'].append(mask_chunks[i])
+                            labels = copy.deepcopy(input_chunks[i])
+                            final_inputs['labels'].append(labels)
                 
                 return final_inputs
 
@@ -818,7 +845,7 @@ def process_dataset(dataset, tokenizer):
                 desc="Running tokenizer on dataset",
                 keep_in_memory=True,
             )
-        elif cfg['data_name'] == 'arc':
+        elif cfg['data_name'] == 'arc' or 'arc' in cfg['data_name']:
             '''
             https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/arc.py
             {

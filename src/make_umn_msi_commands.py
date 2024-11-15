@@ -524,29 +524,29 @@ def main():
 
             # flap speed vs pp speed
             # , 'opt-13b'
-            control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                             ['flap'], ['flap-default-recordspeed'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
+            #                  ['flap'], ['flap-default-recordspeed'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                             ['wandasp'], ['calib-recordspeed'], ['asyncinter'], ['c4-2000'], ['None'],
-                            ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
+            #                  ['wandasp'], ['calib-recordspeed'], ['asyncinter'], ['c4-2000'], ['None'],
+            #                 ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                            ['ppwandasp'], ['probe-default-recordspeed'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
-                        ['default']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
+            #                 ['ppwandasp'], ['probe-default-recordspeed'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
-            control_name = [[['wikitext-2v1'], ['llama-2-13b'], ['clm'], ['20'], ['1024'], ['0'], 
-                             ['None'], ['dense-recordspeed'], ['None'], ['None'], ['None'],        
-                            ['None']]]
-            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
-            controls.extend(CIFAR10_controls_9)
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0'], 
+            #                  ['None'], ['dense-recordspeed'], ['None'], ['None'], ['None'],        
+            #                 ['None']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
 
             # ----- record common channel
             # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
@@ -618,49 +618,76 @@ def main():
             # controls.extend(CIFAR10_controls_9)
 
             # importance-scaled fusion
-            def probe_combination():
-                return_list = []
-                for seq in ['0.05', '0.1', '0.3',  '0.5',  '0.7', '0.8', '1.0']:
-                    for bsz in ['0.25']:
-                    # for bsz in ['1']:
-                        # for rank in ['seqrank', 'bszrank']:
-                            # Create the repeated sequence-bsz pattern
-                        pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
-                        pattern = pattern[:-1]  # remove the last extra hyphen
+            # def probe_combination():
+            #     return_list = []
+            #     for seq in ['0.05', '0.1', '0.3',  '0.5',  '0.7', '0.8', '1.0']:
+            #         for bsz in ['0.25']:
+            #         # for bsz in ['1']:
+            #             # for rank in ['seqrank', 'bszrank']:
+            #                 # Create the repeated sequence-bsz pattern
+            #             pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
+            #             pattern = pattern[:-1]  # remove the last extra hyphen
 
-                        # Append 'seqrank' and 'bszrank' placeholders or values
-                        final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
+            #             # Append 'seqrank' and 'bszrank' placeholders or values
+            #             final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
 
-                        # Append to the return list
-                        return_list.append(final_string)
-                return return_list
-            # 'probe-default-probefixratio0.1', 'probe-default-probefixratio0.5'
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                            ['ppwandasp'], ['probe-default-probefixratio0.1', 'probe-default-probefixratio0.5', 'probe-default-probefixratio0.9'], ['sync'], ['c4-2000'], probe_combination(),
+            #             # Append to the return list
+            #             return_list.append(final_string)
+            #     return return_list
+            # # 'probe-default-probefixratio0.1', 'probe-default-probefixratio0.5'
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                 ['ppwandasp'], ['probe-default-probefixratio0.1', 'probe-default-probefixratio0.5', 'probe-default-probefixratio0.9'], ['sync'], ['c4-2000'], probe_combination(),
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+            # # residual-importance
+            # def probe_combination():
+            #     return_list = []
+            #     for seq in ['0.05', '0.1', '0.3',  '0.5',  '0.7', '0.8', '1.0']:
+            #         for bsz in ['0.05', '0.25']:
+            #         # for bsz in ['1']:
+            #             # for rank in ['seqrank', 'bszrank']:
+            #                 # Create the repeated sequence-bsz pattern
+            #             pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
+            #             pattern = pattern[:-1]  # remove the last extra hyphen
+
+            #             # Append 'seqrank' and 'bszrank' placeholders or values
+            #             final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
+
+            #             # Append to the return list
+            #             return_list.append(final_string)
+            #     return return_list
+            # # 'probe-default-probefixratio0.1', 'probe-default-probefixratio0.5'
+            # control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
+            #                 ['ppwandasp'], ['probe-calib-ema'], ['sync'], ['c4-2000'], probe_combination(),
+            #             ['default']]]
+            # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            # controls.extend(CIFAR10_controls_9)
+
+
+            # --- rebuttal
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['1024'], ['0.2', '0.4'], 
+                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.05-0.05-0.05-0.05-0.05-seqrank'],
                         ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
 
-            # residual-importance
-            def probe_combination():
-                return_list = []
-                for seq in ['0.05', '0.1', '0.3',  '0.5',  '0.7', '0.8', '1.0']:
-                    for bsz in ['0.05', '0.25']:
-                    # for bsz in ['1']:
-                        # for rank in ['seqrank', 'bszrank']:
-                            # Create the repeated sequence-bsz pattern
-                        pattern = (f"{seq}+{bsz}-") * 5  # repeats 'seq+bsz-' five times
-                        pattern = pattern[:-1]  # remove the last extra hyphen
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['1024'], ['0.2', '0.4'], 
+                            ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
 
-                        # Append 'seqrank' and 'bszrank' placeholders or values
-                        final_string = pattern + '-seqrank+bszrank'  # Adjust this as needed for actual rank values
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['1'], ['1024'], ['0.2', '0.4'], 
+                            ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
 
-                        # Append to the return list
-                        return_list.append(final_string)
-                return return_list
-            # 'probe-default-probefixratio0.1', 'probe-default-probefixratio0.5'
-            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.4'], 
-                            ['ppwandasp'], ['probe-calib-ema'], ['sync'], ['c4-2000'], probe_combination(),
+            # --- limit seq
+            control_name = [[['wikitext-2v1'], ['llama-2-7b'], ['clm'], ['20'], ['1024'], ['0.2', '0.4'], 
+                            ['ppwandasp'], ['probe-default-limitseq'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
                         ['default']]]
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
@@ -981,6 +1008,25 @@ def main():
             #                 ['default']]]
             # CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             # controls.extend(CIFAR10_controls_9)
+            
+            # ----- rebuttal
+            control_name = [[['arc-c'], ['llama-2-7b'], ['csr'], ['1'], ['512'], ['0.2', '0.4'], 
+                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.05-0.05-0.05-0.05-0.05-seqrank'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['arc-c'], ['llama-2-7b'], ['csr'], ['1'], ['512'], ['0.2', '0.4'], 
+                            ['flap'], ['flap-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
+
+            control_name = [[['arc-c'], ['llama-2-7b'], ['csr'], ['1'], ['512'], ['0.2', '0.4'], 
+                            ['wandasp'], ['wandasp-default'], ['asyncinter'], ['c4-2000'], ['None'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
             pass
     # gather calib info to save time
     # model, seq, metric, calib, target module important

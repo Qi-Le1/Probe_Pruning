@@ -43,7 +43,9 @@ def rank_process(norm_across_feature, probe_num, probe_type):
             l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=1)
         elif 'seq' in probe_type:
             l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=0)
-        
+            if 'limitseq' in cfg['prune_method']:
+                l2_norms = l2_norms[:int(0.5 * l2_norms.size(0))]
+
         values, indices = torch.topk(l2_norms, probe_num)
         sorted_indices = indices.sort()[0]
         # print('sorted_indices', sorted_indices, flush=True)
