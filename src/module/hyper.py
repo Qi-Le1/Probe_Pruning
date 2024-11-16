@@ -198,7 +198,7 @@ def process_control():
     cfg['pq_gamma'] = 1
     make_data_name()
     
-    if cfg['task_name'] in ['clm', 'csr']:
+    if cfg['task_name'] in ['clm', 'csr', 'mix']:
         cfg['collate_mode'] = 'transformer'
         cfg['gpt2'] = {'max_length': cfg['max_seq_len']}
         if 'llama' in cfg['model_name']:
@@ -293,99 +293,120 @@ def process_control():
 
 
 def make_data_name():
-    data_name_list = cfg['control']['data_name'].split('-')
-    if len(data_name_list) == 2:
-        cfg['data_name'], cfg['subset_name'] = data_name_list
-    else:
-        cfg['data_name'] = data_name_list[0]
-        cfg['subset_name'] = 'none'
-    if cfg['task_name'] in ['clm', 'csr']:
-        data_name_dict = {
-            'c4': {'data_name': 'c4',
-                          'subset_name_dict': {'none': {'subset_name': None,
-                                                   'text_column': None,
-                                                   'label_column': None}
-                                           }                       
-                         },
-            # https://huggingface.co/datasets/wikitext
-            'wikitext': {'data_name': 'wikitext',
-                          'subset_name_dict': {'2v1': {'subset_name': 'wikitext-2-raw-v1',
-                                                   'text_column': ['text'],
-                                                   'label_column': None}
-                                           }                       
-                         },
-            'ptb': {'data_name': 'ptb_text_only',
-                          'subset_name_dict': {'none': {'subset_name': 'penn_treebank',
-                                                   'text_column': ['sentence'],
-                                                   'label_column': None}
-                                           }                       
-            },
-            # piqa: piqa
-            # boolq: boolq , 
-            # arc-e: arc-easy 
-            # arc-c: arc-challenge (Clark et al., 2018), 
-            # hellaswag: hellaswag (Zellers et al., 2019) 
-            # winogrande: winogrande 
-            # obqa: OpenBookQA (Mihaylov et al., 2018)
-            # preprocessing according to: https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/arc.py
-            # https://huggingface.co/datasets/piqa
-            'boolq': {'data_name': 'google/boolq',
-                    'subset_name_dict': {
-                        'none': {'subset_name': None,
-                              'text_column': ['hardcode'],
-                              'label_column': 'hardcode'}
+    data_name_dict = {
+        'c4': {'data_name': 'c4',
+                        'subset_name_dict': {'none': {'subset_name': None,
+                                                'text_column': None,
+                                                'label_column': None}
+                                        }                       
                         },
-            },  
-            'piqa': {'data_name': 'piqa',
-                    'subset_name_dict': {
-                        'none': {'subset_name': None,
-                              'text_column': ['hardcode'],
-                              'label_column': 'hardcode'}
+        # https://huggingface.co/datasets/wikitext
+        'wikitext': {'data_name': 'wikitext',
+                        'subset_name_dict': {'2v1': {'subset_name': 'wikitext-2-raw-v1',
+                                                'text_column': ['text'],
+                                                'label_column': None}
+                                        }                       
                         },
-            },          
-            # https://huggingface.co/datasets/social_i_qa/viewer/default/validation
-            'siqa': {'data_name': 'social_i_qa',
-                    'subset_name_dict': {
-                        'none': {'subset_name': None,
-                              'text_column': ['hardcode'],
-                              'label_column': 'hardcode'}
-                        },
-            },         
-            # https://huggingface.co/datasets/ai2_arc          
-           'arc': {'data_name': 'ai2_arc',
-                    'subset_name_dict': {
-                        'e': {'subset_name': 'ARC-Easy',
-                              'text_column': ['hardcode'],
-                             'label_column': 'hardcode'},   
-                        'c': {'subset_name': 'ARC-Challenge',
-                              'text_column': ['hardcode'],
-                              'label_column': 'hardcode'}
-                        },                        
-            },
-            # https://huggingface.co/datasets/Rowan/hellaswag
-            'hellaswag': {'data_name': 'Rowan/hellaswag',
-                    'subset_name_dict': {
-                        'none': {'subset_name': None,
-                              'text_column': 'hardcode',
-                              'label_column': 'hardcode'}, 
-                        },                        
-            },
-            'winogrande': {'data_name': 'winogrande',
-                    'subset_name_dict': {
-                        'none': {'subset_name': 'winogrande_debiased',
-                              'text_column': 'hardcode',
-                              'label_column': 'hardcode'}, 
-                        },                        
-            },
-            # https://huggingface.co/datasets/openbookqa
-            'obqa': {'data_name': 'openbookqa',
-                    'subset_name_dict': {
-                        'none': {'subset_name': 'main',
-                              'text_column': ['hardcode'],
-                              'label_column': 'hardcode'},    
-                        },                        
-            },
-        }
+        'ptb': {'data_name': 'ptb_text_only',
+                        'subset_name_dict': {'none': {'subset_name': 'penn_treebank',
+                                                'text_column': ['sentence'],
+                                                'label_column': None}
+                                        }                       
+        },
+        # piqa: piqa
+        # boolq: boolq , 
+        # arc-e: arc-easy 
+        # arc-c: arc-challenge (Clark et al., 2018), 
+        # hellaswag: hellaswag (Zellers et al., 2019) 
+        # winogrande: winogrande 
+        # obqa: OpenBookQA (Mihaylov et al., 2018)
+        # preprocessing according to: https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/arc.py
+        # https://huggingface.co/datasets/piqa
+        'boolq': {'data_name': 'google/boolq',
+                'subset_name_dict': {
+                    'none': {'subset_name': None,
+                            'text_column': ['hardcode'],
+                            'label_column': 'hardcode'}
+                    },
+        },  
+        'piqa': {'data_name': 'piqa',
+                'subset_name_dict': {
+                    'none': {'subset_name': None,
+                            'text_column': ['hardcode'],
+                            'label_column': 'hardcode'}
+                    },
+        },          
+        # https://huggingface.co/datasets/social_i_qa/viewer/default/validation
+        'siqa': {'data_name': 'social_i_qa',
+                'subset_name_dict': {
+                    'none': {'subset_name': None,
+                            'text_column': ['hardcode'],
+                            'label_column': 'hardcode'}
+                    },
+        },         
+        # https://huggingface.co/datasets/ai2_arc          
+        'arc': {'data_name': 'ai2_arc',
+                'subset_name_dict': {
+                    'e': {'subset_name': 'ARC-Easy',
+                            'text_column': ['hardcode'],
+                            'label_column': 'hardcode'},   
+                    'c': {'subset_name': 'ARC-Challenge',
+                            'text_column': ['hardcode'],
+                            'label_column': 'hardcode'}
+                    },                        
+        },
+        # https://huggingface.co/datasets/Rowan/hellaswag
+        'hellaswag': {'data_name': 'Rowan/hellaswag',
+                'subset_name_dict': {
+                    'none': {'subset_name': None,
+                            'text_column': 'hardcode',
+                            'label_column': 'hardcode'}, 
+                    },                        
+        },
+        'winogrande': {'data_name': 'winogrande',
+                'subset_name_dict': {
+                    'none': {'subset_name': 'winogrande_debiased',
+                            'text_column': 'hardcode',
+                            'label_column': 'hardcode'}, 
+                    },                        
+        },
+        # https://huggingface.co/datasets/openbookqa
+        'obqa': {'data_name': 'openbookqa',
+                'subset_name_dict': {
+                    'none': {'subset_name': 'main',
+                            'text_column': ['hardcode'],
+                            'label_column': 'hardcode'},    
+                    },                        
+        },
+    }
+    
+    if cfg['task_name'] in ['mix']:
+        data_name_list = cfg['control']['data_name'].split('+')
+        task_name_list = ['csr', 'clm']
+        for i in range(len(task_name_list)):
+            task_type = task_name_list[i]
+            cur_data_name_list = data_name_list[i].split('-')
+            if len(cur_data_name_list) == 2:
+                cfg[f'{task_type}_data_name'], cfg[f'{task_type}_subset_name'] = cur_data_name_list
+            else:
+                cfg[f'{task_type}_data_name'] = cur_data_name_list[0]
+                cfg[f'{task_type}_subset_name'] = 'none'
+
+            cfg[f'{task_type}_hf_data_name'] = data_name_dict[cfg[f'{task_type}_data_name']]['data_name']
+            cfg[f'{task_type}_hf_subset_name'] = data_name_dict[cfg[f'{task_type}_data_name']]['subset_name_dict'][
+                cfg[f'{task_type}_subset_name']]['subset_name']
+            cfg[f'{task_type}_text_column'] = data_name_dict[cfg[f'{task_type}_data_name']]['subset_name_dict'][
+                cfg[f'{task_type}_subset_name']]['text_column']
+            cfg[f'{task_type}_label_column'] = data_name_dict[cfg[f'{task_type}_data_name']]['subset_name_dict'][
+                cfg[f'{task_type}_subset_name']]['label_column']
+    elif cfg['task_name'] in ['clm', 'csr']:
+        data_name_list = cfg['control']['data_name'].split('-')
+        if len(data_name_list) == 2:
+            cfg['data_name'], cfg['subset_name'] = data_name_list
+        else:
+            cfg['data_name'] = data_name_list[0]
+            cfg['subset_name'] = 'none'
+        
         cfg['hf_data_name'] = data_name_dict[cfg['data_name']]['data_name']
         cfg['hf_subset_name'] = data_name_dict[cfg['data_name']]['subset_name_dict'][
             cfg['subset_name']]['subset_name']

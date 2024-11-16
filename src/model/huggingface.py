@@ -220,6 +220,14 @@ def make_hf_model(model_name):
         # need tokenizer.model, tokenizer_config.json from https://huggingface.co/meta-llama/Llama-2-13b-hf/tree/main   (corresponding model type)
         cfg['model_name_or_path'] = f'output/{model_name}'
         cfg['tokenizer_name_or_path'] = f'output/{model_name}'
+
+        if 'llama-3.2' in model_name:
+            if '1b' in model_name:
+                cfg['model_name_or_path'] = f'meta-llama/Llama-3.2-1B'
+                cfg['tokenizer_name_or_path'] = f'meta-llama/Llama-3.2-1B'
+            if '3b' in model_name:
+                cfg['model_name_or_path'] = f'meta-llama/Llama-3.2-3B'
+                cfg['tokenizer_name_or_path'] = f'meta-llama/Llama-3.2-3B'
     else:
         raise ValueError('Not valid model name')
     cfg['cache_model_path'] = os.path.join('output', 'model', model_name)

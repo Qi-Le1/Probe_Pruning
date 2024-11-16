@@ -49,17 +49,29 @@ def runExperiment():
     if check_dense_model() is None:
         print('No dense model found, will not print out the dense model info')
     cfg['epoch'] = 0 
-    dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
-    if 'mixdataset' in cfg['prune_method']:
-        dataset_csr = make_dataset('csr', 'test')
-        clm_num_samples = len(dataset_csr['test']) * cfg['batch_size']
-        dataset_clm = make_dataset('wikitext', 'test', clm_num_samples, dataset_csr['test'])
-
     model, tokenizer = make_model(cfg['model_name'])
     cfg['tokenizer'] = tokenizer
+
+    if cfg['task_name'] == 'mix':
+        # clm dataset is shorter than csr dataset (hardcode)
+        cfg['hf_data_name'], cfg['hf_subset_name'], cfg['text_column'], cfg['label_column'] = \
+            cfg['csr_hf_data_name'], cfg['csr_hf_subset_name'], cfg['csr_text_column'], cfg['csr_label_column']
+        csr_dataset = make_dataset(cfg['csr_data_name'], 'test')
+        csr_dataset = process_dataset(csr_dataset, tokenizer, data_name=cfg['csr_data_name'])
+        csr_data_loader = make_data_loader(csr_dataset, tokenizer, cfg['model_name'], batch_size={'test': int(cfg['batch_size'] * 0.5)})
+        clm_num_samples = len(csr_data_loader['test']) * int(cfg['batch_size'] * 0.5)
+        cfg['hf_data_name'], cfg['hf_subset_name'], cfg['text_column'], cfg['label_column'] = \
+            cfg['clm_hf_data_name'], cfg['clm_hf_subset_name'], cfg['clm_text_column'], cfg['clm_label_column']
+        clm_dataset = make_dataset(cfg['clm_data_name'], 'test')
+        dataset = process_dataset(clm_dataset, tokenizer, data_name=cfg['clm_data_name'], clm_num_samples=clm_num_samples, csr_data_loader=csr_data_loader)
+        data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+    else:
+        dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
+        dataset = process_dataset(dataset, tokenizer)
+        data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+
+    
     # prepare_cude_events(model)
-    dataset = process_dataset(dataset, tokenizer)
-    data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
     metric = make_metric({'train': ['Loss'], 'test': ['Loss']}, tokenizer)
     if cfg['model_name'] in ['cnn', 'resnet18', 'wresnet28x2']:
         model = make_batchnorm_stats(dataset['train'], model, cfg['model_name'])

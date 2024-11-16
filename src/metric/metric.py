@@ -86,12 +86,12 @@ class CsrAccuracy:
         self.average = []
     
     def add(self, input, output):
-        if 'mix' in cfg['task_name']:
+        if cfg['task_name'] == 'mix':
             num_samples = int(cfg['batch_size'] * 0.5)
             lm_logits = output['target'][:num_samples, ...]
             labels = input['target'][:num_samples, ...]
-            input['input_indices'] = input['input_indices'][:num_samples]
-            input['correct_labels'] = input['correct_labels'][:num_samples]
+            input['input_indices'] = input['input_indices'][:num_samples, ...]
+            input['correct_labels'] = input['correct_labels'][:num_samples, ...]
         else:
             lm_logits = output['target']
             labels = input['target']
@@ -141,8 +141,15 @@ class CsrAccuracyNorm:
         self.average = []
         
     def add(self, input, output):
-        lm_logits = output['target']
-        labels = input['target']
+        if cfg['task_name'] == 'mix':
+            num_samples = int(cfg['batch_size'] * 0.5)
+            lm_logits = output['target'][:num_samples, ...]
+            labels = input['target'][:num_samples, ...]
+            input['input_indices'] = input['input_indices'][:num_samples, ...]
+            input['correct_labels'] = input['correct_labels'][:num_samples, ...]
+        else:
+            lm_logits = output['target']
+            labels = input['target']
 
         bsz = lm_logits.size(0)
         

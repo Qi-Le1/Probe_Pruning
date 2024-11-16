@@ -1028,6 +1028,12 @@ def main():
             CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
             controls.extend(CIFAR10_controls_9)
             pass
+        elif 'mix' in data:
+            control_name = [[['arc-c+wikitext-2v1'], ['llama-2-7b'], ['mix'], ['20'], ['1024'], ['0.2', '0.4'], 
+                            ['ppwandasp'], ['probe-default'], ['sync'], ['c4-2000'], ['0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank'],
+                        ['default']]]
+            CIFAR10_controls_9 = make_controls(script_name, init_seeds, device, resume_mode, control_name)
+            controls.extend(CIFAR10_controls_9)
     # gather calib info to save time
     # model, seq, metric, calib, target module important
 
