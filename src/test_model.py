@@ -65,6 +65,8 @@ def runExperiment():
         clm_dataset = make_dataset(cfg['clm_data_name'], 'test')
         dataset = process_dataset(clm_dataset, tokenizer, data_name=cfg['clm_data_name'], clm_num_samples=clm_num_samples, csr_data_loader=csr_data_loader)
         data_loader = make_data_loader(dataset, tokenizer, cfg['model_name'])
+        print('dataloadertest', len(data_loader['test']), data_loader['test'])
+        # return
     else:
         dataset = make_dataset(cfg['data_name'], cfg['subset_name'])
         dataset = process_dataset(dataset, tokenizer)

@@ -34,6 +34,9 @@ def make_metric(metric_name, tokenizer):
             raise ValueError('Not valid data name')
     elif cfg['task_name'] == 'mix':
         for k in metric_name:
+            pivot = -float('inf')
+            pivot_direction = 'up'
+            pivot_name = 'None'
             metric_name[k].extend(['CsrAccuracy'])
             metric_name[k].extend(['CsrAccuracyNorm'])
             metric_name[k].extend(['Perplexity'])

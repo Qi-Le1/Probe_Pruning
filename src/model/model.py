@@ -8,7 +8,7 @@ from .huggingface import make_hf_model, make_local_tuned_model
 
 
 def make_model(model_name):
-    if cfg['task_name'] in ['clm', 'csr']:
+    if cfg['task_name'] in ['clm', 'csr', 'mix']:
         if 'llmpruner' in cfg['prune_method'] or 'loraprune' in cfg['prune_method']:
             model, tokenizer = make_local_tuned_model(model_name)
             return model, tokenizer

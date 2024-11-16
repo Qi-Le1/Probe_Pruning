@@ -1437,7 +1437,7 @@ class LlamaDecoderLayer(nn.Module):
 
         
         residual = hidden_states
-        # print('residual start new layer', self.layer_order, residual[0], check_nan_inf(residual), residual.shape, flush=True)
+        print('residual start new layer', self.layer_order, flush=True)
 
 
         torch.cuda.synchronize()

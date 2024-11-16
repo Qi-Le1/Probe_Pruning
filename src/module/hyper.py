@@ -273,7 +273,7 @@ def process_control():
     if model_name not in cfg:
         cfg[model_name] = {}
     cfg[model_name]['shuffle'] = {'train': False, 'test': False}
-    if cfg['task_name'] in ['clm', 'csr']:
+    if cfg['task_name'] in ['clm', 'csr', 'mix']:
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
     elif cfg['task_name'] in ['ic']:
         cfg[model_name]['batch_size'] = {'train': cfg['batch_size'], 'test': cfg['batch_size']}
@@ -293,6 +293,7 @@ def process_control():
 
 
 def make_data_name():
+    cfg['data_name'] = None
     data_name_dict = {
         'c4': {'data_name': 'c4',
                         'subset_name_dict': {'none': {'subset_name': None,

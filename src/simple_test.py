@@ -75,29 +75,39 @@ import torch
 # print(indices_dim2)
 
 # print(tensor_3d[indices_dim1, indices_dim2, :])
+import torch
+
+# Create a 2D tensor
+tensor = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+
+# Convert the tensor to a list of lists
+list_of_lists = tensor.tolist()
+
+print("Tensor:\n", tensor)
+print("\nList of Lists:", list_of_lists, type(list_of_lists), type(list_of_lists[0]))
 
 
 # Generate a 3D tensor of shape (3, 4, 5)
-tensor_3d = torch.rand(3, 4)
+# tensor_3d = torch.rand(3, 4)
 
-# Generate two 1D indices for dimension 1 and dimension 2
-indices_dim1 = torch.arange(3)
-indices_dim2 = torch.arange(3)  # Adjust to match the length of indices_dim1
+# # Generate two 1D indices for dimension 1 and dimension 2
+# indices_dim1 = torch.arange(3)
+# indices_dim2 = torch.arange(3)  # Adjust to match the length of indices_dim1
 
-print("Original 3D Tensor:")
-print(tensor_3d)
-print("Indices for Dimension 1:", indices_dim1)
-print("Indices for Dimension 2:", indices_dim2)
+# print("Original 3D Tensor:")
+# print(tensor_3d)
+# print("Indices for Dimension 1:", indices_dim1)
+# print("Indices for Dimension 2:", indices_dim2)
 
-# Using meshgrid to generate broadcastable indices for tensor indexing
-ii, jj = torch.meshgrid(indices_dim1, indices_dim2, indexing='ij')
-print(ii)
-print(tensor_3d[ii, jj])
-print(tensor_3d[ii], tensor_3d[ii].shape)
+# # Using meshgrid to generate broadcastable indices for tensor indexing
+# ii, jj = torch.meshgrid(indices_dim1, indices_dim2, indexing='ij')
+# print(ii)
+# print(tensor_3d[ii, jj])
+# print(tensor_3d[ii], tensor_3d[ii].shape)
 
-iii = ii == 0
-print(iii)
-print(tensor_3d[iii], tensor_3d[iii].shape)
+# iii = ii == 0
+# print(iii)
+# print(tensor_3d[iii], tensor_3d[iii].shape)
 
 # bsz, seq, dim = 4, 5, 10  # Example sizes
 # hidden_states = torch.randn(bsz, seq, dim)

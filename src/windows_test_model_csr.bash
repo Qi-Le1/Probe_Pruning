@@ -1,1 +1,0 @@
-bash csr0obqa_llama-2-7b_csr_20_512_0.4_ppwandasp_probe-default_asyncintra_c4-2000_0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank_default.sh

@@ -207,8 +207,8 @@ def make_data_loader(dataset, tokenizer, tag, batch_size=None, shuffle=None, sam
                                         worker_init_fn=np.random.seed(cfg['seed']), drop_last=True)
         cfg['num_steps'][k] = len(data_loader[k])
         cfg['dataset_size'][k] = len(dataset[k])
-        print(f"{'tag'}_dataset_size", k, cfg['dataset_size'][k])
-        print(f"{'tag'}_batch_num", k, cfg['num_steps'][k])
+        print(f"{tag}_dataset_size", k, cfg['dataset_size'][k])
+        print(f"{tag}_batch_num", k, cfg['num_steps'][k])
     return data_loader
 
 def make_calibration_dataloader(tokenizer):
@@ -442,28 +442,56 @@ def process_dataset(dataset, tokenizer, data_name=None, clm_num_samples=None, cs
                 final_inputs = defaultdict(list)
                 if cfg['task_name'] == 'mix' and clm_num_samples is not None:
                     for i, input in enumerate(csr_data_loader['test']):
-                        csr_input_ids = input['input_ids']
-                        csr_attention_mask = input['attention_mask']
-                        csr_labels = input['labels']
-                        csr_input_indices = input['input_indices']
-                        csr_correct_labels = input['correct_labels']
+                        print('i', i)
+                        csr_input_ids = input['input_ids'].tolist()
+                        print('csr_input_ids', csr_input_ids, len(csr_input_ids))
+                        csr_attention_mask = input['attention_mask'].tolist()
+                        csr_labels = input['labels'].tolist()
+                        csr_input_indices = input['input_indices'].tolist()
+                        csr_correct_labels = input['correct_labels'].tolist()
                         
-                        final_inputs['input_ids'].append(csr_input_ids)
-                        final_inputs['attention_mask'].append(csr_attention_mask)
-                        final_inputs['labels'].append(csr_labels)
-                        final_inputs['input_indices'].append(csr_input_indices)
-                        final_inputs['correct_labels'].append(csr_correct_labels)
+                        final_inputs['input_ids'].extend(csr_input_ids)
+                        final_inputs['attention_mask'].extend(csr_attention_mask)
+                        final_inputs['labels'].extend(csr_labels)
+                        final_inputs['input_indices'].extend(csr_input_indices)
+                        final_inputs['correct_labels'].extend(csr_correct_labels)
+                        print('lencsr_input_indices', len(csr_input_indices))
+                        print('lencorrect_labels', len(csr_correct_labels))
+                        if len(csr_input_indices) != int(0.5 * cfg['batch_size']):
+                            print('not equal')
 
-                        start_indx = (i * cfg['batch_size']) % len(input_chunks)
-                        end_indx = ((i + 1) * cfg['batch_size']) % len(input_chunks)
-                        clm_input_ids = input_chunks[start_indx:end_indx]
-                        clm_attention_mask = mask_chunks[start_indx:end_indx]
+
+                        clm_batch_size = int(0.5 * cfg['batch_size'])
+                        start_indx = (i * clm_batch_size) % len(input_chunks)
+                        end_indx = ((i + 1) * clm_batch_size) % len(input_chunks)
+                        # clm_input_ids = input_chunks[start_indx:end_indx]
+                        # print('start_indx', start_indx, len(input_chunks))
+                        # print('end_indx', end_indx)
+                        # print('clm_input_ids', clm_input_ids, len(clm_input_ids))
+                        # clm_attention_mask = mask_chunks[start_indx:end_indx]
+                        # clm_labels = copy.deepcopy(clm_input_ids)
+                        if end_indx < start_indx:
+                            # This means we've wrapped around, so concatenate the end and start of the list
+                            clm_input_ids = input_chunks[start_indx:] + input_chunks[:end_indx]
+                            clm_attention_mask = mask_chunks[start_indx:] + mask_chunks[:end_indx]
+                        else:
+                            # Normal slicing
+                            clm_input_ids = input_chunks[start_indx:end_indx]
+                            clm_attention_mask = mask_chunks[start_indx:end_indx]
                         clm_labels = copy.deepcopy(clm_input_ids)
-                        final_inputs['input_ids'].append(clm_input_ids)
-                        final_inputs['attention_mask'].append(clm_attention_mask)
-                        final_inputs['labels'].append(clm_labels)
-                        final_inputs['input_indices'].append([i] * cfg['batch_size'])
-                        final_inputs['correct_labels'].append([1] * cfg['batch_size'])
+
+                        final_inputs['input_ids'].extend(clm_input_ids)
+                        final_inputs['attention_mask'].extend(clm_attention_mask)
+                        final_inputs['labels'].extend(clm_labels)
+                        final_inputs['input_indices'].extend([i] * clm_batch_size)
+                        final_inputs['correct_labels'].extend([1] * clm_batch_size)
+                        print('------s')
+                        print(len(final_inputs['input_ids']))
+                        print(len(final_inputs['attention_mask']))
+                        print(len(final_inputs['labels']))
+                        print(len(final_inputs['input_indices']))
+                        print(len(final_inputs['correct_labels']))
+                        assert len(final_inputs['input_ids']) == len(final_inputs['attention_mask']) == len(final_inputs['labels']) == len(final_inputs['input_indices']) == len(final_inputs['correct_labels'])
                 else:
                     for i in range(len(input_chunks)):
                         # print('len(input_chunks[i])', len(input_chunks[i]))
@@ -917,6 +945,9 @@ def process_dataset(dataset, tokenizer, data_name=None, clm_num_samples=None, cs
                         # Combine the current input ids and label input ids
                         temp_input = sample_input_ids + label_input_ids
                         max_length_in_batch = max(max_length_in_batch, len(temp_input))
+                        # align with clm lenth if task is mix
+                        if cfg['task_name'] == 'mix':
+                            max_length_in_batch = cfg['max_seq_len']
                         # max_length_in_batch = 100
 
                     # Second pass: adjust sequences to the max length in this batch

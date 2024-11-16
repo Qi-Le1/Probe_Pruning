@@ -134,6 +134,8 @@ class HiddenRepresentationPruning():
         if 'ppwandasp' in metric_type:
             combined_probe_out = None
             if global_metric_score_distribution is not None:
+                print('cur_global_metric_score_distribution', cur_global_metric_score_distribution)
+                print('seq_selected_indices', seq_selected_indices)
                 cur_global_metric_score_distribution = global_metric_score_distribution[seq_selected_indices, :] if seq_selected_indices is not None else global_metric_score_distribution
                 cur_global_metric_score_distribution = cur_global_metric_score_distribution.to(probe_out.device)
                 norm_probe_out_square = torch.clamp(torch.linalg.vector_norm(probe_out, ord=2, dim=0) ** 2 / probe_num, max=cfg['data_type_max'])

@@ -74,6 +74,7 @@ def load_calib_saving_info(model):
         
         # Set the attribute with the value that's now on the correct device
         setattr(module, attr_name, value_to_device)
+        print('value_to_device:', value_to_device)
     print("Calibration data applied to the model successfully.")
     return
 
