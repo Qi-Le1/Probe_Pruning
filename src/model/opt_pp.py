@@ -8,7 +8,7 @@ from config import cfg
 from module import check_skip_layers
 
 
-class OPTEriModel(torch.nn.Module):
+class OPTPPModel(torch.nn.Module):
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -48,9 +48,7 @@ class OPTEriModel(torch.nn.Module):
         key_list = [key for key, _ in self.model.named_modules()]
         # return
         target_modules = _get_target_modules(cfg)
-        print('target_modules: ', target_modules)
         for key in key_list:
-            print('key', key)
             if 'dense' in cfg['prune_method'] or 'llmpruner' in cfg['prune_method'] or 'loraprune' in cfg['prune_method']:
                 continue
 
@@ -118,12 +116,9 @@ class EriLayer:
         
     def extract_in_dim_weight(self, weight, indices):
         return weight[:, indices.to(self.weight.device)]
-        # return torch.index_select(weight, dim=1, index=indices.to(self.weight.device))
            
     def extract_out_dim_weight(self, weight, indices):
-        # print('key', self.key, weight.shape)
         return weight[indices.to(self.weight.device), :]
-        # return torch.index_select(weight, dim=0, index=indices.to(self.weight.device))
     
     def extract_bias(self, bias, indices):
         return bias[indices.to(self.bias.device)]
@@ -353,7 +348,6 @@ class Linear(nn.Linear, EriLayer):
             self.async_interbatch_bias = self.bias[kwargs['out_dim_indices']]
             self.async_interbatch_weight = self.extract_out_dim_weight(self.weight, kwargs['out_dim_indices'])
         elif 'in_dim_indices' in kwargs:
-            print('biasshape', self.key, self.bias.shape)
             self.async_interbatch_bias = self.bias
             self.async_interbatch_weight = self.extract_in_dim_weight(self.weight, kwargs['in_dim_indices'])
             # record indices to update metric
@@ -369,7 +363,6 @@ class Linear(nn.Linear, EriLayer):
             self.async_intrabatch_in_dim_indices = kwargs['in_dim_indices']
         else:
             self.async_intrabatch_in_dim_indices = torch.arange(self.in_features, dtype=torch.int).to(device=self.weight.device)
-
         return
 
     
@@ -415,7 +408,6 @@ class Linear(nn.Linear, EriLayer):
             return self.async_intrabatch_in_dim_indices
     
     def get_compensate_bias(self, x, weight, in_dim_indices):
-        # return torch.zeros(weight.shape[0], device=x.device)
         if cfg['cur_batch_index'] == 0:
             return torch.zeros(weight.shape[0], device=x.device)
 

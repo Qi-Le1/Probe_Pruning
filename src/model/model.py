@@ -27,12 +27,12 @@ def make_model(model_name):
     return model, tokenizer
 
 def make_prune_model(model):
-    from .llama_eri import LlamaEriModel
-    from .opt_eri import OPTEriModel
+    from .llama_pp import LlamaPPModel
+    from .opt_pp import OPTPPModel
     if 'llama' in cfg['model_name']:
-        model = LlamaEriModel(model)
+        model = LlamaPPModel(model)
     elif 'opt' in cfg['model_name']:
-        model = OPTEriModel(model)
+        model = OPTPPModel(model)
     else:
         raise ValueError('Not valid model name')
     return model

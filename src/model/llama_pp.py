@@ -8,7 +8,7 @@ from config import cfg
 from module import check_skip_layers
 
 
-class LlamaEriModel(torch.nn.Module):
+class LlamaPPModel(torch.nn.Module):
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -49,7 +49,6 @@ class LlamaEriModel(torch.nn.Module):
         key_list = [key for key, _ in self.model.named_modules()]
         # return
         target_modules = _get_target_modules(cfg)
-        print('target_modules: ', target_modules)
         for key in key_list:
             if 'dense' in cfg['prune_method'] or 'llmpruner' in cfg['prune_method'] or 'loraprune' in cfg['prune_method']:
                 continue
@@ -117,12 +116,10 @@ class EriLayer:
     def extract_in_dim_weight(self, weight, indices):
         indices = indices.to(self.weight.device)
         return weight[:, indices]
-        # return torch.index_select(weight, dim=1, index=indices.to(self.weight.device))
            
     def extract_out_dim_weight(self, weight, indices):
         indices = indices.to(self.weight.device)
         return weight[indices, :]
-        # return torch.index_select(weight, dim=0, index=indices.to(self.weight.device))
         
 class Linear(nn.Linear, EriLayer):
     def __init__(

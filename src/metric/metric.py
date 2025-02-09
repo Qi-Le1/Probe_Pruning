@@ -146,9 +146,6 @@ class CsrAccuracyNorm:
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
         self.average.append(loss.item())
         
-        # accnorm
-        # print('loss_per_sample', loss_per_sample)
-        # print('label_length_per_sample', label_length_per_sample)
         for i in range(input['input_indices'].shape[0]):
             self.acc_norm_output_for_one_question[input['input_indices'][i].item()].append(loss_per_sample[i].item()/label_length_per_sample[i].item())
             self.acc_norm_correct_labels_for_one_question[input['input_indices'][i].item()].append(int(input['correct_labels'][i].item()))
@@ -179,8 +176,6 @@ class Metric:
                 if m == 'Loss':
                     metric[split][m] = {'mode': 'batch', 'metric': (lambda input, output: recur(Loss, output['loss']))}
                 elif m == 'Perplexity':
-                    # metric[split][m] = {'mode': 'batch', 'metric': (lambda input,
-                    #                                                        output: recur(Perplexity, output['loss']))}
                     metric[split][m] = {'mode': 'full', 'metric': Perplexity()}
                 elif m == 'CsrAccuracy':
                     metric[split][m] = {'mode': 'full', 'metric': CsrAccuracy()}

@@ -25,10 +25,6 @@ def list_available_gpus():
         print("CUDA is not available. No GPU detected.")
 
 def process_control():
-    print('is cuda available: ', torch.cuda.is_available())
-    print('torch version: ', torch.__version__)
-    print('cuda version: ', torch.version.cuda)
-    print('cudnn version: ', torch.backends.cudnn.version())
     cfg['cudatoolkit_version'] = float(torch.version.cuda)
     cfg['cudnn_version'] = float(torch.backends.cudnn.version())
 
@@ -43,8 +39,7 @@ def process_control():
     cfg['data_type'] = torch.float16
     cfg['data_type_max'] = torch.finfo(cfg['data_type']).max
     cfg['data_type_min'] = torch.finfo(cfg['data_type']).min
-    # cfg['data_type_min_positive'] = torch.finfo(cfg['data_type']).tiny
-    cfg['data_type_min_positive'] = 1e-8
+
     # This can be implemented dynamically in each layer
     # tc stands for tensor core
     # https://docs.nvidia.com/deeplearning/performance/dl-performance-matrix-multiplication/index.html
@@ -58,7 +53,6 @@ def process_control():
                 cfg['tc_multiple'] = 64
         else:
             cfg['tc_multiple'] = 64
-
 
     cfg['model_name'] = cfg['control']['model_name']
     model_name = cfg['model_name']
@@ -94,10 +88,6 @@ def process_control():
         # further update prune_ratio in make_model to match the mean prune ratio
         cfg['prune_ratio'] = float(prune_ratio_list[0])
         # cfg['mean_prune_ratio'] = float(prune_ratio_list[0])
-    elif len(prune_ratio_list) == 2:
-        # only use this for grid search, first ratio for attn, second ratio for mlp
-        cfg['prune_ratio'] = [float(x) for x in prune_ratio_list]
-        # cfg['mean_prune_ratio'] = [float(x) for x in prune_ratio_list]
     else:
         raise ValueError('prune_ratio is not valid')
           
@@ -109,34 +99,13 @@ def process_control():
             float_value = float(match.group(1))
             cfg['ema_momentum'] = float_value  
         else:
-            float_value = None
-    
-    cfg['resinfo_ratio'] = 1
-    if 'resinfo' in cfg['prune_method']:
-        match = re.search(r'resinfo(\d+(?:\.\d+)?)', cfg['prune_method'])
-        if match:
-            # Convert the matched string to a float
-            float_value = float(match.group(1))
-            cfg['resinfo_ratio'] = float_value  
-        else:
-            float_value = None
-        
-    
-    if torch.cuda.is_available():
-        # cfg['cuda_default_stream'] = torch.cuda.default_stream()
-        # # if 'asyncintra' in cfg['mode']:
-        # #     cfg['cuda_default_stream'] = torch.cuda.Stream()
-        # cfg['cuda_stream1'] = torch.cuda.Stream()
-        pass
-    else:
-        raise ValueError('No cuda device available')
+            float_value = None        
 
     cfg['calib_info'] = cfg['control']['calib_info']
     if cfg['calib_info'] != 'None':
         calib_info_list = cfg['calib_info'].split('-')
         cfg['calibration_dataset'] = calib_info_list[0]
         cfg['calibration_nsamples'] = int(calib_info_list[1])
-
 
     cfg['cust_tgt_modules'] = cfg['control']['cust_tgt_modules'].split('+')
     if 'llama' in cfg['model_name'] and cfg['cust_tgt_modules'] != ['default']:
@@ -151,7 +120,6 @@ def process_control():
         else:
             raise ValueError('Not valid model name')
 
-    
     cfg['calibration_stage'] = False
     # default skip 3 layers
     cfg['skip_layers'] = [0, 1, 2]
@@ -172,15 +140,8 @@ def process_control():
                 skip_layers.extend(range(start, end + 1))
             cfg['skip_layers'] = skip_layers
 
-
     cfg['cur_batch_index'] = -1
-    cfg['prune_dim'] = -1
-    cfg['pq_p'] = 1
-    cfg['pq_q'] = 2
-    cfg['pq_beta'] = 0.9
-    cfg['pq_gamma'] = 1
     make_data_name()
-    
     if cfg['task_name'] in ['clm', 'csr']:
         cfg['collate_mode'] = 'transformer'
         cfg['gpt2'] = {'max_length': cfg['max_seq_len']}
@@ -203,7 +164,7 @@ def process_control():
             if 'probe' in cfg['prune_method']:
                 cfg['probe_generation_type'] = prune_info_list[-1].split('+')
                 for probe_type in cfg['probe_generation_type']:
-                    if not any(term in probe_type for term in ['rank', 'mean', 'absnml']):
+                    if not any(term in probe_type for term in ['rank']):
                         raise ValueError('probe_generation_type is not valid')
             
                 for key in prune_keys:

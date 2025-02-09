@@ -283,8 +283,6 @@ def apply_rotary_pos_emb_for_prune_each_head(q, k, cos, sin, position_ids, probe
     num_heads = q.shape[1]
     seq_len = q.shape[2]
     head_dim = q.shape[3]
-    
-
 
     cos = cos[position_ids].unsqueeze(unsqueeze_dim).repeat(bsz, num_heads, 1, 1)
     sin = sin[position_ids].unsqueeze(unsqueeze_dim).repeat(bsz, num_heads, 1, 1)
@@ -390,7 +388,6 @@ class LlamaMLP(nn.Module):
                         elif cfg['mode'] == 'asyncintra':
                             if 'post_layernorm_attn_residual' in kwargs:
                                 _, _ = self.probe_process(kwargs['post_layernorm_attn_residual'], **kwargs)
-                                # return
                             else:
                                 # whole_batch_inference
                                 pass
@@ -399,10 +396,6 @@ class LlamaMLP(nn.Module):
                             self.mlp_cur_select_indices = probe_out_dim_indices.tolist()
 
                         down_proj = self.down_proj(self.act_fn(self.gate_proj(x, out_dim_indices=probe_out_dim_indices)) * self.up_proj(x, out_dim_indices=probe_out_dim_indices), in_dim_indices=probe_out_dim_indices)
-     
-                        # if cfg['mode'] == 'asyncinter':
-                        #     with torch.cuda.stream(cfg['cuda_stream1']):
-                        #         _, _ = self.probe_process(x)
                         return down_proj
                     elif 'calib' in cfg['prune_method'] and ('runningmean' in cfg['prune_method'] or 'ema' in cfg['prune_method']):
 

@@ -18,23 +18,16 @@ def get_next_layer(layers, idx):
 
 
 def rank_process(norm_across_feature, probe_num, probe_type):
-    if 'randomrank' in cfg['prune_method']:
-        if 'bsz' in probe_type:
-            sorted_indices = torch.randperm(norm_across_feature.size(0))[:probe_num]
-        elif 'seq' in probe_type:
-            sorted_indices = torch.randperm(norm_across_feature.size(1))[:probe_num]
-        return sorted_indices
-    else:
-        if 'bsz' in probe_type:
-            l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=1)
-        elif 'seq' in probe_type:
-            l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=0)
-        
-        values, indices = torch.topk(l2_norms, probe_num)
-        sorted_indices = indices.sort()[0]
-        if 'seq' in probe_type and probe_num <= 10:
-            # keep the first token in the extreme case
-            sorted_indices[0] = 0
+    if 'bsz' in probe_type:
+        l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=1)
+    elif 'seq' in probe_type:
+        l2_norms = torch.linalg.vector_norm(norm_across_feature, ord=2, dim=0)
+    
+    values, indices = torch.topk(l2_norms, probe_num)
+    sorted_indices = indices.sort()[0]
+    if 'seq' in probe_type and probe_num <= 10:
+        # keep the first token in the extreme case
+        sorted_indices[0] = 0
         
     return sorted_indices
 
