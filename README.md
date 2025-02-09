@@ -8,32 +8,32 @@
 
 ## Requirements
 
-- Requires Python 3.9
+- Requires Python 3.9.
 
-- See pprequirements.txt
+- See pprequirements.txt.
   
-- See localtunedllmrequirements.txt for running LLM-Pruner and LoRA-Prune tuned models
+- See localtunedllmrequirements.txt for running LLM-Pruner and LoRA-Prune tuned models.
 
 - C4 calibration dataset can be found at [here](https://drive.google.com/drive/folders/1OT4TBYDfAz4SNUFrXLJl04SRHNX9nGDj?usp=sharing). Please download it and place it under data/c4.
 
 ## Instruction
 
-- Global hyperparameters are configured in config.yml
+- Global hyperparameters are configured in config.yml.
 
-- Hyperparameters can be found at hyper.py in modules
+- Hyperparameters can be found at hyper.py in modules.
 
-- Code for tuning model using LLM-Pruner and LoRA-Prune is available [here]() and tuned models are available [here]()
+- Code for tuning model using LLM-Pruner and LoRA-Prune is available [here]() and tuned models are available [here]().
 
 
 ## Examples
 
-- Test WikiText2 dataset using Probe Pruning with the default probe at a 40% pruning ratio on LLaMA-2-7B
+- Test WikiText2 dataset using Probe Pruning with the default probe at a 40% pruning ratio on LLaMA-2-7B.
 
   ```ruby
   python test_model.py --control_name wikitext-2v1_llama-2-7b_clm_20_1024_0.4_ppwandasp_probe-default_sync_c4-2000_0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank_default --device cuda
   ```
 
-- Test WikiText2 dataset using FLAP at a 40% pruning ratio on LLaMA-2-7B
+- Test WikiText2 dataset using FLAP at a 40% pruning ratio on LLaMA-2-7B.
 
   ```ruby
   python test_model.py --control_name wikitext-2v1_llama-2-7b_clm_20_1024_0.4_flap_flap-default_asyncinter_c4-2000_None_default --device cuda
