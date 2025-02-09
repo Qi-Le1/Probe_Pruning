@@ -20,19 +20,23 @@
 
 - Hyperparameters can be found at hyper.py in modules
 
+- C4 calibratio dataset can be found at [here](https://drive.google.com/drive/folders/1OT4TBYDfAz4SNUFrXLJl04SRHNX9nGDj?usp=sharing)
+
+- Code for tuning model using LLM-Pruner and LoRA-Prune is available [here]() and tuned models are available [here]()
+
 
 ## Examples
 
-- Train CIFAR10 dataset with CNN, 0.1 active rate, 100 clients, K=1, DynamicAvg, Dynamic-0.3, 'a-g' interval
+- Test WikiText2 dataset using Probe Pruning with the default probe at a 40% pruning ratio on LLaMA-2-7B
 
   ```ruby
-  python train_classifier_fl.py --control_name CIFAR10_cnn_0.1_100_non-iid-l-1_dynamicfl_5_0.3-0.7_1-0_6-1
+  python test_model.py --control_name wikitext-2v1_llama-2-7b_clm_20_1024_0.4_ppwandasp_probe-default_sync_c4-2000_0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-0.5+0.05-seqrank+bszrank_default --device cuda
   ```
 
-- Train CIFAR100 dataset with ResNet-18, 0.1 active rate, 100 clients, Dir(0.3), DynamicAvg, Fix-0.3, 'b-f' interval
+- Test WikiText2 dataset using FLAP at a 40% pruning ratio on LLaMA-2-7B
 
   ```ruby
-  python train_classifier_fl.py --control_name CIFAR100_resnet18_0.1_100_non-iid-d-0.3_dynamicfl_5_1-0_0.3-0.7_5-2
+  python test_model.py --control_name wikitext-2v1_llama-2-7b_clm_20_1024_0.4_flap_flap-default_asyncinter_c4-2000_None_default --device cuda
   ```
 
 
