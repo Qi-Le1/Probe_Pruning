@@ -14,13 +14,13 @@
   
 - See localtunedllmrequirements.txt for running LLM-Pruner and LoRA-Prune tuned models
 
+- C4 calibration dataset can be found at [here](https://drive.google.com/drive/folders/1OT4TBYDfAz4SNUFrXLJl04SRHNX9nGDj?usp=sharing). Please download and place it under data/c4.
+
 ## Instruction
 
 - Global hyperparameters are configured in config.yml
 
 - Hyperparameters can be found at hyper.py in modules
-
-- C4 calibratio dataset can be found at [here](https://drive.google.com/drive/folders/1OT4TBYDfAz4SNUFrXLJl04SRHNX9nGDj?usp=sharing)
 
 - Code for tuning model using LLM-Pruner and LoRA-Prune is available [here]() and tuned models are available [here]()
 
