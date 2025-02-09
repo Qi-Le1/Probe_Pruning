@@ -9,12 +9,9 @@
 ## Requirements
 
 - Requires Python 3.9.
-
 - See pprequirements.txt.
-  
 - See localtunedllmrequirements.txt for running LLM-Pruner and LoRA-Prune tuned models.
-
-- C4 calibration dataset can be found at [here](https://drive.google.com/drive/folders/1OT4TBYDfAz4SNUFrXLJl04SRHNX9nGDj?usp=sharing). Please download it and place it under data/c4.
+- C4 calibration dataset can be found at [here](https://drive.google.com/file/d/1dTl7rPeOqKqQmFPxldITolJTVAp8MScv/view?usp=sharing). Please download it and place it under data/c4.
 
 ## Instruction
 
@@ -22,7 +19,7 @@
 
 - Hyperparameters can be found at hyper.py in modules.
 
-- Code for tuning model using LLM-Pruner and LoRA-Prune is available [here]() and tuned models are available [here]().
+- Code for tuning model using LLM-Pruner and LoRA-Prune is available [here]() and example tuned models are available [here]().
 
 
 ## Examples
