@@ -19,7 +19,7 @@
 
 - Hyperparameters can be found at hyper.py in modules.
 
-- Code for tuning model using LLM-Pruner and LoRA-Prune is available [here]() and example tuned models are available [here]().
+- Code for tuning model using LLM-Pruner and LoRA-Prune is available [here](https://github.com/wangziyannb/finetuning-baseline-of-PP) and example tuned models are available [here](https://drive.google.com/drive/folders/170q3BcGBaG8mGu7KTc6eVxrN36S-dNNJ).
 
 
 ## Examples
