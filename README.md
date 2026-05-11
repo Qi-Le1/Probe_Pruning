@@ -1,6 +1,6 @@
 # Probe Pruning: Accelerating LLMs through Dynamic Pruning via Model-Probing
 
-[ICLR 2025] This is an implementation of *Probe Pruning: Accelerating LLMs through Dynamic Pruning via Model-Probing*
+[ICLR 2025] This is an implementation of [Probe Pruning: Accelerating LLMs through Dynamic Pruning via Model-Probing](https://arxiv.org/abs/2502.15618)
 
 ![Main Method](asset/method.png)
 
